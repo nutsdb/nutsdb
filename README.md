@@ -216,3 +216,83 @@ if err := db.Update(
 	log.Fatal(err)
 }
 ```
+
+### Iterating over keys
+
+NutsDB stores its keys in byte-sorted order within a bucket. This makes sequential iteration over these keys extremely fast.
+
+#### Prefix scans
+
+To iterate over a key prefix, we can use `PrefixScan` function, and the paramter `limitNum` constrain the number of entries returned :
+
+```golang
+
+if err := db.View(
+	func(tx *nutsdb.Tx) error {
+		prefix := []byte("user_")
+		// Constrain 100 entries returned 
+		if entries, err := tx.PrefixScan(bucket, prefix, 100); err != nil {
+			return err
+		} else {
+			keys, es := nutsdb.SortedEntryKeys(entries)
+			for _, key := range keys {
+				fmt.Println(key, string(es[key].Value))
+			}
+		}
+		return nil
+	}); err != nil {
+		log.Fatal(err)
+}
+
+```
+
+#### Range scans
+
+To scan over a range, we can use `RangeScan` function. For example：
+
+```golang
+if err := db.View(
+	func(tx *nutsdb.Tx) error {
+		// Assume key from user_0000000 to user_9999999.
+		// Query a specific user key range like this.
+		start := []byte("user_0010001")
+		end := []byte("user_0010010")
+		bucket：= []byte("user_list)
+		if entries, err := tx.RangeScan(bucket, start, end); err != nil {
+			return err
+		} else {
+			keys, es := nutsdb.SortedEntryKeys(entries)
+			for _, key := range keys {
+				fmt.Println(key, string(es[key].Value))
+			}
+		}
+		return nil
+	}); err != nil {
+	log.Fatal(err)
+}
+```
+
+Another common use case is scanning over a range such as a time range:
+
+```golang
+if err := db.View(
+	func(tx *nutsdb.Tx) error {
+		start := []byte("2018-01-01T00:00:00Z")
+		end := []byte("2019-01-01T00:00:00Z")
+		bucket：= []byte("user_list)
+		if entries, err := tx.RangeScan(bucket, start, end); err != nil {
+			return err
+		} else {
+			keys, es := nutsdb.SortedEntryKeys(entries)
+			for _, key := range keys {
+				fmt.Println(key, string(es[key].Value))
+			}
+		}
+		return nil
+	}); err != nil {
+	log.Fatal(err)
+}
+```
+
+
+
