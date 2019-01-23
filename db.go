@@ -38,19 +38,20 @@ const (
 type (
 	// DB represents a collection of buckets that persist on disk.
 	DB struct {
-		opt        Options // the database options
+		opt        Options   // the database options
 		HintIdx    BPTreeIdx // Hint Index
 		ActiveFile *DataFile
 		MaxFileId  int64
 		mu         sync.RWMutex
 		KeyCount   int // total key number ,include expired, deleted, repeated.
 		closed     bool
+		isMerging  bool
 	}
 
 	// BPTreeIdx is the B+ tree index
 	BPTreeIdx map[string]*BPTree
 
-	Entries   map[string]*Entry
+	Entries map[string]*Entry
 )
 
 // Open returns a newly initialized DB object.
@@ -144,7 +145,7 @@ func (db *DB) Merge() error {
 		pendingMergeEntries           []*Entry
 	)
 
-	db.opt.IsMerging = true
+	db.isMerging = true
 
 	_, dataFileIds = db.getMaxFileIdAndFileIds()
 	pendingMergeFIds = dataFileIds
@@ -154,7 +155,7 @@ func (db *DB) Merge() error {
 		fId := int64(pendingMergeFId)
 		f, err := NewDataFile(db.getDataPath(fId), db.opt.SegmentSize)
 		if err != nil {
-			db.opt.IsMerging = false
+			db.isMerging = false
 			return err
 		}
 		readEntriesNum := 0
@@ -192,7 +193,7 @@ func (db *DB) Merge() error {
 		//rewrite to active file
 		tx, err := db.Begin(true)
 		if err != nil {
-			db.opt.IsMerging = false
+			db.isMerging = false
 			return err
 		}
 
@@ -200,14 +201,14 @@ func (db *DB) Merge() error {
 			err := tx.put(string(e.Meta.bucket), e.Key, e.Value, e.Meta.TTL, e.Meta.Flag, e.Meta.timestamp)
 			if err != nil {
 				tx.Rollback()
-				db.opt.IsMerging = false
+				db.isMerging = false
 				return err
 			}
 		}
 		tx.Commit()
 		//remove old file
 		if err := os.Remove(db.getDataPath(int64(pendingMergeFId))); err != nil {
-			db.opt.IsMerging = false
+			db.isMerging = false
 			return fmt.Errorf("when merge err: %s", err)
 		}
 	}

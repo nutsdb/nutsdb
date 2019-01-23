@@ -157,7 +157,7 @@ func (tx *Tx) Commit() error {
 		}
 
 		countFlag := CountFlagEnabled
-		if tx.db.opt.IsMerging {
+		if tx.db.isMerging {
 			countFlag = CountFlagDisabled
 		}
 		bucket := string(entry.Meta.bucket)
