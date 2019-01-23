@@ -276,3 +276,6 @@ if err := db.View(
 TODO
 
 
+### License
+
+The NutsDB is open-sourced software licensed under the [Apache 2.0 license](https://github.com/xujiajun/nutsdb/blob/master/LICENSE).
