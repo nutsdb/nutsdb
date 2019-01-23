@@ -161,3 +161,42 @@ if err := db.Update(
 }
 
 ```
+
+### Using key/value pairs
+
+To save a key/value pair, use the `tx.Put` method:
+
+```golang
+
+if err := db.Update(
+	func(tx *nutsdb.Tx) error {
+	key := []byte("name1")
+	val := []byte("val1")
+	bucket: = "bucket1"
+	if err := tx.Put(bucket, key, val, 0); err != nil {
+		return err
+	}
+	return nil
+}); err != nil {
+	log.Fatal(err)
+}
+
+```
+
+This will set the value of the "name1" key to "val1" in the bucket1 bucket. To retrieve this value, we can use the `tx.Get` function:
+
+```golang
+if err := db.View(
+func(tx *nutsdb.Tx) error {
+	key := []byte("name1")
+	bucket: = "bucket1"
+	if e, err := tx.Get(bucket, key); err != nil {
+		return err
+	} else {
+		fmt.Println(string(e.Value)) // "val1"
+	}
+	return nil
+}); err != nil {
+	log.Println(err)
+}
+```
