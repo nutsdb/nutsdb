@@ -127,3 +127,37 @@ if err = tx.Put(bucket, key, val, Persistent); err != nil {
 	}
 }
 ```
+
+### Using buckets
+
+Buckets are collections of key/value pairs within the database. All keys in a bucket must be unique.
+Bucket can be interpreted as a table or namespace. So you can store the same key in different bucket. 
+
+```golang
+
+key := []byte("key001")
+val := []byte("val001")
+
+bucket001 := "bucket001"
+if err := db.Update(
+	func(tx *nutsdb.Tx) error {
+		if err := tx.Put(bucket001, key, val, 0); err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+	log.Fatal(err)
+}
+
+bucket002 := "bucket002"
+if err := db.Update(
+	func(tx *nutsdb.Tx) error {
+		if err := tx.Put(bucket002, key, val, 0); err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+	log.Fatal(err)
+}
+
+```
