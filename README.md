@@ -203,7 +203,7 @@ func(tx *nutsdb.Tx) error {
 
 Use the `tx.Delete()` function to delete a key from the bucket.
 
-```
+```golang
 if err := db.Update(
 	func(tx *nutsdb.Tx) error {
 	key := []byte("name1")
