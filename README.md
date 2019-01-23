@@ -272,27 +272,7 @@ if err := db.View(
 }
 ```
 
-Another common use case is scanning over a range such as a time range:
-
-```golang
-if err := db.View(
-	func(tx *nutsdb.Tx) error {
-		start := []byte("2018-01-01T00:00:00Z")
-		end := []byte("2019-01-01T00:00:00Z")
-		bucket：= []byte("user_list)
-		if entries, err := tx.RangeScan(bucket, start, end); err != nil {
-			return err
-		} else {
-			keys, es := nutsdb.SortedEntryKeys(entries)
-			for _, key := range keys {
-				fmt.Println(key, string(es[key].Value))
-			}
-		}
-		return nil
-	}); err != nil {
-	log.Fatal(err)
-}
-```
-
+### Database backups
+TODO
 
 
