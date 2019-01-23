@@ -31,3 +31,39 @@ given bucket and given key , or iterate over keys. Read-write transactions can u
 - [Acknowledgements](#acknowledgements)
 
 - [License](#license)
+
+## Getting Started
+
+### Installing
+To start using NutsDB, first needs [Go](https://golang.org/dl/) installed (version 1.11+ is required).  and run go get:
+
+```
+go get -u github.com/xujiajun/nutsdb
+```
+
+### Opening a database
+
+To open your database, use the nutsdb.Open() function,with the appropriate options.The `Dir` , `EntryIdxMode`  and  `SegmentSize`  options are must be specified by the client.
+```
+package main
+
+import (
+	"log"
+
+	"github.com/xujiajun/nutsdb"
+)
+
+func main() {
+	// Open the database located in the /tmp/nutsdb directory.
+	// It will be created if it doesn't exist.
+	opt := nutsdb.DefaultOptions
+	opt.Dir = "/tmp/nutsdb"
+	db, err := nutsdb.Open(opt)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	...
+}
+```
