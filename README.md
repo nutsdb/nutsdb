@@ -200,3 +200,19 @@ func(tx *nutsdb.Tx) error {
 	log.Println(err)
 }
 ```
+
+Use the `tx.Delete()` function to delete a key from the bucket.
+
+```
+if err := db.Update(
+	func(tx *nutsdb.Tx) error {
+	key := []byte("name1")
+	bucket: = "bucket1"
+	if err := tx.Delete(bucket, key); err != nil {
+		return err
+	}
+	return nil
+}); err != nil {
+	log.Fatal(err)
+}
+```
