@@ -302,7 +302,6 @@ err := db.Merge()
 if err != nil {
     ...
 }
-
 ```
 
 ### Database backup
@@ -315,6 +314,13 @@ if err != nil {
    ...
 }
 ```
+
+### Acknowledgements
+
+This package is inspired by the following:
+
+* [BoltDB](https://github.com/boltdb)
+* [BuntDB](https://github.com/tidwall/buntdb)
 
 ### License
 
