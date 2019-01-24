@@ -294,11 +294,20 @@ if err := db.View(
 ```
 
 ### Merge Operation
-TODO
+
+NutsDB supports merge operation. you can use `db.Merge()` function removes dirty data and reduce data redundancy. Call this function from a read-write transaction. It will effect other write request. So you can execute it at the appropriate time.
+
+```
+err := db.Merge()
+if err != nil {
+    ...
+}
+
+```
 
 ### Database backup
 
-NutsDB is easy to backup. You can use the `db.Backup()` function at given dir,call this function from a read-only transaction, it will perform a hot backup and not block your other database reads and writes.
+NutsDB is easy to backup. You can use the `db.Backup()` function at given dir, call this function from a read-only transaction, it will perform a hot backup and not block your other database reads and writes.
 
 ```
 err = db.Backup(dir)
