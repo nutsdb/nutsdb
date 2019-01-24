@@ -297,8 +297,15 @@ if err := db.View(
 TODO
 
 ### Database backup
-TODO
 
+NutsDB is easy to backup. You can use the `db.Backup()` function at given dir,call this function from a read-only transaction, it will perform a hot backup and not block your other database reads and writes.
+
+```
+err = db.Backup(dir)
+if err != nil {
+   ...
+}
+```
 
 ### License
 
