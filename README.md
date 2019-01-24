@@ -336,6 +336,11 @@ if err != nil {
    ...
 }
 ```
+### Caveats & Limitations
+
+NutsDB supports two modes about entry index: `HintAndRAMIdxMode`  and  `HintAndMemoryMapIdxMode`. The default mode use `HintAndRAMIdxMode`, entries are indexed base on RAM, so its read/write performance is fast. but can’t handle databases much larger than the available physical RAM. If you set the `HintAndMemoryMapIdxMode` mode, HintIndex will not cache the value of the entry. Its write performance is also fast. To retrieve a key by seeking to offset relative to the start of the data file, so its read performance more slowly that RAM way, but it can handle databases much larger than the available physical RAM.
+
+NutsDB will truncate data file if the active file is larger than  `SegmentSize`, so the size of the entry can not be set larger that `SegmentSize` , defalut `SegmentSize` is 64MB, you can set it(opt.SegmentSize) as option before DB opening. Once set, it cannot be changed.
 
 ### Contact
 
