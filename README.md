@@ -319,6 +319,7 @@ if err != nil {
 
 This package is inspired by the following:
 
+* [Bitcask-intro](https://github.com/basho/bitcask/blob/develop/doc/bitcask-intro.pdf)
 * [BoltDB](https://github.com/boltdb)
 * [BuntDB](https://github.com/tidwall/buntdb)
 
