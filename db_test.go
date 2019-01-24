@@ -238,6 +238,16 @@ func TestOpen_Err(t *testing.T) {
 	}
 }
 
+func TestDB_Backup(t *testing.T) {
+	InitOpt(false)
+	db, err = Open(opt)
+	path := "/tmp/nutsdbtest_backup"
+	err = db.Backup(path)
+	if err != nil {
+		t.Error("err TestDB_Backup")
+	}
+}
+
 func TestDB_Close(t *testing.T) {
 	InitOpt(false)
 	db, err = Open(opt)

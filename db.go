@@ -216,6 +216,18 @@ func (db *DB) Merge() error {
 	return nil
 }
 
+// Backup copies the database to file directory at the given path.
+func (db *DB) Backup(path string) error {
+	err := db.Update(func(tx *Tx) error {
+		return filesystem.CopyDir(db.opt.Dir, path)
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // Close releases all db resources.
 func (db *DB) Close() error {
 	db.mu.Lock()
