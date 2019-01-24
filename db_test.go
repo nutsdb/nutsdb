@@ -241,8 +241,8 @@ func TestOpen_Err(t *testing.T) {
 func TestDB_Backup(t *testing.T) {
 	InitOpt(false)
 	db, err = Open(opt)
-	path := "/tmp/nutsdbtest_backup"
-	err = db.Backup(path)
+	dir := "/tmp/nutsdbtest_backup"
+	err = db.Backup(dir)
 	if err != nil {
 		t.Error("err TestDB_Backup")
 	}
