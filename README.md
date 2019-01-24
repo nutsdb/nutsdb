@@ -343,6 +343,23 @@ if err != nil {
 
 ### Contributing
 
+Welcomes contributions to NutsDB.
+
+#### Issues
+Feel free to submit [issues](https://github.com/xujiajun/nutsdb/issues) and enhancement requests.
+
+#### Contribution flow
+
+This is a rough outline of what a contributor's workflow looks like:
+
+* 1.**Fork** the repo on GitHub
+* 2.**Clone** the project to your own machine
+* 3.**Commit** changes to your own branch
+* 4.**Push** your work back up to your fork
+* 5.Submit a **Pull request** so that we can review your changes
+
+Thanks for contributing!
+
 ### Acknowledgements
 
 This package is inspired by the following:
