@@ -4,3 +4,5 @@ github.com/grandecola/mmap v0.2.0 h1:4s/zu5Cg/OwYf/DyTqoBYTjLi0r2yaoBNxQjtih4mMU
 github.com/grandecola/mmap v0.2.0/go.mod h1:6Lhf+IGNm1y3FtzfdwcBnl+EGer5COf6SL6Nbh8FWwM=
 github.com/xujiajun/utils v0.0.0-20181129063021-62f2ed6b43d6 h1:Hiy6d2f4AEylIT0uY1+xpoW0Bz2OI/vzYEuAh5jqPxY=
 github.com/xujiajun/utils v0.0.0-20181129063021-62f2ed6b43d6/go.mod h1:AZd87GYJlUzl82Yab2kTjx1EyXSQCAfZDhpTo1SQC4k=
+github.com/xujiajun/utils v0.0.0-20190123093513-8bf096c4f53b h1:jKG9OiL4T4xQN3IUrhUpc1tG+HfDXppkgVcrAiiaI/0=
+github.com/xujiajun/utils v0.0.0-20190123093513-8bf096c4f53b/go.mod h1:AZd87GYJlUzl82Yab2kTjx1EyXSQCAfZDhpTo1SQC4k=
