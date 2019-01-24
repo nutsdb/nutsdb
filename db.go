@@ -216,10 +216,10 @@ func (db *DB) Merge() error {
 	return nil
 }
 
-// Backup copies the database to file directory at the given path.
-func (db *DB) Backup(path string) error {
+// Backup copies the database to file directory at the given dir.
+func (db *DB) Backup(dir string) error {
 	err := db.View(func(tx *Tx) error {
-		return filesystem.CopyDir(db.opt.Dir, path)
+		return filesystem.CopyDir(db.opt.Dir, dir)
 	})
 	if err != nil {
 		return err
