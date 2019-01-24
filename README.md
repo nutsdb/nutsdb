@@ -18,7 +18,8 @@ given bucket and given key , or iterate over keys. Read-write transactions can u
   - [Iterating over keys](#iterating-over-keys)
     - [Prefix scans](#prefix-scans)
     - [Range scans](#range-scans)
-  - [Database backups](#database-backups)
+  - [Merge Operation](#merge-operation)
+  - [Database backup](#database-backup)
 - [Comparison with other databases](#comparison-with-other-databases)
 
 - [Caveats & Limitations](#caveats--limitations)
@@ -292,7 +293,10 @@ if err := db.View(
 }
 ```
 
-### Database backups
+### Merge Operation
+TODO
+
+### Database backup
 TODO
 
 
