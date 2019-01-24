@@ -337,6 +337,12 @@ if err != nil {
 }
 ```
 
+### Contact
+
+* [xujiajun](https://github.com/xujiajun)
+
+### Contributing
+
 ### Acknowledgements
 
 This package is inspired by the following:
