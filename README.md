@@ -15,6 +15,7 @@ given bucket and given key , or iterate over keys. Read-write transactions can u
     - [Managing transactions manually](#managing-transactions-manually)
   - [Using buckets](#using-buckets)
   - [Using key/value pairs](#using-keyvalue-pairs)
+  - [Using TTL(Time To Live)](#using-ttltime-to-live)
   - [Iterating over keys](#iterating-over-keys)
     - [Prefix scans](#prefix-scans)
     - [Range scans](#range-scans)
@@ -238,6 +239,27 @@ if err := db.Update(
 }
 ```
 
+### Using TTL(Time To Live)
+
+NusDB supports TTL(Time to Live) for keys, you can use `tx.Put` function with a `ttl` parameter.
+
+```
+if err := db.Update(
+	func(tx *nutsdb.Tx) error {
+	key := []byte("name1")
+	val := []byte("val1")
+	bucket: = "bucket1"
+	
+	// If set ttl = 0 or Persistent, this key will nerver expired.
+	// Set ttl = 60 , after 60 seconds, this key will expired.
+	if err := tx.Put(bucket, key, val, 60); err != nil {
+		return err
+	}
+	return nil
+}); err != nil {
+	log.Fatal(err)
+}
+```
 ### Iterating over keys
 
 NutsDB stores its keys in byte-sorted order within a bucket. This makes sequential iteration over these keys extremely fast.
