@@ -7,13 +7,13 @@ It also supports range or prefix queries and TTL.
 ## Motivation
 I wanted a simple, fast, embeddable and persistent key/value store written in pure Go. There are some options: 
 
-BoltDB,it is based on B+ tree, has a great read performance,and it supports ACID transactions, but its write performance not so good. 
+BoltDB,it is based on B+ tree, has a great read performance, and it supports ACID transactions, but its write performance not so good. 
 
-GoLevelDB is based on based on a log-structured merge-tree (LSM tree),but it not support transaction.
+GoLevelDB is based on a log-structured merge-tree (LSM tree), but it not support transaction.
 
-Badger is based in LSM tree with value log. It designed for SSDs. It also supports transactions. But in my benchmark its write performance is not as good as i thought. 
+Badger is based in LSM tree with value log. It designed for SSDs. It also supports transactions. But in my [benchmark](https://github.com/xujiajun/nutsdb#benchmarks) its write performance is not as good as i thought. 
 
-So i try to build a kv store by myself, i wanted to find a simple store engine model as reference. Finally i found the bitcask model. It is very simple and easy to implement. Howerver it has its limition,like range or prefix queries are not effcient. For example, you can not easily scan over all keys between user000000 and user999999,you had to look up each key individully in the hashmap. So i tried to optimize them. I try to use B+ tree replace of hashmap and use mmap to optimize write performance. Finally i did it and named `NutsDB`. NutsDB offers a high read/write performance and supports ACID transactions. And it still has a lot of room for optimization. Welcome contributions to NutsDB.
+So i try to build a kv store by myself, i wanted to find a simple store engine model as reference. Finally i found the bitcask model. It is very simple and easy to implement. Howerver it has its limition,like range or prefix queries are not effcient. For example, you can not easily scan over all keys between user000000 and user999999,you had to look up each key individully in the hashmap. So i tried to optimize them. I try to use B+ tree replace of hashmap and use mmap to optimize write performance. Finally i did it and named `NutsDB`. NutsDB offers a high read/write performance and supports ACID transactions. And it still has a lot of room for optimization. Welcome [contributions to NutsDB](https://github.com/xujiajun/nutsdb#contributing).
 
 ## Table of Contents
 
