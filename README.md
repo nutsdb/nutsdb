@@ -21,7 +21,12 @@ given bucket and given key , or iterate over keys. Read-write transactions can u
     - [Range scans](#range-scans)
   - [Merge Operation](#merge-operation)
   - [Database backup](#database-backup)
+  
 - [Comparison with other databases](#comparison-with-other-databases)
+   - [BoltDB](#boltdb)
+   - [LevelDB, RocksDB](#leveldb-rocksdb)
+   - [Badger](#badger)
+- [Benchmarks](#benchmarks)
 
 - [Caveats & Limitations](#caveats--limitations)
 
@@ -36,6 +41,7 @@ given bucket and given key , or iterate over keys. Read-write transactions can u
 ## Getting Started
 
 ### Installing
+
 To start using NutsDB, first needs [Go](https://golang.org/dl/) installed (version 1.11+ is required).  and run go get:
 
 ```
@@ -336,6 +342,23 @@ if err != nil {
    ...
 }
 ```
+
+### Comparison with other databases
+
+#### BoltDB
+
+BoltDB is similar to NutsDB, both use B+tree and support transaction. However, Bolt uses a B+tree internally and only a single file, and NutsDB is based on bitcask model with  multiple log files. NutsDB supports TTL, but BoltDB not support it . NutsDB offers high-performance reads and writes, but BoltDb writes performance not so good.
+
+#### LevelDB, RocksDB
+
+LevelDB and RocksDB are based on a log-structured merge-tree (LSM tree).An LSM tree optimizes random writes by using a write ahead log and multi-tiered, sorted files called SSTables. LevelDB does not have transactions. It supports batch writing of key/values pairs and it supports read snapshots but it will not give you the ability to do a compare-and-swap operation safely. NutsDB supports fully serializable ACID transactions.
+
+#### Badger
+
+Badger is based in LSM tree with value log. It designed for SSDs. It also supports transaction and TTL. But in my benchmark its write performance is not as good as i thought.
+
+### Benchmarks
+
 ### Caveats & Limitations
 
 NutsDB supports two modes about entry index: `HintAndRAMIdxMode`  and  `HintAndMemoryMapIdxMode`. The default mode use `HintAndRAMIdxMode`, entries are indexed base on RAM, so its read/write performance is fast. but can’t handle databases much larger than the available physical RAM. If you set the `HintAndMemoryMapIdxMode` mode, HintIndex will not cache the value of the entry. Its write performance is also fast. To retrieve a key by seeking to offset relative to the start of the data file, so its read performance more slowly that RAM way, but it can handle databases much larger than the available physical RAM.
