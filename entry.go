@@ -43,11 +43,12 @@ type (
 		valueSize  uint32
 		timestamp  uint64
 		TTL        uint32
-		Flag       uint16 //Delete
+		Flag       uint16 // delete / set
 		bucket     []byte
 		bucketSize uint32
 		txId       uint64
 		status     uint16 // committed / uncommitted
+		ds         uint16 // data structure
 	}
 )
 
@@ -60,9 +61,9 @@ func (e *Entry) Size() int64 {
 //
 //  the entry stored format:
 //  |----------------------------------------------------------------------------------------------------------------|
-//  |  crc    | timestamp | ksz    | valueSize | flag  | TTL  |bucketSize| status | txId |  bucket |  key  |  value  |
+//  |  crc  | timestamp | ksz | valueSize | flag  | TTL  |bucketSize| status | ds   | txId |  bucket |  key  | value |
 //  |----------------------------------------------------------------------------------------------------------------|
-//  | uint32  | uint64   |  uint32 |  uint32  | uint16 | uint32| uint32 | uint16 | uint64 | []byte | []byte | []byte |
+//  | uint32| uint64  |uint32 |  uint32 | uint16  | uint32| uint32 | uint16 | uint16 |uint64 |[]byte|[]byte | []byte |
 //  |----------------------------------------------------------------------------------------------------------------|
 //
 func (e *Entry) Encode() []byte {
@@ -93,7 +94,8 @@ func (e *Entry) setEntryHeaderBuf(buf []byte) []byte {
 	binary.LittleEndian.PutUint32(buf[22:26], e.Meta.TTL)
 	binary.LittleEndian.PutUint32(buf[26:30], e.Meta.bucketSize)
 	binary.LittleEndian.PutUint16(buf[30:32], e.Meta.status)
-	binary.LittleEndian.PutUint64(buf[32:40], e.Meta.txId)
+	binary.LittleEndian.PutUint16(buf[32:34], e.Meta.ds)
+	binary.LittleEndian.PutUint64(buf[34:42], e.Meta.txId)
 
 	return buf
 }

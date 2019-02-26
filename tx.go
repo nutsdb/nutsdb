@@ -16,11 +16,15 @@ package nutsdb
 
 import (
 	"errors"
-	"fmt"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/bwmarrin/snowflake"
+	"github.com/xujiajun/nutsdb/ds/list"
+	"github.com/xujiajun/nutsdb/ds/set"
+	"github.com/xujiajun/nutsdb/ds/zset"
+	"github.com/xujiajun/utils/strconv2"
 )
 
 var (
@@ -94,9 +98,6 @@ func newTx(db *DB, writable bool) (tx *Tx, err error) {
 	}
 
 	tx.id = txId
-	if err != nil {
-		return nil, err
-	}
 
 	return
 }
@@ -109,6 +110,7 @@ func (tx *Tx) getTxId() (id uint64, err error) {
 	}
 
 	id = uint64(node.Generate().Int64())
+
 	return
 }
 
@@ -174,16 +176,92 @@ func (tx *Tx) Commit() error {
 		if tx.db.isMerging {
 			countFlag = CountFlagDisabled
 		}
+
 		bucket := string(entry.Meta.bucket)
-		if _, ok := tx.db.HintIdx[bucket]; !ok {
-			tx.db.HintIdx[bucket] = NewTree()
+
+		if entry.Meta.ds == DataStructureBPTree {
+			if _, ok := tx.db.BPTreeIdx[bucket]; !ok {
+				tx.db.BPTreeIdx[bucket] = NewTree()
+			}
+			_ = tx.db.BPTreeIdx[bucket].Insert(entry.Key, e, &Hint{
+				fileId:  tx.db.ActiveFile.fileId,
+				key:     entry.Key,
+				meta:    entry.Meta,
+				dataPos: uint64(off),
+			}, countFlag)
 		}
-		_ = tx.db.HintIdx[bucket].Insert(entry.Key, e, &Hint{
-			fileId:  tx.db.ActiveFile.fileId,
-			key:     entry.Key,
-			meta:    entry.Meta,
-			dataPos: uint64(off),
-		}, countFlag)
+
+		if entry.Meta.ds == DataStructureSet {
+			if _, ok := tx.db.SetIdx[bucket]; !ok {
+				tx.db.SetIdx[bucket] = set.New()
+			}
+
+			if entry.Meta.Flag == DataDeleteFlag {
+				_ = tx.db.SetIdx[bucket].SRem(string(entry.Key), entry.Value)
+			}
+
+			if entry.Meta.Flag == DataSetFlag {
+				_ = tx.db.SetIdx[bucket].SAdd(string(entry.Key), entry.Value)
+			}
+		}
+
+		if entry.Meta.ds == DataStructureSortedSet {
+			if _, ok := tx.db.SortedSetIdx[bucket]; !ok {
+				tx.db.SortedSetIdx[bucket] = zset.New()
+			}
+
+			switch entry.Meta.Flag {
+			case DataZAddFlag:
+				keyAndScore := strings.Split(string(entry.Key), SeparatorForZSetKey)
+				key := keyAndScore[0]
+				score, _ := strconv2.StrToFloat64(keyAndScore[1])
+				_ = tx.db.SortedSetIdx[bucket].Put(key, zset.SCORE(score), entry.Value)
+			case DataZRemFlag:
+				_ = tx.db.SortedSetIdx[bucket].Remove(string(entry.Key))
+			case DataZRemRangeByRankFlag:
+				start, _ := strconv2.StrToInt(string(entry.Key))
+				end, _ := strconv2.StrToInt(string(entry.Value))
+				_ = tx.db.SortedSetIdx[bucket].GetByRankRange(start, end, true)
+			case DataZPopMaxFlag:
+				_ = tx.db.SortedSetIdx[bucket].PopMax()
+			case DataZPopMinFlag:
+				_ = tx.db.SortedSetIdx[bucket].PopMin()
+			}
+		}
+
+		if entry.Meta.ds == DataStructureList {
+			if _, ok := tx.db.ListIdx[bucket]; !ok {
+				tx.db.ListIdx[bucket] = list.New()
+			}
+
+			key, value := entry.Key, entry.Value
+
+			switch entry.Meta.Flag {
+			case DataLPushFlag:
+				_, _ = tx.db.ListIdx[bucket].LPush(string(key), value)
+			case DataRPushFlag:
+				_, _ = tx.db.ListIdx[bucket].RPush(string(key), value)
+			case DataLRemFlag:
+				count, _ := strconv2.StrToInt(string(value))
+				_, _ = tx.db.ListIdx[bucket].LRem(string(key), count)
+			case DataLPopFlag:
+				_, _ = tx.db.ListIdx[bucket].LPop(string(key))
+			case DataRPopFlag:
+				_, _ = tx.db.ListIdx[bucket].RPop(string(key))
+			case DataLSetFlag:
+				keyAndIndex := strings.Split(string(key), SeparatorForListKey)
+				newKey := keyAndIndex[0]
+				index, _ := strconv2.StrToInt(keyAndIndex[1])
+				_ = tx.db.ListIdx[bucket].LSet(newKey, index, value)
+			case DataLTrimFlag:
+				keyAndStartIndex := strings.Split(string(key), SeparatorForListKey)
+				newKey := keyAndStartIndex[0]
+				start, _ := strconv2.StrToInt(keyAndStartIndex[1])
+				end, _ := strconv2.StrToInt(string(value))
+				_ = tx.db.ListIdx[bucket].Ltrim(newKey, start, end)
+			}
+		}
+
 		tx.db.KeyCount++
 	}
 
@@ -252,7 +330,7 @@ func (tx *Tx) unlock() {
 // Put sets the value for a key in the bucket.
 // a wrapper of the function put.
 func (tx *Tx) Put(bucket string, key, value []byte, ttl uint32) error {
-	return tx.put(bucket, key, value, ttl, DataSetFlag, uint64(time.Now().Unix()))
+	return tx.put(bucket, key, value, ttl, DataSetFlag, uint64(time.Now().Unix()), DataStructureBPTree)
 }
 
 func (tx *Tx) checkTxIsClosed() error {
@@ -264,7 +342,7 @@ func (tx *Tx) checkTxIsClosed() error {
 
 // put sets the value for a key in the bucket.
 // Returns an error if tx is closed, if performing a write operation on a read-only transaction, if the key is empty.
-func (tx *Tx) put(bucket string, key, value []byte, ttl uint32, flag uint16, timestamp uint64) error {
+func (tx *Tx) put(bucket string, key, value []byte, ttl uint32, flag uint16, timestamp uint64, ds uint16) error {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return err
 	}
@@ -289,151 +367,10 @@ func (tx *Tx) put(bucket string, key, value []byte, ttl uint32, flag uint16, tim
 			bucket:     []byte(bucket),
 			bucketSize: uint32(len(bucket)),
 			status:     UnCommitted,
+			ds:         ds,
 			txId:       tx.id,
 		},
 	})
 
 	return nil
-}
-
-// Get retrieves the value for a key in the bucket.
-// The returned value is only valid for the life of the transaction.
-func (tx *Tx) Get(bucket string, key []byte) (e *Entry, err error) {
-	if err := tx.checkTxIsClosed(); err != nil {
-		return nil, err
-	}
-
-	idxMode := tx.db.opt.EntryIdxMode
-	if idxMode == HintAndRAMIdxMode || idxMode == HintAndMemoryMapIdxMode {
-		if idx, ok := tx.db.HintIdx[bucket]; ok {
-			r, err := idx.Find(key)
-			if err != nil {
-				return nil, err
-			}
-
-			if r.H.meta.Flag == DataDeleteFlag || r.isExpired() {
-				return nil, ErrNotFoundKey
-			}
-
-			if idxMode == HintAndRAMIdxMode {
-				return r.E, nil
-			}
-
-			if idxMode == HintAndMemoryMapIdxMode {
-				path := tx.db.getDataPath(r.H.fileId)
-				df, err := NewDataFile(path, tx.db.opt.SegmentSize)
-				if err != nil {
-					return nil, err
-				}
-
-				item, err := df.ReadAt(int(r.H.dataPos))
-				if err != nil {
-					return nil, fmt.Errorf("read err. pos %d, key %s, err %s", r.H.dataPos, string(key), err)
-				}
-
-				if err := df.m.Unmap(); err != nil {
-					return nil, err
-				}
-
-				return item, nil
-			}
-		}
-	}
-
-	return nil, errors.New("not found bucket:" + bucket + ",key:" + string(key))
-}
-
-// RangeScan query a range at given bucket, start and end slice.
-func (tx *Tx) RangeScan(bucket string, start, end []byte) (entries Entries, err error) {
-	if err := tx.checkTxIsClosed(); err != nil {
-		return nil, err
-	}
-
-	entries = make(Entries)
-
-	if index, ok := tx.db.HintIdx[bucket]; ok {
-		records, err := index.Range(start, end)
-		if err != nil {
-			return nil, ErrRangeScan
-		}
-
-		entries, err = tx.getHintIdxDataItemsWrapper(records, ScanNoLimit, entries, RangeScan)
-		if err != nil {
-			return nil, ErrRangeScan
-		}
-	}
-
-	if len(entries) == 0 {
-		return nil, ErrRangeScan
-	}
-
-	return
-}
-
-// PrefixScan iterates over a key prefix at given bucket, prefix and limitNum.
-// LimitNum will limit the number of entries return.
-func (tx *Tx) PrefixScan(bucket string, prefix []byte, limitNum int) (es Entries, err error) {
-	if err := tx.checkTxIsClosed(); err != nil {
-		return nil, err
-	}
-
-	es = make(Entries)
-
-	if idx, ok := tx.db.HintIdx[bucket]; ok {
-		records, err := idx.PrefixScan(prefix, limitNum)
-		if err != nil {
-			return nil, ErrPrefixScan
-		}
-
-		es, err = tx.getHintIdxDataItemsWrapper(records, limitNum, es, PrefixScan)
-		if err != nil {
-			return nil, ErrPrefixScan
-		}
-	}
-
-	if len(es) == 0 {
-		return nil, ErrPrefixScan
-	}
-
-	return
-}
-
-// Delete removes a key from the bucket at given bucket and key.
-func (tx *Tx) Delete(bucket string, key []byte) error {
-	if err := tx.checkTxIsClosed(); err != nil {
-		return err
-	}
-
-	return tx.put(bucket, key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()))
-}
-
-// getHintIdxDataItemsWrapper returns wrapped entries when prefix scanning or range scanning.
-func (tx *Tx) getHintIdxDataItemsWrapper(records Records, limitNum int, es Entries, scanMode string) (Entries, error) {
-	for k, r := range records {
-		if r.H.meta.Flag == DataDeleteFlag || r.isExpired() {
-			continue
-		}
-
-		if limitNum > 0 && len(es) < limitNum || limitNum == ScanNoLimit {
-			idxMode := tx.db.opt.EntryIdxMode
-			if idxMode == HintAndMemoryMapIdxMode {
-				path := tx.db.getDataPath(r.H.fileId)
-				df, err := NewDataFile(path, tx.db.opt.SegmentSize)
-				if err != nil {
-					return nil, err
-				}
-				if item, err := df.ReadAt(int(r.H.dataPos)); err == nil {
-					es[k] = item
-				} else {
-					return nil, fmt.Errorf("HintIdx r.Hi.dataPos %d, err %s", r.H.dataPos, err)
-				}
-			}
-
-			if idxMode == HintAndRAMIdxMode {
-				es[k] = r.E
-			}
-		}
-	}
-
-	return es, nil
 }

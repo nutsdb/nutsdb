@@ -39,6 +39,11 @@ func TestDataFile_All(t *testing.T) {
 		t.Error("err ReadAt")
 	}
 
+	e, err = df.ReadAt(1025)
+	if err == nil && e != nil {
+		t.Error("err ReadAt")
+	}
+
 	entry := Entry{
 		Key:   []byte("key_0001"),
 		Value: []byte("val_0001"),

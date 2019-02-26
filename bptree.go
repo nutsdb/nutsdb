@@ -17,7 +17,6 @@ package nutsdb
 import (
 	"bytes"
 	"errors"
-	"time"
 )
 
 var (
@@ -49,7 +48,8 @@ type (
 	// BPTree records root node and valid key number.
 	BPTree struct {
 		root          *Node
-		validKeyCount int // the number of the key that not expired or deleted
+		ValidKeyCount int // the number of the key that not expired or deleted
+		idxType       int
 	}
 
 	// Records records multi-records as result when is called Range or PrefixScan.
@@ -63,28 +63,7 @@ type (
 		isLeaf   bool
 		KeysNum  int
 	}
-
-	// Record records entry and hint.
-	Record struct {
-		H *Hint
-		E *Entry
-	}
 )
-
-// isExpired returns the record if expired or not.
-func (r *Record) isExpired() bool {
-	return IsExpired(r.H.meta.TTL, r.H.meta.timestamp)
-}
-
-// IsExpired checks the ttl if expired or not.
-func IsExpired(ttl uint32, timestamp uint64) bool {
-	now := time.Now().Unix()
-	if ttl > 0 && uint64(ttl)+timestamp > uint64(now) || ttl == Persistent {
-		return false
-	}
-
-	return true
-}
 
 // newNode returns a newly initialized Node object that implements the Node.
 func newNode() *Node {
@@ -275,14 +254,6 @@ func (t *BPTree) Find(key []byte) (*Record, error) {
 	return leaf.pointers[i].(*Record), nil
 }
 
-// updateRecord updates the record.
-func (r *Record) updateRecord(h *Hint, e *Entry) error {
-	r.E = e
-	r.H = h
-
-	return nil
-}
-
 // startNewTree returns a start new tree.
 func (t *BPTree) startNewTree(key []byte, pointer *Record) error {
 	t.root = newLeaf()
@@ -297,22 +268,22 @@ func (t *BPTree) startNewTree(key []byte, pointer *Record) error {
 // and if the key exists, update the record and the counter(if countFlag set true,it will start count).
 func (t *BPTree) Insert(key []byte, e *Entry, h *Hint, countFlag bool) error {
 	if r, err := t.Find(key); err == nil && r != nil {
-		if countFlag && h.meta.Flag == DataDeleteFlag && r.H.meta.Flag != DataDeleteFlag && t.validKeyCount > 0 {
-			t.validKeyCount--
+		if countFlag && h.meta.Flag == DataDeleteFlag && r.H.meta.Flag != DataDeleteFlag && t.ValidKeyCount > 0 {
+			t.ValidKeyCount--
 		}
 
 		if countFlag && h.meta.Flag != DataDeleteFlag && r.H.meta.Flag == DataDeleteFlag {
-			t.validKeyCount++
+			t.ValidKeyCount++
 		}
 
-		return r.updateRecord(h, e)
+		return r.UpdateRecord(h, e)
 	}
 
 	// Initialize the Record object When key does not exist.
 	pointer := &Record{H: h, E: e}
 
 	// Update the validKeyCount number
-	t.validKeyCount++
+	t.ValidKeyCount++
 
 	// Check if the root node is nil or not
 	// if nil build a start new tree for insert.

@@ -34,7 +34,7 @@ func TestEntry_All(t *testing.T) {
 		position: 0,
 	}
 
-	expectedEncodeVal := []byte{139, 141, 194, 104, 1, 38, 64, 92, 0, 0, 0, 0, 8, 0, 0, 0, 8, 0, 0, 0, 1, 0, 0, 0, 0, 0, 13, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 116, 101, 115, 116, 95, 101, 110, 116, 114, 121, 0, 0, 0, 107, 101, 121, 95, 48, 48, 48, 49, 118, 97, 108, 95, 48, 48, 48, 49}
+	expectedEncodeVal := []byte{172, 41, 40, 169, 1, 38, 64, 92, 0, 0, 0, 0, 8, 0, 0, 0, 8, 0, 0, 0, 1, 0, 0, 0, 0, 0, 13, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 116, 101, 115, 116, 95, 101, 110, 116, 114, 121, 0, 0, 0, 107, 101, 121, 95, 48, 48, 48, 49, 118, 97, 108, 95, 48, 48, 48, 49}
 
 	if string(expectedEncodeVal) != string(entry.Encode()) {
 		t.Errorf("err TestEntry_Encode got %s want %s", string(entry.Encode()), string(expectedEncodeVal))
@@ -44,7 +44,7 @@ func TestEntry_All(t *testing.T) {
 		t.Errorf("err entry.IsZero got %v want %v", true, false)
 	}
 
-	if entry.GetCrc(entry.Encode()) != 2777557425 {
+	if entry.GetCrc(entry.Encode()) != 529078050 {
 		t.Errorf("err entry.GetCrc got %d want %d", entry.GetCrc(entry.Encode()), 2777557425)
 	}
 }
