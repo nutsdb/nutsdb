@@ -191,7 +191,7 @@ func (db *DB) Merge() error {
 				}
 
 				if r, err := db.HintIdx[string(entry.Meta.bucket)].Find(entry.Key); err == nil {
-					if r.H.meta.timestamp == entry.Meta.timestamp {
+					if r.H.meta.Flag == DataSetFlag {
 						pendingMergeEntries = append(pendingMergeEntries, entry)
 					}
 				}
