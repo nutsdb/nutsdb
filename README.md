@@ -35,6 +35,19 @@ In order to break the limition, i tried to optimize them. I tried to use B+ tree
     - [Range scans](#range-scans)
   - [Merge Operation](#merge-operation)
   - [Database backup](#database-backup)
+- [Using Other data structures](#using-other-data-structures)
+   - [List](#list)
+     - [RPush](#rpush)
+     - [LPush](#lpush)
+     - [LPop](#lpop)
+     - [RPop](#rpop)
+     - [LRange](#lrange)
+     - [LRem](#lrem)
+     - [LSet](#lset)	
+     - [Ltrim](#ltrim)
+     - [LSize](#lsize)  	
+   - [Set](#set)
+   - [Sorted Set](#sorted-set)
 - [Comparison with other databases](#comparison-with-other-databases)
    - [BoltDB](#boltdb)
    - [LevelDB, RocksDB](#leveldb-rocksdb)
@@ -350,6 +363,24 @@ if err != nil {
    ...
 }
 ```
+
+### Using other data structures
+
+#### List
+
+##### RPush 
+##### LPush 
+##### LPop 
+##### RPop 
+##### LRange 
+##### LRem 
+##### LSet 
+##### Ltrim 
+##### LSize 
+
+#### Set
+
+#### Sorted Set
 
 ### Comparison with other databases
 
