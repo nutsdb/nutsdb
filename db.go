@@ -116,7 +116,7 @@ func Open(opt Options) (*DB, error) {
 	}
 
 	if ok := filesystem.PathIsExist(db.opt.Dir); !ok {
-		if err := os.Mkdir(db.opt.Dir, os.ModePerm); err != nil {
+		if err := os.MkdirAll(db.opt.Dir, os.ModePerm); err != nil {
 			return nil, err
 		}
 	}
