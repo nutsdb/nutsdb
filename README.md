@@ -35,21 +35,15 @@ In order to break the limition, i tried to optimize them. I tried to use B+ tree
     - [Range scans](#range-scans)
   - [Merge Operation](#merge-operation)
   - [Database backup](#database-backup)
-  
 - [Comparison with other databases](#comparison-with-other-databases)
    - [BoltDB](#boltdb)
    - [LevelDB, RocksDB](#leveldb-rocksdb)
    - [Badger](#badger)
 - [Benchmarks](#benchmarks)
-
 - [Caveats & Limitations](#caveats--limitations)
-
 - [Contact](#contact)
-
 - [Contributing](#contributing)
-
 - [Acknowledgements](#acknowledgements)
-
 - [License](#license)
 
 ## Getting Started
