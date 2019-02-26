@@ -32,7 +32,10 @@ var (
 )
 
 const (
-	DataSuffix          = ".dat"
+	// DataSuffix returns the data suffix
+	DataSuffix = ".dat"
+
+	// DataEntryHeaderSize returns the entry header size
 	DataEntryHeaderSize = 42
 )
 
@@ -41,7 +44,7 @@ type DataFile struct {
 	fd         *os.File
 	m          mmap.IMmap
 	path       string
-	fileId     int64
+	fileID     int64
 	writeOff   int64
 	ActualSize int64
 }
@@ -147,6 +150,6 @@ func readMetaData(buf []byte) *MetaData {
 		bucketSize: binary.LittleEndian.Uint32(buf[26:30]),
 		status:     binary.LittleEndian.Uint16(buf[30:32]),
 		ds:         binary.LittleEndian.Uint16(buf[32:34]),
-		txId:       binary.LittleEndian.Uint64(buf[34:42]),
+		txID:       binary.LittleEndian.Uint64(buf[34:42]),
 	}
 }

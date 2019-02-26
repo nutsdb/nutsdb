@@ -84,7 +84,7 @@ func (db *DB) Begin(writable bool) (tx *Tx, err error) {
 
 // newTx returns a newly initialized Tx object at given writable.
 func newTx(db *DB, writable bool) (tx *Tx, err error) {
-	var txId uint64
+	var txID uint64
 
 	tx = &Tx{
 		db:            db,
@@ -92,18 +92,18 @@ func newTx(db *DB, writable bool) (tx *Tx, err error) {
 		pendingWrites: []*Entry{},
 	}
 
-	txId, err = tx.getTxId()
+	txID, err = tx.getTxID()
 	if err != nil {
 		return nil, err
 	}
 
-	tx.id = txId
+	tx.id = txID
 
 	return
 }
 
-// getTxId returns the tx id.
-func (tx *Tx) getTxId() (id uint64, err error) {
+// getTxID returns the tx id.
+func (tx *Tx) getTxID() (id uint64, err error) {
 	node, err := snowflake.NewNode(tx.db.opt.NodeNum)
 	if err != nil {
 		return 0, err
@@ -184,7 +184,7 @@ func (tx *Tx) Commit() error {
 				tx.db.BPTreeIdx[bucket] = NewTree()
 			}
 			_ = tx.db.BPTreeIdx[bucket].Insert(entry.Key, e, &Hint{
-				fileId:  tx.db.ActiveFile.fileId,
+				fileID:  tx.db.ActiveFile.fileID,
 				key:     entry.Key,
 				meta:    entry.Meta,
 				dataPos: uint64(off),
@@ -275,7 +275,7 @@ func (tx *Tx) Commit() error {
 // rotateActiveFile rotates log file when active file is not enough space to store the entry.
 func (tx *Tx) rotateActiveFile() error {
 	var err error
-	tx.db.MaxFileId++
+	tx.db.MaxFileID++
 
 	if err := tx.db.ActiveFile.m.Flush(syscall.SYS_SYNC); err != nil {
 		return err
@@ -285,13 +285,13 @@ func (tx *Tx) rotateActiveFile() error {
 		return err
 	}
 
-	path := tx.db.getDataPath(tx.db.MaxFileId)
+	path := tx.db.getDataPath(tx.db.MaxFileID)
 	tx.db.ActiveFile, err = NewDataFile(path, tx.db.opt.SegmentSize)
 	if err != nil {
 		return err
 	}
 
-	tx.db.ActiveFile.fileId = tx.db.MaxFileId
+	tx.db.ActiveFile.fileID = tx.db.MaxFileID
 
 	return nil
 }
@@ -368,7 +368,7 @@ func (tx *Tx) put(bucket string, key, value []byte, ttl uint32, flag uint16, tim
 			bucketSize: uint32(len(bucket)),
 			status:     UnCommitted,
 			ds:         ds,
-			txId:       tx.id,
+			txID:       tx.id,
 		},
 	})
 

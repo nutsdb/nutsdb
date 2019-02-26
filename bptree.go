@@ -37,10 +37,16 @@ const (
 	// Default number of b+ tree orders
 	order = 8
 
-	RangeScan  = "RangeScan"
+	// RangeScan returns range scanMode flag
+	RangeScan = "RangeScan"
+
+	// PrefixScan returns prefix scanMode flag
 	PrefixScan = "PrefixScan"
-	// CountFlag
-	CountFlagEnabled  = true
+
+	// CountFlagEnabled returns enabled CountFlag
+	CountFlagEnabled = true
+
+	// CountFlagDisabled returns disabled CountFlag
 	CountFlagDisabled = false
 )
 
@@ -103,7 +109,7 @@ func (t *BPTree) FindLeaf(key []byte) *Node {
 		i = 0
 		for i < curr.KeysNum {
 			if compare(key, curr.Keys[i]) >= 0 {
-				i += 1
+				i++
 			} else {
 				break
 			}
@@ -146,7 +152,7 @@ func (t *BPTree) findRange(start, end []byte) (numFound int, keys [][]byte, poin
 			}
 			keys = append(keys, n.Keys[i])
 			pointers = append(pointers, n.pointers[i])
-			numFound += 1
+			numFound++
 		}
 
 		n, _ = n.pointers[order-1].(*Node)
@@ -212,7 +218,7 @@ func (t *BPTree) PrefixScan(prefix []byte, limitNum int) (records Records, err e
 
 			keys = append(keys, n.Keys[i])
 			pointers = append(pointers, n.pointers[i])
-			numFound += 1
+			numFound++
 
 			if limitNum > 0 && numFound == limitNum {
 				scanFlag = false
@@ -364,8 +370,8 @@ func (t *BPTree) splitLeaf(leaf *Node, key []byte, pointer *Record) error {
 	for i = splitIndex; i < order; i++ {
 		newLeaf.Keys[j] = tmpKeys[i]
 		newLeaf.pointers[j] = tmpPointers[i]
-		newLeaf.KeysNum += 1
-		j += 1
+		newLeaf.KeysNum++
+		j++
 	}
 
 	// Set the last pointer of the new leaf node to point the last pointer of the leaf node.
@@ -390,7 +396,7 @@ func (t *BPTree) insertIntoNewRoot(left *Node, key []byte, right *Node) error {
 	t.root.Keys[0] = key
 	t.root.pointers[0] = left
 	t.root.pointers[1] = right
-	t.root.KeysNum += 1
+	t.root.KeysNum++
 	t.root.parent = nil
 
 	left.parent = t.root
@@ -408,7 +414,7 @@ func (t *BPTree) insertIntoNode(node *Node, leftIndex int, key []byte, right *No
 
 	node.Keys[leftIndex] = key
 	node.pointers[leftIndex+1] = right
-	node.KeysNum += 1
+	node.KeysNum++
 
 	return nil
 }
@@ -490,7 +496,7 @@ func (t *BPTree) splitParent(node *Node, leftIndex int, key []byte, right *Node)
 	newNode := newNode()
 
 	j = 0
-	for i += 1; i < order; i++ {
+	for i++; i < order; i++ {
 		newNode.Keys[j] = tmpKeys[i]
 		newNode.pointers[j] = tmpPointers[i]
 		newNode.KeysNum++
@@ -532,5 +538,5 @@ func insertIntoLeaf(leaf *Node, key []byte, pointer *Record) {
 
 	leaf.Keys[i] = key
 	leaf.pointers[i] = pointer
-	leaf.KeysNum += 1
+	leaf.KeysNum++
 }

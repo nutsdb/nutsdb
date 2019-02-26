@@ -8,7 +8,7 @@ type Record struct {
 	E *Entry
 }
 
-// isExpired returns the record if expired or not.
+// IsExpired returns the record if expired or not.
 func (r *Record) IsExpired() bool {
 	return IsExpired(r.H.meta.TTL, r.H.meta.timestamp)
 }

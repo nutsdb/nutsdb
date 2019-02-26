@@ -656,15 +656,6 @@ func TestTx_Get_NotFound(t *testing.T) {
 
 }
 
-func TestOpen_Err(t *testing.T) {
-	InitOpt("", false)
-	opt.Dir = ":/xx"
-	db, err = Open(opt)
-	if err == nil {
-		t.Error("err TestOpen")
-	}
-}
-
 func TestOpen(t *testing.T) {
 	InitOpt("/tmp/nutsdbtestfordbopen", true)
 

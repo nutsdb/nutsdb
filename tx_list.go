@@ -10,8 +10,10 @@ import (
 	"github.com/xujiajun/utils/strconv2"
 )
 
+// SeparatorForListKey represents separator for listKey
 const SeparatorForListKey = "|"
 
+// RPop removes and returns the last element of the list stored in the bucket at given bucket and key.
 func (tx *Tx) RPop(bucket string, key []byte) (item []byte, err error) {
 	item, err = tx.RPeek(bucket, key)
 	if err != nil {
@@ -21,6 +23,7 @@ func (tx *Tx) RPop(bucket string, key []byte) (item []byte, err error) {
 	return item, tx.push(bucket, key, DataRPopFlag, item)
 }
 
+// RPeek returns the last element of the list stored in the bucket at given bucket and key.
 func (tx *Tx) RPeek(bucket string, key []byte) (item []byte, err error) {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return nil, err
@@ -35,6 +38,7 @@ func (tx *Tx) RPeek(bucket string, key []byte) (item []byte, err error) {
 	return
 }
 
+// push sets values for list stored in the bucket at given bucket, key, flag and values.
 func (tx *Tx) push(bucket string, key []byte, flag uint16, values ...[]byte) error {
 	for _, value := range values {
 		err := tx.put(bucket, key, value, Persistent, flag, uint64(time.Now().Unix()), DataStructureList)
@@ -46,6 +50,7 @@ func (tx *Tx) push(bucket string, key []byte, flag uint16, values ...[]byte) err
 	return nil
 }
 
+// RPush inserts the values at the tail of the list stored in the bucket at given bucket,key and values.
 func (tx *Tx) RPush(bucket string, key []byte, values ...[]byte) error {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return err
@@ -58,6 +63,7 @@ func (tx *Tx) RPush(bucket string, key []byte, values ...[]byte) error {
 	return tx.push(bucket, key, DataRPushFlag, values...)
 }
 
+// LPush inserts the values at the head of the list stored in the bucket at given bucket,key and values.
 func (tx *Tx) LPush(bucket string, key []byte, values ...[]byte) error {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return err
@@ -70,6 +76,7 @@ func (tx *Tx) LPush(bucket string, key []byte, values ...[]byte) error {
 	return tx.push(bucket, key, DataLPushFlag, values...)
 }
 
+// LPop removes and returns the first element of the list stored in the bucket at given bucket and key.
 func (tx *Tx) LPop(bucket string, key []byte) (item []byte, err error) {
 	item, err = tx.LPeek(bucket, key)
 	if err != nil {
@@ -79,6 +86,7 @@ func (tx *Tx) LPop(bucket string, key []byte) (item []byte, err error) {
 	return item, tx.push(bucket, key, DataLPopFlag, item)
 }
 
+// LPeek returns the first element of the list stored in the bucket at given bucket and key.
 func (tx *Tx) LPeek(bucket string, key []byte) (item []byte, err error) {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return nil, err
@@ -93,6 +101,7 @@ func (tx *Tx) LPeek(bucket string, key []byte) (item []byte, err error) {
 	return
 }
 
+// LSize returns the size of key in the bucket in the bucket at given bucket and key.
 func (tx *Tx) LSize(bucket string, key []byte) (int, error) {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return 0, err
@@ -105,6 +114,11 @@ func (tx *Tx) LSize(bucket string, key []byte) (int, error) {
 	return tx.db.ListIdx[bucket].Size(string(key))
 }
 
+// LRange returns the specified elements of the list stored in the bucket at given bucket,key, start and end.
+// the offsets start and stop are zero-based indexes 0 being the first element of the list (the head of the list),
+// 1 being the next element and so on.
+// start and end can also be negative numbers indicating offsets from the end of the list,
+// where -1 is the last element of the list, -2 the penultimate element and so on.
 func (tx *Tx) LRange(bucket string, key []byte, start, end int) (list [][]byte, err error) {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return nil, err
@@ -117,6 +131,11 @@ func (tx *Tx) LRange(bucket string, key []byte, start, end int) (list [][]byte, 
 	return tx.db.ListIdx[bucket].LRange(string(key), start, end)
 }
 
+// LRem removes the first count occurrences of elements equal to value from the list stored in the bucket at given bucket,key,count.
+// the count argument influences the operation in the following ways:
+// count > 0: Remove elements equal to value moving from head to tail.
+// count < 0: Remove elements equal to value moving from tail to head.
+// count = 0: Remove all elements equal to value.
 func (tx *Tx) LRem(bucket string, key []byte, count int) error {
 	var err error
 
@@ -139,6 +158,7 @@ func (tx *Tx) LRem(bucket string, key []byte, count int) error {
 	return tx.push(bucket, key, DataLRemFlag, []byte(strconv2.IntToStr(count)))
 }
 
+// LSet sets the list element at index to value.
 func (tx *Tx) LSet(bucket string, key []byte, index int, value []byte) error {
 	var (
 		err    error
@@ -171,6 +191,11 @@ func (tx *Tx) LSet(bucket string, key []byte, index int, value []byte) error {
 	return tx.push(bucket, newKey, DataLSetFlag, value)
 }
 
+// Ltrim trims an existing list so that it will contain only the specified range of elements specified.
+// the offsets start and stop are zero-based indexes 0 being the first element of the list (the head of the list),
+// 1 being the next element and so on.
+// start and end can also be negative numbers indicating offsets from the end of the list,
+// where -1 is the last element of the list, -2 the penultimate element and so on.
 func (tx *Tx) Ltrim(bucket string, key []byte, start, end int) error {
 	var (
 		err    error
@@ -201,6 +226,7 @@ func (tx *Tx) Ltrim(bucket string, key []byte, start, end int) error {
 	return tx.push(bucket, newKey, DataLTrimFlag, []byte(strconv2.IntToStr(end)))
 }
 
+// ErrSeparatorForListKey returns when list key contains the SeparatorForListKey.
 func ErrSeparatorForListKey() error {
 	return errors.New("contain separator (" + SeparatorForListKey + ") for List key")
 }

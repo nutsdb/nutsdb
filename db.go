@@ -44,36 +44,74 @@ var (
 )
 
 const (
-	//flag
+	// DataDeleteFlag represents the data delete flag
 	DataDeleteFlag uint16 = iota
+
+	// DataSetFlag represents the data set flag
 	DataSetFlag
+
+	// DataLPushFlag represents the data LPush flag
 	DataLPushFlag
+
+	// DataRPushFlag represents the data RPush flag
 	DataRPushFlag
+
+	// DataLRemFlag represents the data LRem flag
 	DataLRemFlag
+
+	// DataLPopFlag represents the data LPop flag
 	DataLPopFlag
+
+	// DataRPopFlag represents the data RPop flag
 	DataRPopFlag
+
+	// DataLSetFlag represents the data LSet flag
 	DataLSetFlag
+
+	// DataLTrimFlag represents the data LTrim flag
 	DataLTrimFlag
+
+	// DataZAddFlag represents the data ZAdd flag
 	DataZAddFlag
+
+	// DataZRemFlag represents the data ZRem flag
 	DataZRemFlag
+
+	// DataZRemRangeByRankFlag represents the data ZRemRangeByRank flag
 	DataZRemRangeByRankFlag
+
+	// DataZPopMaxFlag represents the data ZPopMax flag
 	DataZPopMaxFlag
+
+	// DataZPopMinFlag represents the data aZPopMin flag
 	DataZPopMinFlag
 )
 
 const (
-	//status
+	// UnCommitted represents the tx unCommitted status
 	UnCommitted uint16 = 0
-	Committed   uint16 = 1
 
-	Persistent  uint32 = 0
-	ScanNoLimit int    = -1
+	// Committed represents the tx committed status
+	Committed uint16 = 1
+
+	// Persistent represents the data persistent flag
+	Persistent uint32 = 0
+
+	// ScanNoLimit represents the data scan no limit flag
+	ScanNoLimit int = -1
 )
 
 const (
+	// DataStructureSet represents the data structure set flag
 	DataStructureSet uint16 = iota
+
+	// DataStructureSortedSet represents the data structure sorted set flag
 	DataStructureSortedSet
+
+	// DataStructureBPTree represents the data structure b+ tree flag
 	DataStructureBPTree
+
+	// DataStructureList represents the data structure list flag
 	DataStructureList
 )
 
@@ -86,19 +124,26 @@ type (
 		SortedSetIdx SortedSetIdx
 		ListIdx      ListIdx
 		ActiveFile   *DataFile
-		MaxFileId    int64
+		MaxFileID    int64
 		mu           sync.RWMutex
 		KeyCount     int // total key number ,include expired, deleted, repeated.
 		closed       bool
 		isMerging    bool
 	}
 
-	// BPTreeIdx is the B+ tree index
-	BPTreeIdx    map[string]*BPTree
-	SetIdx       map[string]*set.Set
-	SortedSetIdx map[string]*zset.SortedSet
-	ListIdx      map[string]*list.List
+	// BPTreeIdx represents the B+ tree index
+	BPTreeIdx map[string]*BPTree
 
+	// SetIdx represents the set index
+	SetIdx map[string]*set.Set
+
+	// SortedSetIdx represents the sorted set index
+	SortedSetIdx map[string]*zset.SortedSet
+
+	// ListIdx represents the list index
+	ListIdx map[string]*list.List
+
+	// Entries represents entry map
 	Entries map[string]*Entry
 )
 
@@ -109,7 +154,7 @@ func Open(opt Options) (*DB, error) {
 		SetIdx:       make(SetIdx),
 		SortedSetIdx: make(SortedSetIdx),
 		ListIdx:      make(ListIdx),
-		MaxFileId:    0,
+		MaxFileID:    0,
 		opt:          opt,
 		KeyCount:     0,
 		closed:       false,
@@ -160,8 +205,8 @@ func (db *DB) managed(writable bool, fn func(tx *Tx) error) (err error) {
 }
 
 // getDataPath returns the data path at given fid.
-func (db *DB) getDataPath(fId int64) string {
-	return db.opt.Dir + "/" + strconv2.Int64ToStr(fId) + DataSuffix
+func (db *DB) getDataPath(fID int64) string {
+	return db.opt.Dir + "/" + strconv2.Int64ToStr(fID) + DataSuffix
 }
 
 // Merge removes dirty data and reduce data redundancy,following these steps:
@@ -185,13 +230,13 @@ func (db *DB) Merge() error {
 
 	db.isMerging = true
 
-	_, dataFileIds = db.getMaxFileIdAndFileIds()
+	_, dataFileIds = db.getMaxFileIDAndFileIDs()
 	pendingMergeFIds = dataFileIds
 
 	for _, pendingMergeFId := range pendingMergeFIds {
 		off = 0
-		fId := int64(pendingMergeFId)
-		f, err := NewDataFile(db.getDataPath(fId), db.opt.SegmentSize)
+		fID := int64(pendingMergeFId)
+		f, err := NewDataFile(db.getDataPath(fID), db.opt.SegmentSize)
 		if err != nil {
 			db.isMerging = false
 			return err
@@ -329,25 +374,25 @@ func (db *DB) Close() error {
 
 // setActiveFile sets the ActiveFile (DataFile object).
 func (db *DB) setActiveFile() (err error) {
-	filepath := db.getDataPath(db.MaxFileId)
+	filepath := db.getDataPath(db.MaxFileID)
 	db.ActiveFile, err = NewDataFile(filepath, db.opt.SegmentSize)
 	if err != nil {
 		return
 	}
 
-	db.ActiveFile.fileId = db.MaxFileId
+	db.ActiveFile.fileID = db.MaxFileID
 
 	return nil
 }
 
-// getMaxFileIdAndFileIds returns max fileId and fileIds.
-func (db *DB) getMaxFileIdAndFileIds() (maxFileId int64, dataFileIds []int) {
+// getMaxFileIDAndFileIds returns max fileId and fileIds.
+func (db *DB) getMaxFileIDAndFileIDs() (maxFileID int64, dataFileIds []int) {
 	files, _ := ioutil.ReadDir(db.opt.Dir)
 	if len(files) == 0 {
 		return 0, nil
 	}
 
-	maxFileId = 0
+	maxFileID = 0
 
 	for _, f := range files {
 		id := f.Name()
@@ -362,7 +407,7 @@ func (db *DB) getMaxFileIdAndFileIds() (maxFileId int64, dataFileIds []int) {
 	}
 
 	sort.Sort(sort.IntSlice(dataFileIds))
-	maxFileId = int64(dataFileIds[len(dataFileIds)-1])
+	maxFileID = int64(dataFileIds[len(dataFileIds)-1])
 
 	return
 }
@@ -403,10 +448,10 @@ func (db *DB) buildHintIdx(dataFileIds []int) error {
 
 	committedTxIds = make(map[uint64]struct{})
 
-	for _, dataId := range dataFileIds {
+	for _, dataID := range dataFileIds {
 		off = 0
-		fId := int64(dataId)
-		f, err := NewDataFile(db.getDataPath(fId), db.opt.SegmentSize)
+		fID := int64(dataID)
+		f, err := NewDataFile(db.getDataPath(fID), db.opt.SegmentSize)
 
 		if err != nil {
 			return err
@@ -428,13 +473,13 @@ func (db *DB) buildHintIdx(dataFileIds []int) error {
 				}
 
 				if entry.Meta.status == Committed {
-					committedTxIds[entry.Meta.txId] = struct{}{}
+					committedTxIds[entry.Meta.txID] = struct{}{}
 				}
 
 				unconfirmedRecords = append(unconfirmedRecords, &Record{
 					H: &Hint{
 						key:     entry.Key,
-						fileId:  fId,
+						fileID:  fID,
 						meta:    entry.Meta,
 						dataPos: uint64(off),
 					},
@@ -460,7 +505,7 @@ func (db *DB) buildHintIdx(dataFileIds []int) error {
 
 	if len(unconfirmedRecords) > 0 {
 		for _, r := range unconfirmedRecords {
-			if _, ok := committedTxIds[r.H.meta.txId]; ok {
+			if _, ok := committedTxIds[r.H.meta.txID]; ok {
 				bucket := string(r.H.meta.bucket)
 
 				if r.H.meta.ds == DataStructureBPTree {
@@ -589,21 +634,21 @@ func ErrWhenBuildListIdx(err error) error {
 // buildIndexes builds indexes when db initialize resource.
 func (db *DB) buildIndexes() (err error) {
 	var (
-		maxFileId   int64
+		maxFileID   int64
 		dataFileIds []int
 	)
 
-	maxFileId, dataFileIds = db.getMaxFileIdAndFileIds()
+	maxFileID, dataFileIds = db.getMaxFileIDAndFileIDs()
 
 	//init db.ActiveFile
-	db.MaxFileId = maxFileId
+	db.MaxFileID = maxFileID
 
 	//set ActiveFile
 	if err = db.setActiveFile(); err != nil {
 		return
 	}
 
-	if dataFileIds == nil && maxFileId == 0 {
+	if dataFileIds == nil && maxFileID == 0 {
 		return
 	}
 

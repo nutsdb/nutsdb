@@ -30,7 +30,7 @@ func (tx *Tx) Get(bucket string, key []byte) (e *Entry, err error) {
 			}
 
 			if idxMode == HintAndMemoryMapIdxMode {
-				path := tx.db.getDataPath(r.H.fileId)
+				path := tx.db.getDataPath(r.H.fileID)
 				df, err := NewDataFile(path, tx.db.opt.SegmentSize)
 				if err != nil {
 					return nil, err
@@ -127,7 +127,7 @@ func (tx *Tx) getHintIdxDataItemsWrapper(records Records, limitNum int, es Entri
 		if limitNum > 0 && len(es) < limitNum || limitNum == ScanNoLimit {
 			idxMode := tx.db.opt.EntryIdxMode
 			if idxMode == HintAndMemoryMapIdxMode {
-				path := tx.db.getDataPath(r.H.fileId)
+				path := tx.db.getDataPath(r.H.fileID)
 				df, err := NewDataFile(path, tx.db.opt.SegmentSize)
 				if err != nil {
 					return nil, err

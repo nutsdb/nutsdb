@@ -32,7 +32,7 @@ type (
 	// Hint represents the index of the key
 	Hint struct {
 		key     []byte
-		fileId  int64
+		fileID  int64
 		meta    *MetaData
 		dataPos uint64
 	}
@@ -46,7 +46,7 @@ type (
 		Flag       uint16 // delete / set
 		bucket     []byte
 		bucketSize uint32
-		txId       uint64
+		txID       uint64
 		status     uint16 // committed / uncommitted
 		ds         uint16 // data structure
 	}
@@ -95,7 +95,7 @@ func (e *Entry) setEntryHeaderBuf(buf []byte) []byte {
 	binary.LittleEndian.PutUint32(buf[26:30], e.Meta.bucketSize)
 	binary.LittleEndian.PutUint16(buf[30:32], e.Meta.status)
 	binary.LittleEndian.PutUint16(buf[32:34], e.Meta.ds)
-	binary.LittleEndian.PutUint64(buf[34:42], e.Meta.txId)
+	binary.LittleEndian.PutUint64(buf[34:42], e.Meta.txID)
 
 	return buf
 }

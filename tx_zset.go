@@ -11,6 +11,7 @@ import (
 	"github.com/xujiajun/utils/strconv2"
 )
 
+// SeparatorForZSetKey represents separator for zSet key.
 const SeparatorForZSetKey = "|"
 
 // ZAdd adds all the specified members with the specified scores to the sorted set stored at key.
@@ -83,7 +84,7 @@ func (tx *Tx) ZPopMin(bucket string) (*zset.SortedSetNode, error) {
 	return item, tx.put(bucket, []byte(" "), []byte(""), Persistent, DataZPopMinFlag, uint64(time.Now().Unix()), DataStructureSortedSet)
 }
 
-// ZPickMax returns up to count members with the highest scores in the sorted set stored at key.
+// ZPeekMax returns up to count members with the highest scores in the sorted set stored at key.
 func (tx *Tx) ZPeekMax(bucket string) (*zset.SortedSetNode, error) {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return nil, err
@@ -96,7 +97,7 @@ func (tx *Tx) ZPeekMax(bucket string) (*zset.SortedSetNode, error) {
 	return tx.db.SortedSetIdx[bucket].PeekMax(), nil
 }
 
-// ZPickMin returns up to count members with the lowest scores in the sorted set stored at key.
+// ZPeekMin returns up to count members with the lowest scores in the sorted set stored at key.
 func (tx *Tx) ZPeekMin(bucket string) (*zset.SortedSetNode, error) {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return nil, err
@@ -122,6 +123,8 @@ func (tx *Tx) ZRangeByScore(bucket string, start, end float64, opts *zset.GetByS
 	return tx.db.SortedSetIdx[bucket].GetByScoreRange(zset.SCORE(start), zset.SCORE(end), opts), nil
 }
 
+// ZRangByRank returns all the elements in the sorted set in one bucket at bucket and key
+// with a rank between start and end (including elements with rank equal to start or end).
 func (tx *Tx) ZRangByRank(bucket string, start, end int) ([]*zset.SortedSetNode, error) {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return nil, err
@@ -134,6 +137,7 @@ func (tx *Tx) ZRangByRank(bucket string, start, end int) ([]*zset.SortedSetNode,
 	return tx.db.SortedSetIdx[bucket].GetByRankRange(start, end, false), nil
 }
 
+// ZRem removes the specified members from the sorted set stored in one bucket at given bucket and key.
 func (tx *Tx) ZRem(bucket, key string) error {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return err
@@ -146,6 +150,8 @@ func (tx *Tx) ZRem(bucket, key string) error {
 	return tx.put(bucket, []byte(key), []byte(""), Persistent, DataZRemFlag, uint64(time.Now().Unix()), DataStructureSortedSet)
 }
 
+// ZRemRangeByRank removes all elements in the sorted set stored in one bucket at given bucket with rank between start and end.
+// the rank is 1-based integer. Rank 1 means the first node; Rank -1 means the last node.
 func (tx *Tx) ZRemRangeByRank(bucket string, start, end int) error {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return err
@@ -160,7 +166,7 @@ func (tx *Tx) ZRemRangeByRank(bucket string, start, end int) error {
 	return tx.put(bucket, []byte(newKey), []byte(newVal), Persistent, DataZRemRangeByRankFlag, uint64(time.Now().Unix()), DataStructureSortedSet)
 }
 
-//Returns the rank of member in the sorted set stored at key, with the scores ordered from low to high.
+//ZRank returns the rank of member in the sorted set stored in the bucket at given bucket and key.
 func (tx *Tx) ZRank(bucket string, key []byte) (int, error) {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return 0, err
@@ -173,6 +179,7 @@ func (tx *Tx) ZRank(bucket string, key []byte) (int, error) {
 	return tx.db.SortedSetIdx[bucket].FindRank(string(key)), nil
 }
 
+// ZScore returns the score of member in the sorted set in the bucket at given bucket and key.
 func (tx *Tx) ZScore(bucket string, key []byte) (float64, error) {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return 0, err
@@ -189,6 +196,7 @@ func (tx *Tx) ZScore(bucket string, key []byte) (float64, error) {
 	return 0, ErrNotFoundKey
 }
 
+// ZGetByKey returns node in the bucket at given bucket and key.
 func (tx *Tx) ZGetByKey(bucket string, key []byte) (*zset.SortedSetNode, error) {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return nil, err
@@ -205,6 +213,7 @@ func (tx *Tx) ZGetByKey(bucket string, key []byte) (*zset.SortedSetNode, error) 
 	return nil, ErrNotFoundKey
 }
 
+// ErrSeparatorForZSetKey returns when zSet key contains the SeparatorForZSetKey flag.
 func ErrSeparatorForZSetKey() error {
 	return errors.New("contain separator (" + SeparatorForZSetKey + ") for ZSet key")
 }

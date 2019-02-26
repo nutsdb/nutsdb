@@ -18,14 +18,17 @@ func (tx *Tx) sPut(bucket string, key []byte, dataFlag uint16, items ...[]byte) 
 	return nil
 }
 
+// SAdd adds the specified members to the set stored int the bucket at given bucket,key and items.
 func (tx *Tx) SAdd(bucket string, key []byte, items ...[]byte) error {
 	return tx.sPut(bucket, key, DataSetFlag, items...)
 }
 
+// SRem removes the specified members from the set stored int the bucket at given bucket,key and items.
 func (tx *Tx) SRem(bucket string, key []byte, items ...[]byte) error {
 	return tx.sPut(bucket, key, DataDeleteFlag, items...)
 }
 
+// SAreMembers returns if the specified members are the member of the set int the bucket at given bucket,key and items.
 func (tx *Tx) SAreMembers(bucket string, key []byte, items ...[]byte) (bool, error) {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return false, err
@@ -38,6 +41,7 @@ func (tx *Tx) SAreMembers(bucket string, key []byte, items ...[]byte) (bool, err
 	return false, ErrBucketAndKey(bucket, key)
 }
 
+// SIsMember if member is a member of the set stored int the bucket at given bucket,key and item.
 func (tx *Tx) SIsMember(bucket string, key, item []byte) (bool, error) {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return false, err
@@ -53,6 +57,7 @@ func (tx *Tx) SIsMember(bucket string, key, item []byte) (bool, error) {
 	return false, ErrBucketAndKey(bucket, key)
 }
 
+// SMembers returns all the members of the set value stored int the bucket at given bucket and key.
 func (tx *Tx) SMembers(bucket string, key []byte) (list [][]byte, err error) {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return nil, err
@@ -66,6 +71,7 @@ func (tx *Tx) SMembers(bucket string, key []byte) (list [][]byte, err error) {
 
 }
 
+// SHasKey returns if the set in the bucket at given bucket and key.
 func (tx *Tx) SHasKey(bucket string, key []byte) (bool, error) {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return false, err
@@ -78,6 +84,7 @@ func (tx *Tx) SHasKey(bucket string, key []byte) (bool, error) {
 	return false, ErrBucketAndKey(bucket, key)
 }
 
+// SPop removes and returns one or more random elements from the set value store in the bucket at given bucket and key.
 func (tx *Tx) SPop(bucket string, key []byte) ([]byte, error) {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return nil, err
@@ -92,6 +99,7 @@ func (tx *Tx) SPop(bucket string, key []byte) ([]byte, error) {
 	return nil, ErrBucketAndKey(bucket, key)
 }
 
+// SCard returns the set cardinality (number of elements) of the set stored in the bucket at given bucket and key.
 func (tx *Tx) SCard(bucket string, key []byte) (int, error) {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return 0, err
@@ -104,6 +112,8 @@ func (tx *Tx) SCard(bucket string, key []byte) (int, error) {
 	return 0, ErrBucketAndKey(bucket, key)
 }
 
+// SDiffByOneBucket returns the members of the set resulting from the difference
+// between the first set and all the successive sets in one bucket.
 func (tx *Tx) SDiffByOneBucket(bucket string, key1, key2 []byte) (list [][]byte, err error) {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return nil, err
@@ -116,6 +126,8 @@ func (tx *Tx) SDiffByOneBucket(bucket string, key1, key2 []byte) (list [][]byte,
 	return nil, ErrBucketAndKey(bucket, key1)
 }
 
+// SDiffByTwoBuckets returns the members of the set resulting from the difference
+// between the first set and all the successive sets in two buckets.
 func (tx *Tx) SDiffByTwoBuckets(bucket1 string, key1 []byte, bucket2 string, key2 []byte) (list [][]byte, err error) {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return nil, err
@@ -143,6 +155,7 @@ func (tx *Tx) SDiffByTwoBuckets(bucket1 string, key1 []byte, bucket2 string, key
 	return
 }
 
+// SMoveByOneBucket moves member from the set at source to the set at destination in one bucket.
 func (tx *Tx) SMoveByOneBucket(bucket string, key1, key2, item []byte) (bool, error) {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return false, err
@@ -155,6 +168,7 @@ func (tx *Tx) SMoveByOneBucket(bucket string, key1, key2, item []byte) (bool, er
 	return false, ErrBucket
 }
 
+// SMoveByTwoBuckets moves member from the set at source to the set at destination in two buckets.
 func (tx *Tx) SMoveByTwoBuckets(bucket1 string, key1 []byte, bucket2 string, key2, item []byte) (bool, error) {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return false, err
@@ -190,6 +204,7 @@ func (tx *Tx) SMoveByTwoBuckets(bucket1 string, key1 []byte, bucket2 string, key
 	return true, nil
 }
 
+// SUnionByOneBucket the members of the set resulting from the union of all the given sets in one bucket.
 func (tx *Tx) SUnionByOneBucket(bucket string, key1, key2 []byte) (list [][]byte, err error) {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return nil, err
@@ -202,6 +217,7 @@ func (tx *Tx) SUnionByOneBucket(bucket string, key1, key2 []byte) (list [][]byte
 	return nil, ErrBucket
 }
 
+// SUnionByTwoBuckets the members of the set resulting from the union of all the given sets in two buckets.
 func (tx *Tx) SUnionByTwoBuckets(bucket1 string, key1 []byte, bucket2 string, key2 []byte) (list [][]byte, err error) {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return nil, err
@@ -241,10 +257,12 @@ func (tx *Tx) SUnionByTwoBuckets(bucket1 string, key1 []byte, bucket2 string, ke
 	return
 }
 
+// ErrBucketAndKey returns when bucket or key not found.
 func ErrBucketAndKey(bucket string, key []byte) error {
 	return errors.New("not found bucket:" + bucket + ",key:" + string(key))
 }
 
+// ErrNotFoundKeyInBucket returns when key not in the bucket.
 func ErrNotFoundKeyInBucket(bucket string, key []byte) error {
 	return errors.New(string(key) + " is not in the" + bucket)
 }
