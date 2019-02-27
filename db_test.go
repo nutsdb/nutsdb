@@ -791,7 +791,7 @@ func TestOpen(t *testing.T) {
 	}
 
 	if err := db.Update(func(tx *Tx) error {
-		err := tx.LSet(listBucket, []byte("myList"), 0,[]byte("newVal"))
+		err := tx.LSet(listBucket, []byte("myList"), 0, []byte("newVal"))
 		if err != nil {
 			return err
 		}
@@ -804,7 +804,7 @@ func TestOpen(t *testing.T) {
 	zSetBucket := "myListBucket"
 
 	if err := db.Update(func(tx *Tx) error {
-		err := tx.ZAdd(zSetBucket, []byte("key1"), 1,[]byte("val1"))
+		err := tx.ZAdd(zSetBucket, []byte("key1"), 1, []byte("val1"))
 		if err != nil {
 			return err
 		}
@@ -815,7 +815,7 @@ func TestOpen(t *testing.T) {
 	}
 
 	if err := db.Update(func(tx *Tx) error {
-		err := tx.ZAdd(zSetBucket, []byte("key2"), 2,[]byte("val2"))
+		err := tx.ZAdd(zSetBucket, []byte("key2"), 2, []byte("val2"))
 		if err != nil {
 			return err
 		}
@@ -825,9 +825,8 @@ func TestOpen(t *testing.T) {
 		t.Fatal(err)
 	}
 
-
 	if err := db.Update(func(tx *Tx) error {
-		n,err := tx.ZPopMax(zSetBucket)
+		n, err := tx.ZPopMax(zSetBucket)
 		if err != nil {
 			return err
 		}
@@ -842,7 +841,7 @@ func TestOpen(t *testing.T) {
 	}
 
 	if err := db.Update(func(tx *Tx) error {
-		n,err := tx.ZPopMin(zSetBucket)
+		n, err := tx.ZPopMin(zSetBucket)
 		if err != nil {
 			return err
 		}
@@ -857,7 +856,7 @@ func TestOpen(t *testing.T) {
 	}
 
 	if err := db.Update(func(tx *Tx) error {
-		err := tx.ZAdd(zSetBucket, []byte("key3"), 3,[]byte("val3"))
+		err := tx.ZAdd(zSetBucket, []byte("key3"), 3, []byte("val3"))
 		if err != nil {
 			return err
 		}
@@ -879,8 +878,9 @@ func TestOpen(t *testing.T) {
 	}
 
 	setBucket := "mySetBucket"
+	key := []byte("myList")
 	if err := db.Update(func(tx *Tx) error {
-		err := tx.SAdd(setBucket, []byte("key"), []byte("val"))
+		err := tx.SAdd(setBucket, key, []byte("val"))
 		if err != nil {
 			return err
 		}
@@ -891,7 +891,7 @@ func TestOpen(t *testing.T) {
 	}
 
 	if err := db.Update(func(tx *Tx) error {
-		ok,err := tx.SIsMember(setBucket, []byte("myList"), []byte("val"))
+		ok, err := tx.SIsMember(setBucket, key, []byte("val"))
 		if err != nil || !ok {
 			return err
 		}
@@ -902,8 +902,8 @@ func TestOpen(t *testing.T) {
 	}
 
 	if err := db.Update(func(tx *Tx) error {
-		item,err := tx.SPop(setBucket, []byte("myList"))
-		if err != nil || item!=nil {
+		item, err := tx.SPop(setBucket, key)
+		if err != nil || item != nil {
 			return err
 		}
 
@@ -913,7 +913,7 @@ func TestOpen(t *testing.T) {
 	}
 
 	if err := db.Update(func(tx *Tx) error {
-		err := tx.SAdd(setBucket, []byte("myList"), []byte("val1"))
+		err := tx.SAdd(setBucket, key, []byte("val1"))
 		if err != nil {
 			return err
 		}
@@ -923,10 +923,9 @@ func TestOpen(t *testing.T) {
 		t.Fatal(err)
 	}
 
-
 	if err := db.Update(func(tx *Tx) error {
-		err := tx.SRem(setBucket, []byte("key"),[]byte("val1"))
-		if err != nil  {
+		err := tx.SRem(setBucket, key, []byte("val1"))
+		if err != nil {
 			return err
 		}
 

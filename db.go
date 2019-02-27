@@ -184,24 +184,29 @@ func (db *DB) View(fn func(tx *Tx) error) error {
 }
 
 // managed calls a block of code that is fully contained in a transaction.
-func (db *DB) managed(writable bool, fn func(tx *Tx) error) (err error) {
+func (db *DB) managed(writable bool, fn func(tx *Tx) error) error {
 	var tx *Tx
-	tx, err = db.Begin(writable)
+
+	tx, err := db.Begin(writable)
 	if err != nil {
-		return
+		return err
 	}
 
 	if err = fn(tx); err != nil {
-		err = tx.Rollback()
-		return
+		if errRollback := tx.Rollback(); errRollback != nil {
+			return errRollback
+		}
+		return err
 	}
 
 	if err = tx.Commit(); err != nil {
-		err = tx.Rollback()
-		return
+		if errRollback := tx.Rollback(); errRollback != nil {
+			return errRollback
+		}
+		return err
 	}
 
-	return
+	return nil
 }
 
 // getDataPath returns the data path at given fid.
