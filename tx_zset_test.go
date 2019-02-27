@@ -317,12 +317,12 @@ func TestTx_ZRangByRank(t *testing.T) {
 	expectResult[key1] = struct{}{}
 	expectResult[key2] = struct{}{}
 
-	nodes, err := tx.ZRangByRank("bucket_fake", 1, 2)
+	nodes, err := tx.ZRangeByRank("bucket_fake", 1, 2)
 	if err == nil || nodes != nil {
 		t.Error("TestTx_ZRangByRank err")
 	}
 
-	nodes, err = tx.ZRangByRank(bucket, 1, 2)
+	nodes, err = tx.ZRangeByRank(bucket, 1, 2)
 	if err != nil {
 		tx.Rollback()
 		t.Fatal(err)
@@ -339,7 +339,7 @@ func TestTx_ZRangByRank(t *testing.T) {
 			}
 		}
 
-		nodes, err = tx.ZRangByRank(bucket, 1, 3)
+		nodes, err = tx.ZRangeByRank(bucket, 1, 3)
 		if err == nil || nodes != nil {
 			t.Error("TestTx_ZRangByRank err")
 		}

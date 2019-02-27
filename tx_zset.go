@@ -123,9 +123,9 @@ func (tx *Tx) ZRangeByScore(bucket string, start, end float64, opts *zset.GetByS
 	return tx.db.SortedSetIdx[bucket].GetByScoreRange(zset.SCORE(start), zset.SCORE(end), opts), nil
 }
 
-// ZRangByRank returns all the elements in the sorted set in one bucket at bucket and key
+// ZRangeByRank returns all the elements in the sorted set in one bucket at bucket and key
 // with a rank between start and end (including elements with rank equal to start or end).
-func (tx *Tx) ZRangByRank(bucket string, start, end int) ([]*zset.SortedSetNode, error) {
+func (tx *Tx) ZRangeByRank(bucket string, start, end int) ([]*zset.SortedSetNode, error) {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return nil, err
 	}
