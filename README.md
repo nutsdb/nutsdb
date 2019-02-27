@@ -40,7 +40,9 @@ In order to break the limition, i tried to optimize them. I tried to use B+ tree
      - [RPush](#rpush)
      - [LPush](#lpush)
      - [LPop](#lpop)
+     - [LPeek](#lpeek)
      - [RPop](#rpop)
+     - [RPeek](#rpeek)
      - [LRange](#lrange)
      - [LRem](#lrem)
      - [LSet](#lset)	
@@ -368,10 +370,82 @@ if err != nil {
 
 #### List
 
-##### RPush 
+##### RPush
+
+Inserts the values at the tail of the list stored in the bucket at given bucket,key and values.
+
+```
+if err := db.Update(
+	func(tx *nutsdb.Tx) error {
+		key := []byte("myList")
+		val := []byte("val1")
+		if err := tx.RPush(bucket, key, val); err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+	log.Fatal(err)
+}
+```
+
 ##### LPush 
+
+Inserts the values at the head of the list stored in the bucket at given bucket,key and values.
+
+```
+if err := db.Update(
+	func(tx *nutsdb.Tx) error {
+		key := []byte("myList")
+		val := []byte("val2")
+		if err := tx.LPush(bucket, key, val); err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+	log.Fatal(err)
+}
+```
+
 ##### LPop 
+
+Removes and returns the first element of the list stored in the bucket at given bucket and key.
+
+```
+if err := db.Update(
+	func(tx *nutsdb.Tx) error {
+		key := []byte("myList")
+		if item, err := tx.LPop(bucket, key); err != nil {
+			return err
+		} else {
+			fmt.Println("LPop item:", string(item))
+		}
+		return nil
+	}); err != nil {
+	log.Fatal(err)
+}
+```
+
+##### LPeek
+
+Returns the first element of the list stored in the bucket at given bucket and key.
+
+```
+if err := db.View(
+	func(tx *nutsdb.Tx) error {
+		key := []byte("myList")
+		if item, err := tx.LPeek(bucket, key); err != nil {
+			return err
+		} else {
+			fmt.Println("LPeek item:", string(item)) //val11
+		}
+		return nil
+	}); err != nil {
+	log.Fatal(err)
+}
+```
+
 ##### RPop 
+##### RPeek
 ##### LRange 
 ##### LRem 
 ##### LSet 
