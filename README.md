@@ -64,6 +64,21 @@ In order to break the limition, i tried to optimize them. I tried to use B+ tree
      - [SUnionByOneBucket](#sunionbyonebucket)
      - [SUnionByTwoBucket](#sunionbytwobuckets)
    - [Sorted Set](#sorted-set)
+     - [ZAdd](#zadd)
+     - [ZCard](#zcard)
+     - [ZCount](#zcount)
+     - [ZGetByKey](#zgetbykey)
+     - [ZMembers](#zmembers)
+     - [ZPeekMax](#zpeekmax)
+     - [ZPeekMin](#zpeekmin)
+     - [ZPopMax](#zpopmax)
+     - [ZPopMin](#zpopmin)
+     - [ZRangeByRank](#zrangebyrank)
+     - [ZRangeByScore](#zrangebyscore)
+     - [ZRank](#zrank)
+     - [ZRem](#zrem)
+     - [ZRemRangeByRank](#zremrangebyrank)
+     - [ZScore](#zscore)
 - [Comparison with other databases](#comparison-with-other-databases)
    - [BoltDB](#boltdb)
    - [LevelDB, RocksDB](#leveldb-rocksdb)
@@ -1122,6 +1137,22 @@ if err := db.View(
 ```
 
 #### Sorted Set
+
+##### ZAdd
+##### ZCard 
+##### ZCount 
+##### ZGetByKey 
+##### ZMembers 
+##### ZPeekMax 
+##### ZPeekMin 
+##### ZPopMax 
+##### ZPopMin 
+##### ZRangeByRank 
+##### ZRangeByScore 
+##### ZRank 
+##### ZRem 
+##### ZRemRangeByRank 
+##### ZScore
 
 ### Comparison with other databases
 
