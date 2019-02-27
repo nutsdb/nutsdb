@@ -14,7 +14,7 @@ import (
 // SeparatorForZSetKey represents separator for zSet key.
 const SeparatorForZSetKey = "|"
 
-// ZAdd adds all the specified members with the specified scores to the sorted set stored at key.
+// ZAdd adds the specified member with the specified score and specified val to the sorted set stored at key.
 func (tx *Tx) ZAdd(bucket string, key []byte, score float64, val []byte) error {
 	var buffer bytes.Buffer
 
