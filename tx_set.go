@@ -41,7 +41,7 @@ func (tx *Tx) SAreMembers(bucket string, key []byte, items ...[]byte) (bool, err
 	return false, ErrBucketAndKey(bucket, key)
 }
 
-// SIsMember if member is a member of the set stored int the bucket at given bucket,key and item.
+// SIsMember returns if member is a member of the set stored int the bucket at given bucket,key and item.
 func (tx *Tx) SIsMember(bucket string, key, item []byte) (bool, error) {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return false, err

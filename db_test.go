@@ -747,7 +747,7 @@ func TestOpen(t *testing.T) {
 	}
 
 	if err := db.Update(func(tx *Tx) error {
-		err := tx.Ltrim(listBucket, []byte("myList"), 0, 1)
+		err := tx.LTrim(listBucket, []byte("myList"), 0, 1)
 		if err != nil {
 			return err
 		}

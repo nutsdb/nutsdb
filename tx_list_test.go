@@ -414,7 +414,7 @@ func TestTx_LSet(t *testing.T) {
 	}
 }
 
-func TestTx_Ltrim(t *testing.T) {
+func TestTx_LTrim(t *testing.T) {
 	InitForList()
 	db, err = Open(opt)
 	if err != nil {
@@ -426,9 +426,9 @@ func TestTx_Ltrim(t *testing.T) {
 	bucket := "myBucket"
 	key := []byte("myList")
 
-	err := tx.Ltrim(bucket, key, 0, 1)
+	err := tx.LTrim(bucket, key, 0, 1)
 	if err == nil {
-		t.Error("TestTx_Ltrim err")
+		t.Error("TestTx_LTrim err")
 	}
 	tx.Rollback()
 
@@ -436,15 +436,15 @@ func TestTx_Ltrim(t *testing.T) {
 
 	tx, err = db.Begin(true)
 
-	err = tx.Ltrim(bucket, []byte("fake_key"), 0, 1)
+	err = tx.LTrim(bucket, []byte("fake_key"), 0, 1)
 	if err == nil {
-		t.Error("TestTx_Ltrim err")
+		t.Error("TestTx_LTrim err")
 	}
 
-	err = tx.Ltrim(bucket, key, 0, 1)
+	err = tx.LTrim(bucket, key, 0, 1)
 	if err != nil {
 		tx.Rollback()
-		t.Error("TestTx_Ltrim err")
+		t.Error("TestTx_LTrim err")
 	}
 
 	tx.Commit()
@@ -458,15 +458,15 @@ func TestTx_Ltrim(t *testing.T) {
 
 	tx.Commit()
 
-	err = tx.Ltrim(bucket, key, 0, 1)
+	err = tx.LTrim(bucket, key, 0, 1)
 	if err == nil {
-		t.Error("TestTx_Ltrim err")
+		t.Error("TestTx_LTrim err")
 	}
 
 	expectResult := []string{"a", "b"}
 	for i := 0; i < len(expectResult); i++ {
 		if string(list[i]) != string(expectResult[i]) {
-			t.Error("TestTx_Ltrim err")
+			t.Error("TestTx_LTrim err")
 		}
 	}
 
@@ -475,9 +475,9 @@ func TestTx_Ltrim(t *testing.T) {
 
 	tx, err = db.Begin(true)
 
-	err = tx.Ltrim(bucket, key, 0, -10)
+	err = tx.LTrim(bucket, key, 0, -10)
 	if err == nil {
-		t.Error("TestTx_Ltrim err")
+		t.Error("TestTx_LTrim err")
 	}
 	tx.Rollback()
 }

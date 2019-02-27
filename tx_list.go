@@ -115,9 +115,9 @@ func (tx *Tx) LSize(bucket string, key []byte) (int, error) {
 }
 
 // LRange returns the specified elements of the list stored in the bucket at given bucket,key, start and end.
-// the offsets start and stop are zero-based indexes 0 being the first element of the list (the head of the list),
+// The offsets start and stop are zero-based indexes 0 being the first element of the list (the head of the list),
 // 1 being the next element and so on.
-// start and end can also be negative numbers indicating offsets from the end of the list,
+// Start and end can also be negative numbers indicating offsets from the end of the list,
 // where -1 is the last element of the list, -2 the penultimate element and so on.
 func (tx *Tx) LRange(bucket string, key []byte, start, end int) (list [][]byte, err error) {
 	if err := tx.checkTxIsClosed(); err != nil {
@@ -132,7 +132,7 @@ func (tx *Tx) LRange(bucket string, key []byte, start, end int) (list [][]byte, 
 }
 
 // LRem removes the first count occurrences of elements equal to value from the list stored in the bucket at given bucket,key,count.
-// the count argument influences the operation in the following ways:
+// The count argument influences the operation in the following ways:
 // count > 0: Remove elements equal to value moving from head to tail.
 // count < 0: Remove elements equal to value moving from tail to head.
 // count = 0: Remove all elements equal to value.
@@ -191,12 +191,12 @@ func (tx *Tx) LSet(bucket string, key []byte, index int, value []byte) error {
 	return tx.push(bucket, newKey, DataLSetFlag, value)
 }
 
-// Ltrim trims an existing list so that it will contain only the specified range of elements specified.
+// LTrim trims an existing list so that it will contain only the specified range of elements specified.
 // the offsets start and stop are zero-based indexes 0 being the first element of the list (the head of the list),
 // 1 being the next element and so on.
 // start and end can also be negative numbers indicating offsets from the end of the list,
 // where -1 is the last element of the list, -2 the penultimate element and so on.
-func (tx *Tx) Ltrim(bucket string, key []byte, start, end int) error {
+func (tx *Tx) LTrim(bucket string, key []byte, start, end int) error {
 	var (
 		err    error
 		buffer bytes.Buffer
