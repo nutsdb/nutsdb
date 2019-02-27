@@ -49,6 +49,20 @@ In order to break the limition, i tried to optimize them. I tried to use B+ tree
      - [Ltrim](#ltrim)
      - [LSize](#lsize)  	
    - [Set](#set)
+     - [SAdd](#sadd)
+     - [SAreMembers](#saremembers)
+     - [SCard](#scard)
+     - [SDiffByOneBucket](#sdiffbyonebucket)
+     - [SDiffByTwoBuckets](#sdiffbytwobuckets)
+     - [SHasKey](#shaskey)
+     - [SIsMember](#sismember)
+     - [SMembers](#smembers)
+     - [SMoveByOneBucket](#smovebyonebucket)
+     - [SMoveByTwoBuckets](#smovebytwobuckets)
+     - [SPop](#spop)
+     - [SRem](#srem)
+     - [SUnionByOneBucket](#sunionbyonebucket)
+     - [SUnionByTwoBucket](#sunionbytwobuckets)
    - [Sorted Set](#sorted-set)
 - [Comparison with other databases](#comparison-with-other-databases)
    - [BoltDB](#boltdb)
@@ -588,6 +602,21 @@ if err := db.Update(
 ```
 
 #### Set
+
+##### SAdd
+##### SAreMembers 
+##### SCard 
+##### SDiffByOneBucket 
+##### SDiffByTwoBuckets 
+##### SHasKey 
+##### SIsMember 
+##### SMembers 
+##### SMoveByOneBucket 
+##### SMoveByTwoBuckets 
+##### SPop 
+##### SRem 
+##### SUnionByOneBucket 
+##### SUnionByTwoBuckets 
 
 #### Sorted Set
 
