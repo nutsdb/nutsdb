@@ -445,12 +445,147 @@ if err := db.View(
 ```
 
 ##### RPop 
+
+Removes and returns the last element of the list stored in the bucket at given bucket and key.
+
+```
+if err := db.Update(
+	func(tx *nutsdb.Tx) error {
+		key := []byte("myList")
+		if item, err := tx.RPop(bucket, key); err != nil {
+			return err
+		} else {
+			fmt.Println("RPop item:", string(item))
+		}
+		return nil
+	}); err != nil {
+	log.Fatal(err)
+}
+```
+
 ##### RPeek
+
+Returns the last element of the list stored in the bucket at given bucket and key.
+
+```
+if err := db.View(
+	func(tx *nutsdb.Tx) error {
+		key := []byte("myList")
+		if item, err := tx.RPeek(bucket, key); err != nil {
+			return err
+		} else {
+			fmt.Println("RPeek item:", string(item))
+		}
+		return nil
+	}); err != nil {
+	log.Fatal(err)
+}
+```
+
 ##### LRange 
+
+Returns the specified elements of the list stored in the bucket at given bucket,key, start and end.
+The offsets start and stop are zero-based indexes 0 being the first element of the list (the head of the list),
+1 being the next element and so on. 
+Start and end can also be negative numbers indicating offsets from the end of the list,
+where -1 is the last element of the list, -2 the penultimate element and so on.
+
+```
+if err := db.View(
+	func(tx *nutsdb.Tx) error {
+		key := []byte("myList")
+		if items, err := tx.LRange(bucket, key, 0, -1); err != nil {
+			return err
+		} else {
+			//fmt.Println(items)
+			for _, item := range items {
+				fmt.Println(string(item))
+			}
+		}
+		return nil
+	}); err != nil {
+	log.Fatal(err)
+}
+```
 ##### LRem 
+
+Removes the first count occurrences of elements equal to value from the list stored in the bucket at given bucket,key,count.
+The count argument influences the operation in the following ways:
+
+* count > 0: Remove elements equal to value moving from head to tail.
+* count < 0: Remove elements equal to value moving from tail to head.
+* count = 0: Remove all elements equal to value.
+
+```
+if err := db.Update(
+	func(tx *nutsdb.Tx) error {
+		key := []byte("myList")
+		if err := tx.LRem(bucket, key, 1); err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+	log.Fatal(err)
+}
+```
+
 ##### LSet 
+
+Sets the list element at index to value.
+
+```
+if err := db.Update(
+	func(tx *nutsdb.Tx) error {
+		key := []byte("myList")
+		if err := tx.LSet(bucket, key, 0, []byte("val11")); err != nil {
+			return err
+		} else {
+			fmt.Println("LSet ok, index 0 item value => val11")
+		}
+		return nil
+	}); err != nil {
+	log.Fatal(err)
+}
+```
+
 ##### Ltrim 
+
+Trims an existing list so that it will contain only the specified range of elements specified.
+the offsets start and stop are zero-based indexes 0 being the first element of the list (the head of the list),
+1 being the next element and so on.Start and end can also be negative numbers indicating offsets from the end of the list,
+where -1 is the last element of the list, -2 the penultimate element and so on.
+
+```
+if err := db.Update(
+	func(tx *nutsdb.Tx) error {
+		key := []byte("myList")
+		if err := tx.LTrim(bucket, key, 0, 1); err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+	log.Fatal(err)
+}
+```
+
 ##### LSize 
+
+Returns the size of key in the bucket in the bucket at given bucket and key.
+
+```
+if err := db.Update(
+	func(tx *nutsdb.Tx) error {
+		key := []byte("myList")
+		if size,err := tx.LSize(bucket, key); err != nil {
+			return err
+		} else {
+			fmt.Println("myList size is ",size)
+		}
+		return nil
+	}); err != nil {
+	log.Fatal(err)
+}
+```
 
 #### Set
 
