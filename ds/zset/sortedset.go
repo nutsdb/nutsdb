@@ -516,5 +516,5 @@ func (ss *SortedSet) FindRevRank(key string) int {
 		return 0
 	}
 
-	return int(ss.length) - ss.FindRank(key) + 1
+	return ss.Size() - ss.FindRank(key) + 1
 }
