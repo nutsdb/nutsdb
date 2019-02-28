@@ -1441,7 +1441,7 @@ if err := db.View(
 ```
 ##### ZRank
 
-Returns the rank of member in the sorted set stored in the bucket at given bucket and key.
+Returns the rank of member in the sorted set stored in the bucket at given bucket and key, with the scores ordered from low to high.
 
 ```go
 if err := db.View(
