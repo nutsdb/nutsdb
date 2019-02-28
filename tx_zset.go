@@ -166,7 +166,8 @@ func (tx *Tx) ZRemRangeByRank(bucket string, start, end int) error {
 	return tx.put(bucket, []byte(newKey), []byte(newVal), Persistent, DataZRemRangeByRankFlag, uint64(time.Now().Unix()), DataStructureSortedSet)
 }
 
-//ZRank returns the rank of member in the sorted set stored in the bucket at given bucket and key.
+// ZRank returns the rank of member in the sorted set stored in the bucket at given bucket and key,
+// with the scores ordered from low to high.
 func (tx *Tx) ZRank(bucket string, key []byte) (int, error) {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return 0, err
@@ -177,6 +178,20 @@ func (tx *Tx) ZRank(bucket string, key []byte) (int, error) {
 	}
 
 	return tx.db.SortedSetIdx[bucket].FindRank(string(key)), nil
+}
+
+// ZRevRank returns the rank of member in the sorted set stored in the bucket at given bucket and key,
+// with the scores ordered from high to low.
+func (tx *Tx) ZRevRank(bucket string, key []byte) (int, error) {
+	if err := tx.checkTxIsClosed(); err != nil {
+		return 0, err
+	}
+
+	if _, ok := tx.db.SortedSetIdx[bucket]; !ok {
+		return 0, ErrBucket
+	}
+
+	return tx.db.SortedSetIdx[bucket].FindRevRank(string(key)), nil
 }
 
 // ZScore returns the score of member in the sorted set in the bucket at given bucket and key.

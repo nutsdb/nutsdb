@@ -108,6 +108,7 @@ func (ss *SortedSet) insertNode(score SCORE, key string, value []byte) *SortedSe
 
 		/* update span covered by update[i] as x is inserted here */
 		x.level[i].span = update[i].level[i].span - (rank[0] - rank[i])
+
 		update[i].level[i].span = (rank[0] - rank[i]) + 1
 	}
 
@@ -121,12 +122,15 @@ func (ss *SortedSet) insertNode(score SCORE, key string, value []byte) *SortedSe
 	} else {
 		x.backward = update[0]
 	}
+
 	if x.level[0].forward != nil {
 		x.level[0].forward.backward = x
 	} else {
 		ss.tail = x
 	}
+
 	ss.length++
+
 	return x
 }
 
@@ -474,7 +478,7 @@ func (ss *SortedSet) GetByKey(key string) *SortedSetNode {
 	return ss.Dict[key]
 }
 
-// Find the rank of the node specified by key
+// FindRank Returns the rank of member in the sorted set stored at key, with the scores ordered from low to high.
 // Note that the rank is 1-based integer. Rank 1 means the first node
 //
 // If the node is not found, 0 is returned. Otherwise rank(> 0) is returned
@@ -500,4 +504,17 @@ func (ss *SortedSet) FindRank(key string) int {
 		}
 	}
 	return 0
+}
+
+// FindRevRank Returns the rank of member in the sorted set stored at key, with the scores ordered from high to low.
+func (ss *SortedSet) FindRevRank(key string) int {
+	if ss.length == 0 {
+		return 0
+	}
+
+	if _, ok := ss.Dict[key]; !ok {
+		return 0
+	}
+
+	return int(ss.length) - ss.FindRank(key) + 1
 }
