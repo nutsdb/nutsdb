@@ -14,13 +14,14 @@
 
 package nutsdb
 
-type (
-	EntryIdxMode  int
-	MergeStrategy string
-)
+// EntryIdxMode represents entry index mode
+type EntryIdxMode int
 
 const (
+	// HintAndRAMIdxMode represents ram index mode
 	HintAndRAMIdxMode EntryIdxMode = iota
+
+	// HintAndMemoryMapIdxMode represents memory map index mode
 	HintAndMemoryMapIdxMode
 )
 
@@ -34,6 +35,7 @@ type Options struct {
 
 var defaultSegmentSize int64 = 64 * 1024 * 1024
 
+// DefaultOptions represents the default options
 var DefaultOptions = Options{
 	EntryIdxMode: HintAndRAMIdxMode,
 	SegmentSize:  defaultSegmentSize,

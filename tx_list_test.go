@@ -1,0 +1,568 @@
+package nutsdb
+
+import (
+	"io/ioutil"
+	"os"
+	"testing"
+)
+
+func InitForList() {
+	fileDir := "/tmp/nutsdbtestlisttx"
+	files, _ := ioutil.ReadDir(fileDir)
+	for _, f := range files {
+		name := f.Name()
+		if name != "" {
+			err := os.Remove(fileDir + "/" + name)
+			if err != nil {
+				panic(err)
+			}
+		}
+	}
+
+	opt = DefaultOptions
+	opt.Dir = fileDir
+	opt.SegmentSize = 8 * 1024
+	return
+}
+
+func TestTx_RPush(t *testing.T) {
+	InitForList()
+	db, err = Open(opt)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tx, err = db.Begin(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bucket := "myBucket"
+	key := []byte("myList")
+
+	if err := tx.RPush(bucket, []byte("myList"+SeparatorForListKey), []byte("a"), []byte("b"), []byte("c"), []byte("d")); err == nil {
+		tx.Rollback()
+		t.Fatal("TestTx_RPush err")
+	}
+
+	if err := tx.RPush(bucket, key, []byte("a"), []byte("b"), []byte("c"), []byte("d")); err != nil {
+		tx.Rollback()
+		t.Fatal(err)
+	}
+
+	if err := tx.RPush(bucket, []byte(""), []byte("a"), []byte("b"), []byte("c"), []byte("d")); err == nil {
+		tx.Rollback()
+		t.Fatal("TestTx_RPush err")
+	}
+
+	tx.Commit()
+
+	err = tx.RPush(bucket, key, []byte("e"))
+	if err == nil {
+		t.Error("TestTx_RPush err")
+	}
+
+	checkPushResult(bucket, key, t)
+}
+
+func TestTx_LPush(t *testing.T) {
+	InitForList()
+	db, err = Open(opt)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tx, err = db.Begin(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bucket := "myBucket"
+	key := []byte("myList")
+	if err := tx.LPush(bucket, []byte("myList"+SeparatorForListKey), []byte("d"), []byte("c"), []byte("b"), []byte("a")); err == nil {
+		t.Error("TestTx_LPush err")
+	}
+
+	if err := tx.LPush(bucket, key, []byte("d"), []byte("c"), []byte("b"), []byte("a")); err != nil {
+		t.Fatal(err)
+	}
+
+	tx.Commit()
+
+	err = tx.LPush(bucket, key, []byte("e"))
+	if err == nil {
+		t.Error("TestTx_LPush err")
+	}
+
+	checkPushResult(bucket, key, t)
+}
+
+func checkPushResult(bucket string, key []byte, t *testing.T) {
+	expectResult := []string{"a", "b", "c", "d"}
+	for i := 0; i < len(expectResult); i++ {
+		tx, err = db.Begin(true)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		item, err := tx.LPop(bucket, key)
+		if err != nil || string(item) != expectResult[i] {
+			tx.Rollback()
+			t.Error("TestTx_LPush err")
+		} else {
+			tx.Commit()
+		}
+	}
+}
+
+func TestTx_LPop(t *testing.T) {
+	InitForList()
+	db, err = Open(opt)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tx, err = db.Begin(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bucket := "myBucket"
+	key := []byte("myList")
+
+	_, err := tx.LPop(bucket, key)
+	if err == nil {
+		t.Error("TestTx_LPop err")
+	}
+	tx.Rollback()
+
+	InitDataForList(bucket, key, t)
+	tx, err = db.Begin(true)
+	item, err := tx.LPop(bucket, key)
+	if err != nil || string(item) != "a" {
+		tx.Rollback()
+		t.Error("TestTx_LPop err")
+	} else {
+		tx.Commit()
+	}
+
+	tx, err = db.Begin(true)
+	item, err = tx.LPop(bucket, key)
+	if err != nil || string(item) != "b" {
+		tx.Rollback()
+		t.Error("TestTx_LPop err")
+	} else {
+		tx.Commit()
+		item, err = tx.LPop(bucket, key)
+		if err == nil || item != nil {
+			t.Error("TestTx_LPop err")
+		}
+	}
+
+	tx, err = db.Begin(true)
+	item, err = tx.LPop(bucket, key)
+	if err != nil || string(item) != "c" {
+		tx.Rollback()
+		t.Error("TestTx_LPop err")
+	} else {
+		tx.Commit()
+	}
+
+	tx, err = db.Begin(true)
+	item, err = tx.LPop(bucket, key)
+	if err == nil || item != nil {
+		tx.Rollback()
+		t.Fatal("TestTx_LPop err")
+	}
+
+	tx.Commit()
+}
+
+func TestTx_LRange(t *testing.T) {
+	InitForList()
+	db, err = Open(opt)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tx, err = db.Begin(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bucket := "myBucket"
+	key := []byte("myList")
+	list, err := tx.LRange(bucket, key, 0, -1)
+	if err == nil || list != nil {
+		t.Error("TestTx_LRange err")
+	}
+
+	tx.Rollback()
+
+	InitDataForList(bucket, key, t)
+
+	tx, err = db.Begin(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	list, err = tx.LRange(bucket, key, 0, -1)
+	expectResult := []string{"a", "b", "c"}
+	if err != nil {
+		tx.Rollback()
+		t.Fatal(err)
+	}
+
+	for i := 0; i < len(expectResult); i++ {
+		if string(list[i]) != string(expectResult[i]) {
+			t.Error("TestTx_LRange err")
+		}
+	}
+
+	tx.Commit()
+
+	list, err = tx.LRange(bucket, key, 0, -1)
+	if err == nil {
+		t.Error("TestTx_LRange err")
+	}
+}
+
+func TestTx_LRem(t *testing.T) {
+	InitForList()
+	db, err = Open(opt)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tx, err = db.Begin(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bucket := "myBucket"
+	key := []byte("myList")
+	err := tx.LRem(bucket, key, 1)
+	if err == nil {
+		t.Fatal(err)
+	}
+	tx.Rollback()
+
+	InitDataForList(bucket, key, t)
+
+	tx, err = db.Begin(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = tx.LRem(bucket, []byte("fake_key"), 1)
+	if err == nil {
+		t.Error("TestTx_LRem err")
+	}
+
+	err = tx.LRem(bucket, key, 1)
+	if err != nil {
+		tx.Rollback()
+		t.Fatal(err)
+	} else {
+		tx.Commit()
+		err = tx.LRem(bucket, key, 1)
+		if err == nil {
+			t.Error("TestTx_LRem err")
+		}
+	}
+
+	tx, err = db.Begin(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	list, err := tx.LRange(bucket, key, 0, -1)
+
+	expectResult := []string{"b", "c"}
+	for i := 0; i < len(expectResult); i++ {
+		if string(list[i]) != string(expectResult[i]) {
+			t.Error("TestTx_LRem err")
+		}
+	}
+
+	if err != nil {
+		tx.Rollback()
+		t.Fatal(err)
+	} else {
+		tx.Commit()
+	}
+
+	InitDataForList(bucket, []byte("myList2"), t)
+
+	tx, err = db.Begin(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = tx.LRem(bucket, key, 3)
+	if err == nil {
+		t.Error("TestTx_LRem err")
+	}
+	tx.Rollback()
+
+	InitDataForList(bucket, []byte("myList3"), t)
+
+	tx, err = db.Begin(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = tx.LRem(bucket, key, -4)
+	if err == nil {
+		t.Error("TestTx_LRem err")
+	}
+	tx.Rollback()
+
+}
+
+func InitDataForList(bucket string, key []byte, t *testing.T) {
+	tx, err = db.Begin(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = tx.RPush(bucket, key, []byte("a"), []byte("b"), []byte("c"))
+	if err != nil {
+		tx.Rollback()
+		t.Error(err)
+	} else {
+		tx.Commit()
+	}
+}
+
+func TestTx_LSet(t *testing.T) {
+	InitForList()
+	db, err = Open(opt)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tx, err = db.Begin(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bucket := "myBucket"
+	key := []byte("myList")
+	err = tx.LSet("fake_bucket", key, 0, []byte("foo"))
+	if err == nil {
+		t.Error("TestTx_LSet err")
+	}
+	tx.Rollback()
+
+	InitDataForList(bucket, key, t)
+	tx, err = db.Begin(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = tx.LSet(bucket, key, -1, []byte("a1"))
+	if err == nil {
+		t.Error("TestTx_LSet err")
+	}
+
+	err = tx.LSet(bucket, []byte("fake_key"), 0, []byte("a1"))
+	if err == nil {
+		t.Error("TestTx_LSet err")
+	}
+
+	err = tx.LSet(bucket, key, 0, []byte("a1"))
+	if err != nil {
+		tx.Rollback()
+		t.Fatal(err)
+	} else {
+		tx.Commit()
+		err = tx.LSet(bucket, key, 0, []byte("a1"))
+		if err == nil {
+			t.Error("TestTx_LSet err")
+		}
+	}
+
+	tx, err = db.Begin(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	list, err := tx.LRange(bucket, key, 0, -1)
+
+	expectResult := []string{"a1", "b", "c"}
+	for i := 0; i < len(expectResult); i++ {
+		if string(list[i]) != string(expectResult[i]) {
+			t.Error("TestTx_LSet err")
+		}
+	}
+
+	if err != nil {
+		tx.Rollback()
+		t.Fatal(err)
+	} else {
+		tx.Commit()
+	}
+
+	tx, err = db.Begin(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = tx.LSet(bucket, key, 100, []byte("a1"))
+	tx.Rollback()
+	if err == nil {
+		t.Fatal("TestTx_LSet err")
+	}
+}
+
+func TestTx_LTrim(t *testing.T) {
+	InitForList()
+	db, err = Open(opt)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tx, err = db.Begin(true)
+
+	bucket := "myBucket"
+	key := []byte("myList")
+
+	err := tx.LTrim(bucket, key, 0, 1)
+	if err == nil {
+		t.Error("TestTx_LTrim err")
+	}
+	tx.Rollback()
+
+	InitDataForList(bucket, key, t)
+
+	tx, err = db.Begin(true)
+
+	err = tx.LTrim(bucket, []byte("fake_key"), 0, 1)
+	if err == nil {
+		t.Error("TestTx_LTrim err")
+	}
+
+	err = tx.LTrim(bucket, key, 0, 1)
+	if err != nil {
+		tx.Rollback()
+		t.Error("TestTx_LTrim err")
+	}
+
+	tx.Commit()
+
+	tx, err = db.Begin(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	list, err := tx.LRange(bucket, key, 0, -1)
+
+	tx.Commit()
+
+	err = tx.LTrim(bucket, key, 0, 1)
+	if err == nil {
+		t.Error("TestTx_LTrim err")
+	}
+
+	expectResult := []string{"a", "b"}
+	for i := 0; i < len(expectResult); i++ {
+		if string(list[i]) != string(expectResult[i]) {
+			t.Error("TestTx_LTrim err")
+		}
+	}
+
+	key = []byte("myList2")
+	InitDataForList(bucket, key, t)
+
+	tx, err = db.Begin(true)
+
+	err = tx.LTrim(bucket, key, 0, -10)
+	if err == nil {
+		t.Error("TestTx_LTrim err")
+	}
+	tx.Rollback()
+}
+
+func TestTx_RPop(t *testing.T) {
+	InitForList()
+	db, err = Open(opt)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tx, err = db.Begin(true)
+
+	bucket := "myBucket"
+	key := []byte("myList")
+
+	item, err := tx.RPop(bucket, key)
+	if err == nil || item != nil {
+		t.Error("TestTx_RPop err")
+	}
+	tx.Rollback()
+
+	InitDataForList(bucket, key, t)
+
+	tx, err = db.Begin(true)
+
+	item, err = tx.RPop(bucket, []byte("fake_key"))
+	if err == nil || item != nil {
+		t.Error("TestTx_RPop err")
+	}
+
+	item, err = tx.RPop(bucket, key)
+	if err != nil || string(item) != "c" {
+		t.Error(err)
+	}
+
+	tx.Commit()
+
+	item, err = tx.RPop(bucket, key)
+	if err == nil || item != nil {
+		t.Error("TestTx_RPop err")
+	}
+}
+
+func TestTx_LSize(t *testing.T) {
+	InitForList()
+	db, err = Open(opt)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bucket := "myBucket"
+	key := []byte("myList")
+
+	tx, err = db.Begin(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	size, err := tx.LSize(bucket, key)
+	if err == nil || size != 0 {
+		t.Error("TestTx_LSize err")
+	}
+	tx.Rollback()
+
+	InitDataForList(bucket, key, t)
+
+	tx, err = db.Begin(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	size, err = tx.LSize(bucket, key)
+	if err != nil {
+		tx.Rollback()
+		t.Error(err)
+	} else {
+		if size != 3 {
+			t.Error("TestTx_LSize err")
+		}
+		tx.Commit()
+
+		size, err = tx.LSize(bucket, key)
+		if size != 0 || err == nil {
+			t.Error("TestTx_LSize err")
+		}
+	}
+}

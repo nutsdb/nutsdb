@@ -18,6 +18,7 @@ import (
 	"sort"
 )
 
+// SortedEntryKeys returns sorted entries.
 func SortedEntryKeys(m map[string]*Entry) (keys []string, es map[string]*Entry) {
 	for k := range m {
 		keys = append(keys, k)

@@ -32,8 +32,11 @@ var (
 )
 
 const (
-	DataSuffix          = ".dat"
-	DataEntryHeaderSize = 40
+	// DataSuffix returns the data suffix
+	DataSuffix = ".dat"
+
+	// DataEntryHeaderSize returns the entry header size
+	DataEntryHeaderSize = 42
 )
 
 // DataFile records about data file information.
@@ -41,29 +44,29 @@ type DataFile struct {
 	fd         *os.File
 	m          mmap.IMmap
 	path       string
-	fileId     int64
+	fileID     int64
 	writeOff   int64
 	ActualSize int64
 }
 
 // NewDataFile returns a newly initialized DataFile object.
-func NewDataFile(path string, capacity int64) (*DataFile,error) {
+func NewDataFile(path string, capacity int64) (*DataFile, error) {
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
 	if err != nil {
-		return nil,err
+		return nil, err
 	}
 	defer f.Close()
 
 	fileInfo, _ := os.Stat(path)
 	if fileInfo.Size() < capacity {
 		if err := f.Truncate(capacity); err != nil {
-			return nil,err
+			return nil, err
 		}
 	}
 
 	m, err := mmap.NewSharedFileMmap(f, 0, int(capacity), syscall.PROT_READ|syscall.PROT_WRITE)
 	if err != nil {
-		return nil,err
+		return nil, err
 	}
 
 	return &DataFile{
@@ -72,7 +75,7 @@ func NewDataFile(path string, capacity int64) (*DataFile,error) {
 		path:       path,
 		writeOff:   0,
 		ActualSize: 0,
-	},nil
+	}, nil
 }
 
 // ReadAt returns entry at the given off(offset).
@@ -146,6 +149,7 @@ func readMetaData(buf []byte) *MetaData {
 		TTL:        binary.LittleEndian.Uint32(buf[22:26]),
 		bucketSize: binary.LittleEndian.Uint32(buf[26:30]),
 		status:     binary.LittleEndian.Uint16(buf[30:32]),
-		txId:       binary.LittleEndian.Uint64(buf[32:40]),
+		ds:         binary.LittleEndian.Uint16(buf[32:34]),
+		txID:       binary.LittleEndian.Uint64(buf[34:42]),
 	}
 }

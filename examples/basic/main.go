@@ -2,7 +2,9 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"log"
+	"os"
 
 	"github.com/xujiajun/nutsdb"
 )
@@ -14,22 +16,43 @@ var (
 
 func init() {
 	opt := nutsdb.DefaultOptions
-	opt.Dir = "testdata/example"
+	fileDir := "/tmp/nutsdb_example"
+
+	files, _ := ioutil.ReadDir(fileDir)
+	for _, f := range files {
+		name := f.Name()
+		if name != "" {
+			fmt.Println(fileDir + "/" + name)
+			err := os.Remove(fileDir + "/" + name)
+			if err != nil {
+				panic(err)
+			}
+		}
+	}
+	opt.Dir = fileDir
+	opt.SegmentSize = 1024 * 1024 // 1MB
 	db, _ = nutsdb.Open(opt)
-	bucket = "bucket1"
+	bucket = "bucketForString"
 }
 
 func main() {
-	//insert put
+	//insert
 	put()
 	//read
 	read()
+
 	//delete
 	delete()
 	//read
 	read()
-	//update put
+
+	//insert
 	put()
+	//read
+	read()
+
+	//update
+	put2()
 	//read
 	read()
 }
@@ -60,7 +83,19 @@ func put() {
 		log.Fatal(err)
 	}
 }
-
+func put2() {
+	if err := db.Update(
+		func(tx *nutsdb.Tx) error {
+			key := []byte("name1")
+			val := []byte("val2")
+			if err := tx.Put(bucket, key, val, 0); err != nil {
+				return err
+			}
+			return nil
+		}); err != nil {
+		log.Fatal(err)
+	}
+}
 func read() {
 	if err := db.View(
 		func(tx *nutsdb.Tx) error {

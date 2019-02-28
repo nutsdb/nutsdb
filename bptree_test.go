@@ -160,12 +160,12 @@ func TestIsExpired(t *testing.T) {
 		},
 		E: nil,
 	}
-	if !record.isExpired() {
+	if !record.IsExpired() {
 		t.Error("err TestIsExpired")
 	}
 
 	record.H.meta.TTL = Persistent
-	if record.isExpired() {
+	if record.IsExpired() {
 		t.Error("err TestIsExpired")
 	}
 }
