@@ -374,13 +374,13 @@ func TestTx_ZRem(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	n,err:= tx.ZGetByKey(bucket,[]byte(key1))
-	if n !=nil || err==nil {
+	n, err := tx.ZGetByKey(bucket, []byte(key1))
+	if n != nil || err == nil {
 		t.Error("TestTx_ZRem err")
 	}
 
-	n,err= tx.ZGetByKey(bucket,[]byte(key2))
-	if n ==nil || err!=nil {
+	n, err = tx.ZGetByKey(bucket, []byte(key2))
+	if n == nil || err != nil {
 		t.Error("TestTx_ZRem err")
 	}
 
@@ -452,7 +452,7 @@ func TestTx_ZRemRangeByRank(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if items,err:= tx.ZMembers(bucket);err!=nil && items !=nil {
+	if items, err := tx.ZMembers(bucket); err != nil && items != nil {
 		t.Error("TestTx_ZRemRangeByRank err")
 	}
 	tx.Commit()
@@ -493,6 +493,39 @@ func TestTx_ZRank(t *testing.T) {
 	rank, err = tx.ZRank(bucket, []byte(key3))
 	if err == nil || rank == 3 {
 		t.Error("TestTx_ZRank err")
+	}
+}
+
+func TestTx_ZRevRank(t *testing.T) {
+	bucket, key1, key2, key3 := InitDataForZSet(t)
+	tx, err = db.Begin(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rank, err := tx.ZRevRank("bucket_fake", []byte(key1))
+	if err == nil || rank != 0 {
+		t.Error("TestTx_ZRevRank err")
+	}
+
+	rank, err = tx.ZRevRank(bucket, []byte(key1))
+	if err != nil || rank != 3 {
+		t.Error("TestTx_ZRevRank err")
+	}
+	rank, err = tx.ZRevRank(bucket, []byte(key2))
+	if err != nil || rank != 2 {
+		t.Error("TestTx_ZRevRank err")
+	}
+	rank, err = tx.ZRevRank(bucket, []byte(key3))
+	if err != nil || rank != 1 {
+		t.Error("TestTx_ZRevRank err")
+	}
+
+	tx.Commit()
+
+	rank, err = tx.ZRevRank(bucket, []byte(key3))
+	if err == nil || rank == 1 {
+		t.Error("TestTx_ZRevRank err")
 	}
 }
 
