@@ -18,16 +18,19 @@ import (
 	"errors"
 )
 
+// Set represents the Set.
 type Set struct {
 	M map[string]map[string]struct{}
 }
 
+// New returns a newly initialized Set Object that implements the Set.
 func New() *Set {
 	return &Set{
 		M: make(map[string]map[string]struct{}),
 	}
 }
 
+// SAdd adds the specified members to the set stored at key.
 func (s *Set) SAdd(key string, items ...[]byte) error {
 	if _, ok := s.M[key]; !ok {
 		s.M[key] = make(map[string]struct{})
@@ -57,6 +60,7 @@ func (s *Set) SRem(key string, items ...[]byte) error {
 	return nil
 }
 
+// SHasKey returns if has the set at given key.
 func (s *Set) SHasKey(key string) bool {
 	if _, ok := s.M[key]; !ok {
 		return false
@@ -118,6 +122,7 @@ func (s *Set) SInter(key1, key2 string) (list [][]byte, err error) {
 	return
 }
 
+// checkKey1AndKey2 returns if key1 and key2 exists.
 func (s *Set) checkKey1AndKey2(key1, key2 string) (list [][]byte, err error) {
 	if _, ok := s.M[key1]; !ok {
 		return nil, errors.New("set1 is not exists")
@@ -159,6 +164,7 @@ func (s *Set) SAreMembers(key string, items ...[]byte) (bool, error) {
 	return true, nil
 }
 
+// SMembers returns all the members of the set value stored at key.
 func (s *Set) SMembers(key string) (list [][]byte, err error) {
 	if _, ok := s.M[key]; !ok {
 		return nil, errors.New("set not exists")

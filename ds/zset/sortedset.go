@@ -28,8 +28,10 @@ const (
 	SkipListP        = 0.25
 )
 
+// SCORE represents the score type.
 type SCORE float64
 
+// SortedSet represents the sorted set.
 type SortedSet struct {
 	header *SortedSetNode
 	tail   *SortedSetNode
@@ -38,6 +40,7 @@ type SortedSet struct {
 	Dict   map[string]*SortedSetNode
 }
 
+// createNode returns a newly initialized SortedSetNode Object that implements the SortedSetNode.
 func createNode(level int, score SCORE, key string, value []byte) *SortedSetNode {
 	node := SortedSetNode{
 		score: score,
@@ -48,7 +51,7 @@ func createNode(level int, score SCORE, key string, value []byte) *SortedSetNode
 	return &node
 }
 
-// Returns a random level for the new skiplist node we are going to create.
+// randomLevel returns a random level for the new skiplist node we are going to create.
 // The return value of this function is between 1 and SkipListMaxLevel
 // (both inclusive), with a powerlaw-alike distribution where higher
 // levels are less likely to be returned.
@@ -70,7 +73,7 @@ func (ss *SortedSet) insertNode(score SCORE, key string, value []byte) *SortedSe
 
 	x := ss.header
 	for i := ss.level - 1; i >= 0; i-- {
-		/* store rank that is crossed to reach the insert position */
+		// store rank that is crossed to reach the insert position
 		if ss.level-1 == i {
 			rank[i] = 0
 		} else {
@@ -113,7 +116,7 @@ func (ss *SortedSet) insertNode(score SCORE, key string, value []byte) *SortedSe
 		update[i].level[i].span = (rank[0] - rank[i]) + 1
 	}
 
-	/* increment span for untouched levels */
+	//increment span for untouched levels
 	for i := level; i < ss.level; i++ {
 		update[i].level[i].span++
 	}
@@ -135,7 +138,7 @@ func (ss *SortedSet) insertNode(score SCORE, key string, value []byte) *SortedSe
 	return x
 }
 
-/* Internal function used by delete, DeleteByScore and DeleteByRank */
+// deleteNode represents internal function used by delete, DeleteByScore and DeleteByRank.
 func (ss *SortedSet) deleteNode(x *SortedSetNode, update [SkipListMaxLevel]*SortedSetNode) {
 	for i := 0; i < ss.level; i++ {
 		if update[i].level[i].forward == x {
@@ -157,7 +160,7 @@ func (ss *SortedSet) deleteNode(x *SortedSetNode, update [SkipListMaxLevel]*Sort
 	delete(ss.Dict, x.key)
 }
 
-/* Delete an element with matching score/key from the skiplist. */
+// delete removes an element with matching score/key from the skiplist.
 func (ss *SortedSet) delete(score SCORE, key string) bool {
 	var update [SkipListMaxLevel]*SortedSetNode
 
@@ -182,7 +185,7 @@ func (ss *SortedSet) delete(score SCORE, key string) bool {
 	return false /* not found */
 }
 
-// Create a new SortedSet
+// New returns a newly initialized SortedSet Object that implements the SortedSet.
 func New() *SortedSet {
 	sortedSet := SortedSet{
 		level: 1,
@@ -192,21 +195,21 @@ func New() *SortedSet {
 	return &sortedSet
 }
 
-// Get the number of elements
+// Size returns the number of elements in the SortedSet.
 func (ss *SortedSet) Size() int {
 	return int(ss.length)
 }
 
-// get the element with minimum score, nil if the set is empty
+// PeekMin returns the element with minimum score, nil if the set is empty.
 //
-// Time complexity of this method is : O(log(N))
+// Time complexity of this method is : O(log(N)).
 func (ss *SortedSet) PeekMin() *SortedSetNode {
 	return ss.header.level[0].forward
 }
 
-// get and remove the element with minimal score, nil if the set is empty
+// PopMin returns and remove the element with minimal score, nil if the set is empty.
 //
-// // Time complexity of this method is : O(log(N))
+// Time complexity of this method is : O(log(N)).
 func (ss *SortedSet) PopMin() *SortedSetNode {
 	x := ss.header.level[0].forward
 	if x != nil {
@@ -215,15 +218,16 @@ func (ss *SortedSet) PopMin() *SortedSetNode {
 	return x
 }
 
-// get the element with maximum score, nil if the set is empty
-// Time Complexity : O(1)
+// PeekMax returns the element with maximum score, nil if the set is empty.
+//
+// Time Complexity : O(1).
 func (ss *SortedSet) PeekMax() *SortedSetNode {
 	return ss.tail
 }
 
-// get and remove the element with maximum score, nil if the set is empty
+// PopMax returns and remove the element with maximum score, nil if the set is empty.
 //
-// Time complexity of this method is : O(log(N))
+// Time complexity of this method is : O(log(N)).
 func (ss *SortedSet) PopMax() *SortedSetNode {
 	x := ss.tail
 	if x != nil {
@@ -232,9 +236,9 @@ func (ss *SortedSet) PopMax() *SortedSetNode {
 	return x
 }
 
-// Add an element into the sorted set with specific key / value / score.
+// Put puts an element into the sorted set with specific key / value / score.
 //
-// Time complexity of this method is : O(log(N))
+// Time complexity of this method is : O(log(N)).
 func (ss *SortedSet) Put(key string, score SCORE, value []byte) error {
 	var newNode *SortedSetNode
 
@@ -257,9 +261,9 @@ func (ss *SortedSet) Put(key string, score SCORE, value []byte) error {
 	return nil
 }
 
-// Delete element specified by key
+// Remove removes element specified at given key.
 //
-// Time complexity of this method is : O(log(N))
+// Time complexity of this method is : O(log(N)).
 func (ss *SortedSet) Remove(key string) *SortedSetNode {
 	found := ss.Dict[key]
 	if found != nil {
@@ -269,17 +273,17 @@ func (ss *SortedSet) Remove(key string) *SortedSetNode {
 	return nil
 }
 
+// GetByScoreRangeOptions represents the options of the GetByScoreRange function.
 type GetByScoreRangeOptions struct {
 	Limit        int  // limit the max nodes to return
 	ExcludeStart bool // exclude start value, so it search in interval (start, end] or (start, end)
 	ExcludeEnd   bool // exclude end value, so it search in interval [start, end) or (start, end)
 }
 
-// Get the nodes whose score within the specific range
+// GetByScoreRange returns the nodes whose score within the specific range.
+// If options is nil, it searchs in interval [start, end] without any limit by default.
 //
-// If options is nil, it searchs in interval [start, end] without any limit by default
-//
-// Time complexity of this method is : O(log(N))
+// Time complexity of this method is : O(log(N)).
 func (ss *SortedSet) GetByScoreRange(start SCORE, end SCORE, options *GetByScoreRangeOptions) []*SortedSetNode {
 	limit := 1 << 31
 	if options != nil && options.Limit > 0 {
@@ -383,13 +387,12 @@ func (ss *SortedSet) GetByScoreRange(start SCORE, end SCORE, options *GetByScore
 	return nodes
 }
 
-// Get nodes within specific rank range [start, end]
-// Note that the rank is 1-based integer. Rank 1 means the first node; Rank -1 means the last node;
-//
+// GetByRankRange returns nodes within specific rank range [start, end].
+// Note that the rank is 1-based integer. Rank 1 means the first node; Rank -1 means the last node
 // If start is greater than end, the returned array is in reserved order
-// If remove is true, the returned nodes are removed
+// If remove is true, the returned nodes are removed.
 //
-// Time complexity of this method is : O(log(N))
+// Time complexity of this method is : O(log(N)).
 func (ss *SortedSet) GetByRankRange(start int, end int, remove bool) []*SortedSetNode {
 	var (
 		update    [SkipListMaxLevel]*SortedSetNode
@@ -397,7 +400,7 @@ func (ss *SortedSet) GetByRankRange(start int, end int, remove bool) []*SortedSe
 		traversed int
 	)
 
-	/* Sanitize indexes. */
+	// Sanitize indexes.
 	if start < 0 {
 		start = int(ss.length) + start + 1
 	}
@@ -456,13 +459,12 @@ func (ss *SortedSet) GetByRankRange(start int, end int, remove bool) []*SortedSe
 	return nodes
 }
 
-// Get node by rank.
-// Note that the rank is 1-based integer. Rank 1 means the first node; Rank -1 means the last node;
-//
+// GetByRank returns the node at given rank.
+// Note that the rank is 1-based integer. Rank 1 means the first node; Rank -1 means the last node.
 // If remove is true, the returned nodes are removed
-// If node is not found at specific rank, nil is returned
+// If node is not found at specific rank, nil is returned.
 //
-// Time complexity of this method is : O(log(N))
+// Time complexity of this method is : O(log(N)).
 func (ss *SortedSet) GetByRank(rank int, remove bool) *SortedSetNode {
 	nodes := ss.GetByRankRange(rank, rank, remove)
 	if len(nodes) == 1 {
@@ -471,20 +473,19 @@ func (ss *SortedSet) GetByRank(rank int, remove bool) *SortedSetNode {
 	return nil
 }
 
-// Get node by key
-//
+// GetByKey returns the  node at given key.
 // If node is not found, nil is returned
-// Time complexity : O(1)
+//
+// Time complexity : O(1).
 func (ss *SortedSet) GetByKey(key string) *SortedSetNode {
 	return ss.Dict[key]
 }
 
 // FindRank Returns the rank of member in the sorted set stored at key, with the scores ordered from low to high.
 // Note that the rank is 1-based integer. Rank 1 means the first node
+// If the node is not found, 0 is returned. Otherwise rank(> 0) is returned.
 //
-// If the node is not found, 0 is returned. Otherwise rank(> 0) is returned
-//
-// Time complexity of this method is : O(log(N))
+// Time complexity of this method is : O(log(N)).
 func (ss *SortedSet) FindRank(key string) int {
 	rank := 0
 	node := ss.Dict[key]

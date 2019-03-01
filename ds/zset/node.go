@@ -18,12 +18,13 @@
 
 package zset
 
+// SortedSetLevel records forward and span.
 type SortedSetLevel struct {
 	forward *SortedSetNode
 	span    int64
 }
 
-// Node in skip list
+// SortedSetNode represents a node in the SortedSet.
 type SortedSetNode struct {
 	key      string // unique key of this node
 	Value    []byte // associated data
@@ -32,12 +33,12 @@ type SortedSetNode struct {
 	level    []SortedSetLevel
 }
 
-// Get the key of the node
+// Key returns the key of the node.
 func (ssn *SortedSetNode) Key() string {
 	return ssn.key
 }
 
-// Get the node of the node
+// Score returns the score of the node.
 func (ssn *SortedSetNode) Score() SCORE {
 	return ssn.score
 }
