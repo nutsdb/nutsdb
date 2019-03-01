@@ -61,10 +61,7 @@ func delete() {
 	if err := db.Update(
 		func(tx *nutsdb.Tx) error {
 			key := []byte("name1")
-			if err := tx.Delete(bucket, key); err != nil {
-				return err
-			}
-			return nil
+			return tx.Delete(bucket, key)
 		}); err != nil {
 		log.Fatal(err)
 	}
@@ -75,10 +72,7 @@ func put() {
 		func(tx *nutsdb.Tx) error {
 			key := []byte("name1")
 			val := []byte("val1")
-			if err := tx.Put(bucket, key, val, 0); err != nil {
-				return err
-			}
-			return nil
+			return tx.Put(bucket, key, val, 0)
 		}); err != nil {
 		log.Fatal(err)
 	}
@@ -88,10 +82,7 @@ func put2() {
 		func(tx *nutsdb.Tx) error {
 			key := []byte("name1")
 			val := []byte("val2")
-			if err := tx.Put(bucket, key, val, 0); err != nil {
-				return err
-			}
-			return nil
+			return tx.Put(bucket, key, val, 0)
 		}); err != nil {
 		log.Fatal(err)
 	}
@@ -100,11 +91,12 @@ func read() {
 	if err := db.View(
 		func(tx *nutsdb.Tx) error {
 			key := []byte("name1")
-			if e, err := tx.Get(bucket, key); err != nil {
+			e, err := tx.Get(bucket, key)
+			if err != nil {
 				return err
-			} else {
-				fmt.Println("val:", string(e.Value))
 			}
+			fmt.Println("val:", string(e.Value))
+
 			return nil
 		}); err != nil {
 		log.Println(err)
