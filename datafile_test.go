@@ -87,7 +87,7 @@ func TestDataFile_All(t *testing.T) {
 		t.Fatal(err)
 	}
 	content := entry.Encode()[0 : DataEntryHeaderSize-1]
-	n, err = df.WriteAt(content, 0)
+	_, err = df.WriteAt(content, 0)
 	if err != nil {
 		t.Error("err TestDataFile_All WriteAt")
 	}
@@ -104,7 +104,7 @@ func TestDataFile_All(t *testing.T) {
 		t.Fatal(err)
 	}
 	content = entry.Encode()[0 : DataEntryHeaderSize+1]
-	n, err = df.WriteAt(content, 0)
+	_, err = df.WriteAt(content, 0)
 	if err != nil {
 		t.Error("err TestDataFile_All WriteAt")
 	}
@@ -126,7 +126,7 @@ func TestDataFile_All(t *testing.T) {
 	errContent = append(errContent, entry.Encode()[0:4]...)
 	errContent = append(errContent, entry.Encode()[4:entry.Size()-1]...)
 	errContent = append(errContent, 0)
-	n, err = df.WriteAt(errContent, 0)
+	_, err = df.WriteAt(errContent, 0)
 	if err != nil {
 		t.Error("err TestDataFile_All WriteAt")
 	}

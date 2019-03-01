@@ -76,7 +76,7 @@ func TestTx_PutAndGet(t *testing.T) {
 
 	if e, err := tx.Get(bucket, key); err != nil {
 		//tx rollback
-		err = tx.Rollback()
+		tx.Rollback()
 	} else {
 		//tx commit
 		tx.Commit()
@@ -96,7 +96,7 @@ func TestTx_PutAndGet(t *testing.T) {
 	db.Close()
 
 	if err = tx.Put(bucket, key, val, Persistent); err != nil {
-		err = tx.Rollback()
+		tx.Rollback()
 	} else {
 		t.Error("err tx.Put")
 	}
@@ -141,7 +141,7 @@ func TestTx_BatchPutsAndScans(t *testing.T) {
 	end := []byte("key_0010010")
 	if _, err := tx.RangeScan(bucket, start, end); err != nil {
 		//tx rollback
-		err = tx.Rollback()
+		tx.Rollback()
 	} else {
 		t.Error("err range scan")
 	}
@@ -156,7 +156,7 @@ func TestTx_BatchPutsAndScans(t *testing.T) {
 	end = []byte("key_0000010")
 	if entries, err := tx.RangeScan(bucket, start, end); err != nil {
 		//tx rollback
-		err = tx.Rollback()
+		tx.Rollback()
 	} else {
 		keys, _ := SortedEntryKeys(entries)
 		j := 0
@@ -185,7 +185,7 @@ func TestTx_BatchPutsAndScans(t *testing.T) {
 	prefix := []byte("key_")
 	if entries, err := tx.PrefixScan(bucket, prefix, 10); err != nil {
 		//tx rollback
-		err = tx.Rollback()
+		tx.Rollback()
 	} else {
 		keys, _ := SortedEntryKeys(entries)
 		j := 0
@@ -240,7 +240,7 @@ func TestTx_DeleteAndGet(t *testing.T) {
 		key := []byte("key_" + fmt.Sprintf("%07d", i))
 		if entry, err := tx.Get(bucket, key); err != nil {
 			//tx rollback
-			err = tx.Rollback()
+			tx.Rollback()
 			//t.Fatal(err)
 		} else {
 			val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", i))
@@ -284,8 +284,7 @@ func TestTx_DeleteAndGet(t *testing.T) {
 		key := []byte("key_" + fmt.Sprintf("%07d", i))
 		if _, err := tx.Get(bucket, key); err != nil {
 			//tx rollback
-			err = tx.Rollback()
-
+			tx.Rollback()
 		} else {
 			t.Error("err read tx ")
 		}
@@ -299,7 +298,7 @@ func TestTx_DeleteAndGet(t *testing.T) {
 		key := []byte("key_" + fmt.Sprintf("%07d", i))
 		if entry, err := tx.Get(bucket, key); err != nil {
 			//tx rollback
-			err = tx.Rollback()
+			tx.Rollback()
 		} else {
 			val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", i))
 			if string(val) != string(entry.Value) {
@@ -348,8 +347,7 @@ func TestTx_GetAndScansFromMmap(t *testing.T) {
 		key := []byte("key_" + fmt.Sprintf("%07d", i))
 		if entry, err := tx.Get(bucket, key); err != nil {
 			//tx rollback
-			err = tx.Rollback()
-
+			tx.Rollback()
 		} else {
 			val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", i))
 			if string(val) != string(entry.Value) {
@@ -369,7 +367,7 @@ func TestTx_GetAndScansFromMmap(t *testing.T) {
 	end := []byte("key_0000010")
 	if entries, err := tx.RangeScan(bucket, start, end); err != nil {
 		//tx rollback
-		err = tx.Rollback()
+		tx.Rollback()
 	} else {
 		keys, _ := SortedEntryKeys(entries)
 		j := 0
@@ -405,7 +403,7 @@ func TestTx_Put_Err(t *testing.T) {
 	val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 0))
 	if err = tx.Put(bucket, key, val, Persistent); err != nil {
 		//tx rollback
-		err = tx.Rollback()
+		tx.Rollback()
 	} else {
 		t.Fatal("err TestTx_Put_Err")
 	}
@@ -421,7 +419,7 @@ func TestTx_Put_Err(t *testing.T) {
 	val = []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 0))
 	if err = tx.Put(bucket, key, val, Persistent); err != nil {
 		//tx rollback
-		err = tx.Rollback()
+		tx.Rollback()
 	} else {
 		t.Fatal("err TestTx_Put_Err")
 	}
@@ -441,7 +439,7 @@ func TestTx_Put_Err(t *testing.T) {
 	tx.Put(bucket, key, []byte(bigVal), Persistent)
 
 	if err = tx.Commit(); err != nil {
-		err = tx.Rollback()
+		tx.Rollback()
 	} else {
 		t.Error("err put too big val")
 	}
@@ -463,7 +461,7 @@ func TestTx_PrefixScan_NotFound(t *testing.T) {
 		if entries != nil {
 			t.Error("err TestTx_PrefixScan_NotFound")
 		}
-		err = tx.Rollback()
+		tx.Rollback()
 	} else {
 		t.Error("err TestTx_PrefixScan_NotFound")
 	}
@@ -501,7 +499,7 @@ func TestTx_PrefixScan_NotFound(t *testing.T) {
 		if entries != nil {
 			t.Error("err TestTx_PrefixScan_NotFound")
 		}
-		err = tx.Rollback()
+		tx.Rollback()
 	} else {
 		t.Error("err TestTx_PrefixScan_NotFound")
 	}

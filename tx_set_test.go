@@ -130,7 +130,7 @@ func TestTx_SRem(t *testing.T) {
 	}
 
 	if ok, err := tx.SAreMembers(bucket, key, val1, val2); err != nil {
-		err = tx.Rollback()
+		tx.Rollback()
 	} else {
 		tx.Commit()
 		if !ok {
@@ -180,7 +180,7 @@ func TestTx_SMembers(t *testing.T) {
 	}
 
 	if list, err := tx.SMembers(bucket, key); err != nil {
-		err = tx.Rollback()
+		tx.Rollback()
 	} else {
 		if len(list) != 2 {
 			t.Error("TestTx_SMembers err")
@@ -432,8 +432,8 @@ func TestTx_SPop(t *testing.T) {
 		tx.Commit()
 	}
 
-	tx, err = db.Begin(false)
-	num, err := tx.SCard(bucket, key)
+	tx, _ = db.Begin(false)
+	num, _ := tx.SCard(bucket, key)
 	if num != 3 {
 		tx.Rollback()
 		t.Fatal("TestTx_SPop err")
@@ -465,8 +465,8 @@ func TestTx_SPop(t *testing.T) {
 
 	tx.Commit()
 
-	tx, err = db.Begin(false)
-	num, err = tx.SCard(bucket, key)
+	tx, _ = db.Begin(false)
+	num, _ = tx.SCard(bucket, key)
 	if num != 2 {
 		tx.Rollback()
 		t.Fatal("TestTx_SPop err")

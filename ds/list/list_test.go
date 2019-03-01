@@ -244,6 +244,9 @@ func TestList_LRem(t *testing.T) {
 	list, key = InitListData()
 
 	num, err = list.LRem(key, -1)
+	if err != nil || num == 0 {
+		t.Error("TestList_LRem err")
+	}
 	items, err = list.LRange(key, 0, -1)
 	if err != nil || items == nil {
 		t.Error("TestList_LRem err")

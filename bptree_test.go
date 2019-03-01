@@ -67,7 +67,7 @@ func TestBPTree_Find(t *testing.T) {
 
 func TestBPTree_PrefixScan(t *testing.T) {
 	tree = NewTree()
-	rs, err := tree.PrefixScan([]byte("key_001"), 10)
+	_, err := tree.PrefixScan([]byte("key_001"), 10)
 	if err == nil {
 		t.Fatal("err prefix Scan")
 	}
@@ -75,7 +75,7 @@ func TestBPTree_PrefixScan(t *testing.T) {
 	setup(t, limit)
 
 	// prefix scan
-	rs, err = tree.PrefixScan([]byte("key_"), limit)
+	rs, err := tree.PrefixScan([]byte("key_"), limit)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,7 +84,7 @@ func TestBPTree_PrefixScan(t *testing.T) {
 		t.Errorf("err prefix Scan. got %v want %v", rs, expected)
 	}
 
-	rs, err = tree.PrefixScan([]byte("key_xx"), limit)
+	_, err = tree.PrefixScan([]byte("key_xx"), limit)
 	if err == nil {
 		t.Error("err prefix Scan")
 	}
@@ -100,11 +100,11 @@ func TestBPTree_PrefixScan(t *testing.T) {
 		}
 	}
 
-	rs, err = tree.PrefixScan([]byte("name_"), limit)
+	_, err = tree.PrefixScan([]byte("name_"), limit)
 	if err != nil {
 		t.Error("err prefix Scan")
 	}
-	rs, err = tree.PrefixScan([]byte("key_100"), limit)
+	_, err = tree.PrefixScan([]byte("key_100"), limit)
 	if err != nil {
 		t.Error("err prefix Scan")
 	}
@@ -112,7 +112,7 @@ func TestBPTree_PrefixScan(t *testing.T) {
 
 func TestBPTree_Range(t *testing.T) {
 	tree = NewTree()
-	rs, err := tree.Range([]byte("key_001"), []byte("key_010"))
+	_, err := tree.Range([]byte("key_001"), []byte("key_010"))
 	if err == nil {
 		t.Fatal("err prefix Scan")
 	}
@@ -120,7 +120,7 @@ func TestBPTree_Range(t *testing.T) {
 	limit := 10
 	setup(t, limit)
 	// range scan
-	rs, err = tree.Range([]byte("key_001"), []byte("key_010"))
+	rs, err := tree.Range([]byte("key_001"), []byte("key_010"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -129,12 +129,12 @@ func TestBPTree_Range(t *testing.T) {
 		t.Errorf("err range Scan. got %v want %v", rs, expected)
 	}
 
-	rs, err = tree.Range([]byte("key_101"), []byte("key_110"))
+	_, err = tree.Range([]byte("key_101"), []byte("key_110"))
 	if err == nil {
 		t.Error("err tree.Range scan")
 	}
 
-	rs, err = tree.Range([]byte("key_101"), []byte("key_100"))
+	_, err = tree.Range([]byte("key_101"), []byte("key_100"))
 	if err == nil {
 		t.Error("err tree.Range scan")
 	}

@@ -199,12 +199,11 @@ func TestSortedSet_FindRevRank(t *testing.T) {
 	var rank int
 	ss = New()
 
-	rank = ss.FindRevRank("key1")
 	if rank = ss.FindRevRank("key1"); rank != 0 {
 		t.Error("TestSortedSet_FindRevRank err")
 	}
 	ss.Put("key0", 0, []byte("a0"))
-	rank = ss.FindRevRank("key1")
+
 	if rank = ss.FindRevRank("key1"); rank != 0 {
 		t.Error("TestSortedSet_FindRevRank err")
 	}

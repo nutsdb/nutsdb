@@ -138,6 +138,9 @@ func TestTx_LPop(t *testing.T) {
 
 	InitDataForList(bucket, key, t)
 	tx, err = db.Begin(true)
+	if err != nil {
+		t.Error(err)
+	}
 	item, err := tx.LPop(bucket, key)
 	if err != nil || string(item) != "a" {
 		tx.Rollback()
@@ -146,7 +149,7 @@ func TestTx_LPop(t *testing.T) {
 		tx.Commit()
 	}
 
-	tx, err = db.Begin(true)
+	tx, _ = db.Begin(true)
 	item, err = tx.LPop(bucket, key)
 	if err != nil || string(item) != "b" {
 		tx.Rollback()
@@ -168,7 +171,7 @@ func TestTx_LPop(t *testing.T) {
 		tx.Commit()
 	}
 
-	tx, err = db.Begin(true)
+	tx, _ = db.Begin(true)
 	item, err = tx.LPop(bucket, key)
 	if err == nil || item != nil {
 		tx.Rollback()
@@ -221,7 +224,7 @@ func TestTx_LRange(t *testing.T) {
 
 	tx.Commit()
 
-	list, err = tx.LRange(bucket, key, 0, -1)
+	_, err = tx.LRange(bucket, key, 0, -1)
 	if err == nil {
 		t.Error("TestTx_LRange err")
 	}
@@ -434,7 +437,7 @@ func TestTx_LTrim(t *testing.T) {
 
 	InitDataForList(bucket, key, t)
 
-	tx, err = db.Begin(true)
+	tx, _ = db.Begin(true)
 
 	err = tx.LTrim(bucket, []byte("fake_key"), 0, 1)
 	if err == nil {
@@ -473,7 +476,7 @@ func TestTx_LTrim(t *testing.T) {
 	key = []byte("myList2")
 	InitDataForList(bucket, key, t)
 
-	tx, err = db.Begin(true)
+	tx, _ = db.Begin(true)
 
 	err = tx.LTrim(bucket, key, 0, -10)
 	if err == nil {
@@ -502,7 +505,7 @@ func TestTx_RPop(t *testing.T) {
 
 	InitDataForList(bucket, key, t)
 
-	tx, err = db.Begin(true)
+	tx, _ = db.Begin(true)
 
 	item, err = tx.RPop(bucket, []byte("fake_key"))
 	if err == nil || item != nil {
