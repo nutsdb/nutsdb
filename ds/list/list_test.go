@@ -140,24 +140,25 @@ func TestList_LRange(t *testing.T) {
 		t.Error("TestList_LRange err")
 	}
 
-	expectResult := make(map[string]struct{}, 3)
-	expectResult["a"] = struct{}{}
-	expectResult["b"] = struct{}{}
-	expectResult["c"] = struct{}{}
+	expectResult := getExpectResult("a", "b", "c")
 	for _, item := range items {
 		if _, ok := expectResult[string(item)]; !ok {
 			t.Error("TestList_LRange err")
 		}
 	}
+}
 
-	items, err = list.LRange(key, 4, 8)
+func TestList_LRange2(t *testing.T) {
+	list, key := InitListData()
+	list.RPush(key, []byte("e"))
+	list.RPush(key, []byte("f"))
+
+	items, err := list.LRange(key, 4, 8)
 	if err != nil {
 		t.Error("TestList_LRange err")
 	}
 
-	expectResult = make(map[string]struct{}, 2)
-	expectResult["e"] = struct{}{}
-	expectResult["f"] = struct{}{}
+	expectResult := getExpectResult("e", "f")
 	for _, item := range items {
 		if _, ok := expectResult[string(item)]; !ok {
 			t.Error("TestList_LRange err")
@@ -168,16 +169,17 @@ func TestList_LRange(t *testing.T) {
 	if err == nil || items != nil {
 		t.Error("TestList_LRange err")
 	}
+}
 
-	items, err = list.LRange(key, -3, -1)
+func TestList_LRange3(t *testing.T) {
+	list, key := InitListData()
+	list.RPush(key, []byte("e"))
+	items, err := list.LRange(key, -3, -1)
 	if err != nil {
 		t.Error("TestList_LRange err")
 	}
 
-	expectResult = make(map[string]struct{}, 2)
-	expectResult["d"] = struct{}{}
-	expectResult["e"] = struct{}{}
-	expectResult["f"] = struct{}{}
+	expectResult := getExpectResult("c", "d", "e")
 	for _, item := range items {
 		if _, ok := expectResult[string(item)]; !ok {
 			t.Error("TestList_LRange err")
@@ -188,8 +190,12 @@ func TestList_LRange(t *testing.T) {
 	if err == nil || items != nil {
 		t.Error("TestList_LRange err")
 	}
+}
 
-	items, err = list.LRange("key_fake", -2, -1)
+func TestList_LRange4(t *testing.T) {
+	list, key := InitListData()
+
+	items, err := list.LRange("key_fake", -2, -1)
 	if err == nil || items != nil {
 		t.Error("TestList_LRange err")
 	}
@@ -200,7 +206,7 @@ func TestList_LRange(t *testing.T) {
 	}
 
 	items, err = list.LRange(key, 0, -1)
-	if len(items) != 6 || err != nil {
+	if len(items) != 4 || err != nil {
 		t.Error("TestList_LRange err")
 	}
 }
@@ -208,78 +214,69 @@ func TestList_LRange(t *testing.T) {
 func TestList_LRem(t *testing.T) {
 	list, key := InitListData()
 
-	num, err := list.LRem("key_fake", 1)
-	if err == nil || num != 0 {
+	if num, err := list.LRem("key_fake", 1); err == nil || num != 0 {
 		t.Error("TestList_LRem err")
 	}
 
-	num, err = list.LRem(key, 1)
-	if err != nil && num != 1 {
+	if num, err := list.LRem(key, 1); err != nil && num != 1 {
 		t.Error("TestList_LRem err")
 	}
-	expectResult := make(map[string]struct{}, 2)
-	expectResult["b"] = struct{}{}
-	expectResult["c"] = struct{}{}
-	expectResult["d"] = struct{}{}
 
-	items, err := list.LRange(key, 0, -1)
-	if err != nil {
+	expectResult := getExpectResult("b", "c", "d")
+
+	if items, err := list.LRange(key, 0, -1); err != nil {
 		t.Error("TestList_LRem err")
-	}
-	for _, item := range items {
-		if _, ok := expectResult[string(item)]; !ok {
-			t.Error("TestList_LRem err")
+	} else {
+		for _, item := range items {
+			if _, ok := expectResult[string(item)]; !ok {
+				t.Error("TestList_LRem err")
+			}
 		}
 	}
+}
 
-	num, err = list.LRem(key, 0)
-	if err != nil && num != 3 {
-		t.Error("TestList_LRem err")
-	}
-	size, err := list.Size(key)
-	if err == nil || size != 0 {
-		t.Error("TestList_LRem err")
-	}
+func TestList_LRem2(t *testing.T) {
+	list, key := InitListData()
 
-	list, key = InitListData()
-
-	num, err = list.LRem(key, -1)
-	if err != nil || num == 0 {
-		t.Error("TestList_LRem err")
-	}
-	items, err = list.LRange(key, 0, -1)
-	if err != nil || items == nil {
+	if num, err := list.LRem(key, -1); err != nil || num == 0 {
 		t.Error("TestList_LRem err")
 	}
 
-	expectResult = make(map[string]struct{}, 3)
-	expectResult["a"] = struct{}{}
-	expectResult["b"] = struct{}{}
-	expectResult["c"] = struct{}{}
-	for _, item := range items {
-		if _, ok := expectResult[string(item)]; !ok {
-			t.Error("TestList_LRem err")
+	expectResult := getExpectResult("a", "b", "c")
+
+	if items, err := list.LRange(key, 0, -1); err != nil || items == nil {
+		t.Error("TestList_LRem err")
+	} else {
+		for _, item := range items {
+			if _, ok := expectResult[string(item)]; !ok {
+				t.Error("TestList_LRem err")
+			}
 		}
 	}
-	num, err = list.LRem(key, -2)
-	if num != 2 || err != nil {
-		t.Error("TestList_LRem err")
-	}
-	items, err = list.LRange(key, 0, -1)
-	if err != nil {
+}
+
+func TestList_LRem3(t *testing.T) {
+	list, key := InitListData()
+
+	if num, err := list.LRem(key, -2); num != 2 || err != nil {
 		t.Error("TestList_LRem err")
 	}
 
-	expectResult = make(map[string]struct{}, 1)
-	expectResult["a"] = struct{}{}
-	for _, item := range items {
-		if _, ok := expectResult[string(item)]; !ok {
-			t.Error("TestList_LRem err")
+	if items, err := list.LRange(key, 0, -1); err != nil {
+		t.Error("TestList_LRem err")
+	} else {
+		expectResult := getExpectResult("a", "b")
+		for _, item := range items {
+			if _, ok := expectResult[string(item)]; !ok {
+				t.Error("TestList_LRem err")
+			}
 		}
 	}
+}
 
-	list, key = InitListData()
-	num, err = list.LRem(key, -10)
+func TestList_LRem4(t *testing.T) {
+	list, key := InitListData()
+	num, err := list.LRem(key, -10)
 	if err == nil || num != 0 {
 		t.Error("TestList_LRem err")
 	}
@@ -294,6 +291,18 @@ func TestList_LRem(t *testing.T) {
 	num, err = list.LRem(key, 3)
 	if err != nil || num == 0 {
 		t.Error(err)
+	}
+}
+
+func TestList_LRem5(t *testing.T) {
+	list, key := InitListData()
+	num, err := list.LRem(key, 0)
+	if err != nil && num != 4 {
+		t.Error("TestList_LRem err")
+	}
+	size, err := list.Size(key)
+	if err == nil || size != 0 {
+		t.Error("TestList_LRem err")
 	}
 }
 
@@ -329,11 +338,7 @@ func TestList_LSet(t *testing.T) {
 func TestList_Ltrim(t *testing.T) {
 	list, key := InitListData()
 
-	expectResult := make(map[string]struct{}, 1)
-	expectResult["a"] = struct{}{}
-	expectResult["b"] = struct{}{}
-	expectResult["c"] = struct{}{}
-	expectResult["d"] = struct{}{}
+	expectResult := getExpectResult("a", "b", "c", "d")
 
 	for _, item := range list.Items[key] {
 		if _, ok := expectResult[string(item)]; !ok {
@@ -341,28 +346,31 @@ func TestList_Ltrim(t *testing.T) {
 		}
 	}
 
-	err := list.Ltrim(key, 0, 2)
-	if err != nil {
+	if err := list.Ltrim(key, 0, 2); err != nil {
 		t.Error("TestList_Ltrim err")
 	}
 
-	expectResult = make(map[string]struct{}, 1)
-	expectResult["a"] = struct{}{}
-	expectResult["b"] = struct{}{}
-	expectResult["c"] = struct{}{}
+	expectResult = getExpectResult("a", "b", "c")
 	for _, item := range list.Items[key] {
 		if _, ok := expectResult[string(item)]; !ok {
 			t.Error("TestList_Ltrim err")
 		}
 	}
 
-	err = list.Ltrim("key_fake", 0, 2)
-	if err == nil {
+	if err := list.Ltrim("key_fake", 0, 2); err == nil {
 		t.Error("TestList_Ltrim err")
 	}
 
-	err = list.Ltrim(key, -1, -2)
-	if err == nil {
+	if err := list.Ltrim(key, -1, -2); err == nil {
 		t.Error("TestList_Ltrim err")
 	}
+}
+
+func getExpectResult(items ...string) map[string]struct{} {
+	expectResult := make(map[string]struct{}, len(items))
+	for _, item := range items {
+		expectResult[item] = struct{}{}
+	}
+
+	return expectResult
 }
