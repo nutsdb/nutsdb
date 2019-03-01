@@ -19,32 +19,14 @@ import (
 	"testing"
 )
 
-func TestDataFile_All(t *testing.T) {
-	filepath := "/tmp/foo"
+var (
+	filepath string
+	entry    Entry
+)
 
-	df, err := NewDataFile(filepath, -1)
-	defer os.Remove(filepath)
-
-	if err == nil {
-		t.Error("err invalid argument")
-	}
-
-	df, err = NewDataFile(filepath, 1024)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	e, err := df.ReadAt(0)
-	if err != nil && e != nil {
-		t.Error("err ReadAt")
-	}
-
-	e, err = df.ReadAt(1025)
-	if err == nil && e != nil {
-		t.Error("err ReadAt")
-	}
-
-	entry := Entry{
+func init() {
+	filepath = "/tmp/foo"
+	entry = Entry{
 		Key:   []byte("key_0001"),
 		Value: []byte("val_0001"),
 		Meta: &MetaData{
@@ -58,13 +40,29 @@ func TestDataFile_All(t *testing.T) {
 		},
 		position: 0,
 	}
+}
+func TestDataFile_Err(t *testing.T) {
+	_, err := NewDataFile(filepath, -1)
+	defer os.Remove(filepath)
+
+	if err == nil {
+		t.Error("err invalid argument")
+	}
+
+}
+
+func TestDataFile1(t *testing.T) {
+	df, err := NewDataFile(filepath, 1024)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	n, err := df.WriteAt(entry.Encode(), 0)
 	if err != nil {
 		t.Error("err TestDataFile_All WriteAt")
 	}
 
-	e, err = df.ReadAt(n)
+	e, err := df.ReadAt(n)
 	if e != nil || err != nil {
 		t.Error("err TestDataFile_All ReadAt")
 	}
@@ -78,10 +76,11 @@ func TestDataFile_All(t *testing.T) {
 	if err == nil || e != nil {
 		t.Error("err TestDataFile_All ReadAt")
 	}
+}
 
-	//err
+func TestDataFile2(t *testing.T) {
 	filepath2 := "/tmp/foo2"
-	df, err = NewDataFile(filepath2, 39)
+	df, err := NewDataFile(filepath2, 39)
 	defer os.Remove(filepath2)
 	if err != nil {
 		t.Fatal(err)
@@ -92,7 +91,7 @@ func TestDataFile_All(t *testing.T) {
 		t.Error("err TestDataFile_All WriteAt")
 	}
 
-	e, err = df.ReadAt(0)
+	e, err := df.ReadAt(0)
 	if err == nil || e != nil {
 		t.Error("err TestDataFile_All ReadAt")
 	}
@@ -113,11 +112,37 @@ func TestDataFile_All(t *testing.T) {
 	if err == nil || e != nil {
 		t.Error("err TestDataFile_All ReadAt")
 	}
+}
 
-	//crc err
+func TestDataFile_ReadAt(t *testing.T) {
+	df, err := NewDataFile(filepath, 1024)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	e, err := df.ReadAt(0)
+	if err != nil && e != nil {
+		t.Error("err ReadAt")
+	}
+
+	e, err = df.ReadAt(1025)
+	if err == nil && e != nil {
+		t.Error("err ReadAt")
+	}
+}
+
+func TestDataFile_Err_Path(t *testing.T) {
+	filepath5 := ":/tmp/foo5"
+	df, err := NewDataFile(filepath5, entry.Size())
+	if err == nil && df != nil {
+		t.Error("err TestDataFile_All open")
+	}
+}
+
+func TestDataFile_Crc_Err(t *testing.T) {
 	filepath4 := "/tmp/foo4"
 
-	df, err = NewDataFile(filepath4, entry.Size())
+	df, err := NewDataFile(filepath4, entry.Size())
 	defer os.Remove(filepath4)
 	if err != nil {
 		t.Fatal(err)
@@ -131,15 +156,8 @@ func TestDataFile_All(t *testing.T) {
 		t.Error("err TestDataFile_All WriteAt")
 	}
 
-	e, err = df.ReadAt(0)
+	e, err := df.ReadAt(0)
 	if err == nil || e != nil {
 		t.Error("err TestDataFile_All ReadAt")
-	}
-
-	//err path
-	filepath5 := ":/tmp/foo5"
-	df, err = NewDataFile(filepath5, entry.Size())
-	if err == nil && df != nil {
-		t.Error("err TestDataFile_All open")
 	}
 }
