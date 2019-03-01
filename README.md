@@ -671,9 +671,9 @@ if err := db.View(
 
 ##### SCard 
 
-```go
-
 Returns the set cardinality (number of elements) of the set stored in the bucket at given bucket and key.
+
+```go
 
 if err := db.View(
 	func(tx *nutsdb.Tx) error {
@@ -1442,7 +1442,7 @@ if err := db.View(
 ```
 ##### ZRank
 
-Returns the rank of member in the sorted set stored in the bucket at given bucket and key,with the scores ordered from low to high.
+Returns the rank of member in the sorted set stored in the bucket at given bucket and key, with the scores ordered from low to high.
 
 ```go
 
