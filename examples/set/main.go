@@ -39,36 +39,36 @@ func init() {
 }
 
 func main() {
-	SAdd()
+	testSAdd()
 
-	SAreMembers()
+	testSAreMembers()
 
-	SCard()
+	testSCard()
 
-	SDiffByOneBucket()
+	testSDiffByOneBucket()
 
-	SDiffByTwoBuckets()
+	testSDiffByTwoBuckets()
 
-	SHasKey()
+	testSHasKey()
 
-	SIsMember()
+	testSIsMember()
 
-	SMembers()
+	testSMembers()
 
-	SMoveByOneBucket()
+	testSMoveByOneBucket()
 
-	SMoveByTwoBuckets()
+	testSMoveByTwoBuckets()
 
-	SPop()
+	testSPop()
 
-	SRem()
+	testSRem()
 
-	SUnionByOneBucket()
+	testSUnionByOneBucket()
 
-	SUnionByTwoBucket()
+	testSUnionByTwoBucket()
 }
 
-func SAdd() {
+func testSAdd() {
 	if err := db.Update(
 		func(tx *nutsdb.Tx) error {
 			key := []byte("mySet")
@@ -81,7 +81,7 @@ func SAdd() {
 	}
 }
 
-func SAreMembers() {
+func testSAreMembers() {
 	if err := db.View(
 		func(tx *nutsdb.Tx) error {
 			key := []byte("mySet")
@@ -96,7 +96,7 @@ func SAreMembers() {
 	}
 }
 
-func SCard() {
+func testSCard() {
 	if err := db.View(
 		func(tx *nutsdb.Tx) error {
 			key := []byte("mySet")
@@ -111,7 +111,7 @@ func SCard() {
 	}
 }
 
-func SDiffByOneBucket() {
+func testSDiffByOneBucket() {
 	key1 := []byte("mySet1")
 	key2 := []byte("mySet2")
 
@@ -153,7 +153,7 @@ func SDiffByOneBucket() {
 	}
 }
 
-func SDiffByTwoBuckets() {
+func testSDiffByTwoBuckets() {
 	bucket1 := "bucket1"
 	key1 := []byte("mySet1")
 
@@ -197,7 +197,7 @@ func SDiffByTwoBuckets() {
 
 }
 
-func SHasKey() {
+func testSHasKey() {
 	if err := db.View(
 		func(tx *nutsdb.Tx) error {
 			if ok, err := tx.SHasKey(bucket, []byte("fakeSet")); err != nil {
@@ -223,7 +223,7 @@ func SHasKey() {
 	}
 }
 
-func SIsMember() {
+func testSIsMember() {
 	if err := db.View(
 		func(tx *nutsdb.Tx) error {
 			if ok, err := tx.SIsMember(bucket, []byte("mySet"), []byte("d")); err != nil {
@@ -249,7 +249,7 @@ func SIsMember() {
 	}
 }
 
-func SMembers() {
+func testSMembers() {
 	if err := db.View(
 		func(tx *nutsdb.Tx) error {
 			if items, err := tx.SMembers(bucket, []byte("mySet")); err != nil {
@@ -266,7 +266,7 @@ func SMembers() {
 	}
 }
 
-func SMoveByOneBucket() {
+func testSMoveByOneBucket() {
 	bucket3 := "bucket3"
 	if err := db.Update(
 		func(tx *nutsdb.Tx) error {
@@ -330,7 +330,7 @@ func SMoveByOneBucket() {
 	}
 }
 
-func SMoveByTwoBuckets() {
+func testSMoveByTwoBuckets() {
 	bucket4 := "bucket4"
 	bucket5 := "bucket5"
 	if err := db.Update(
@@ -395,7 +395,7 @@ func SMoveByTwoBuckets() {
 	}
 }
 
-func SPop() {
+func testSPop() {
 	if err := db.Update(
 		func(tx *nutsdb.Tx) error {
 			key := []byte("mySet")
@@ -410,7 +410,7 @@ func SPop() {
 	}
 }
 
-func SRem() {
+func testSRem() {
 	bucket6 := "bucket6"
 	if err := db.Update(
 		func(tx *nutsdb.Tx) error {
@@ -450,7 +450,7 @@ func SRem() {
 	}
 }
 
-func SUnionByOneBucket() {
+func testSUnionByOneBucket() {
 	bucket7 := "bucket1"
 	key1 := []byte("mySet1")
 	key2 := []byte("mySet2")
@@ -491,7 +491,7 @@ func SUnionByOneBucket() {
 	}
 }
 
-func SUnionByTwoBucket() {
+func testSUnionByTwoBucket() {
 	bucket8 := "bucket1"
 	key1 := []byte("mySet1")
 

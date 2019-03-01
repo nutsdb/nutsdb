@@ -39,34 +39,34 @@ func init() {
 }
 
 func main() {
-	RPushAndLPush()
+	testRPushAndLPush()
 
-	LRange()
+	testLRange()
 
-	LPop()
+	testLPop()
 
-	RPop()
+	testRPop()
 
-	RPushItems()
+	testRPushItems()
 
-	LRem()
+	testLRem()
 
-	LRange()
+	testLRange()
 
-	LSet()
+	testLSet()
 
-	LPeek()
+	testLPeek()
 
-	RPeek()
+	testRPeek()
 
-	LTrim()
+	testLTrim()
 
-	LRange()
+	testLRange()
 
-	LSize()
+	testLSize()
 }
 
-func RPushAndLPush() {
+func testRPushAndLPush() {
 	fmt.Println("RPushAndLPush init data")
 	if err := db.Update(
 		func(tx *nutsdb.Tx) error {
@@ -93,7 +93,7 @@ func RPushAndLPush() {
 	}
 }
 
-func LRange() {
+func testLRange() {
 	fmt.Println("LRange:")
 	if err := db.View(
 		func(tx *nutsdb.Tx) error {
@@ -112,7 +112,7 @@ func LRange() {
 	}
 }
 
-func LPop() {
+func testLPop() {
 	if err := db.Update(
 		func(tx *nutsdb.Tx) error {
 			key := []byte("myList")
@@ -126,7 +126,7 @@ func LPop() {
 		log.Fatal(err)
 	}
 }
-func RPop() {
+func testRPop() {
 	if err := db.Update(
 		func(tx *nutsdb.Tx) error {
 			key := []byte("myList")
@@ -141,7 +141,7 @@ func RPop() {
 	}
 }
 
-func RPushItems() {
+func testRPushItems() {
 	if err := db.Update(
 		func(tx *nutsdb.Tx) error {
 			key := []byte("myList")
@@ -180,7 +180,7 @@ func RPushItems() {
 	fmt.Println("RPushItems 3 items ok")
 }
 
-func LRem() {
+func testLRem() {
 	fmt.Println("LRem count 1: ")
 	if err := db.Update(
 		func(tx *nutsdb.Tx) error {
@@ -194,7 +194,7 @@ func LRem() {
 	}
 }
 
-func LSet() {
+func testLSet() {
 	if err := db.Update(
 		func(tx *nutsdb.Tx) error {
 			key := []byte("myList")
@@ -209,7 +209,7 @@ func LSet() {
 	}
 }
 
-func LPeek() {
+func testLPeek() {
 	if err := db.View(
 		func(tx *nutsdb.Tx) error {
 			key := []byte("myList")
@@ -225,7 +225,7 @@ func LPeek() {
 
 }
 
-func RPeek() {
+func testRPeek() {
 	if err := db.View(
 		func(tx *nutsdb.Tx) error {
 			key := []byte("myList")
@@ -240,7 +240,7 @@ func RPeek() {
 	}
 }
 
-func LTrim() {
+func testLTrim() {
 	if err := db.Update(
 		func(tx *nutsdb.Tx) error {
 			key := []byte("myList")
@@ -253,7 +253,7 @@ func LTrim() {
 	}
 }
 
-func LSize() {
+func testLSize() {
 	if err := db.Update(
 		func(tx *nutsdb.Tx) error {
 			key := []byte("myList")
