@@ -28,7 +28,7 @@ const (
 	SkipListMaxLevel = 32
 
 	// SkipListP represents the p parameter of the skipList.
-	SkipListP        = 0.25
+	SkipListP = 0.25
 )
 
 // SCORE represents the score type.

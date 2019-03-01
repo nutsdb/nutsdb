@@ -287,7 +287,7 @@ func TestTx_LRem2(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if list, err := tx.LRange(bucket, key, 0, -1);err!=nil {
+	if list, err := tx.LRange(bucket, key, 0, -1); err != nil {
 		tx.Rollback()
 		t.Fatal(err)
 	} else {
