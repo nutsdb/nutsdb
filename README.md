@@ -1,6 +1,6 @@
 # NutsDB
 NutsDB is a simple, fast, embeddable and persistent key/value store
-written in pure Go. It supports fully serializable transactions. All operations happen inside a Tx. Tx represents a transaction, which can be read-only or read-write. Read-only transactions can read values for a
+written in pure Go. It supports fully serializable transactions and many data structures such as list、set、sorted set. All operations happen inside a Tx. Tx represents a transaction, which can be read-only or read-write. Read-only transactions can read values for a
 given bucket and given key , or iterate over keys. Read-write transactions can update and delete keys from the DB.
 It also supports range or prefix queries and TTL.
 
@@ -398,6 +398,8 @@ if err != nil {
 ```
 
 ### Using other data structures
+
+The syntax here is modeled after [Redis commands](https://redis.io/commands)
 
 #### List
 
@@ -1747,7 +1749,7 @@ if err := db.View(
 
 #### BoltDB
 
-BoltDB is similar to NutsDB, both use B+tree and support transaction. However, Bolt uses a B+tree internally and only a single file, and NutsDB is based on bitcask model with  multiple log files. NutsDB supports TTL, but BoltDB not support it . NutsDB offers high-performance reads and writes, but BoltDb writes performance not so good.
+BoltDB is similar to NutsDB, both use B+tree and support transaction. However, Bolt uses a B+tree internally and only a single file, and NutsDB is based on bitcask model with  multiple log files. NutsDB supports TTL and many data structures, but BoltDB not supports them . NutsDB offers high-performance reads and writes, but BoltDb writes performance not so good.
 
 #### LevelDB, RocksDB
 
@@ -1755,7 +1757,7 @@ LevelDB and RocksDB are based on a log-structured merge-tree (LSM tree).An LSM t
 
 #### Badger
 
-Badger is based in LSM tree with value log. It designed for SSDs. It also supports transaction and TTL. But in my benchmark its write performance is not as good as i thought.
+Badger is based in LSM tree with value log. It designed for SSDs. It also supports transaction and TTL. But in my benchmark its write performance is not as good as i thought. In addition, NutsDB supports data structures such as list、set、sorted set, but Badger not supports them.
 
 ### Benchmarks
 
@@ -1856,6 +1858,8 @@ This package is inspired by the following:
 * [Bitcask-intro](https://github.com/basho/bitcask/blob/develop/doc/bitcask-intro.pdf)
 * [BoltDB](https://github.com/boltdb)
 * [BuntDB](https://github.com/tidwall/buntdb)
+* [Redis](https://redis.io)
+* [Sorted Set](https://github.com/wangjia184/sortedset)
 
 ### License
 
