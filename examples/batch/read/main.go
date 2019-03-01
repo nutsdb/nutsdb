@@ -31,7 +31,7 @@ func main() {
 			for i := 0; i < 1000000; i++ {
 				key := []byte("namename" + strconv2.IntToStr(i))
 				if _, err := tx.Get(bucket, key); err != nil {
-					log.Println("key",string(key))
+					log.Println("key", string(key))
 					panic(err)
 					return err
 				}

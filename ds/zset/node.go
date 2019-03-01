@@ -15,6 +15,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 package zset
 
 type SortedSetLevel struct {
@@ -24,9 +25,9 @@ type SortedSetLevel struct {
 
 // Node in skip list
 type SortedSetNode struct {
-	key      string      // unique key of this node
+	key      string // unique key of this node
 	Value    []byte // associated data
-	score    SCORE       // score to determine the order of this node in the set
+	score    SCORE  // score to determine the order of this node in the set
 	backward *SortedSetNode
 	level    []SortedSetLevel
 }

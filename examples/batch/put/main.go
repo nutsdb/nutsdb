@@ -24,12 +24,12 @@ func init() {
 func main() {
 	time2.Start()
 
-	end:= 1
+	end := 1
 
 	for j := 1; j <= end; j++ {
 		if err := db.Update(
 			func(tx *nutsdb.Tx) error {
-				for i := (j-1)*1000000; i < j*1000000; i++ {
+				for i := (j - 1) * 1000000; i < j*1000000; i++ {
 					key := []byte("namename" + strconv2.IntToStr(i))
 					val := []byte("valvalvavalvalvalvavalvalvalvavalvalvalvaval" + strconv2.IntToStr(i))
 					if err := tx.Put(bucket, key, val, 0); err != nil {

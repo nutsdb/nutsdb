@@ -1,3 +1,17 @@
+// Copyright 2019 The nutsdb Authors. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package set
 
 import (
@@ -131,18 +145,18 @@ func (s *Set) SIsMember(key string, item []byte) bool {
 
 // SAreMembers Returns if members are members of the set stored at key.
 // For multiple items it returns true only if all of  the items exist.
-func (s *Set) SAreMembers(key string, items ...[]byte) (bool,error) {
+func (s *Set) SAreMembers(key string, items ...[]byte) (bool, error) {
 	if _, ok := s.M[key]; !ok {
-		return false,errors.New("key not exits")
+		return false, errors.New("key not exits")
 	}
 
 	for _, item := range items {
 		if _, ok := s.M[key][string(item)]; !ok {
-			return false,errors.New("item not exits")
+			return false, errors.New("item not exits")
 		}
 	}
 
-	return true,nil
+	return true, nil
 }
 
 func (s *Set) SMembers(key string) (list [][]byte, err error) {

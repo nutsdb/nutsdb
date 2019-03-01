@@ -1,3 +1,17 @@
+// Copyright 2019 The nutsdb Authors. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package list
 
 import (
@@ -139,7 +153,7 @@ func (l *List) LRange(key string, start, end int) (list [][]byte, err error) {
 	}
 
 	if start < 0 && end < 0 {
-		start,end = size + start,size + end
+		start, end = size+start, size+end
 	}
 
 	if end >= size {
@@ -182,7 +196,7 @@ func (l *List) LRem(key string, count int) (int, error) {
 	if count < 0 {
 		index := size + count
 		if 0 < index && index <= size {
-			l.Items[key] = l.Items[key][0 : index]
+			l.Items[key] = l.Items[key][0:index]
 		} else {
 			return 0, ErrCount
 		}
