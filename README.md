@@ -76,6 +76,7 @@ In order to break the limition, i tried to optimize them. I tried to use B+ tree
      - [ZRangeByRank](#zrangebyrank)
      - [ZRangeByScore](#zrangebyscore)
      - [ZRank](#zrank)
+     - [ZRevRank](#zrevrank)
      - [ZRem](#zrem)
      - [ZRemRangeByRank](#zremrangebyrank)
      - [ZScore](#zscore)
@@ -670,9 +671,9 @@ if err := db.View(
 
 ##### SCard 
 
-```go
-
 Returns the set cardinality (number of elements) of the set stored in the bucket at given bucket and key.
+
+```go
 
 if err := db.View(
 	func(tx *nutsdb.Tx) error {
@@ -1444,6 +1445,45 @@ if err := db.View(
 Returns the rank of member in the sorted set stored in the bucket at given bucket and key, with the scores ordered from low to high.
 
 ```go
+
+// ZAdd
+if err := db.Update(
+	func(tx *nutsdb.Tx) error {
+		bucket := "myZSet4"
+		key1 := []byte("key1")
+		if err := tx.ZAdd(bucket, key1, 70, []byte("val1")); err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+	log.Fatal(err)
+}
+
+if err := db.Update(
+	func(tx *nutsdb.Tx) error {
+		bucket := "myZSet4"
+		key2 := []byte("key2")
+		if err := tx.ZAdd(bucket, key2, 90, []byte("val2")); err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+	log.Fatal(err)
+}
+
+if err := db.Update(
+	func(tx *nutsdb.Tx) error {
+		bucket := "myZSet4"
+		key3 := []byte("key3")
+		if err := tx.ZAdd(bucket, key3, 86, []byte("val3")); err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+	log.Fatal(err)
+}
+
+// ZRank
 if err := db.View(
 	func(tx *nutsdb.Tx) error {
 		bucket := "myZSet4"
@@ -1451,13 +1491,69 @@ if err := db.View(
 		if rank, err := tx.ZRank(bucket, key1); err != nil {
 			return err
 		} else {
-			fmt.Println("key1 ZRank :", rank)
+			fmt.Println("key1 ZRank :", rank) // key1 ZRank : 1
 		}
 		return nil
 	}); err != nil {
 	log.Fatal(err)
 }
 ```
+
+#### ZRevRank
+
+Returns the rank of member in the sorted set stored in the bucket at given bucket and key,with the scores ordered from high to low.
+
+```
+// ZAdd
+if err := db.Update(
+	func(tx *nutsdb.Tx) error {
+		bucket := "myZSet8"
+		key1 := []byte("key1")
+		if err := tx.ZAdd(bucket, key1, 10, []byte("val1")); err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+	log.Fatal(err)
+}
+if err := db.Update(
+	func(tx *nutsdb.Tx) error {
+		bucket := "myZSet8"
+		key2 := []byte("key2")
+		if err := tx.ZAdd(bucket, key2, 20, []byte("val2")); err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+	log.Fatal(err)
+}
+if err := db.Update(
+	func(tx *nutsdb.Tx) error {
+		bucket := "myZSet8"
+		key3 := []byte("key3")
+		if err := tx.ZAdd(bucket, key3, 30, []byte("val3")); err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+	log.Fatal(err)
+}
+
+// ZRevRank
+if err := db.View(
+	func(tx *nutsdb.Tx) error {
+		bucket := "myZSet8"
+		if rank, err := tx.ZRevRank(bucket, []byte("key3")); err != nil {
+			return err
+		} else {
+			fmt.Println("ZRevRank key1 rank:", rank) //ZRevRank key3 rank: 1
+		}
+		return nil
+	}); err != nil {
+	log.Fatal(err)
+}
+```
+
 ##### ZRem 
 
 Removes the specified members from the sorted set stored in one bucket at given bucket and key.

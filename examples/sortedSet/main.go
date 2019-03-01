@@ -67,6 +67,8 @@ func main() {
 	ZRemRangeByRank()
 
 	ZScore()
+
+	ZRevRank()
 }
 
 func ZAdd() {
@@ -532,7 +534,7 @@ func ZRemRangeByRank() {
 		func(tx *nutsdb.Tx) error {
 			bucket := "myZSet6"
 			key3 := []byte("key3")
-			if err := tx.ZAdd(bucket, key3, 30, []byte("val2")); err != nil {
+			if err := tx.ZAdd(bucket, key3, 30, []byte("val3")); err != nil {
 				return err
 			}
 			return nil
@@ -603,6 +605,79 @@ func ZScore() {
 				return err
 			} else {
 				fmt.Println("ZScore key1 score:", score)
+			}
+			return nil
+		}); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func ZRevRank() {
+	if err := db.Update(
+		func(tx *nutsdb.Tx) error {
+			bucket := "myZSet8"
+			key1 := []byte("key1")
+			if err := tx.ZAdd(bucket, key1, 10, []byte("val1")); err != nil {
+				return err
+			}
+			return nil
+		}); err != nil {
+		log.Fatal(err)
+	}
+	if err := db.Update(
+		func(tx *nutsdb.Tx) error {
+			bucket := "myZSet8"
+			key2 := []byte("key2")
+			if err := tx.ZAdd(bucket, key2, 20, []byte("val2")); err != nil {
+				return err
+			}
+			return nil
+		}); err != nil {
+		log.Fatal(err)
+	}
+	if err := db.Update(
+		func(tx *nutsdb.Tx) error {
+			bucket := "myZSet8"
+			key3 := []byte("key3")
+			if err := tx.ZAdd(bucket, key3, 30, []byte("val3")); err != nil {
+				return err
+			}
+			return nil
+		}); err != nil {
+		log.Fatal(err)
+	}
+
+	if err := db.View(
+		func(tx *nutsdb.Tx) error {
+			bucket := "myZSet8"
+			if rank, err := tx.ZRevRank(bucket, []byte("key1")); err != nil {
+				return err
+			} else {
+				fmt.Println("ZRevRank key1 rank:", rank) //ZRevRank key1 rank: 3
+			}
+			return nil
+		}); err != nil {
+		log.Fatal(err)
+	}
+	if err := db.View(
+		func(tx *nutsdb.Tx) error {
+			bucket := "myZSet8"
+			if rank, err := tx.ZRevRank(bucket, []byte("key2")); err != nil {
+				return err
+			} else {
+				fmt.Println("ZRevRank key2 rank:", rank) //ZRevRank key2 rank: 2
+			}
+			return nil
+		}); err != nil {
+		log.Fatal(err)
+	}
+	if err := db.View(
+		func(tx *nutsdb.Tx) error {
+			bucket := "myZSet8"
+			if rank, err := tx.ZRevRank(bucket, []byte("key3")); err != nil {
+				return err
+			} else {
+				fmt.Println("ZRevRank key3 rank:", rank) //ZRevRank key3 rank: 1
 			}
 			return nil
 		}); err != nil {
