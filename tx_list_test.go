@@ -162,7 +162,7 @@ func TestTx_LPop(t *testing.T) {
 		}
 	}
 
-	tx, err = db.Begin(true)
+	tx, _ = db.Begin(true)
 	item, err = tx.LPop(bucket, key)
 	if err != nil || string(item) != "c" {
 		tx.Rollback()
@@ -458,6 +458,9 @@ func TestTx_LTrim(t *testing.T) {
 	}
 
 	list, err := tx.LRange(bucket, key, 0, -1)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	tx.Commit()
 
