@@ -1,4 +1,4 @@
-# NutsDB
+# NutsDB [![GoDoc](https://godoc.org/github.com/xujiajun/nutsdb?status.svg)](https://godoc.org/github.com/xujiajun/nutsdb)  [![Go Report Card](https://goreportcard.com/badge/github.com/xujiajun/nutsdb)](https://goreportcard.com/report/github.com/xujiajun/nutsdb) 
 
 NutsDB is a simple, fast, embeddable and persistent key/value store written in pure Go. 
 
