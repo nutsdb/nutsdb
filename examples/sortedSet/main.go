@@ -38,40 +38,40 @@ func init() {
 }
 
 func main() {
-	ZAdd()
+	testZAdd()
 
-	ZCard()
+	testZCard()
 
-	ZCount()
+	testZCount()
 
-	ZGetByKey()
+	testZGetByKey()
 
-	ZMembers()
+	testZMembers()
 
-	ZPeekMax()
+	testZPeekMax()
 
-	ZPeekMin()
+	testZPeekMin()
 
-	ZPopMax()
+	testZPopMax()
 
-	ZPopMin()
+	testZPopMin()
 
-	ZRangeByRank()
+	testZRangeByRank()
 
-	ZRangeByScore()
+	testZRangeByScore()
 
-	ZRank()
+	testZRank()
 
-	ZRem()
+	testZRem()
 
-	ZRemRangeByRank()
+	testZRemRangeByRank()
 
-	ZScore()
+	testZScore()
 
-	ZRevRank()
+	testZRevRank()
 }
 
-func ZAdd() {
+func testZAdd() {
 	if err := db.Update(
 		func(tx *nutsdb.Tx) error {
 			bucket := "myZSet1"
@@ -85,7 +85,7 @@ func ZAdd() {
 	}
 }
 
-func ZCard() {
+func testZCard() {
 	if err := db.View(
 		func(tx *nutsdb.Tx) error {
 			bucket := "myZSet1"
@@ -100,7 +100,7 @@ func ZCard() {
 	}
 }
 
-func ZCount() {
+func testZCount() {
 	if err := db.Update(
 		func(tx *nutsdb.Tx) error {
 			bucket := "myZSet1"
@@ -127,7 +127,7 @@ func ZCount() {
 	}
 }
 
-func ZGetByKey() {
+func testZGetByKey() {
 	if err := db.View(
 		func(tx *nutsdb.Tx) error {
 			bucket := "myZSet1"
@@ -157,7 +157,7 @@ func ZGetByKey() {
 	}
 }
 
-func ZMembers() {
+func testZMembers() {
 	if err := db.View(
 		func(tx *nutsdb.Tx) error {
 			bucket := "myZSet1"
@@ -176,7 +176,7 @@ func ZMembers() {
 	}
 }
 
-func ZPeekMax() {
+func testZPeekMax() {
 	if err := db.Update(
 		func(tx *nutsdb.Tx) error {
 			bucket := "myZSet1"
@@ -203,7 +203,7 @@ func ZPeekMax() {
 	}
 }
 
-func ZPeekMin() {
+func testZPeekMin() {
 	if err := db.View(
 		func(tx *nutsdb.Tx) error {
 			bucket := "myZSet1"
@@ -218,7 +218,7 @@ func ZPeekMin() {
 	}
 }
 
-func ZPopMax() {
+func testZPopMax() {
 	if err := db.Update(
 		func(tx *nutsdb.Tx) error {
 			bucket := "myZSet1"
@@ -233,7 +233,7 @@ func ZPopMax() {
 	}
 }
 
-func ZPopMin() {
+func testZPopMin() {
 	if err := db.Update(
 		func(tx *nutsdb.Tx) error {
 			bucket := "myZSet1"
@@ -248,7 +248,7 @@ func ZPopMin() {
 	}
 }
 
-func ZRangeByRank() {
+func testZRangeByRank() {
 	if err := db.Update(
 		func(tx *nutsdb.Tx) error {
 			bucket := "myZSet2"
@@ -302,7 +302,7 @@ func ZRangeByRank() {
 	}
 }
 
-func ZRangeByScore() {
+func testZRangeByScore() {
 	if err := db.Update(
 		func(tx *nutsdb.Tx) error {
 			bucket := "myZSet3"
@@ -356,7 +356,7 @@ func ZRangeByScore() {
 	}
 }
 
-func ZRank() {
+func testZRank() {
 	if err := db.Update(
 		func(tx *nutsdb.Tx) error {
 			bucket := "myZSet4"
@@ -436,7 +436,7 @@ func ZRank() {
 	}
 }
 
-func ZRem() {
+func testZRem() {
 	if err := db.Update(
 		func(tx *nutsdb.Tx) error {
 			bucket := "myZSet5"
@@ -505,7 +505,7 @@ func ZRem() {
 	}
 }
 
-func ZRemRangeByRank() {
+func testZRemRangeByRank() {
 	if err := db.Update(
 		func(tx *nutsdb.Tx) error {
 			bucket := "myZSet6"
@@ -586,7 +586,7 @@ func ZRemRangeByRank() {
 	}
 }
 
-func ZScore() {
+func testZScore() {
 	if err := db.Update(
 		func(tx *nutsdb.Tx) error {
 			bucket := "myZSet7"
@@ -612,7 +612,7 @@ func ZScore() {
 	}
 }
 
-func ZRevRank() {
+func testZRevRank() {
 	if err := db.Update(
 		func(tx *nutsdb.Tx) error {
 			bucket := "myZSet8"
