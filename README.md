@@ -1505,7 +1505,7 @@ if err := db.View(
 
 Returns the rank of member in the sorted set stored in the bucket at given bucket and key,with the scores ordered from high to low.
 
-```
+```go
 // ZAdd
 if err := db.Update(
 	func(tx *nutsdb.Tx) error {
