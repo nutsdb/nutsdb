@@ -281,7 +281,7 @@ type GetByScoreRangeOptions struct {
 }
 
 // GetByScoreRange returns the nodes whose score within the specific range.
-// If options is nil, it searchs in interval [start, end] without any limit by default.
+// If options is nil, it searches in interval [start, end] without any limit by default.
 //
 // Time complexity of this method is : O(log(N)).
 func (ss *SortedSet) GetByScoreRange(start SCORE, end SCORE, options *GetByScoreRangeOptions) []*SortedSetNode {
