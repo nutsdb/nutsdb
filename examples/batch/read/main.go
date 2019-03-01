@@ -32,7 +32,6 @@ func main() {
 				key := []byte("namename" + strconv2.IntToStr(i))
 				if _, err := tx.Get(bucket, key); err != nil {
 					log.Println("key", string(key))
-					panic(err)
 					return err
 				}
 			}
