@@ -27,7 +27,7 @@ func TestTx_Rollback(t *testing.T) {
 	defer db.Close()
 
 	tx, err := db.Begin(true)
-	if err!=nil {
+	if err != nil {
 		t.Fatal(err)
 	}
 	bucket := "bucket_rollback_test"
