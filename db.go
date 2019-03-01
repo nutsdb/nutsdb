@@ -503,7 +503,7 @@ func (db *DB) buildHintIdx(dataFileIds []int) error {
 					break
 				}
 
-				//return fmt.Errorf("when build hintIndex readAt err: %s", err)
+				return fmt.Errorf("when build hintIndex readAt err: %s", err)
 			}
 		}
 	}

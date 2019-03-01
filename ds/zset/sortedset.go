@@ -1,6 +1,7 @@
 // Copyright (c) 2016, Jerry.Wang. All rights reserved.
 // Use of this source code is governed by a BSD 2-Clause
 // license that can be found in the LICENSE file.
+// link: https://github.com/wangjia184/sortedset
 
 // Copyright 2019 The nutsdb Authors. All rights reserved.
 //
