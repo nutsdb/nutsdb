@@ -19,15 +19,22 @@ import (
 )
 
 var (
-	ErrListNotFound    = errors.New("the list not found")
+	// ErrListNotFound is returned when the list not found.
+	ErrListNotFound = errors.New("the list not found")
+
+	// ErrIndexOutOfRange is returned when use LSet function set index out of range.
 	ErrIndexOutOfRange = errors.New("index out of range")
-	ErrCount           = errors.New("err count")
+
+	//ErrCount is returned when count is error.
+	ErrCount = errors.New("err count")
 )
 
+// List represents the list.
 type List struct {
 	Items map[string][][]byte
 }
 
+// New returns returns a newly initialized List Object that implements the List.
 func New() *List {
 	return &List{
 		Items: make(map[string][][]byte),
@@ -47,7 +54,7 @@ func (l *List) RPop(key string) (item []byte, err error) {
 	return
 }
 
-// RPick returns the last element of the list stored at key.
+// RPeek returns the last element of the list stored at key.
 func (l *List) RPeek(key string) (item []byte, size int, err error) {
 	if _, ok := l.Items[key]; !ok {
 		return nil, 0, ErrListNotFound
@@ -101,6 +108,7 @@ func (l *List) LPush(key string, values ...[]byte) (size int, err error) {
 	return newSize, nil
 }
 
+// LPop removes and returns the first element of the list stored at key.
 func (l *List) LPop(key string) (item []byte, err error) {
 	item, err = l.LPeek(key)
 	if err != nil {
@@ -115,6 +123,7 @@ func (l *List) LPop(key string) (item []byte, err error) {
 	return nil, errors.New("list is empty")
 }
 
+// LPeek returns the first element of the list stored at key.
 func (l *List) LPeek(key string) (item []byte, err error) {
 	if _, ok := l.Items[key]; !ok {
 		return nil, ErrListNotFound
@@ -128,6 +137,7 @@ func (l *List) LPeek(key string) (item []byte, err error) {
 	return nil, ErrListNotFound
 }
 
+// Size returns the size of the list at given key.
 func (l *List) Size(key string) (int, error) {
 	if _, ok := l.Items[key]; !ok {
 		return 0, ErrListNotFound

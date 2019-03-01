@@ -85,9 +85,8 @@ func testSAreMembers() {
 			ok, err := tx.SAreMembers(bucket, key, []byte("a"), []byte("b"), []byte("c"))
 			if err != nil {
 				return err
-			} else {
-				fmt.Println("SAreMembers:", ok)
 			}
+			fmt.Println("SAreMembers:", ok)
 			return nil
 		}); err != nil {
 		log.Fatal(err)

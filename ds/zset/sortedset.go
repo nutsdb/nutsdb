@@ -24,7 +24,10 @@ import (
 )
 
 const (
+	// SkipListMaxLevel represents the skipList max level number.
 	SkipListMaxLevel = 32
+
+	// SkipListP represents the p parameter of the skipList.
 	SkipListP        = 0.25
 )
 

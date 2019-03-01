@@ -66,10 +66,7 @@ func TestDB_Basic(t *testing.T) {
 	//put
 	if err := db.Update(
 		func(tx *Tx) error {
-			if err := tx.Put(bucket, key, val, Persistent); err != nil {
-				return err
-			}
-			return nil
+			return tx.Put(bucket, key, val, Persistent)
 		}); err != nil {
 		t.Fatal(err)
 	}
@@ -115,10 +112,7 @@ func TestDB_Basic(t *testing.T) {
 	val = []byte("val001")
 	if err := db.Update(
 		func(tx *Tx) error {
-			if err := tx.Put(bucket, key, val, Persistent); err != nil {
-				return err
-			}
-			return nil
+			return tx.Put(bucket, key, val, Persistent)
 		}); err != nil {
 		t.Fatal(err)
 	}
@@ -158,10 +152,7 @@ func TestDB_Merge_For_string(t *testing.T) {
 				func(tx *Tx) error {
 					key := []byte("key_" + fmt.Sprintf("%07d", i))
 					val := []byte("val" + fmt.Sprintf("%07d", i))
-					if err := tx.Put(bucketForString, key, val, Persistent); err != nil {
-						return err
-					}
-					return nil
+					return tx.Put(bucketForString, key, val, Persistent)
 				}); err != nil {
 				t.Fatal(err)
 			}

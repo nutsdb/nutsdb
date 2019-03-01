@@ -228,10 +228,7 @@ func testLTrim() {
 	if err := db.Update(
 		func(tx *nutsdb.Tx) error {
 			key := []byte("myList")
-			if err := tx.LTrim(bucket, key, 0, 1); err != nil {
-				return err
-			}
-			return nil
+			return tx.LTrim(bucket, key, 0, 1)
 		}); err != nil {
 		log.Fatal(err)
 	}
