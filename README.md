@@ -1546,7 +1546,7 @@ if err := db.View(
 		if rank, err := tx.ZRevRank(bucket, []byte("key3")); err != nil {
 			return err
 		} else {
-			fmt.Println("ZScore key1 rank:", rank) //ZScore key3 rank: 1
+			fmt.Println("ZRevRank key1 rank:", rank) //ZRevRank key3 rank: 1
 		}
 		return nil
 	}); err != nil {
