@@ -165,11 +165,10 @@ func (tx *Tx) Commit() error {
 		tx.db.ActiveFile.ActualSize += entrySize
 		tx.db.ActiveFile.writeOff += entrySize
 
+		e = nil
 		if tx.db.opt.EntryIdxMode == HintAndRAMIdxMode {
 			entry.Meta.status = Committed
 			e = entry
-		} else {
-			e = nil
 		}
 
 		countFlag := CountFlagEnabled
@@ -180,86 +179,19 @@ func (tx *Tx) Commit() error {
 		bucket := string(entry.Meta.bucket)
 
 		if entry.Meta.ds == DataStructureBPTree {
-			if _, ok := tx.db.BPTreeIdx[bucket]; !ok {
-				tx.db.BPTreeIdx[bucket] = NewTree()
-			}
-			_ = tx.db.BPTreeIdx[bucket].Insert(entry.Key, e, &Hint{
-				fileID:  tx.db.ActiveFile.fileID,
-				key:     entry.Key,
-				meta:    entry.Meta,
-				dataPos: uint64(off),
-			}, countFlag)
+			tx.buildBPTreeIdx(bucket, entry, e, off, countFlag)
 		}
 
 		if entry.Meta.ds == DataStructureSet {
-			if _, ok := tx.db.SetIdx[bucket]; !ok {
-				tx.db.SetIdx[bucket] = set.New()
-			}
-
-			if entry.Meta.Flag == DataDeleteFlag {
-				_ = tx.db.SetIdx[bucket].SRem(string(entry.Key), entry.Value)
-			}
-
-			if entry.Meta.Flag == DataSetFlag {
-				_ = tx.db.SetIdx[bucket].SAdd(string(entry.Key), entry.Value)
-			}
+			tx.buildSetIdx(bucket, entry)
 		}
 
 		if entry.Meta.ds == DataStructureSortedSet {
-			if _, ok := tx.db.SortedSetIdx[bucket]; !ok {
-				tx.db.SortedSetIdx[bucket] = zset.New()
-			}
-
-			switch entry.Meta.Flag {
-			case DataZAddFlag:
-				keyAndScore := strings.Split(string(entry.Key), SeparatorForZSetKey)
-				key := keyAndScore[0]
-				score, _ := strconv2.StrToFloat64(keyAndScore[1])
-				_ = tx.db.SortedSetIdx[bucket].Put(key, zset.SCORE(score), entry.Value)
-			case DataZRemFlag:
-				_ = tx.db.SortedSetIdx[bucket].Remove(string(entry.Key))
-			case DataZRemRangeByRankFlag:
-				start, _ := strconv2.StrToInt(string(entry.Key))
-				end, _ := strconv2.StrToInt(string(entry.Value))
-				_ = tx.db.SortedSetIdx[bucket].GetByRankRange(start, end, true)
-			case DataZPopMaxFlag:
-				_ = tx.db.SortedSetIdx[bucket].PopMax()
-			case DataZPopMinFlag:
-				_ = tx.db.SortedSetIdx[bucket].PopMin()
-			}
+			tx.buildSortedSetIdx(bucket, entry)
 		}
 
 		if entry.Meta.ds == DataStructureList {
-			if _, ok := tx.db.ListIdx[bucket]; !ok {
-				tx.db.ListIdx[bucket] = list.New()
-			}
-
-			key, value := entry.Key, entry.Value
-
-			switch entry.Meta.Flag {
-			case DataLPushFlag:
-				_, _ = tx.db.ListIdx[bucket].LPush(string(key), value)
-			case DataRPushFlag:
-				_, _ = tx.db.ListIdx[bucket].RPush(string(key), value)
-			case DataLRemFlag:
-				count, _ := strconv2.StrToInt(string(value))
-				_, _ = tx.db.ListIdx[bucket].LRem(string(key), count)
-			case DataLPopFlag:
-				_, _ = tx.db.ListIdx[bucket].LPop(string(key))
-			case DataRPopFlag:
-				_, _ = tx.db.ListIdx[bucket].RPop(string(key))
-			case DataLSetFlag:
-				keyAndIndex := strings.Split(string(key), SeparatorForListKey)
-				newKey := keyAndIndex[0]
-				index, _ := strconv2.StrToInt(keyAndIndex[1])
-				_ = tx.db.ListIdx[bucket].LSet(newKey, index, value)
-			case DataLTrimFlag:
-				keyAndStartIndex := strings.Split(string(key), SeparatorForListKey)
-				newKey := keyAndStartIndex[0]
-				start, _ := strconv2.StrToInt(keyAndStartIndex[1])
-				end, _ := strconv2.StrToInt(string(value))
-				_ = tx.db.ListIdx[bucket].Ltrim(newKey, start, end)
-			}
+			tx.buildListIdx(bucket, entry)
 		}
 
 		tx.db.KeyCount++
@@ -270,6 +202,89 @@ func (tx *Tx) Commit() error {
 	tx.db = nil
 
 	return nil
+}
+
+func (tx *Tx) buildBPTreeIdx(bucket string, entry, e *Entry, off int64, countFlag bool) {
+	if _, ok := tx.db.BPTreeIdx[bucket]; !ok {
+		tx.db.BPTreeIdx[bucket] = NewTree()
+	}
+	_ = tx.db.BPTreeIdx[bucket].Insert(entry.Key, e, &Hint{
+		fileID:  tx.db.ActiveFile.fileID,
+		key:     entry.Key,
+		meta:    entry.Meta,
+		dataPos: uint64(off),
+	}, countFlag)
+}
+
+func (tx *Tx) buildSetIdx(bucket string, entry *Entry) {
+	if _, ok := tx.db.SetIdx[bucket]; !ok {
+		tx.db.SetIdx[bucket] = set.New()
+	}
+
+	if entry.Meta.Flag == DataDeleteFlag {
+		_ = tx.db.SetIdx[bucket].SRem(string(entry.Key), entry.Value)
+	}
+
+	if entry.Meta.Flag == DataSetFlag {
+		_ = tx.db.SetIdx[bucket].SAdd(string(entry.Key), entry.Value)
+	}
+}
+
+func (tx *Tx) buildSortedSetIdx(bucket string, entry *Entry) {
+	if _, ok := tx.db.SortedSetIdx[bucket]; !ok {
+		tx.db.SortedSetIdx[bucket] = zset.New()
+	}
+
+	switch entry.Meta.Flag {
+	case DataZAddFlag:
+		keyAndScore := strings.Split(string(entry.Key), SeparatorForZSetKey)
+		key := keyAndScore[0]
+		score, _ := strconv2.StrToFloat64(keyAndScore[1])
+		_ = tx.db.SortedSetIdx[bucket].Put(key, zset.SCORE(score), entry.Value)
+	case DataZRemFlag:
+		_ = tx.db.SortedSetIdx[bucket].Remove(string(entry.Key))
+	case DataZRemRangeByRankFlag:
+		start, _ := strconv2.StrToInt(string(entry.Key))
+		end, _ := strconv2.StrToInt(string(entry.Value))
+		_ = tx.db.SortedSetIdx[bucket].GetByRankRange(start, end, true)
+	case DataZPopMaxFlag:
+		_ = tx.db.SortedSetIdx[bucket].PopMax()
+	case DataZPopMinFlag:
+		_ = tx.db.SortedSetIdx[bucket].PopMin()
+	}
+}
+
+func (tx *Tx) buildListIdx(bucket string, entry *Entry) {
+	if _, ok := tx.db.ListIdx[bucket]; !ok {
+		tx.db.ListIdx[bucket] = list.New()
+	}
+
+	key, value := entry.Key, entry.Value
+
+	switch entry.Meta.Flag {
+	case DataLPushFlag:
+		_, _ = tx.db.ListIdx[bucket].LPush(string(key), value)
+	case DataRPushFlag:
+		_, _ = tx.db.ListIdx[bucket].RPush(string(key), value)
+	case DataLRemFlag:
+		count, _ := strconv2.StrToInt(string(value))
+		_, _ = tx.db.ListIdx[bucket].LRem(string(key), count)
+	case DataLPopFlag:
+		_, _ = tx.db.ListIdx[bucket].LPop(string(key))
+	case DataRPopFlag:
+		_, _ = tx.db.ListIdx[bucket].RPop(string(key))
+	case DataLSetFlag:
+		keyAndIndex := strings.Split(string(key), SeparatorForListKey)
+		newKey := keyAndIndex[0]
+		index, _ := strconv2.StrToInt(keyAndIndex[1])
+		_ = tx.db.ListIdx[bucket].LSet(newKey, index, value)
+	case DataLTrimFlag:
+		keyAndStartIndex := strings.Split(string(key), SeparatorForListKey)
+		newKey := keyAndStartIndex[0]
+		start, _ := strconv2.StrToInt(keyAndStartIndex[1])
+		end, _ := strconv2.StrToInt(string(value))
+		_ = tx.db.ListIdx[bucket].Ltrim(newKey, start, end)
+	}
 }
 
 // rotateActiveFile rotates log file when active file is not enough space to store the entry.
