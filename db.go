@@ -183,101 +183,6 @@ func (db *DB) View(fn func(tx *Tx) error) error {
 	return db.managed(false, fn)
 }
 
-// managed calls a block of code that is fully contained in a transaction.
-func (db *DB) managed(writable bool, fn func(tx *Tx) error) error {
-	var tx *Tx
-
-	tx, err := db.Begin(writable)
-	if err != nil {
-		return err
-	}
-
-	if err = fn(tx); err != nil {
-		if errRollback := tx.Rollback(); errRollback != nil {
-			return errRollback
-		}
-		return err
-	}
-
-	if err = tx.Commit(); err != nil {
-		if errRollback := tx.Rollback(); errRollback != nil {
-			return errRollback
-		}
-		return err
-	}
-
-	return nil
-}
-
-// getDataPath returns the data path at given fid.
-func (db *DB) getDataPath(fID int64) string {
-	return db.opt.Dir + "/" + strconv2.Int64ToStr(fID) + DataSuffix
-}
-
-func (db *DB) getPendingMergeEntries(entry *Entry, pendingMergeEntries []*Entry) []*Entry {
-	if entry.Meta.ds == DataStructureBPTree {
-		if r, err := db.BPTreeIdx[string(entry.Meta.bucket)].Find(entry.Key); err == nil {
-			if r.H.meta.Flag == DataSetFlag {
-				pendingMergeEntries = append(pendingMergeEntries, entry)
-			}
-		}
-	}
-
-	if entry.Meta.ds == DataStructureSet {
-		if db.SetIdx[string(entry.Meta.bucket)].SIsMember(string(entry.Key), entry.Value) {
-			pendingMergeEntries = append(pendingMergeEntries, entry)
-		}
-	}
-
-	if entry.Meta.ds == DataStructureSortedSet {
-		keyAndScore := strings.Split(string(entry.Key), SeparatorForZSetKey)
-		if len(keyAndScore) == 2 {
-			key := keyAndScore[0]
-			n := db.SortedSetIdx[string(entry.Meta.bucket)].GetByKey(key)
-			if n != nil {
-				pendingMergeEntries = append(pendingMergeEntries, entry)
-			}
-		}
-	}
-
-	if entry.Meta.ds == DataStructureList {
-		items, _ := db.ListIdx[string(entry.Meta.bucket)].LRange(string(entry.Key), 0, -1)
-		ok := false
-		if entry.Meta.Flag == DataRPushFlag || entry.Meta.Flag == DataLPushFlag {
-			for _, item := range items {
-				if string(entry.Value) == string(item) {
-					ok = true
-					break
-				}
-			}
-			if ok {
-				pendingMergeEntries = append(pendingMergeEntries, entry)
-			}
-		}
-	}
-
-	return pendingMergeEntries
-}
-
-func (db *DB) reWriteData(pendingMergeEntries []*Entry) error {
-	tx, err := db.Begin(true)
-	if err != nil {
-		db.isMerging = false
-		return err
-	}
-
-	for _, e := range pendingMergeEntries {
-		err := tx.put(string(e.Meta.bucket), e.Key, e.Value, e.Meta.TTL, e.Meta.Flag, e.Meta.timestamp, e.Meta.ds)
-		if err != nil {
-			tx.Rollback()
-			db.isMerging = false
-			return err
-		}
-	}
-	tx.Commit()
-	return nil
-}
-
 // Merge removes dirty data and reduce data redundancy,following these steps:
 //
 // 1. Filter delete or expired entry.
@@ -292,20 +197,18 @@ func (db *DB) reWriteData(pendingMergeEntries []*Entry) error {
 // will effect the other write request. so execute it at the appropriate time.
 func (db *DB) Merge() error {
 	var (
-		off                           int64
-		dataFileIds, pendingMergeFIds []int
-		pendingMergeEntries           []*Entry
+		off                 int64
+		pendingMergeFIds    []int
+		pendingMergeEntries []*Entry
 	)
 
 	db.isMerging = true
 
-	_, dataFileIds = db.getMaxFileIDAndFileIDs()
-	pendingMergeFIds = dataFileIds
+	_, pendingMergeFIds = db.getMaxFileIDAndFileIDs()
 
 	for _, pendingMergeFId := range pendingMergeFIds {
 		off = 0
-		fID := int64(pendingMergeFId)
-		f, err := NewDataFile(db.getDataPath(fID), db.opt.SegmentSize)
+		f, err := NewDataFile(db.getDataPath(int64(pendingMergeFId)), db.opt.SegmentSize)
 		if err != nil {
 			db.isMerging = false
 			return err
@@ -319,11 +222,8 @@ func (db *DB) Merge() error {
 					break
 				}
 				readEntriesNum++
-				if entry.Meta.Flag == DataDeleteFlag || entry.Meta.Flag == DataRPopFlag ||
-					entry.Meta.Flag == DataLPopFlag || entry.Meta.Flag == DataLRemFlag ||
-					entry.Meta.Flag == DataLTrimFlag || entry.Meta.Flag == DataZRemFlag ||
-					entry.Meta.Flag == DataZRemRangeByRankFlag || entry.Meta.Flag == DataZPopMaxFlag ||
-					entry.Meta.Flag == DataZPopMinFlag || IsExpired(entry.Meta.TTL, entry.Meta.timestamp) {
+
+				if db.isFilterEntry(entry) {
 					off += entry.Size()
 					if off >= db.opt.SegmentSize {
 						break
@@ -346,12 +246,10 @@ func (db *DB) Merge() error {
 			}
 		}
 
-		//rewrite to active file
 		if err := db.reWriteData(pendingMergeEntries); err != nil {
 			return err
 		}
 
-		//remove old file
 		if err := os.Remove(db.getDataPath(int64(pendingMergeFId))); err != nil {
 			db.isMerging = false
 			return fmt.Errorf("when merge err: %s", err)
@@ -713,4 +611,111 @@ func (db *DB) buildIndexes() (err error) {
 
 	// build hint index
 	return db.buildHintIdx(dataFileIds)
+}
+
+// managed calls a block of code that is fully contained in a transaction.
+func (db *DB) managed(writable bool, fn func(tx *Tx) error) error {
+	var tx *Tx
+
+	tx, err := db.Begin(writable)
+	if err != nil {
+		return err
+	}
+
+	if err = fn(tx); err != nil {
+		if errRollback := tx.Rollback(); errRollback != nil {
+			return errRollback
+		}
+		return err
+	}
+
+	if err = tx.Commit(); err != nil {
+		if errRollback := tx.Rollback(); errRollback != nil {
+			return errRollback
+		}
+		return err
+	}
+
+	return nil
+}
+
+// getDataPath returns the data path at given fid.
+func (db *DB) getDataPath(fID int64) string {
+	return db.opt.Dir + "/" + strconv2.Int64ToStr(fID) + DataSuffix
+}
+
+func (db *DB) getPendingMergeEntries(entry *Entry, pendingMergeEntries []*Entry) []*Entry {
+	if entry.Meta.ds == DataStructureBPTree {
+		if r, err := db.BPTreeIdx[string(entry.Meta.bucket)].Find(entry.Key); err == nil {
+			if r.H.meta.Flag == DataSetFlag {
+				pendingMergeEntries = append(pendingMergeEntries, entry)
+			}
+		}
+	}
+
+	if entry.Meta.ds == DataStructureSet {
+		if db.SetIdx[string(entry.Meta.bucket)].SIsMember(string(entry.Key), entry.Value) {
+			pendingMergeEntries = append(pendingMergeEntries, entry)
+		}
+	}
+
+	if entry.Meta.ds == DataStructureSortedSet {
+		keyAndScore := strings.Split(string(entry.Key), SeparatorForZSetKey)
+		if len(keyAndScore) == 2 {
+			key := keyAndScore[0]
+			n := db.SortedSetIdx[string(entry.Meta.bucket)].GetByKey(key)
+			if n != nil {
+				pendingMergeEntries = append(pendingMergeEntries, entry)
+			}
+		}
+	}
+
+	if entry.Meta.ds == DataStructureList {
+		items, _ := db.ListIdx[string(entry.Meta.bucket)].LRange(string(entry.Key), 0, -1)
+		ok := false
+		if entry.Meta.Flag == DataRPushFlag || entry.Meta.Flag == DataLPushFlag {
+			for _, item := range items {
+				if string(entry.Value) == string(item) {
+					ok = true
+					break
+				}
+			}
+			if ok {
+				pendingMergeEntries = append(pendingMergeEntries, entry)
+			}
+		}
+	}
+
+	return pendingMergeEntries
+}
+
+func (db *DB) reWriteData(pendingMergeEntries []*Entry) error {
+	tx, err := db.Begin(true)
+	if err != nil {
+		db.isMerging = false
+		return err
+	}
+
+	for _, e := range pendingMergeEntries {
+		err := tx.put(string(e.Meta.bucket), e.Key, e.Value, e.Meta.TTL, e.Meta.Flag, e.Meta.timestamp, e.Meta.ds)
+		if err != nil {
+			tx.Rollback()
+			db.isMerging = false
+			return err
+		}
+	}
+	tx.Commit()
+	return nil
+}
+
+func (db *DB) isFilterEntry(entry *Entry) bool {
+	if entry.Meta.Flag == DataDeleteFlag || entry.Meta.Flag == DataRPopFlag ||
+		entry.Meta.Flag == DataLPopFlag || entry.Meta.Flag == DataLRemFlag ||
+		entry.Meta.Flag == DataLTrimFlag || entry.Meta.Flag == DataZRemFlag ||
+		entry.Meta.Flag == DataZRemRangeByRankFlag || entry.Meta.Flag == DataZPopMaxFlag ||
+		entry.Meta.Flag == DataZPopMinFlag || IsExpired(entry.Meta.TTL, entry.Meta.timestamp) {
+		return true
+	}
+
+	return false
 }
