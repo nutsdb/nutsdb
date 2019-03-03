@@ -100,11 +100,7 @@ func TestSortedSet_GetByRank(t *testing.T) {
 }
 
 func TestSortedSet_GetByRankRange(t *testing.T) {
-	var resultSet map[string]struct{}
-	resultSet = make(map[string]struct{}, 2)
-	resultSet["key1"] = struct{}{}
-	resultSet["key2"] = struct{}{}
-
+	resultSet := getResultSet("key1", "key2")
 	InitData()
 
 	for _, n := range ss.GetByRankRange(1, 2, false) {
@@ -113,9 +109,7 @@ func TestSortedSet_GetByRankRange(t *testing.T) {
 		}
 	}
 
-	resultSet = make(map[string]struct{}, 2)
-	resultSet["key5"] = struct{}{}
-	resultSet["key4"] = struct{}{}
+	resultSet = getResultSet("key5", "key4")
 
 	for _, n := range ss.GetByRankRange(-1, -2, false) {
 		if _, ok := resultSet[n.key]; !ok {
@@ -123,12 +117,7 @@ func TestSortedSet_GetByRankRange(t *testing.T) {
 		}
 	}
 
-	resultSet = make(map[string]struct{}, 5)
-	resultSet["key5"] = struct{}{}
-	resultSet["key4"] = struct{}{}
-	resultSet["key3"] = struct{}{}
-	resultSet["key2"] = struct{}{}
-	resultSet["key1"] = struct{}{}
+	resultSet = getResultSet("key5", "key4", "key3", "key2", "key1")
 
 	for _, n := range ss.GetByRankRange(-1, 1, false) {
 		if _, ok := resultSet[n.key]; !ok {
@@ -145,8 +134,7 @@ func TestSortedSet_GetByRankRange(t *testing.T) {
 	ss = New()
 	ss.Put("key1", 1, []byte("a"))
 
-	resultSet = make(map[string]struct{}, 1)
-	resultSet["key1"] = struct{}{}
+	resultSet = getResultSet("key1")
 	for _, n := range ss.GetByRankRange(-1, -2, false) {
 		if _, ok := resultSet[n.key]; !ok {
 			t.Error("TestSortedSet_GetByRankRange err")
@@ -158,18 +146,6 @@ func TestSortedSet_GetByRankRange(t *testing.T) {
 			t.Error("TestSortedSet_GetByRankRange err")
 		}
 	}
-
-	//ss = New()
-	//ss.Put("key1", 1, []byte("a"))
-	//ss.Put("key2", 2, []byte("b"))
-	//ss.Put("key3", 3, []byte("v"))
-	//
-	//fmt.Println(ss.Dict)
-	//for _, n := range ss.GetByRankRange(1, 2, true) {
-	//	fmt.Println(n.key)
-	//}
-	//
-	//fmt.Println(ss.Dict)
 }
 
 func TestSortedSet_FindRank(t *testing.T) {
@@ -228,14 +204,8 @@ func TestSortedSet_FindRevRank(t *testing.T) {
 }
 
 func TestSortedSet_GetByScoreRange(t *testing.T) {
-	var resultSet map[string]struct{}
-
 	InitData()
-
-	resultSet = make(map[string]struct{}, 3)
-	resultSet["key5"] = struct{}{}
-	resultSet["key4"] = struct{}{}
-	resultSet["key3"] = struct{}{}
+	resultSet := getResultSet("key5", "key4", "key3")
 
 	for _, n := range ss.GetByScoreRange(90, 100, nil) {
 		if _, ok := resultSet[n.key]; !ok {
@@ -243,8 +213,7 @@ func TestSortedSet_GetByScoreRange(t *testing.T) {
 		}
 	}
 
-	resultSet = make(map[string]struct{}, 1)
-	resultSet["key3"] = struct{}{}
+	resultSet = getResultSet("key3")
 	for _, n := range ss.GetByScoreRange(90, 100, &GetByScoreRangeOptions{
 		ExcludeEnd: true,
 	}) {
@@ -253,10 +222,8 @@ func TestSortedSet_GetByScoreRange(t *testing.T) {
 		}
 	}
 
-	resultSet = make(map[string]struct{}, 3)
-	resultSet["key5"] = struct{}{}
-	resultSet["key4"] = struct{}{}
-	resultSet["key3"] = struct{}{}
+	resultSet = getResultSet("key5", "key4", "key3")
+
 	for _, n := range ss.GetByScoreRange(10, 100, &GetByScoreRangeOptions{
 		ExcludeStart: true,
 	}) {
@@ -265,8 +232,7 @@ func TestSortedSet_GetByScoreRange(t *testing.T) {
 		}
 	}
 
-	resultSet = make(map[string]struct{}, 3)
-	resultSet["key3"] = struct{}{}
+	resultSet = getResultSet("key3")
 	for _, n := range ss.GetByScoreRange(10, 100, &GetByScoreRangeOptions{
 		ExcludeStart: true,
 		ExcludeEnd:   true,
@@ -275,11 +241,11 @@ func TestSortedSet_GetByScoreRange(t *testing.T) {
 			t.Error("TestSortedSet_GetByScoreRange err")
 		}
 	}
+}
 
-	resultSet = make(map[string]struct{}, 3)
-	resultSet["key2"] = struct{}{}
-	resultSet["key3"] = struct{}{}
-	resultSet["key4"] = struct{}{}
+func TestSortedSet_GetByScoreRange2(t *testing.T) {
+	InitData()
+	resultSet := getResultSet("key2", "key3", "key4")
 	for _, n := range ss.GetByScoreRange(10, 100, &GetByScoreRangeOptions{
 		Limit: 3,
 	}) {
@@ -288,18 +254,14 @@ func TestSortedSet_GetByScoreRange(t *testing.T) {
 		}
 	}
 
-	resultSet = make(map[string]struct{}, 2)
-	resultSet["key5"] = struct{}{}
-	resultSet["key4"] = struct{}{}
+	resultSet = getResultSet("key4", "key5")
 	for _, n := range ss.GetByScoreRange(100, 99.999, nil) {
 		if _, ok := resultSet[n.key]; !ok {
 			t.Error("TestSortedSet_GetByScoreRange err")
 		}
 	}
 
-	resultSet = make(map[string]struct{}, 2)
-	resultSet["key4"] = struct{}{}
-	resultSet["key5"] = struct{}{}
+	resultSet = getResultSet("key4", "key5")
 	for _, n := range ss.GetByScoreRange(100, 99.9, &GetByScoreRangeOptions{
 		ExcludeEnd: true,
 	}) {
@@ -308,8 +270,7 @@ func TestSortedSet_GetByScoreRange(t *testing.T) {
 		}
 	}
 
-	resultSet = make(map[string]struct{}, 1)
-	resultSet["key3"] = struct{}{}
+	resultSet = getResultSet("key3")
 
 	for _, n := range ss.GetByScoreRange(100, 99.9, &GetByScoreRangeOptions{
 		ExcludeStart: true,
@@ -327,7 +288,6 @@ func TestSortedSet_PeekMax(t *testing.T) {
 	if n.Key() != "key5" || n.Score() != 100 {
 		t.Error("TestSortedSet_PeekMax err")
 	}
-
 }
 
 func TestSortedSet_PeekMin(t *testing.T) {
@@ -347,12 +307,7 @@ func TestSortedSet_PopMin(t *testing.T) {
 		t.Error("TestSortedSet_PopMin err")
 	}
 
-	var resultSet map[string]struct{}
-	resultSet = make(map[string]struct{}, 4)
-	resultSet["key2"] = struct{}{}
-	resultSet["key3"] = struct{}{}
-	resultSet["key4"] = struct{}{}
-	resultSet["key5"] = struct{}{}
+	resultSet := getResultSet("key2", "key3", "key4", "key5")
 
 	for key := range ss.Dict {
 		if _, ok := resultSet[key]; !ok {
@@ -369,13 +324,7 @@ func TestSortedSet_PopMax(t *testing.T) {
 		t.Error("TestSortedSet_PopMax err")
 	}
 
-	var resultSet map[string]struct{}
-	resultSet = make(map[string]struct{}, 4)
-	resultSet["key1"] = struct{}{}
-	resultSet["key2"] = struct{}{}
-	resultSet["key3"] = struct{}{}
-	resultSet["key4"] = struct{}{}
-
+	resultSet := getResultSet("key1", "key2", "key3", "key4")
 	for key := range ss.Dict {
 		if _, ok := resultSet[key]; !ok {
 			t.Error("TestSortedSet_PopMax err")
@@ -387,12 +336,8 @@ func TestSortedSet_Remove(t *testing.T) {
 	InitData()
 
 	ss.Remove("key1")
-	var resultSet map[string]struct{}
-	resultSet = make(map[string]struct{}, 4)
-	resultSet["key2"] = struct{}{}
-	resultSet["key3"] = struct{}{}
-	resultSet["key4"] = struct{}{}
-	resultSet["key5"] = struct{}{}
+
+	resultSet := getResultSet("key2", "key3", "key4", "key5")
 
 	for key := range ss.Dict {
 		if _, ok := resultSet[key]; !ok {
@@ -407,4 +352,15 @@ func TestSortedSet_Size(t *testing.T) {
 	if ss.Size() != 5 {
 		t.Error("TestSortedSet_Size err")
 	}
+}
+
+func getResultSet(items ...string) map[string]struct{} {
+	var resultSet map[string]struct{}
+	resultSet = make(map[string]struct{}, len(items))
+
+	for _, item := range items {
+		resultSet[item] = struct{}{}
+	}
+
+	return resultSet
 }

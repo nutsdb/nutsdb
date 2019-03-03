@@ -308,83 +308,94 @@ func (ss *SortedSet) GetByScoreRange(start SCORE, end SCORE, options *GetByScore
 		return nodes
 	}
 
-	if reverse { // search from end to start
-		x := ss.header
+	if reverse {
+		// search from end to start
+		return ss.searchReverse(nodes, excludeStart, excludeEnd, start, end, limit)
+	}
+	// search from start to end
+	return ss.searchForward(nodes, excludeStart, excludeEnd, start, end, limit)
+}
 
-		if excludeEnd {
-			for i := ss.level - 1; i >= 0; i-- {
-				for x.level[i].forward != nil &&
-					x.level[i].forward.score < end {
-					x = x.level[i].forward
-				}
+func (ss *SortedSet) searchForward(nodes []*SortedSetNode, excludeStart, excludeEnd bool, start, end SCORE, limit int) []*SortedSetNode {
+	// search from start to end
+	x := ss.header
+	if excludeStart {
+		for i := ss.level - 1; i >= 0; i-- {
+			for x.level[i].forward != nil &&
+				x.level[i].forward.score <= start {
+				x = x.level[i].forward
 			}
-		} else {
-			for i := ss.level - 1; i >= 0; i-- {
-				for x.level[i].forward != nil &&
-					x.level[i].forward.score <= end {
-					x = x.level[i].forward
-				}
-			}
-		}
-
-		for x != nil && limit > 0 {
-			if excludeStart {
-				if x.score <= start {
-					break
-				}
-			} else {
-				if x.score < start {
-					break
-				}
-			}
-
-			next := x.backward
-
-			nodes = append(nodes, x)
-			limit--
-
-			x = next
 		}
 	} else {
-		// search from start to end
-		x := ss.header
-		if excludeStart {
-			for i := ss.level - 1; i >= 0; i-- {
-				for x.level[i].forward != nil &&
-					x.level[i].forward.score <= start {
-					x = x.level[i].forward
-				}
+		for i := ss.level - 1; i >= 0; i-- {
+			for x.level[i].forward != nil &&
+				x.level[i].forward.score < start {
+				x = x.level[i].forward
+			}
+		}
+	}
+
+	/* Current node is the last with score < or <= start. */
+	x = x.level[0].forward
+
+	for x != nil && limit > 0 {
+		if excludeEnd {
+			if x.score >= end {
+				break
 			}
 		} else {
-			for i := ss.level - 1; i >= 0; i-- {
-				for x.level[i].forward != nil &&
-					x.level[i].forward.score < start {
-					x = x.level[i].forward
-				}
+			if x.score > end {
+				break
 			}
 		}
 
-		/* Current node is the last with score < or <= start. */
-		x = x.level[0].forward
+		next := x.level[0].forward
 
-		for x != nil && limit > 0 {
-			if excludeEnd {
-				if x.score >= end {
-					break
-				}
-			} else {
-				if x.score > end {
-					break
-				}
+		nodes = append(nodes, x)
+		limit--
+
+		x = next
+	}
+
+	return nodes
+}
+
+func (ss *SortedSet) searchReverse(nodes []*SortedSetNode, excludeStart, excludeEnd bool, start, end SCORE, limit int) []*SortedSetNode {
+	x := ss.header
+
+	if excludeEnd {
+		for i := ss.level - 1; i >= 0; i-- {
+			for x.level[i].forward != nil &&
+				x.level[i].forward.score < end {
+				x = x.level[i].forward
 			}
-
-			next := x.level[0].forward
-
-			nodes = append(nodes, x)
-			limit--
-
-			x = next
 		}
+	} else {
+		for i := ss.level - 1; i >= 0; i-- {
+			for x.level[i].forward != nil &&
+				x.level[i].forward.score <= end {
+				x = x.level[i].forward
+			}
+		}
+	}
+
+	for x != nil && limit > 0 {
+		if excludeStart {
+			if x.score <= start {
+				break
+			}
+		} else {
+			if x.score < start {
+				break
+			}
+		}
+
+		next := x.backward
+
+		nodes = append(nodes, x)
+		limit--
+
+		x = next
 	}
 
 	return nodes
@@ -396,26 +407,14 @@ func (ss *SortedSet) GetByScoreRange(start SCORE, end SCORE, options *GetByScore
 // If remove is true, the returned nodes are removed.
 //
 // Time complexity of this method is : O(log(N)).
-func (ss *SortedSet) GetByRankRange(start int, end int, remove bool) []*SortedSetNode {
+func (ss *SortedSet) GetByRankRange(start, end int, remove bool) []*SortedSetNode {
 	var (
 		update    [SkipListMaxLevel]*SortedSetNode
 		nodes     []*SortedSetNode
 		traversed int
 	)
 
-	// Sanitize indexes.
-	if start < 0 {
-		start = int(ss.length) + start + 1
-	}
-	if end < 0 {
-		end = int(ss.length) + end + 1
-	}
-	if start <= 0 {
-		start = 1
-	}
-	if end <= 0 {
-		end = 1
-	}
+	start, end = ss.sanitizeIndexes(start, end)
 
 	reverse := start > end
 	if reverse { // swap start and end
@@ -460,6 +459,23 @@ func (ss *SortedSet) GetByRankRange(start int, end int, remove bool) []*SortedSe
 		}
 	}
 	return nodes
+}
+
+func (ss *SortedSet) sanitizeIndexes(start, end int) (newStart, newEnd int) {
+	if start < 0 {
+		start = int(ss.length) + start + 1
+	}
+	if end < 0 {
+		end = int(ss.length) + end + 1
+	}
+	if start <= 0 {
+		start = 1
+	}
+	if end <= 0 {
+		end = 1
+	}
+
+	return start, end
 }
 
 // GetByRank returns the node at given rank.
