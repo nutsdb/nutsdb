@@ -334,29 +334,34 @@ func TestTx_SDiffByOneBucket(t *testing.T) {
 	}
 }
 
-func TestTx_SDiffByTwoBuckets(t *testing.T) {
-	InitForSet()
-	db, err = Open(opt)
-
+func initDataForTestSDiffByTwoBuckets(bucket1, bucket2 string, key1, key2 []byte, t *testing.T) {
 	tx, err := db.Begin(true)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	bucket1 := "bucket6"
-	key1 := []byte("mySet1")
 	if err := tx.SAdd(bucket1, key1, []byte("a"), []byte("b"), []byte("c")); err != nil {
 		tx.Rollback()
 		t.Fatal(err)
 	}
 
-	bucket2 := "bucket7"
-	key2 := []byte("mySet2")
 	if err := tx.SAdd(bucket2, key2, []byte("c"), []byte("d"), []byte("e")); err != nil {
 		tx.Rollback()
 		t.Fatal(err)
 	}
 	tx.Commit()
+}
+
+func TestTx_SDiffByTwoBuckets(t *testing.T) {
+	InitForSet()
+	db, err = Open(opt)
+
+	bucket1 := "bucket6"
+	bucket2 := "bucket7"
+	key1 := []byte("mySet1")
+	key2 := []byte("mySet2")
+
+	initDataForTestSDiffByTwoBuckets(bucket1, bucket2, key1, key2, t)
 
 	tx, err = db.Begin(false)
 	if err != nil {
@@ -480,25 +485,18 @@ func TestTx_SPop(t *testing.T) {
 	}
 }
 
-func TestTx_SMoveByOneBucket(t *testing.T) {
-	InitForSet()
-	db, err = Open(opt)
-
+func initDataForTestSMoveByOneBucket(bucket string, key1, key2 []byte, t *testing.T) {
 	tx, err := db.Begin(true)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	bucket := "bucket10"
-
-	key1 := []byte("mySet1")
 	err = tx.SAdd(bucket, key1, []byte("one"), []byte("two"))
 	if err != nil {
 		tx.Rollback()
 		t.Fatal(err)
 	}
 
-	key2 := []byte("mySet2")
 	tx.SAdd(bucket, key2, []byte("three"))
 	if err != nil {
 		tx.Rollback()
@@ -506,6 +504,17 @@ func TestTx_SMoveByOneBucket(t *testing.T) {
 	}
 
 	tx.Commit()
+}
+
+func TestTx_SMoveByOneBucket(t *testing.T) {
+	InitForSet()
+	db, err = Open(opt)
+
+	bucket := "bucket10"
+	key1 := []byte("mySet1")
+	key2 := []byte("mySet2")
+
+	initDataForTestSMoveByOneBucket(bucket, key1, key2, t)
 
 	tx, err = db.Begin(true)
 	if err != nil {
@@ -557,32 +566,7 @@ func TestTx_SMoveByOneBucket(t *testing.T) {
 	}
 }
 
-func TestTx_SMoveByTwoBuckets(t *testing.T) {
-	InitForSet()
-	db, err = Open(opt)
-
-	tx, err := db.Begin(true)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	bucket1 := "bucket11"
-	key1 := []byte("mySet1")
-	bucket2 := "bucket12"
-	key2 := []byte("mySet2")
-
-	if err = tx.SAdd(bucket1, key1, []byte("one"), []byte("two")); err != nil {
-		tx.Rollback()
-		t.Fatal(err)
-	}
-
-	if err = tx.SAdd(bucket2, key2, []byte("three")); err != nil {
-		tx.Rollback()
-		t.Fatal(err)
-	}
-
-	tx.Commit()
-
+func opSMoveByTwoBucketsForTest(bucket1, bucket2 string, key1, key2 []byte, t *testing.T) {
 	tx, err = db.Begin(true)
 	if err != nil {
 		t.Fatal(err)
@@ -619,13 +603,42 @@ func TestTx_SMoveByTwoBuckets(t *testing.T) {
 	}
 
 	tx.Commit()
+}
+
+func TestTx_SMoveByTwoBuckets(t *testing.T) {
+	InitForSet()
+	db, err = Open(opt)
+
+	tx, err := db.Begin(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bucket1 := "bucket11"
+	key1 := []byte("mySet1")
+	bucket2 := "bucket12"
+	key2 := []byte("mySet2")
+
+	if err = tx.SAdd(bucket1, key1, []byte("one"), []byte("two")); err != nil {
+		tx.Rollback()
+		t.Fatal(err)
+	}
+
+	if err = tx.SAdd(bucket2, key2, []byte("three")); err != nil {
+		tx.Rollback()
+		t.Fatal(err)
+	}
+
+	tx.Commit()
+
+	opSMoveByTwoBucketsForTest(bucket1, bucket2, key1, key2, t)
 
 	tx, err = db.Begin(false)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	ok, err = tx.SIsMember(bucket1, key1, []byte("two"))
+	ok, err := tx.SIsMember(bucket1, key1, []byte("two"))
 	if ok || err == nil {
 		t.Error("TestTx_SMoveByOneBucket err")
 	}
@@ -718,32 +731,7 @@ func TestTx_SUnionByOneBucket(t *testing.T) {
 	}
 }
 
-func TestTx_SUnionByTwoBuckets(t *testing.T) {
-	InitForSet()
-	db, err = Open(opt)
-
-	tx, err := db.Begin(true)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	bucket1 := "bucket14"
-	key1 := []byte("mySet1")
-	bucket2 := "bucket15"
-	key2 := []byte("mySet2")
-
-	if err = tx.SAdd(bucket1, key1, []byte("one"), []byte("two")); err != nil {
-		tx.Rollback()
-		t.Fatal(err)
-	}
-
-	if err = tx.SAdd(bucket2, key2, []byte("three")); err != nil {
-		tx.Rollback()
-		t.Fatal(err)
-	}
-
-	tx.Commit()
-
+func opSUnionByTwoBucketsForTest(bucket1 string, key1 []byte, bucket2 string, key2 []byte, t *testing.T) {
 	tx, err = db.Begin(true)
 	if err != nil {
 		t.Fatal(err)
@@ -785,6 +773,35 @@ func TestTx_SUnionByTwoBuckets(t *testing.T) {
 	if list != nil || err == nil {
 		t.Error("TestTx_SUnionByTwoBuckets err")
 	}
+}
+
+func TestTx_SUnionByTwoBuckets(t *testing.T) {
+	InitForSet()
+	db, err = Open(opt)
+
+	bucket1 := "bucket14"
+	key1 := []byte("mySet1")
+	bucket2 := "bucket15"
+	key2 := []byte("mySet2")
+
+	tx, err := db.Begin(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err = tx.SAdd(bucket1, key1, []byte("one"), []byte("two")); err != nil {
+		tx.Rollback()
+		t.Fatal(err)
+	}
+
+	if err = tx.SAdd(bucket2, key2, []byte("three")); err != nil {
+		tx.Rollback()
+		t.Fatal(err)
+	}
+
+	tx.Commit()
+
+	opSUnionByTwoBucketsForTest(bucket1, key1, bucket2, key2, t)
 }
 
 func TestTx_SHasKey(t *testing.T) {
@@ -830,25 +847,7 @@ func TestTx_SHasKey(t *testing.T) {
 	}
 }
 
-func TestTx_SIsMember(t *testing.T) {
-	InitForSet()
-	db, err = Open(opt)
-
-	tx, err := db.Begin(true)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	bucket := "bucket17"
-	key := []byte("mySet")
-
-	if err = tx.SAdd(bucket, key, []byte("Hello"), []byte("World")); err != nil {
-		tx.Rollback()
-		t.Fatal(err)
-	}
-
-	tx.Commit()
-
+func opSIsMemberForTest(bucket string, key []byte, t *testing.T) {
 	tx, err = db.Begin(false)
 	if err != nil {
 		t.Fatal(err)
@@ -886,7 +885,7 @@ func TestTx_SIsMember(t *testing.T) {
 	}
 }
 
-func TestTx_SAreMembers(t *testing.T) {
+func TestTx_SIsMember(t *testing.T) {
 	InitForSet()
 	db, err = Open(opt)
 
@@ -895,7 +894,7 @@ func TestTx_SAreMembers(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	bucket := "bucket18"
+	bucket := "bucket17"
 	key := []byte("mySet")
 
 	if err = tx.SAdd(bucket, key, []byte("Hello"), []byte("World")); err != nil {
@@ -905,6 +904,10 @@ func TestTx_SAreMembers(t *testing.T) {
 
 	tx.Commit()
 
+	opSIsMemberForTest(bucket, key, t)
+}
+
+func opSAreMembersForTest(bucket string, key []byte, t *testing.T) {
 	tx, err = db.Begin(false)
 	if err != nil {
 		t.Fatal(err)
@@ -941,4 +944,25 @@ func TestTx_SAreMembers(t *testing.T) {
 	if ok || err == nil {
 		t.Error("TestTx_SAreMembers err")
 	}
+}
+
+func TestTx_SAreMembers(t *testing.T) {
+	InitForSet()
+	db, err = Open(opt)
+
+	tx, err := db.Begin(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bucket := "bucket18"
+	key := []byte("mySet")
+
+	if err = tx.SAdd(bucket, key, []byte("Hello"), []byte("World")); err != nil {
+		tx.Rollback()
+		t.Fatal(err)
+	}
+
+	tx.Commit()
+	opSAreMembersForTest(bucket, key, t)
 }
