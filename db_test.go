@@ -131,20 +131,7 @@ func TestDB_Basic(t *testing.T) {
 	}
 }
 
-func TestDB_Merge_For_string(t *testing.T) {
-	InitOpt("/tmp/nutsdbtestformergestring", true)
-	InitOpt("/tmp/nutsdbtestformergestring", false)
-	db, err = Open(opt)
-
-	readFlag := false
-	mergeFlag := true
-	defer db.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	bucketForString := "test_merge"
-
+func initStringDataAndDelForTestMerge(readFlag bool, bucketForString string, t *testing.T) {
 	if !readFlag {
 		////init batch put data
 		for i := 0; i < 10000; i++ {
@@ -175,8 +162,9 @@ func TestDB_Merge_For_string(t *testing.T) {
 			}
 		}
 	}
+}
 
-	//check data
+func checkStringDataForTestMerge(bucketForString string, t *testing.T) {
 	for i := 0; i < 5000; i++ {
 		if err := db.View(
 			func(tx *Tx) error {
@@ -203,6 +191,26 @@ func TestDB_Merge_For_string(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+}
+
+func TestDB_Merge_For_string(t *testing.T) {
+	InitOpt("/tmp/nutsdbtestformergestring", true)
+	InitOpt("/tmp/nutsdbtestformergestring", false)
+	db, err = Open(opt)
+
+	readFlag := false
+	mergeFlag := true
+	defer db.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bucketForString := "test_merge"
+
+	initStringDataAndDelForTestMerge(readFlag, bucketForString, t)
+
+	//check data
+	checkStringDataForTestMerge(bucketForString, t)
 
 	//GetValidKeyCount
 	validKeyNum := db.BPTreeIdx[bucketForString].ValidKeyCount
@@ -214,6 +222,34 @@ func TestDB_Merge_For_string(t *testing.T) {
 	if mergeFlag {
 		if err = db.Merge(); err != nil {
 			t.Error("err merge", err)
+		}
+	}
+}
+
+func opSAddAndCheckForTestMerge(bucketForSet string, key []byte, t *testing.T) {
+	for i := 0; i < 100; i++ {
+		if err := db.Update(func(tx *Tx) error {
+			val := []byte("setVal" + fmt.Sprintf("%07d", i))
+			err := tx.SAdd(bucketForSet, key, val)
+			if err != nil {
+				return err
+			}
+			return nil
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	for i := 0; i < 100; i++ {
+		if err := db.View(func(tx *Tx) error {
+			val := []byte("setVal" + fmt.Sprintf("%07d", i))
+			ok, _ := tx.SIsMember(bucketForSet, key, val)
+			if !ok {
+				t.Error("err read set data ")
+			}
+			return nil
+		}); err != nil {
+			t.Fatal(err)
 		}
 	}
 }
@@ -235,31 +271,7 @@ func TestDB_Merge_for_Set(t *testing.T) {
 	key := []byte("mySet_for_merge_test")
 
 	if !readFlag {
-		for i := 0; i < 100; i++ {
-			if err := db.Update(func(tx *Tx) error {
-				val := []byte("setVal" + fmt.Sprintf("%07d", i))
-				err := tx.SAdd(bucketForSet, key, val)
-				if err != nil {
-					return err
-				}
-				return nil
-			}); err != nil {
-				t.Fatal(err)
-			}
-		}
-
-		for i := 0; i < 100; i++ {
-			if err := db.View(func(tx *Tx) error {
-				val := []byte("setVal" + fmt.Sprintf("%07d", i))
-				ok, _ := tx.SIsMember(bucketForSet, key, val)
-				if !ok {
-					t.Error("err read set data ")
-				}
-				return nil
-			}); err != nil {
-				t.Fatal(err)
-			}
-		}
+		opSAddAndCheckForTestMerge(bucketForSet, key, t)
 	}
 
 	if !readFlag {
@@ -311,67 +323,53 @@ func TestDB_Merge_for_Set(t *testing.T) {
 	}
 }
 
-func TestDB_Merge_For_ZSET(t *testing.T) {
-	InitOpt("/tmp/nutsdbtestformergezset", true)
-	InitOpt("/tmp/nutsdbtestformergezset", false)
-
-	readFlag := false
-	mergeFlag := true
-
-	bucketForZSet := "bucket_for_zset_merge_test"
-
-	db, err = Open(opt)
-	defer db.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if !readFlag {
-		for i := 0; i < 100; i++ {
-			if err := db.Update(func(tx *Tx) error {
-				key := []byte("zsetKey" + fmt.Sprintf("%07d", i))
-				val := []byte("zsetVal" + fmt.Sprintf("%07d", i))
-				score, _ := strconv2.IntToFloat64(i)
-				err := tx.ZAdd(bucketForZSet, key, score, val)
-				if err != nil {
-					return err
-				}
-				return nil
-			}); err != nil {
-				t.Fatal(err)
+func initZSetDataForTestMerge(bucketForZSet string, t *testing.T) {
+	for i := 0; i < 100; i++ {
+		if err := db.Update(func(tx *Tx) error {
+			key := []byte("zsetKey" + fmt.Sprintf("%07d", i))
+			val := []byte("zsetVal" + fmt.Sprintf("%07d", i))
+			score, _ := strconv2.IntToFloat64(i)
+			err := tx.ZAdd(bucketForZSet, key, score, val)
+			if err != nil {
+				return err
 			}
-		}
-
-		for i := 0; i < 100; i++ {
-			if err := db.View(func(tx *Tx) error {
-				key := []byte("zsetKey" + fmt.Sprintf("%07d", i))
-				_, err := tx.ZGetByKey(bucketForZSet, key)
-				if err != nil {
-					return err
-				}
-				return nil
-			}); err != nil {
-				t.Fatal(err)
-			}
+			return nil
+		}); err != nil {
+			t.Fatal(err)
 		}
 	}
 
-	if !readFlag {
-		for i := 0; i < 50; i++ {
-			if err := db.Update(func(tx *Tx) error {
-				key := []byte("zsetKey" + fmt.Sprintf("%07d", i))
-				err := tx.ZRem(bucketForZSet, string(key))
-				if err != nil {
-					return err
-				}
-
-				return nil
-			}); err != nil {
-				t.Fatal(err)
+	for i := 0; i < 100; i++ {
+		if err := db.View(func(tx *Tx) error {
+			key := []byte("zsetKey" + fmt.Sprintf("%07d", i))
+			_, err := tx.ZGetByKey(bucketForZSet, key)
+			if err != nil {
+				return err
 			}
+			return nil
+		}); err != nil {
+			t.Fatal(err)
 		}
 	}
+}
 
+func remZSetDataForTestMerge(bucketForZSet string, t *testing.T) {
+	for i := 0; i < 50; i++ {
+		if err := db.Update(func(tx *Tx) error {
+			key := []byte("zsetKey" + fmt.Sprintf("%07d", i))
+			err := tx.ZRem(bucketForZSet, string(key))
+			if err != nil {
+				return err
+			}
+
+			return nil
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func checkRemZSetDataForTestMerge(bucketForZSet string, t *testing.T) {
 	for i := 0; i < 50; i++ {
 		if err := db.View(func(tx *Tx) error {
 			key := []byte("zsetKey" + fmt.Sprintf("%07d", i))
@@ -385,12 +383,10 @@ func TestDB_Merge_For_ZSET(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-
 	for i := 50; i < 100; i++ {
 		if err := db.View(func(tx *Tx) error {
 			key := []byte("zsetKey" + fmt.Sprintf("%07d", i))
 			_, err := tx.ZGetByKey(bucketForZSet, key)
-			//fmt.Println("get n",n.Key())
 			if err != nil {
 				t.Error(err)
 				return err
@@ -400,7 +396,9 @@ func TestDB_Merge_For_ZSET(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+}
 
+func opZRemRangeByRankForTestMerge(readFlag bool, bucketForZSet string, t *testing.T) {
 	if !readFlag {
 		if err := db.Update(func(tx *Tx) error {
 			err := tx.ZRemRangeByRank(bucketForZSet, 1, 10)
@@ -417,7 +415,6 @@ func TestDB_Merge_For_ZSET(t *testing.T) {
 		if err := db.View(func(tx *Tx) error {
 			key := []byte("zsetKey" + fmt.Sprintf("%07d", i))
 			_, err := tx.ZGetByKey(bucketForZSet, key)
-			//fmt.Println("get n",n.Key())
 			if err != nil {
 				t.Error(err)
 				return err
@@ -427,6 +424,34 @@ func TestDB_Merge_For_ZSET(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+}
+
+func TestDB_Merge_For_ZSET(t *testing.T) {
+	InitOpt("/tmp/nutsdbtestformergezset", true)
+	InitOpt("/tmp/nutsdbtestformergezset", false)
+
+	readFlag := false
+	mergeFlag := true
+
+	bucketForZSet := "bucket_for_zset_merge_test"
+
+	db, err = Open(opt)
+	defer db.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !readFlag {
+		initZSetDataForTestMerge(bucketForZSet, t)
+	}
+
+	if !readFlag {
+		remZSetDataForTestMerge(bucketForZSet, t)
+	}
+
+	checkRemZSetDataForTestMerge(bucketForZSet, t)
+
+	opZRemRangeByRankForTestMerge(readFlag, bucketForZSet, t)
 
 	if !readFlag {
 		if err := db.Update(func(tx *Tx) error {
@@ -453,7 +478,6 @@ func TestDB_Merge_For_ZSET(t *testing.T) {
 	if err := db.View(func(tx *Tx) error {
 		key := []byte("zsetKey" + fmt.Sprintf("%07d", 99))
 		_, err := tx.ZGetByKey(bucketForZSet, key)
-		//fmt.Println("get n",n.Key())
 		if err == nil {
 			t.Error("err TestDB_Merge_For_ZSET")
 			return err
@@ -466,7 +490,6 @@ func TestDB_Merge_For_ZSET(t *testing.T) {
 	if err := db.View(func(tx *Tx) error {
 		key := []byte("zsetKey" + fmt.Sprintf("%07d", 60))
 		_, err := tx.ZGetByKey(bucketForZSet, key)
-		//fmt.Println("get n",n.Key())
 		if err == nil {
 			t.Error("err TestDB_Merge_For_ZSET")
 			return err
@@ -483,51 +506,7 @@ func TestDB_Merge_For_ZSET(t *testing.T) {
 	}
 }
 
-func TestDB_Merge_For_List(t *testing.T) {
-	InitOpt("/tmp/nutsdbtestformergelist", true)
-
-	readFlag := false
-	mergeFlag := true
-
-	bucketForList := "bucket_for_list_merge_test"
-	key := []byte("key_for_list_merge_test")
-
-	db, err = Open(opt)
-	defer db.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if !readFlag {
-		for i := 0; i < 100; i++ {
-			if err := db.Update(func(tx *Tx) error {
-				val := []byte("listVal" + fmt.Sprintf("%07d", i))
-				err := tx.RPush(bucketForList, key, val)
-				if err != nil {
-					return err
-				}
-				return nil
-			}); err != nil {
-				t.Fatal(err)
-			}
-		}
-
-		if err := db.View(func(tx *Tx) error {
-			list, err := tx.LRange(bucketForList, key, 0, 99)
-			if len(list) != 100 {
-				t.Error("TestDB_Merge_For_List err")
-			}
-
-			if err != nil {
-				t.Error(err)
-				return err
-			}
-			return nil
-		}); err != nil {
-			t.Fatal(err)
-		}
-	}
-
+func opLPopAndRPopForTestMerge(bucketForList string, key []byte, t *testing.T) {
 	if err := db.Update(func(tx *Tx) error {
 		item, err := tx.LPop(bucketForList, key)
 		if err != nil {
@@ -586,6 +565,58 @@ func TestDB_Merge_For_List(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func opRPushAndCheckForTestMerge(bucketForList string, key []byte, t *testing.T) {
+	for i := 0; i < 100; i++ {
+		if err := db.Update(func(tx *Tx) error {
+			val := []byte("listVal" + fmt.Sprintf("%07d", i))
+			err := tx.RPush(bucketForList, key, val)
+			if err != nil {
+				return err
+			}
+			return nil
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := db.View(func(tx *Tx) error {
+		list, err := tx.LRange(bucketForList, key, 0, 99)
+		if len(list) != 100 {
+			t.Error("TestDB_Merge_For_List err")
+		}
+
+		if err != nil {
+			t.Error(err)
+			return err
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestDB_Merge_For_List(t *testing.T) {
+	InitOpt("/tmp/nutsdbtestformergelist", true)
+
+	readFlag := false
+	mergeFlag := true
+
+	bucketForList := "bucket_for_list_merge_test"
+	key := []byte("key_for_list_merge_test")
+
+	db, err = Open(opt)
+	defer db.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !readFlag {
+		opRPushAndCheckForTestMerge(bucketForList, key, t)
+	}
+
+	opLPopAndRPopForTestMerge(bucketForList, key, t)
 
 	if err := db.Update(func(tx *Tx) error {
 		err := tx.LRem(bucketForList, key, 1)
@@ -647,14 +678,7 @@ func TestTx_Get_NotFound(t *testing.T) {
 
 }
 
-func TestOpen(t *testing.T) {
-	InitOpt("/tmp/nutsdbtestfordbopen", true)
-
-	db, err = Open(opt)
-	if err != nil {
-		t.Fatal(err)
-	}
-
+func opStrDataForTestOpen(t *testing.T) {
 	strBucket := "myStringBucket"
 	if err := db.Update(func(tx *Tx) error {
 		err := tx.Put(strBucket, []byte("key"), []byte("val"), Persistent)
@@ -666,34 +690,9 @@ func TestOpen(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
+}
 
-	listBucket := "myListBucket"
-
-	if err := db.Update(func(tx *Tx) error {
-		err := tx.LPush(listBucket, []byte("key"), []byte("val"))
-		if err != nil {
-			return err
-		}
-
-		return nil
-	}); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := db.Update(func(tx *Tx) error {
-		item, err := tx.LPop(listBucket, []byte("key"))
-		if string(item) != "val" {
-			t.Error("TestOpen err")
-		}
-		if err != nil {
-			return err
-		}
-
-		return nil
-	}); err != nil {
-		t.Fatal(err)
-	}
-
+func opRPushForTestOpen(listBucket string, t *testing.T) {
 	if err := db.Update(func(tx *Tx) error {
 		err := tx.RPush(listBucket, []byte("myList"), []byte("val1"))
 		if err != nil {
@@ -725,6 +724,41 @@ func TestOpen(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func opLPushAndLPopForTestOpen(listBucket string, t *testing.T) {
+	if err := db.Update(func(tx *Tx) error {
+		err := tx.LPush(listBucket, []byte("key"), []byte("val"))
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := db.Update(func(tx *Tx) error {
+		item, err := tx.LPop(listBucket, []byte("key"))
+		if string(item) != "val" {
+			t.Error("TestOpen err")
+		}
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func opListDataForTestOpen(t *testing.T) {
+	listBucket := "myListBucket"
+
+	opLPushAndLPopForTestOpen(listBucket, t)
+
+	opRPushForTestOpen(listBucket, t)
 
 	if err := db.Update(func(tx *Tx) error {
 		err := tx.LRem(listBucket, []byte("myList"), 1)
@@ -791,9 +825,10 @@ func TestOpen(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
+}
 
-	zSetBucket := "myListBucket"
-
+func opZSetDataForTestOpen(t *testing.T) {
+	zSetBucket := "myZSetBucket"
 	if err := db.Update(func(tx *Tx) error {
 		err := tx.ZAdd(zSetBucket, []byte("key1"), 1, []byte("val1"))
 		if err != nil {
@@ -867,7 +902,9 @@ func TestOpen(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
+}
 
+func opSetDataForTestOpen(t *testing.T) {
 	setBucket := "mySetBucket"
 	key := []byte("myList")
 	if err := db.Update(func(tx *Tx) error {
@@ -924,12 +961,28 @@ func TestOpen(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestOpen(t *testing.T) {
+	InitOpt("/tmp/nutsdbtestfordbopen", true)
 
 	db, err = Open(opt)
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	opStrDataForTestOpen(t)
+
+	opListDataForTestOpen(t)
+
+	opZSetDataForTestOpen(t)
+
+	opSetDataForTestOpen(t)
+
+	db, err = Open(opt)
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestDB_Backup(t *testing.T) {
