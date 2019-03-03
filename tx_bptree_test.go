@@ -103,21 +103,12 @@ func TestTx_PutAndGet(t *testing.T) {
 
 }
 
-func TestTx_BatchPutsAndScans(t *testing.T) {
-	Init()
-	db, err = Open(opt)
-	defer db.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-
+func initDataForTestBatchOps(bucket string, t *testing.T) {
 	//write tx begin
 	tx, err := db.Begin(true)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	bucket := "bucket2"
 
 	for i := 0; i <= 10000; i++ {
 		key := []byte("key_" + fmt.Sprintf("%07d", i))
@@ -130,8 +121,9 @@ func TestTx_BatchPutsAndScans(t *testing.T) {
 	}
 	//tx commit
 	tx.Commit()
+}
 
-	//range scan error
+func opRangeScanForTestBatchOps(bucket string, t *testing.T) {
 	tx, err = db.Begin(false)
 	if err != nil {
 		t.Fatal(err)
@@ -176,7 +168,9 @@ func TestTx_BatchPutsAndScans(t *testing.T) {
 	if err == nil || len(entries) > 0 {
 		t.Errorf("TestTx_BatchPutsAndScans err")
 	}
-	//prefix scan
+}
+
+func opPrefixScanForTestBatchOps(bucket string, t *testing.T) {
 	tx, err = db.Begin(false)
 	if err != nil {
 		t.Fatal(err)
@@ -201,22 +195,31 @@ func TestTx_BatchPutsAndScans(t *testing.T) {
 	tx.Commit()
 }
 
-func TestTx_DeleteAndGet(t *testing.T) {
+func TestTx_BatchPutsAndScans(t *testing.T) {
 	Init()
 	db, err = Open(opt)
-
 	defer db.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	bucket := "bucket2"
+
+	initDataForTestBatchOps(bucket, t)
+
+	//range scan error
+	opRangeScanForTestBatchOps(bucket, t)
+
+	//prefix scan
+	opPrefixScanForTestBatchOps(bucket, t)
+}
+
+func initDataForTestDelete(bucket string, t *testing.T) {
 	//write tx begin
 	tx, err := db.Begin(true)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	bucket := "bucket_delete_test"
 
 	for i := 0; i <= 10; i++ {
 		key := []byte("key_" + fmt.Sprintf("%07d", i))
@@ -229,8 +232,9 @@ func TestTx_DeleteAndGet(t *testing.T) {
 	}
 	//tx commit
 	tx.Commit()
+}
 
-	//read tx begin
+func readDataForTestDelete(bucket string, t *testing.T) {
 	tx, err = db.Begin(false)
 	if err != nil {
 		t.Fatal(err)
@@ -249,12 +253,11 @@ func TestTx_DeleteAndGet(t *testing.T) {
 			}
 		}
 	}
-
 	//tx commit
 	tx.Commit()
+}
 
-	//delete
-
+func deleteDataFortestDelete(bucket string, t *testing.T) {
 	tx, err = db.Begin(true)
 	if err != nil {
 		t.Fatal(err)
@@ -275,7 +278,9 @@ func TestTx_DeleteAndGet(t *testing.T) {
 	if err == nil {
 		t.Error("TestTx_DeleteAndGet err")
 	}
+}
 
+func checkDeleteDataForDelete(bucket string, t *testing.T) {
 	for i := 0; i <= 5; i++ {
 		tx, err = db.Begin(false)
 		if err != nil {
@@ -308,6 +313,26 @@ func TestTx_DeleteAndGet(t *testing.T) {
 			tx.Commit()
 		}
 	}
+}
+
+func TestTx_DeleteAndGet(t *testing.T) {
+	Init()
+	db, err = Open(opt)
+
+	defer db.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bucket := "bucket_delete_test"
+
+	initDataForTestDelete(bucket, t)
+
+	readDataForTestDelete(bucket, t)
+
+	deleteDataFortestDelete(bucket, t)
+
+	checkDeleteDataForDelete(bucket, t)
 }
 
 func TestTx_GetAndScansFromMmap(t *testing.T) {
