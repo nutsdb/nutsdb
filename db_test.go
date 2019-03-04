@@ -151,7 +151,7 @@ func TestDB_Merge_For_string(t *testing.T) {
 	opt.SegmentSize = 1 * 100
 
 	db2, err := Open(opt)
-	defer db2.Close()
+	//defer db2.Close()
 
 	if err != nil {
 		t.Fatal(err)
