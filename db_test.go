@@ -160,7 +160,7 @@ func initStringDataAndDelForTestMerge(readFlag bool, bucketForString string, t *
 					}
 					return nil
 				}); err != nil {
-				t.Fatal("initStringDataAndDel,err batch delete",err,tx.db)
+				t.Error("initStringDataAndDel,err batch delete",err)
 			}
 		}
 	}
