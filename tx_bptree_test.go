@@ -194,24 +194,24 @@ func opPrefixScanForTestBatchOps(bucket string, t *testing.T) {
 	tx.Commit()
 }
 
-func TestTx_BatchPutsAndScans(t *testing.T) {
-	Init()
-	db, err = Open(opt)
-	defer db.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	bucket := "bucket2"
-
-	initDataForTestBatchOps(bucket, t)
-
-	//range scan error
-	opRangeScanForTestBatchOps(bucket, t)
-
-	//prefix scan
-	opPrefixScanForTestBatchOps(bucket, t)
-}
+//func TestTx_BatchPutsAndScans(t *testing.T) {
+//	Init()
+//	db, err = Open(opt)
+//	defer db.Close()
+//	if err != nil {
+//		t.Fatal(err)
+//	}
+//
+//	bucket := "bucket2"
+//
+//	initDataForTestBatchOps(bucket, t)
+//
+//	//range scan error
+//	opRangeScanForTestBatchOps(bucket, t)
+//
+//	//prefix scan
+//	opPrefixScanForTestBatchOps(bucket, t)
+//}
 
 func initDataForTestDelete(bucket string, t *testing.T) {
 	//write tx begin
@@ -314,25 +314,25 @@ func checkDeleteDataForDelete(bucket string, t *testing.T) {
 	}
 }
 
-func TestTx_DeleteAndGet(t *testing.T) {
-	Init()
-	db, err = Open(opt)
-
-	defer db.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	bucket := "bucket_delete_test"
-
-	initDataForTestDelete(bucket, t)
-
-	readDataForTestDelete(bucket, t)
-
-	deleteDataFortestDelete(bucket, t)
-
-	checkDeleteDataForDelete(bucket, t)
-}
+//func TestTx_DeleteAndGet(t *testing.T) {
+//	Init()
+//	db, err = Open(opt)
+//
+//	defer db.Close()
+//	if err != nil {
+//		t.Fatal(err)
+//	}
+//
+//	bucket := "bucket_delete_test"
+//
+//	initDataForTestDelete(bucket, t)
+//
+//	readDataForTestDelete(bucket, t)
+//
+//	deleteDataFortestDelete(bucket, t)
+//
+//	checkDeleteDataForDelete(bucket, t)
+//}
 
 func TestTx_GetAndScansFromMmap(t *testing.T) {
 	Init()
