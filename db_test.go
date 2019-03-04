@@ -146,13 +146,12 @@ func TestDB_Merge_For_string(t *testing.T) {
 		}
 	}
 
-	opt = DefaultOptions
+	opt := DefaultOptions
 	opt.Dir = fileDir
 	opt.SegmentSize = 1 * 100
 
-	db, err = Open(opt)
-
-	//defer db.Close()
+	db, err := Open(opt)
+	defer db.Close()
 
 	if err != nil {
 		t.Fatal(err)
@@ -160,37 +159,34 @@ func TestDB_Merge_For_string(t *testing.T) {
 
 	bucketForString := "test_merge"
 
-	value1 := "value1value1value1value1value1"
-	value2 := "value2value2value2value2value2"
-
+	key1 := []byte("key_" + fmt.Sprintf("%07d", 1))
+	value1 := []byte("value1value1value1value1value1")
 	if err := db.Update(
 		func(tx *Tx) error {
-			key := []byte("key_" + fmt.Sprintf("%07d", 1))
-			return tx.Put(bucketForString, key, []byte(value1), Persistent)
+			return tx.Put(bucketForString, key1, value1, Persistent)
+		}); err != nil {
+		t.Error("initStringDataAndDel,err batch put", err)
+	}
+
+	key2 := []byte("key_" + fmt.Sprintf("%07d", 2))
+	value2 := []byte("value2value2value2value2value2")
+	if err := db.Update(
+		func(tx *Tx) error {
+			return tx.Put(bucketForString, key2, value2, Persistent)
 		}); err != nil {
 		t.Error("initStringDataAndDel,err batch put", err)
 	}
 
 	if err := db.Update(
 		func(tx *Tx) error {
-			key := []byte("key_" + fmt.Sprintf("%07d", 2))
-			return tx.Put(bucketForString, key, []byte(value2), Persistent)
-		}); err != nil {
-		t.Error("initStringDataAndDel,err batch put", err)
-	}
-
-	if err := db.Update(
-		func(tx *Tx) error {
-			key := []byte("key_" + fmt.Sprintf("%07d", 2))
-			return tx.Delete(bucketForString, key)
+			return tx.Delete(bucketForString, key2)
 		}); err != nil {
 		t.Error(err)
 	}
 
 	if err := db.View(
 		func(tx *Tx) error {
-			key := []byte("key_" + fmt.Sprintf("%07d", 2))
-			if _, err := tx.Get(bucketForString, key); err == nil {
+			if _, err := tx.Get(bucketForString, key2); err == nil {
 				t.Error("err read data ", err)
 			}
 			return nil
