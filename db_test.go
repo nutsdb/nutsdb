@@ -131,38 +131,38 @@ func TestDB_Basic(t *testing.T) {
 	}
 }
 
-func initStringDataAndDelForTestMerge(readFlag bool, bucketForString string, t *testing.T) {
-	if !readFlag {
-		//init batch put data
-		for i := 1; i < 10000; i++ {
-			if err := db.Update(
-				func(tx *Tx) error {
-					key := []byte("key_" + fmt.Sprintf("%07d", i))
-					val := []byte("val" + fmt.Sprintf("%07d", i))
-					return tx.Put(bucketForString, key, val, Persistent)
-				}); err != nil {
-				t.Fatal("initStringDataAndDel,err batch put",err)
-			}
-		}
-	}
-
-	if !readFlag {
-		//init batch delete data
-		for i := 0; i < 5000; i++ {
-			if err := db.Update(
-				func(tx *Tx) error {
-					key := []byte("key_" + fmt.Sprintf("%07d", i))
-					if err := tx.Delete(bucketForString, key); err != nil {
-						t.Fatal(err)
-						return err
-					}
-					return nil
-				}); err != nil {
-				t.Fatal("initStringDataAndDel,err batch delete",err,tx.db)
-			}
-		}
-	}
-}
+//func initStringDataAndDelForTestMerge(readFlag bool, bucketForString string, t *testing.T) {
+//	if !readFlag {
+//		//init batch put data
+//		for i := 1; i < 10000; i++ {
+//			if err := db.Update(
+//				func(tx *Tx) error {
+//					key := []byte("key_" + fmt.Sprintf("%07d", i))
+//					val := []byte("val" + fmt.Sprintf("%07d", i))
+//					return tx.Put(bucketForString, key, val, Persistent)
+//				}); err != nil {
+//				t.Fatal("initStringDataAndDel,err batch put",err)
+//			}
+//		}
+//	}
+//
+//	if !readFlag {
+//		//init batch delete data
+//		for i := 0; i < 5000; i++ {
+//			if err := db.Update(
+//				func(tx *Tx) error {
+//					key := []byte("key_" + fmt.Sprintf("%07d", i))
+//					if err := tx.Delete(bucketForString, key); err != nil {
+//						t.Fatal(err)
+//						return err
+//					}
+//					return nil
+//				}); err != nil {
+//				t.Fatal("initStringDataAndDel,err batch delete",err,tx.db)
+//			}
+//		}
+//	}
+//}
 
 func checkStringDataForTestMerge(bucketForString string, t *testing.T) {
 	for i := 0; i < 5000; i++ {
@@ -209,20 +209,68 @@ func TestDB_Merge_For_string(t *testing.T) {
 	bucketForString := "test_merge"
 
 	//TODO debug
-	if err := db.Update(
-		func(tx *Tx) error {
-			key := []byte("key_" + fmt.Sprintf("%07d", 0))
-			val := []byte("val" + fmt.Sprintf("%07d", 0))
-			return tx.Put(bucketForString, key, val, Persistent)
-		}); err != nil {
-		t.Fatal("initStringDataAndDel 0 ,err batch put",err)
+	//initStringDataAndDelForTestMerge(readFlag, bucketForString, t)
+
+	if !readFlag {
+		//init batch put data
+		for i := 0; i < 10000; i++ {
+			if err := db.Update(
+				func(tx *Tx) error {
+					key := []byte("key_" + fmt.Sprintf("%07d", i))
+					val := []byte("val" + fmt.Sprintf("%07d", i))
+					return tx.Put(bucketForString, key, val, Persistent)
+				}); err != nil {
+				t.Fatal("initStringDataAndDel,err batch put",err)
+			}
+		}
 	}
 
-	initStringDataAndDelForTestMerge(readFlag, bucketForString, t)
+	if !readFlag {
+		//init batch delete data
+		for i := 0; i < 5000; i++ {
+			if err := db.Update(
+				func(tx *Tx) error {
+					key := []byte("key_" + fmt.Sprintf("%07d", i))
+					if err := tx.Delete(bucketForString, key); err != nil {
+						t.Fatal(err)
+						return err
+					}
+					return nil
+				}); err != nil {
+				t.Fatal("initStringDataAndDel,err batch delete",err,tx.db)
+			}
+		}
+	}
 
 	//check data
-	checkStringDataForTestMerge(bucketForString, t)
-
+	//TODO
+	//checkStringDataForTestMerge(bucketForString, t)
+	for i := 0; i < 5000; i++ {
+		if err := db.View(
+			func(tx *Tx) error {
+				key := []byte("key_" + fmt.Sprintf("%07d", i))
+				if e, err := tx.Get(bucketForString, key); err == nil {
+					fmt.Println(string(e.Key), string(e.Value), err)
+					t.Error("err read data ")
+				}
+				return nil
+			}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for i := 5000; i < 10000; i++ {
+		if err := db.View(
+			func(tx *Tx) error {
+				key := []byte("key_" + fmt.Sprintf("%07d", i))
+				if _, err := tx.Get(bucketForString, key); err != nil {
+					fmt.Println(err)
+					t.Error("err read data ")
+				}
+				return nil
+			}); err != nil {
+			t.Fatal(err)
+		}
+	}
 	//GetValidKeyCount
 	validKeyNum := db.BPTreeIdx[bucketForString].ValidKeyCount
 	if validKeyNum != 5000 {
