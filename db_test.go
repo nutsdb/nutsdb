@@ -150,8 +150,8 @@ func TestDB_Merge_For_string(t *testing.T) {
 	opt.Dir = fileDir
 	opt.SegmentSize = 1 * 100
 
-	db, err := Open(opt)
-	defer db.Close()
+	db2, err := Open(opt)
+	defer db2.Close()
 
 	if err != nil {
 		t.Fatal(err)
@@ -161,7 +161,7 @@ func TestDB_Merge_For_string(t *testing.T) {
 
 	key1 := []byte("key_" + fmt.Sprintf("%07d", 1))
 	value1 := []byte("value1value1value1value1value1")
-	if err := db.Update(
+	if err := db2.Update(
 		func(tx *Tx) error {
 			return tx.Put(bucketForString, key1, value1, Persistent)
 		}); err != nil {
@@ -170,21 +170,21 @@ func TestDB_Merge_For_string(t *testing.T) {
 
 	key2 := []byte("key_" + fmt.Sprintf("%07d", 2))
 	value2 := []byte("value2value2value2value2value2")
-	if err := db.Update(
+	if err := db2.Update(
 		func(tx *Tx) error {
 			return tx.Put(bucketForString, key2, value2, Persistent)
 		}); err != nil {
 		t.Error("initStringDataAndDel,err batch put", err)
 	}
 
-	if err := db.Update(
+	if err := db2.Update(
 		func(tx *Tx) error {
 			return tx.Delete(bucketForString, key2)
 		}); err != nil {
 		t.Error(err)
 	}
 
-	if err := db.View(
+	if err := db2.View(
 		func(tx *Tx) error {
 			if _, err := tx.Get(bucketForString, key2); err == nil {
 				t.Error("err read data ", err)
@@ -195,12 +195,12 @@ func TestDB_Merge_For_string(t *testing.T) {
 	}
 
 	//GetValidKeyCount
-	validKeyNum := db.BPTreeIdx[bucketForString].ValidKeyCount
+	validKeyNum := db2.BPTreeIdx[bucketForString].ValidKeyCount
 	if validKeyNum != 1 {
 		t.Errorf("err GetValidKeyCount. got %d want %d", validKeyNum, 1)
 	}
 
-	if err = db.Merge(); err != nil {
+	if err = db2.Merge(); err != nil {
 		t.Error("err merge", err)
 	}
 }
