@@ -105,12 +105,11 @@ func TestTx_PutAndGet(t *testing.T) {
 
 func initDataForTestBatchOps(bucket string, t *testing.T) {
 	//write tx begin
-	tx, err := db.Begin(true)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	for i := 0; i <= 10000; i++ {
+		tx, err := db.Begin(true)
+		if err != nil {
+			t.Fatal(err)
+		}
 		key := []byte("key_" + fmt.Sprintf("%07d", i))
 		val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", i))
 		if err = tx.Put(bucket, key, val, Persistent); err != nil {
@@ -118,9 +117,9 @@ func initDataForTestBatchOps(bucket string, t *testing.T) {
 			err = tx.Rollback()
 			t.Fatal(err)
 		}
+		//tx commit
+		tx.Commit()
 	}
-	//tx commit
-	tx.Commit()
 }
 
 func opRangeScanForTestBatchOps(bucket string, t *testing.T) {
