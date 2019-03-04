@@ -141,7 +141,7 @@ func initStringDataAndDelForTestMerge(readFlag bool, bucketForString string, t *
 					val := []byte("val" + fmt.Sprintf("%07d", i))
 					return tx.Put(bucketForString, key, val, Persistent)
 				}); err != nil {
-				t.Fatal(err)
+				t.Error("err initStringDataAndDelForTestMerge",err)
 			}
 		}
 	}
@@ -194,13 +194,14 @@ func checkStringDataForTestMerge(bucketForString string, t *testing.T) {
 }
 
 func TestDB_Merge_For_string(t *testing.T) {
-	InitOpt("/tmp/nutsdbtestformergestring", true)
-	InitOpt("/tmp/nutsdbtestformergestring", false)
+	InitOpt("/tmp/nutsdb_test_str_for_merge", true)
+
 	db, err = Open(opt)
 
 	readFlag := false
 	mergeFlag := true
 	defer db.Close()
+
 	if err != nil {
 		t.Fatal(err)
 	}
