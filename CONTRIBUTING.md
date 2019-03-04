@@ -15,7 +15,6 @@ By contributing to NutsDB, you agree to abide by the [code of conduct](https://g
 If you are looking to contribute to the NutsDB, the best place to start is the [GitHub "issues"](https://github.com/xujiajun/nutsdb/issues) tab. This is also a great place for filing bug reports and making suggestions for ways in which we can improve the code and documentation.
 
 ## Reporting bugs
-We use GitHub issues to track public bugs. Report a bug by [opening a new issue](https://github.com/xujiajun/nutsdb/issues); it's that easy!
 
 See [reporting bugs](https://github.com/xujiajun/nutsdb/blob/master/.github/ISSUE_TEMPLATE.md) for details about reporting any issues.
 
