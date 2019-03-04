@@ -133,7 +133,7 @@ func TestDB_Basic(t *testing.T) {
 
 func initStringDataAndDelForTestMerge(readFlag bool, bucketForString string, t *testing.T) {
 	if !readFlag {
-		////init batch put data
+		//init batch put data
 		for i := 0; i < 10000; i++ {
 			if err := db.Update(
 				func(tx *Tx) error {
@@ -141,13 +141,13 @@ func initStringDataAndDelForTestMerge(readFlag bool, bucketForString string, t *
 					val := []byte("val" + fmt.Sprintf("%07d", i))
 					return tx.Put(bucketForString, key, val, Persistent)
 				}); err != nil {
-				t.Error("err initStringDataAndDelForTestMerge",err)
+				t.Fatal("initStringDataAndDel,err batch put",err,tx.db)
 			}
 		}
 	}
 
 	if !readFlag {
-		////init batch delete data
+		//init batch delete data
 		for i := 0; i < 5000; i++ {
 			if err := db.Update(
 				func(tx *Tx) error {
@@ -158,7 +158,7 @@ func initStringDataAndDelForTestMerge(readFlag bool, bucketForString string, t *
 					}
 					return nil
 				}); err != nil {
-				t.Fatal(err)
+				t.Fatal("initStringDataAndDel,err batch delete",err,tx.db)
 			}
 		}
 	}
