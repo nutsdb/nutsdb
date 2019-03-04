@@ -113,21 +113,33 @@ func TestTx_RangeScan_Err(t *testing.T) {
 
 	bucket := "bucket_for_rangeScan"
 
-	for i := 0; i <= 100; i++ {
-		tx, err := db.Begin(true)
-		if err != nil {
-			t.Fatal(err)
-		}
-		key := []byte("key_" + fmt.Sprintf("%07d", i))
-		val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", i))
-		if err = tx.Put(bucket, key, val, Persistent); err != nil {
-			//tx rollback
-			err = tx.Rollback()
-			t.Fatal(err)
-		}
-		//tx commit
-		tx.Commit()
+	tx, err := db.Begin(true)
+	if err != nil {
+		t.Fatal(err)
 	}
+	key := []byte("key_" + fmt.Sprintf("%07d", 0))
+	val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 0))
+	if err = tx.Put(bucket, key, val, Persistent); err != nil {
+		//tx rollback
+		err = tx.Rollback()
+		t.Fatal(err)
+	}
+	//tx commit
+	tx.Commit()
+
+	tx, err = db.Begin(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	key = []byte("key_" + fmt.Sprintf("%07d", 1))
+	val = []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 1))
+	if err = tx.Put(bucket, key, val, Persistent); err != nil {
+		//tx rollback
+		err = tx.Rollback()
+		t.Fatal(err)
+	}
+	//tx commit
+	tx.Commit()
 
 	tx, err = db.Begin(false)
 	if err != nil {
@@ -154,21 +166,47 @@ func TestTx_RangeScan(t *testing.T) {
 
 	bucket := "bucket_for_range"
 
-	for i := 0; i <= 100; i++ {
-		tx, err := db.Begin(true)
-		if err != nil {
-			t.Fatal(err)
-		}
-		key := []byte("key_" + fmt.Sprintf("%07d", i))
-		val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", i))
-		if err = tx.Put(bucket, key, val, Persistent); err != nil {
-			//tx rollback
-			err = tx.Rollback()
-			t.Fatal(err)
-		}
-		//tx commit
-		tx.Commit()
+	tx, err := db.Begin(true)
+	if err != nil {
+		t.Fatal(err)
 	}
+	key := []byte("key_" + fmt.Sprintf("%07d", 0))
+	val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 0))
+	if err = tx.Put(bucket, key, val, Persistent); err != nil {
+		//tx rollback
+		err = tx.Rollback()
+		t.Fatal(err)
+	}
+	//tx commit
+	tx.Commit()
+
+	tx, err = db.Begin(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	key = []byte("key_" + fmt.Sprintf("%07d", 1))
+	val = []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 1))
+	if err = tx.Put(bucket, key, val, Persistent); err != nil {
+		//tx rollback
+		err = tx.Rollback()
+		t.Fatal(err)
+	}
+	//tx commit
+	tx.Commit()
+
+	tx, err = db.Begin(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	key = []byte("key_" + fmt.Sprintf("%07d", 2))
+	val = []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 2))
+	if err = tx.Put(bucket, key, val, Persistent); err != nil {
+		//tx rollback
+		err = tx.Rollback()
+		t.Fatal(err)
+	}
+	//tx commit
+	tx.Commit()
 
 	tx, err = db.Begin(false)
 	if err != nil {
@@ -176,14 +214,14 @@ func TestTx_RangeScan(t *testing.T) {
 	}
 
 	start := []byte("key_0000001")
-	end := []byte("key_0000010")
+	end := []byte("key_000002")
 	if entries, err := tx.RangeScan(bucket, start, end); err != nil {
 		//tx rollback
 		tx.Rollback()
 	} else {
 		keys, _ := SortedEntryKeys(entries)
 		j := 0
-		for i := 1; i <= 10; i++ {
+		for i := 1; i <= 2; i++ {
 			key := []byte("key_" + fmt.Sprintf("%07d", i))
 			if string(key) != keys[j] {
 				t.Errorf("err tx RangeScan. got %s want %s", keys[j], string(key))
@@ -211,21 +249,33 @@ func TestTx_PrefixScan(t *testing.T) {
 
 	bucket := "bucket_for_prefix_scan"
 
-	for i := 0; i <= 100; i++ {
-		tx, err := db.Begin(true)
-		if err != nil {
-			t.Fatal(err)
-		}
-		key := []byte("key_" + fmt.Sprintf("%07d", i))
-		val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", i))
-		if err = tx.Put(bucket, key, val, Persistent); err != nil {
-			//tx rollback
-			err = tx.Rollback()
-			t.Fatal(err)
-		}
-		//tx commit
-		tx.Commit()
+	tx, err := db.Begin(true)
+	if err != nil {
+		t.Fatal(err)
 	}
+	key := []byte("key_" + fmt.Sprintf("%07d", 0))
+	val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 0))
+	if err = tx.Put(bucket, key, val, Persistent); err != nil {
+		//tx rollback
+		err = tx.Rollback()
+		t.Fatal(err)
+	}
+	//tx commit
+	tx.Commit()
+
+	tx, err = db.Begin(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	key = []byte("key_" + fmt.Sprintf("%07d", 1))
+	val = []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 1))
+	if err = tx.Put(bucket, key, val, Persistent); err != nil {
+		//tx rollback
+		err = tx.Rollback()
+		t.Fatal(err)
+	}
+	//tx commit
+	tx.Commit()
 
 	tx, err = db.Begin(false)
 	if err != nil {
@@ -233,13 +283,13 @@ func TestTx_PrefixScan(t *testing.T) {
 	}
 
 	prefix := []byte("key_")
-	if entries, err := tx.PrefixScan(bucket, prefix, 10); err != nil {
+	if entries, err := tx.PrefixScan(bucket, prefix, 2); err != nil {
 		//tx rollback
 		tx.Rollback()
 	} else {
 		keys, _ := SortedEntryKeys(entries)
 		j := 0
-		for i := 0; i < 10; i++ {
+		for i := 0; i < 2; i++ {
 			key := []byte("key_" + fmt.Sprintf("%07d", i))
 			if string(key) != keys[j] {
 				t.Errorf("err tx RangeScan. got %s want %s", keys[j], string(key))
