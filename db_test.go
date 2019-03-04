@@ -133,9 +133,8 @@ func TestDB_Basic(t *testing.T) {
 
 func initStringDataAndDelForTestMerge(readFlag bool, bucketForString string, t *testing.T) {
 	if !readFlag {
-		fmt.Println("db",db)
 		//init batch put data
-		for i := 0; i < 10000; i++ {
+		for i := 1; i < 10000; i++ {
 			if err := db.Update(
 				func(tx *Tx) error {
 					key := []byte("key_" + fmt.Sprintf("%07d", i))
@@ -208,6 +207,16 @@ func TestDB_Merge_For_string(t *testing.T) {
 	}
 
 	bucketForString := "test_merge"
+
+	//TODO debug
+	if err := db.Update(
+		func(tx *Tx) error {
+			key := []byte("key_" + fmt.Sprintf("%07d", 0))
+			val := []byte("val" + fmt.Sprintf("%07d", 0))
+			return tx.Put(bucketForString, key, val, Persistent)
+		}); err != nil {
+		t.Fatal("initStringDataAndDel 0 ,err batch put",err)
+	}
 
 	initStringDataAndDelForTestMerge(readFlag, bucketForString, t)
 
