@@ -152,7 +152,7 @@ func TestDB_Merge_For_string(t *testing.T) {
 
 	db, err = Open(opt)
 
-	defer db.Close()
+	//defer db.Close()
 
 	if err != nil {
 		t.Fatal(err)
