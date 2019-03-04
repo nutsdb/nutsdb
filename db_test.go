@@ -133,7 +133,22 @@ func TestDB_Basic(t *testing.T) {
 }
 
 func TestDB_Merge_For_string(t *testing.T) {
-	InitOpt("/tmp/nutsdb_test_str_for_merge", true)
+	fileDir := "/tmp/nutsdb_test_str_for_merge"
+
+	files, _ := ioutil.ReadDir(fileDir)
+	for _, f := range files {
+		name := f.Name()
+		if name != "" {
+			err := os.Remove(fileDir + "/" + name)
+			if err != nil {
+				panic(err)
+			}
+		}
+	}
+
+	opt = DefaultOptions
+	opt.Dir = fileDir
+	opt.SegmentSize = 1 * 100
 
 	db, err = Open(opt)
 
@@ -145,15 +160,8 @@ func TestDB_Merge_For_string(t *testing.T) {
 
 	bucketForString := "test_merge"
 
-	var value1, value2 string
-
-	for i := 0; i <= 512; i++ {
-		value1 += "value1" + strconv2.IntToStr(i)
-	}
-
-	for i := 0; i <= 512; i++ {
-		value2 += "value2" + strconv2.IntToStr(i)
-	}
+	value1 := "value1value1value1value1value1"
+	value2 := "value2value2value2value2value2"
 
 	if err := db.Update(
 		func(tx *Tx) error {
@@ -196,10 +204,9 @@ func TestDB_Merge_For_string(t *testing.T) {
 		t.Errorf("err GetValidKeyCount. got %d want %d", validKeyNum, 1)
 	}
 
-	//if err = db.Merge(); err != nil {
-	//	t.Error("err merge", err)
-	//}
-
+	if err = db.Merge(); err != nil {
+		t.Error("err merge", err)
+	}
 }
 
 func opSAddAndCheckForTestMerge(bucketForSet string, key []byte, t *testing.T) {
