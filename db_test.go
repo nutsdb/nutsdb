@@ -131,105 +131,75 @@ func TestDB_Basic(t *testing.T) {
 	}
 }
 
-func initStringDataAndDelForTestMerge(readFlag bool, bucketForString string, t *testing.T) {
-	if !readFlag {
-		//init batch put data
-		for i := 0; i < 100; i++ {
-			if err := db.Update(
-				func(tx *Tx) error {
-					key := []byte("key_" + fmt.Sprintf("%07d", i))
-					val := []byte("val" + fmt.Sprintf("%07d", i))
-					fmt.Println("put key:",string(key))
-					fmt.Println("put val:",string(val))
-					return tx.Put(bucketForString, key, val, Persistent)
-				}); err != nil {
-				t.Error("initStringDataAndDel,err batch put",err)
+func TestDB_Merge_For_string(t *testing.T) {
+	InitOpt("/tmp/nutsdb_test_str_for_merge", true)
+
+	db, err = Open(opt)
+
+	defer db.Close()
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bucketForString := "test_merge"
+
+	var value1, value2 string
+
+	for i := 0; i <= 512; i++ {
+		value1 += "value1" + strconv2.IntToStr(i)
+	}
+
+	for i := 0; i <= 512; i++ {
+		value2 += "value2" + strconv2.IntToStr(i)
+	}
+
+	if err := db.Update(
+		func(tx *Tx) error {
+			key := []byte("key_" + fmt.Sprintf("%07d", 1))
+			return tx.Put(bucketForString, key, []byte(value1), Persistent)
+		}); err != nil {
+		t.Error("initStringDataAndDel,err batch put", err)
+	}
+
+	if err := db.Update(
+		func(tx *Tx) error {
+			key := []byte("key_" + fmt.Sprintf("%07d", 2))
+			return tx.Put(bucketForString, key, []byte(value2), Persistent)
+		}); err != nil {
+		t.Error("initStringDataAndDel,err batch put", err)
+	}
+
+	if err := db.Update(
+		func(tx *Tx) error {
+			key := []byte("key_" + fmt.Sprintf("%07d", 2))
+			return tx.Delete(bucketForString, key)
+		}); err != nil {
+		t.Error(err)
+	}
+
+	if err := db.View(
+		func(tx *Tx) error {
+			key := []byte("key_" + fmt.Sprintf("%07d", 2))
+			if _, err := tx.Get(bucketForString, key); err == nil {
+				t.Error("err read data ", err)
 			}
-		}
+			return nil
+		}); err != nil {
+		t.Fatal(err)
 	}
 
-	if !readFlag {
-		//init batch delete data
-		for i := 0; i < 50; i++ {
-			if err := db.Update(
-				func(tx *Tx) error {
-					key := []byte("key_" + fmt.Sprintf("%07d", i))
-					if err := tx.Delete(bucketForString, key); err != nil {
-						t.Fatal(err)
-						return err
-					}
-					return nil
-				}); err != nil {
-				t.Error("initStringDataAndDel,err batch delete",err)
-			}
-		}
+	//GetValidKeyCount
+	validKeyNum := db.BPTreeIdx[bucketForString].ValidKeyCount
+	if validKeyNum != 1 {
+		t.Errorf("err GetValidKeyCount. got %d want %d", validKeyNum, 1)
 	}
+
+	if err = db.Merge(); err != nil {
+		t.Error("err merge", err)
+	}
+
 }
-
-func checkStringDataForTestMerge(bucketForString string, t *testing.T) {
-	for i := 0; i < 50; i++ {
-		if err := db.View(
-			func(tx *Tx) error {
-				key := []byte("key_" + fmt.Sprintf("%07d", i))
-				if e, err := tx.Get(bucketForString, key); err == nil {
-					fmt.Println(string(e.Key), string(e.Value), err)
-					t.Error("err read data ")
-				}
-				return nil
-			}); err != nil {
-			t.Fatal(err)
-		}
-	}
-	for i := 50; i < 100; i++ {
-		if err := db.View(
-			func(tx *Tx) error {
-				key := []byte("key_" + fmt.Sprintf("%07d", i))
-				if _, err := tx.Get(bucketForString, key); err != nil {
-					fmt.Println(err)
-					t.Error("err read data ")
-				}
-				return nil
-			}); err != nil {
-			t.Fatal(err)
-		}
-	}
-}
-
-//func TestDB_Merge_For_string(t *testing.T) {
-//	InitOpt("/tmp/nutsdb_test_str_for_merge", true)
-//
-//	db, err = Open(opt)
-//
-//	readFlag := false
-//	mergeFlag := true
-//	defer db.Close()
-//
-//	if err != nil {
-//		t.Fatal(err)
-//	}
-//
-//	bucketForString := "test_merge"
-//
-//	//TODO debug
-//
-//	initStringDataAndDelForTestMerge(readFlag, bucketForString, t)
-//
-//	//check data
-//	checkStringDataForTestMerge(bucketForString, t)
-//
-//	//GetValidKeyCount
-//	validKeyNum := db.BPTreeIdx[bucketForString].ValidKeyCount
-//	if validKeyNum != 50 {
-//		t.Errorf("err GetValidKeyCount. got %d want %d", validKeyNum, 5000)
-//	}
-//
-//	//do merge
-//	if mergeFlag {
-//		if err = db.Merge(); err != nil {
-//			t.Error("err merge", err)
-//		}
-//	}
-//}
 
 func opSAddAndCheckForTestMerge(bucketForSet string, key []byte, t *testing.T) {
 	for i := 0; i < 100; i++ {
