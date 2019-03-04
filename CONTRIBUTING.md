@@ -16,7 +16,11 @@ If you are looking to contribute to the NutsDB, the best place to start is the [
 
 ## Reporting bugs
 
-See [reporting bugs](https://github.com/xujiajun/nutsdb/blob/master/.github/ISSUE_TEMPLATE.md) for details about reporting any issues.
+See [reporting bugs](https://github.com/xujiajun/nutsdb/blob/master/.github/ISSUE_TEMPLATE/bug_report.md) for details about reporting any issues.
+
+## Feature request
+
+see [feature request](https://github.com/xujiajun/nutsdb/blob/master/.github/ISSUE_TEMPLATE/feature_request.md) for details about reporting any feature requests.
 
 ## Contribution flow
 
