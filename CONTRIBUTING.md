@@ -8,6 +8,8 @@ We love your input! We want to make contributing to this project as easy and tra
 - Discussing the current state of the code
 - Submitting a fix
 - Proposing new features
+- Contributing Documentation
+- Contributing a Performance Improvement
 
 By contributing to NutsDB, you agree to abide by the [code of conduct](https://github.com/xujiajun/nutsdb/blob/master/CODE_OF_CONDUCT.md).
  
