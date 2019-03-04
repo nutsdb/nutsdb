@@ -413,10 +413,7 @@ if err := db.Update(
 		bucket := "bucketForList"
 		key := []byte("myList")
 		val := []byte("val1")
-		if err := tx.RPush(bucket, key, val); err != nil {
-			return err
-		}
-		return nil
+		return tx.RPush(bucket, key, val)
 	}); err != nil {
 	log.Fatal(err)
 }
@@ -432,10 +429,7 @@ if err := db.Update(
 	        bucket := "bucketForList"
 		key := []byte("myList")
 		val := []byte("val2")
-		if err := tx.LPush(bucket, key, val); err != nil {
-			return err
-		}
-		return nil
+		return tx.LPush(bucket, key, val)
 	}); err != nil {
 	log.Fatal(err)
 }
@@ -561,10 +555,7 @@ if err := db.Update(
 	func(tx *nutsdb.Tx) error {
 	        bucket := "bucketForList"
 		key := []byte("myList")
-		if err := tx.LRem(bucket, key, 1); err != nil {
-			return err
-		}
-		return nil
+		return tx.LRem(bucket, key, 1)
 	}); err != nil {
 	log.Fatal(err)
 }
@@ -602,10 +593,7 @@ if err := db.Update(
 	func(tx *nutsdb.Tx) error {
 	        bucket := "bucketForList"
 		key := []byte("myList")
-		if err := tx.LTrim(bucket, key, 0, 1); err != nil {
-			return err
-		}
-		return nil
+		return tx.LTrim(bucket, key, 0, 1)
 	}); err != nil {
 	log.Fatal(err)
 }
@@ -642,10 +630,7 @@ if err := db.Update(
 	func(tx *nutsdb.Tx) error {
 	        bucket := "bucketForSet"
 		key := []byte("mySet")
-		if err := tx.SAdd(bucket, key, []byte("a"), []byte("b"), []byte("c")); err != nil {
-			return err
-		}
-		return nil
+		return tx.SAdd(bucket, key, []byte("a"), []byte("b"), []byte("c"))
 	}); err != nil {
 	log.Fatal(err)
 }
@@ -704,20 +689,14 @@ bucket := "bucketForSet"
 
 if err := db.Update(
 	func(tx *nutsdb.Tx) error {
-		if err := tx.SAdd(bucket, key1, []byte("a"), []byte("b"), []byte("c")); err != nil {
-			return err
-		}
-		return nil
+		return tx.SAdd(bucket, key1, []byte("a"), []byte("b"), []byte("c"))
 	}); err != nil {
 	log.Fatal(err)
 }
 
 if err := db.Update(
 	func(tx *nutsdb.Tx) error {
-		if err := tx.SAdd(bucket, key2, []byte("c"), []byte("d")); err != nil {
-			return err
-		}
-		return nil
+		return tx.SAdd(bucket, key2, []byte("c"), []byte("d"))
 	}); err != nil {
 	log.Fatal(err)
 }
@@ -754,20 +733,14 @@ key2 := []byte("mySet2")
 
 if err := db.Update(
 	func(tx *nutsdb.Tx) error {
-		if err := tx.SAdd(bucket1, key1, []byte("a"), []byte("b"), []byte("c")); err != nil {
-			return err
-		}
-		return nil
+		return tx.SAdd(bucket1, key1, []byte("a"), []byte("b"), []byte("c"))
 	}); err != nil {
 	log.Fatal(err)
 }
 
 if err := db.Update(
 	func(tx *nutsdb.Tx) error {
-		if err := tx.SAdd(bucket2, key2, []byte("c"), []byte("d")); err != nil {
-			return err
-		}
-		return nil
+		return tx.SAdd(bucket2, key2, []byte("c"), []byte("d"))
 	}); err != nil {
 	log.Fatal(err)
 }
@@ -859,19 +832,13 @@ bucket3 := "bucket3"
 
 if err := db.Update(
 	func(tx *nutsdb.Tx) error {
-		if err := tx.SAdd(bucket3, []byte("mySet1"), []byte("a"), []byte("b"), []byte("c")); err != nil {
-			return err
-		}
-		return nil
+		return SAdd(bucket3, []byte("mySet1"), []byte("a"), []byte("b"), []byte("c"))
 	}); err != nil {
 	log.Fatal(err)
 }
 if err := db.Update(
 	func(tx *nutsdb.Tx) error {
-		if err := tx.SAdd(bucket3, []byte("mySet2"), []byte("c"), []byte("d"), []byte("e")); err != nil {
-			return err
-		}
-		return nil
+		return tx.SAdd(bucket3, []byte("mySet2"), []byte("c"), []byte("d"), []byte("e"))
 	}); err != nil {
 	log.Fatal(err)
 }
@@ -927,19 +894,13 @@ bucket4 := "bucket4"
 bucket5 := "bucket5"
 if err := db.Update(
 	func(tx *nutsdb.Tx) error {
-		if err := tx.SAdd(bucket4, []byte("mySet1"), []byte("a"), []byte("b"), []byte("c")); err != nil {
-			return err
-		}
-		return nil
+		return tx.SAdd(bucket4, []byte("mySet1"), []byte("a"), []byte("b"), []byte("c"))
 	}); err != nil {
 	log.Fatal(err)
 }
 if err := db.Update(
 	func(tx *nutsdb.Tx) error {
-		if err := tx.SAdd(bucket5, []byte("mySet2"), []byte("c"), []byte("d"), []byte("e")); err != nil {
-			return err
-		}
-		return nil
+		return tx.SAdd(bucket5, []byte("mySet2"), []byte("c"), []byte("d"), []byte("e"))
 	}); err != nil {
 	log.Fatal(err)
 }
@@ -1012,10 +973,7 @@ Removes the specified members from the set stored int the bucket at given bucket
 bucket6:="bucket6"
 if err := db.Update(
 	func(tx *nutsdb.Tx) error {
-		if err := tx.SAdd(bucket6, []byte("mySet"), []byte("a"), []byte("b"), []byte("c")); err != nil {
-			return err
-		}
-		return nil
+		return tx.SAdd(bucket6, []byte("mySet"), []byte("a"), []byte("b"), []byte("c"))
 	}); err != nil {
 	log.Fatal(err)
 }
@@ -1058,20 +1016,14 @@ key2 := []byte("mySet2")
 
 if err := db.Update(
 	func(tx *nutsdb.Tx) error {
-		if err := tx.SAdd(bucket7, key1, []byte("a"), []byte("b"), []byte("c")); err != nil {
-			return err
-		}
-		return nil
+		return tx.SAdd(bucket7, key1, []byte("a"), []byte("b"), []byte("c"))
 	}); err != nil {
 	log.Fatal(err)
 }
 
 if err := db.Update(
 	func(tx *nutsdb.Tx) error {
-		if err := tx.SAdd(bucket7, key2, []byte("c"), []byte("d")); err != nil {
-			return err
-		}
-		return nil
+		return tx.SAdd(bucket7, key2, []byte("c"), []byte("d"))
 	}); err != nil {
 	log.Fatal(err)
 }
@@ -1105,20 +1057,14 @@ key2 := []byte("mySet2")
 
 if err := db.Update(
 	func(tx *nutsdb.Tx) error {
-		if err := tx.SAdd(bucket8, key1, []byte("a"), []byte("b"), []byte("c")); err != nil {
-			return err
-		}
-		return nil
+		return tx.SAdd(bucket8, key1, []byte("a"), []byte("b"), []byte("c"))
 	}); err != nil {
 	log.Fatal(err)
 }
 
 if err := db.Update(
 	func(tx *nutsdb.Tx) error {
-		if err := tx.SAdd(bucket9, key2, []byte("c"), []byte("d")); err != nil {
-			return err
-		}
-		return nil
+		return tx.SAdd(bucket9, key2, []byte("c"), []byte("d"))
 	}); err != nil {
 	log.Fatal(err)
 }
@@ -1150,10 +1096,7 @@ if err := db.Update(
 	func(tx *nutsdb.Tx) error {
 		bucket := "myZSet1"
 		key := []byte("key1")
-		if err := tx.ZAdd(bucket, key, 1, []byte("val1")); err != nil {
-			return err
-		}
-		return nil
+		return tx.ZAdd(bucket, key, 1, []byte("val1"))
 	}); err != nil {
 	log.Fatal(err)
 }
@@ -1327,10 +1270,7 @@ if err := db.Update(
 	func(tx *nutsdb.Tx) error {
 		bucket := "myZSet2"
 		key1 := []byte("key1")
-		if err := tx.ZAdd(bucket, key1, 1, []byte("val1")); err != nil {
-			return err
-		}
-		return nil
+		return tx.ZAdd(bucket, key1, 1, []byte("val1"))
 	}); err != nil {
 	log.Fatal(err)
 }
@@ -1339,10 +1279,7 @@ if err := db.Update(
 	func(tx *nutsdb.Tx) error {
 		bucket := "myZSet2"
 		key2 := []byte("key2")
-		if err := tx.ZAdd(bucket, key2, 2, []byte("val2")); err != nil {
-			return err
-		}
-		return nil
+		return tx.ZAdd(bucket, key2, 2, []byte("val2"))
 	}); err != nil {
 	log.Fatal(err)
 }
@@ -1351,10 +1288,7 @@ if err := db.Update(
 	func(tx *nutsdb.Tx) error {
 		bucket := "myZSet2"
 		key3 := []byte("key3")
-		if err := tx.ZAdd(bucket, key3, 3, []byte("val3")); err != nil {
-			return err
-		}
-		return nil
+		return tx.ZAdd(bucket, key3, 3, []byte("val3"))
 	}); err != nil {
 	log.Fatal(err)
 }
@@ -1391,10 +1325,7 @@ if err := db.Update(
 		func(tx *nutsdb.Tx) error {
 			bucket := "myZSet3"
 			key1 := []byte("key1")
-			if err := tx.ZAdd(bucket, key1, 70, []byte("val1")); err != nil {
-				return err
-			}
-			return nil
+			return tx.ZAdd(bucket, key1, 70, []byte("val1"))
 		}); err != nil {
 		log.Fatal(err)
 	}
@@ -1403,10 +1334,7 @@ if err := db.Update(
 	func(tx *nutsdb.Tx) error {
 		bucket := "myZSet3"
 		key2 := []byte("key2")
-		if err := tx.ZAdd(bucket, key2, 90, []byte("val2")); err != nil {
-			return err
-		}
-		return nil
+		return tx.ZAdd(bucket, key2, 90, []byte("val2"))
 	}); err != nil {
 	log.Fatal(err)
 }
@@ -1415,10 +1343,7 @@ if err := db.Update(
 	func(tx *nutsdb.Tx) error {
 		bucket := "myZSet3"
 		key3 := []byte("key3")
-		if err := tx.ZAdd(bucket, key3, 86, []byte("val3")); err != nil {
-			return err
-		}
-		return nil
+		return tx.ZAdd(bucket, key3, 86, []byte("val3"))
 	}); err != nil {
 	log.Fatal(err)
 }
@@ -1453,10 +1378,7 @@ if err := db.Update(
 	func(tx *nutsdb.Tx) error {
 		bucket := "myZSet4"
 		key1 := []byte("key1")
-		if err := tx.ZAdd(bucket, key1, 70, []byte("val1")); err != nil {
-			return err
-		}
-		return nil
+		return tx.ZAdd(bucket, key1, 70, []byte("val1"))
 	}); err != nil {
 	log.Fatal(err)
 }
@@ -1465,10 +1387,7 @@ if err := db.Update(
 	func(tx *nutsdb.Tx) error {
 		bucket := "myZSet4"
 		key2 := []byte("key2")
-		if err := tx.ZAdd(bucket, key2, 90, []byte("val2")); err != nil {
-			return err
-		}
-		return nil
+		return tx.ZAdd(bucket, key2, 90, []byte("val2"))
 	}); err != nil {
 	log.Fatal(err)
 }
@@ -1477,10 +1396,7 @@ if err := db.Update(
 	func(tx *nutsdb.Tx) error {
 		bucket := "myZSet4"
 		key3 := []byte("key3")
-		if err := tx.ZAdd(bucket, key3, 86, []byte("val3")); err != nil {
-			return err
-		}
-		return nil
+		return tx.ZAdd(bucket, key3, 86, []byte("val3"))
 	}); err != nil {
 	log.Fatal(err)
 }
@@ -1511,10 +1427,7 @@ if err := db.Update(
 	func(tx *nutsdb.Tx) error {
 		bucket := "myZSet8"
 		key1 := []byte("key1")
-		if err := tx.ZAdd(bucket, key1, 10, []byte("val1")); err != nil {
-			return err
-		}
-		return nil
+		return tx.ZAdd(bucket, key1, 10, []byte("val1"))
 	}); err != nil {
 	log.Fatal(err)
 }
@@ -1522,10 +1435,7 @@ if err := db.Update(
 	func(tx *nutsdb.Tx) error {
 		bucket := "myZSet8"
 		key2 := []byte("key2")
-		if err := tx.ZAdd(bucket, key2, 20, []byte("val2")); err != nil {
-			return err
-		}
-		return nil
+		return tx.ZAdd(bucket, key2, 20, []byte("val2"))
 	}); err != nil {
 	log.Fatal(err)
 }
@@ -1533,10 +1443,7 @@ if err := db.Update(
 	func(tx *nutsdb.Tx) error {
 		bucket := "myZSet8"
 		key3 := []byte("key3")
-		if err := tx.ZAdd(bucket, key3, 30, []byte("val3")); err != nil {
-			return err
-		}
-		return nil
+		return tx.ZAdd(bucket, key3, 30, []byte("val3"))
 	}); err != nil {
 	log.Fatal(err)
 }
@@ -1565,10 +1472,7 @@ if err := db.Update(
 	func(tx *nutsdb.Tx) error {
 		bucket := "myZSet5"
 		key1 := []byte("key1")
-		if err := tx.ZAdd(bucket, key1, 10, []byte("val1")); err != nil {
-			return err
-		}
-		return nil
+		return tx.ZAdd(bucket, key1, 10, []byte("val1"))
 	}); err != nil {
 	log.Fatal(err)
 }
@@ -1577,10 +1481,7 @@ if err := db.Update(
 	func(tx *nutsdb.Tx) error {
 		bucket := "myZSet5"
 		key2 := []byte("key2")
-		if err := tx.ZAdd(bucket, key2, 20, []byte("val2")); err != nil {
-			return err
-		}
-		return nil
+		return tx.ZAdd(bucket, key2, 20, []byte("val2"))
 	}); err != nil {
 	log.Fatal(err)
 }
@@ -1645,10 +1546,7 @@ if err := db.Update(
 	func(tx *nutsdb.Tx) error {
 		bucket := "myZSet6"
 		key1 := []byte("key1")
-		if err := tx.ZAdd(bucket, key1, 10, []byte("val1")); err != nil {
-			return err
-		}
-		return nil
+		return tx.ZAdd(bucket, key1, 10, []byte("val1"))
 	}); err != nil {
 	log.Fatal(err)
 }
@@ -1657,10 +1555,7 @@ if err := db.Update(
 	func(tx *nutsdb.Tx) error {
 		bucket := "myZSet6"
 		key2 := []byte("key2")
-		if err := tx.ZAdd(bucket, key2, 20, []byte("val2")); err != nil {
-			return err
-		}
-		return nil
+		return tx.ZAdd(bucket, key2, 20, []byte("val2"))
 	}); err != nil {
 	log.Fatal(err)
 }
@@ -1669,10 +1564,7 @@ if err := db.Update(
 	func(tx *nutsdb.Tx) error {
 		bucket := "myZSet6"
 		key3 := []byte("key3")
-		if err := tx.ZAdd(bucket, key3, 30, []byte("val2")); err != nil {
-			return err
-		}
-		return nil
+		return tx.ZAdd(bucket, key3, 30, []byte("val2"))
 	}); err != nil {
 	log.Fatal(err)
 }
