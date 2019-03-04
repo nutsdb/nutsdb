@@ -172,6 +172,9 @@ func TestDB_Merge_For_string(t *testing.T) {
 	value2 := []byte("value2value2value2value2value2")
 	if err := db2.Update(
 		func(tx *Tx) error {
+			fmt.Println("bucketForString",bucketForString)
+			fmt.Println("key2",string(key2))
+			fmt.Println("value2",string(value2))
 			return tx.Put(bucketForString, key2, value2, Persistent)
 		}); err != nil {
 		t.Error("initStringDataAndDel,err batch put", err)
@@ -179,6 +182,8 @@ func TestDB_Merge_For_string(t *testing.T) {
 
 	if err := db2.Update(
 		func(tx *Tx) error {
+			fmt.Println("bucketForString",bucketForString)
+			fmt.Println("key2",string(key2))
 			return tx.Delete(bucketForString, key2)
 		}); err != nil {
 		t.Error(err)
