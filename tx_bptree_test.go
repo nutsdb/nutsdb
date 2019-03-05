@@ -103,27 +103,44 @@ func TestTx_PutAndGet(t *testing.T) {
 
 }
 
-func initDataForTestBatchOps(bucket string, t *testing.T) {
-	//write tx begin
-	tx, err := db.Begin(true)
+func TestTx_RangeScan_Err(t *testing.T) {
+	Init()
+	db, err = Open(opt)
+	defer db.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	for i := 0; i <= 10000; i++ {
-		key := []byte("key_" + fmt.Sprintf("%07d", i))
-		val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", i))
-		if err = tx.Put(bucket, key, val, Persistent); err != nil {
-			//tx rollback
-			err = tx.Rollback()
-			t.Fatal(err)
-		}
+	bucket := "bucket_for_rangeScan"
+
+	tx, err := db.Begin(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	key := []byte("key_" + fmt.Sprintf("%07d", 0))
+	val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 0))
+	if err = tx.Put(bucket, key, val, Persistent); err != nil {
+		//tx rollback
+		err = tx.Rollback()
+		t.Fatal(err)
 	}
 	//tx commit
 	tx.Commit()
-}
 
-func opRangeScanForTestBatchOps(bucket string, t *testing.T) {
+	tx, err = db.Begin(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	key = []byte("key_" + fmt.Sprintf("%07d", 1))
+	val = []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 1))
+	if err = tx.Put(bucket, key, val, Persistent); err != nil {
+		//tx rollback
+		err = tx.Rollback()
+		t.Fatal(err)
+	}
+	//tx commit
+	tx.Commit()
+
 	tx, err = db.Begin(false)
 	if err != nil {
 		t.Fatal(err)
@@ -137,22 +154,74 @@ func opRangeScanForTestBatchOps(bucket string, t *testing.T) {
 	} else {
 		t.Error("err range scan")
 	}
+}
 
-	//range scan ok
+func TestTx_RangeScan(t *testing.T) {
+	Init()
+	db, err = Open(opt)
+	defer db.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bucket := "bucket_for_range"
+
+	tx, err := db.Begin(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	key := []byte("key_" + fmt.Sprintf("%07d", 0))
+	val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 0))
+	if err = tx.Put(bucket, key, val, Persistent); err != nil {
+		//tx rollback
+		err = tx.Rollback()
+		t.Fatal(err)
+	}
+	//tx commit
+	tx.Commit()
+
+	tx, err = db.Begin(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	key = []byte("key_" + fmt.Sprintf("%07d", 1))
+	val = []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 1))
+	if err = tx.Put(bucket, key, val, Persistent); err != nil {
+		//tx rollback
+		err = tx.Rollback()
+		t.Fatal(err)
+	}
+	//tx commit
+	tx.Commit()
+
+	tx, err = db.Begin(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	key = []byte("key_" + fmt.Sprintf("%07d", 2))
+	val = []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 2))
+	if err = tx.Put(bucket, key, val, Persistent); err != nil {
+		//tx rollback
+		err = tx.Rollback()
+		t.Fatal(err)
+	}
+	//tx commit
+	tx.Commit()
+
 	tx, err = db.Begin(false)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	start = []byte("key_0000001")
-	end = []byte("key_0000010")
+	start := []byte("key_0000001")
+	end := []byte("key_000002")
 	if entries, err := tx.RangeScan(bucket, start, end); err != nil {
 		//tx rollback
 		tx.Rollback()
 	} else {
 		keys, _ := SortedEntryKeys(entries)
 		j := 0
-		for i := 1; i <= 10; i++ {
+		for i := 1; i <= 2; i++ {
 			key := []byte("key_" + fmt.Sprintf("%07d", i))
 			if string(key) != keys[j] {
 				t.Errorf("err tx RangeScan. got %s want %s", keys[j], string(key))
@@ -170,20 +239,57 @@ func opRangeScanForTestBatchOps(bucket string, t *testing.T) {
 	}
 }
 
-func opPrefixScanForTestBatchOps(bucket string, t *testing.T) {
+func TestTx_PrefixScan(t *testing.T) {
+	Init()
+	db, err = Open(opt)
+	defer db.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bucket := "bucket_for_prefix_scan"
+
+	tx, err := db.Begin(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	key := []byte("key_" + fmt.Sprintf("%07d", 0))
+	val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 0))
+	if err = tx.Put(bucket, key, val, Persistent); err != nil {
+		//tx rollback
+		err = tx.Rollback()
+		t.Fatal(err)
+	}
+	//tx commit
+	tx.Commit()
+
+	tx, err = db.Begin(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	key = []byte("key_" + fmt.Sprintf("%07d", 1))
+	val = []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 1))
+	if err = tx.Put(bucket, key, val, Persistent); err != nil {
+		//tx rollback
+		err = tx.Rollback()
+		t.Fatal(err)
+	}
+	//tx commit
+	tx.Commit()
+
 	tx, err = db.Begin(false)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	prefix := []byte("key_")
-	if entries, err := tx.PrefixScan(bucket, prefix, 10); err != nil {
+	if entries, err := tx.PrefixScan(bucket, prefix, 2); err != nil {
 		//tx rollback
 		tx.Rollback()
 	} else {
 		keys, _ := SortedEntryKeys(entries)
 		j := 0
-		for i := 0; i < 10; i++ {
+		for i := 0; i < 2; i++ {
 			key := []byte("key_" + fmt.Sprintf("%07d", i))
 			if string(key) != keys[j] {
 				t.Errorf("err tx RangeScan. got %s want %s", keys[j], string(key))
@@ -195,27 +301,17 @@ func opPrefixScanForTestBatchOps(bucket string, t *testing.T) {
 	tx.Commit()
 }
 
-func TestTx_BatchPutsAndScans(t *testing.T) {
+func TestTx_DeleteAndGet(t *testing.T) {
 	Init()
 	db, err = Open(opt)
+
 	defer db.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	bucket := "bucket2"
+	bucket := "bucket_delete_test"
 
-	initDataForTestBatchOps(bucket, t)
-
-	//range scan error
-	opRangeScanForTestBatchOps(bucket, t)
-
-	//prefix scan
-	opPrefixScanForTestBatchOps(bucket, t)
-}
-
-func initDataForTestDelete(bucket string, t *testing.T) {
-	//write tx begin
 	tx, err := db.Begin(true)
 	if err != nil {
 		t.Fatal(err)
@@ -232,32 +328,7 @@ func initDataForTestDelete(bucket string, t *testing.T) {
 	}
 	//tx commit
 	tx.Commit()
-}
 
-func readDataForTestDelete(bucket string, t *testing.T) {
-	tx, err = db.Begin(false)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	for i := 0; i <= 10; i++ {
-		key := []byte("key_" + fmt.Sprintf("%07d", i))
-		if entry, err := tx.Get(bucket, key); err != nil {
-			//tx rollback
-			tx.Rollback()
-			//t.Fatal(err)
-		} else {
-			val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", i))
-			if string(val) != string(entry.Value) {
-				t.Error("err read tx ")
-			}
-		}
-	}
-	//tx commit
-	tx.Commit()
-}
-
-func deleteDataFortestDelete(bucket string, t *testing.T) {
 	tx, err = db.Begin(true)
 	if err != nil {
 		t.Fatal(err)
@@ -278,9 +349,7 @@ func deleteDataFortestDelete(bucket string, t *testing.T) {
 	if err == nil {
 		t.Error("TestTx_DeleteAndGet err")
 	}
-}
 
-func checkDeleteDataForDelete(bucket string, t *testing.T) {
 	for i := 0; i <= 5; i++ {
 		tx, err = db.Begin(false)
 		if err != nil {
@@ -294,45 +363,6 @@ func checkDeleteDataForDelete(bucket string, t *testing.T) {
 			t.Error("err read tx ")
 		}
 	}
-
-	for i := 5; i <= 10; i++ {
-		tx, err = db.Begin(false)
-		if err != nil {
-			t.Fatal(err)
-		}
-		key := []byte("key_" + fmt.Sprintf("%07d", i))
-		if entry, err := tx.Get(bucket, key); err != nil {
-			//tx rollback
-			tx.Rollback()
-		} else {
-			val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", i))
-			if string(val) != string(entry.Value) {
-				t.Error("err read tx ")
-			}
-			//tx commit
-			tx.Commit()
-		}
-	}
-}
-
-func TestTx_DeleteAndGet(t *testing.T) {
-	Init()
-	db, err = Open(opt)
-
-	defer db.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	bucket := "bucket_delete_test"
-
-	initDataForTestDelete(bucket, t)
-
-	readDataForTestDelete(bucket, t)
-
-	deleteDataFortestDelete(bucket, t)
-
-	checkDeleteDataForDelete(bucket, t)
 }
 
 func TestTx_GetAndScansFromMmap(t *testing.T) {

@@ -16,10 +16,11 @@ package nutsdb
 
 import (
 	"fmt"
-	"github.com/xujiajun/utils/strconv2"
 	"io/ioutil"
 	"os"
 	"testing"
+
+	"github.com/xujiajun/utils/strconv2"
 )
 
 var (
@@ -131,98 +132,76 @@ func TestDB_Basic(t *testing.T) {
 	}
 }
 
-func initStringDataAndDelForTestMerge(readFlag bool, bucketForString string, t *testing.T) {
-	if !readFlag {
-		////init batch put data
-		for i := 0; i < 10000; i++ {
-			if err := db.Update(
-				func(tx *Tx) error {
-					key := []byte("key_" + fmt.Sprintf("%07d", i))
-					val := []byte("val" + fmt.Sprintf("%07d", i))
-					return tx.Put(bucketForString, key, val, Persistent)
-				}); err != nil {
-				t.Fatal(err)
-			}
-		}
-	}
-
-	if !readFlag {
-		////init batch delete data
-		for i := 0; i < 5000; i++ {
-			if err := db.Update(
-				func(tx *Tx) error {
-					key := []byte("key_" + fmt.Sprintf("%07d", i))
-					if err := tx.Delete(bucketForString, key); err != nil {
-						t.Fatal(err)
-						return err
-					}
-					return nil
-				}); err != nil {
-				t.Fatal(err)
-			}
-		}
-	}
-}
-
-func checkStringDataForTestMerge(bucketForString string, t *testing.T) {
-	for i := 0; i < 5000; i++ {
-		if err := db.View(
-			func(tx *Tx) error {
-				key := []byte("key_" + fmt.Sprintf("%07d", i))
-				if e, err := tx.Get(bucketForString, key); err == nil {
-					fmt.Println(string(e.Key), string(e.Value), err)
-					t.Error("err read data ")
-				}
-				return nil
-			}); err != nil {
-			t.Fatal(err)
-		}
-	}
-	for i := 5000; i < 10000; i++ {
-		if err := db.View(
-			func(tx *Tx) error {
-				key := []byte("key_" + fmt.Sprintf("%07d", i))
-				if _, err := tx.Get(bucketForString, key); err != nil {
-					fmt.Println(err)
-					t.Error("err read data ")
-				}
-				return nil
-			}); err != nil {
-			t.Fatal(err)
-		}
-	}
-}
-
 func TestDB_Merge_For_string(t *testing.T) {
-	InitOpt("/tmp/nutsdbtestformergestring", true)
-	InitOpt("/tmp/nutsdbtestformergestring", false)
-	db, err = Open(opt)
+	fileDir := "/tmp/nutsdb_test_str_for_merge"
 
-	readFlag := false
-	mergeFlag := true
-	defer db.Close()
+	files, _ := ioutil.ReadDir(fileDir)
+	for _, f := range files {
+		name := f.Name()
+		if name != "" {
+			err := os.Remove(fileDir + "/" + name)
+			if err != nil {
+				panic(err)
+			}
+		}
+	}
+
+	opt := DefaultOptions
+	opt.Dir = fileDir
+	opt.SegmentSize = 1 * 100
+
+	db2, err := Open(opt)
+	//defer db2.Close()
+
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	bucketForString := "test_merge"
 
-	initStringDataAndDelForTestMerge(readFlag, bucketForString, t)
-
-	//check data
-	checkStringDataForTestMerge(bucketForString, t)
-
-	//GetValidKeyCount
-	validKeyNum := db.BPTreeIdx[bucketForString].ValidKeyCount
-	if validKeyNum != 5000 {
-		t.Errorf("err GetValidKeyCount. got %d want %d", validKeyNum, 5000)
+	key1 := []byte("key_" + fmt.Sprintf("%07d", 1))
+	value1 := []byte("value1value1value1value1value1")
+	if err := db2.Update(
+		func(tx *Tx) error {
+			return tx.Put(bucketForString, key1, value1, Persistent)
+		}); err != nil {
+		t.Error("initStringDataAndDel,err batch put", err)
 	}
 
-	//do merge
-	if mergeFlag {
-		if err = db.Merge(); err != nil {
-			t.Error("err merge", err)
-		}
+	key2 := []byte("key_" + fmt.Sprintf("%07d", 2))
+	value2 := []byte("value2value2value2value2value2")
+	if err := db2.Update(
+		func(tx *Tx) error {
+			return tx.Put(bucketForString, key2, value2, Persistent)
+		}); err != nil {
+		t.Error("initStringDataAndDel,err batch put", err)
+	}
+
+	if err := db2.Update(
+		func(tx *Tx) error {
+			return tx.Delete(bucketForString, key2)
+		}); err != nil {
+		t.Error(err)
+	}
+
+	if err := db2.View(
+		func(tx *Tx) error {
+			if _, err := tx.Get(bucketForString, key2); err == nil {
+				t.Error("err read data ", err)
+			}
+			return nil
+		}); err != nil {
+		t.Fatal(err)
+	}
+
+	//GetValidKeyCount
+	validKeyNum := db2.BPTreeIdx[bucketForString].ValidKeyCount
+	if validKeyNum != 1 {
+		t.Errorf("err GetValidKeyCount. got %d want %d", validKeyNum, 1)
+	}
+
+	if err = db2.Merge(); err != nil {
+		t.Error("err merge", err)
 	}
 }
 
@@ -256,7 +235,7 @@ func opSAddAndCheckForTestMerge(bucketForSet string, key []byte, t *testing.T) {
 
 func TestDB_Merge_for_Set(t *testing.T) {
 	InitOpt("/tmp/nutsdbtestformergeset", true)
-	InitOpt("/tmp/nutsdbtestformergeset", false)
+	//InitOpt("/tmp/nutsdbtestformergeset", false)
 	db, err = Open(opt)
 
 	readFlag := false
@@ -428,7 +407,7 @@ func opZRemRangeByRankForTestMerge(readFlag bool, bucketForZSet string, t *testi
 
 func TestDB_Merge_For_ZSET(t *testing.T) {
 	InitOpt("/tmp/nutsdbtestformergezset", true)
-	InitOpt("/tmp/nutsdbtestformergezset", false)
+	//InitOpt("/tmp/nutsdbtestformergezset", false)
 
 	readFlag := false
 	mergeFlag := true
