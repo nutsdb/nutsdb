@@ -33,7 +33,7 @@ type Options struct {
 	NodeNum      int64
 }
 
-var defaultSegmentSize int64 = 64 * 1024 * 1024
+var defaultSegmentSize int64 = 8 * 1024 * 1024
 
 // DefaultOptions represents the default options
 var DefaultOptions = Options{

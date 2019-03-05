@@ -17,7 +17,6 @@ package nutsdb
 import (
 	"errors"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/bwmarrin/snowflake"
@@ -291,10 +290,6 @@ func (tx *Tx) buildListIdx(bucket string, entry *Entry) {
 func (tx *Tx) rotateActiveFile() error {
 	var err error
 	tx.db.MaxFileID++
-
-	if err := tx.db.ActiveFile.m.Flush(syscall.SYS_SYNC); err != nil {
-		return err
-	}
 
 	if err := tx.db.ActiveFile.m.Unmap(); err != nil {
 		return err
