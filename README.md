@@ -1,5 +1,7 @@
 # NutsDB [![GoDoc](https://godoc.org/github.com/xujiajun/nutsdb?status.svg)](https://godoc.org/github.com/xujiajun/nutsdb)  [![Go Report Card](https://goreportcard.com/badge/github.com/xujiajun/nutsdb)](https://goreportcard.com/report/github.com/xujiajun/nutsdb) <a href="https://travis-ci.org/xujiajun/nutsdb"><img src="https://travis-ci.org/xujiajun/nutsdb.svg?branch=master" alt="Build Status"></a> [![Coverage Status](https://coveralls.io/repos/github/xujiajun/nutsdb/badge.svg?branch=develop)](https://coveralls.io/github/xujiajun/nutsdb?branch=develop) [![License](http://img.shields.io/badge/license-Apache_2-blue.svg?style=flat-square)](https://raw.githubusercontent.com/xujiajun/nutsdb/master/LICENSE)
 
+English | [简体中文](https://github.com/xujiajun/nutsdb/blob/master/README-CN.md)
+
 NutsDB is a simple, fast, embeddable and persistent key/value store written in pure Go. 
 
 It supports fully serializable transactions and many data structures such as list、set、sorted set. All operations happen inside a Tx. Tx represents a transaction, which can be read-only or read-write. Read-only transactions can read values for a given bucket and given key or iterate over a set of key-value pairs. Read-write transactions can update and delete keys from the DB.
