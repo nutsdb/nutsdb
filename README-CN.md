@@ -30,10 +30,11 @@ Badger同样是基于LSM tree，不同的是他把key/value分离。据他官网
 
 如上面的选项，我发现大致基于kv模型分：B+ tree和LSM tree，但是我觉得这些模型还是太复杂了。直到我找到bitcask这种模型，他其实本质上是一种hash数据库。
 他模型非常简单很好理解和实现，很快我就实现了一个版本。但是他的缺点是不支持范围扫描。我尝试去优化他，又开发一个版本，基于B+ tree作为索引，满足了范围扫描的问题
-，读性能是够了，写性能很一般，又用mmap实现了一版。写性能又提高了几十倍。现在这个版本基本上都实现了，基本上吸收了上面提到的数据库的一些有用的特性，包括支持范围扫描和前缀扫描、包括支持bucket、事务等。
+，读性能是够了，写性能很一般，又用mmap实现了一版。写性能又提高了几十倍。现在这个版本基本上都实现了，基本上吸收了上面提到的数据库的一些有用的特性，包括支持范围扫描和前缀扫描、包括支持bucket、事务等。[benchmark](https://github.com/xujiajun/nutsdb#benchmarks)来看，NutsDB性能只高不低，100w条数据，我本机基本上2s跑完。写性能可达到40~50W+/秒。
  
+天下没有银弹，NutsDB也有他的局限，比如随着数据量的增大，启动会慢。只想说NutsDB还有很多优化和提高的空间，由于本人精力有限。能力也有限。所以把这个项目开源出来。
 
-由于个人精力有限，希望看到这个文档的童鞋有兴趣的，一起来帮忙贡献代码或者文档，非常欢迎！ [contributions to NutsDB](https://github.com/xujiajun/nutsdb#contributing).
+希望看到这个文档的童鞋有兴趣的，一起来帮忙贡献代码或者文档，非常欢迎！ [contributions to NutsDB](https://github.com/xujiajun/nutsdb#contributing).
 
 ## 目录
 
