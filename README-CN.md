@@ -44,7 +44,7 @@ Badger同样是基于LSM tree，不同的是他把key/value分离。据他官网
  
 天下没有银弹，NutsDB也有他的局限，比如随着数据量的增大，索引变大，启动会慢。只想说NutsDB还有很多优化和提高的空间，由于本人精力以及能力有限。所以把这个项目开源出来。更重要的是我认为一个项目需要有人去使用，有人提意见才会成长。
 
-> 希望看到这个文档的童鞋有兴趣的，一起来参与贡献，欢迎Star、提issues、提交PR ！ [参与贡献](https://github.com/xujiajun/nutsdb/blob/master/README-CN.md#%E5%8F%82%E4%B8%8E%E8%B4%A1%E7%8C%AE).
+> 希望看到这个文档的童鞋有兴趣的，一起来参与贡献，欢迎Star、提issues、提交PR ！ [参与贡献](https://github.com/xujiajun/nutsdb/blob/master/README-CN.md#%E5%8F%82%E4%B8%8E%E8%B4%A1%E7%8C%AE)
 
 ## 目录
 
@@ -1772,7 +1772,12 @@ NutsDB会自动切割分成一个个块（Segment），默认`SegmentSize`是8MB
 
 * key和value的大小限制问题
 
-关于key和value的大小受到SegmentSize的大小的影响，比如SegmentSize为8M，key和value的大小肯定是小于8M的，不然会返回错误。在NutsDB里面entry是最小单位，只要保证entry不大于`SegmentSize`就可以了。（ps：entry=EntryHeaderSize+keySize+valueSize+bucketSize）
+关于key和value的大小受到SegmentSize的大小的影响，比如SegmentSize为8M，key和value的大小肯定是小于8M的，不然会返回错误。
+在NutsDB里面entry是最小单位，只要保证entry不大于`SegmentSize`就可以了。
+
+* entry的大小问题
+
+entry的的大小=EntryHeader的大小+key的大小+value的大小+bucket的大小
  
 
 ### 联系作者
@@ -1781,7 +1786,16 @@ NutsDB会自动切割分成一个个块（Segment），默认`SegmentSize`是8MB
 
 ### 参与贡献
 
-详情参考 [CONTRIBUTING](https://github.com/xujiajun/nutsdb/blob/master/CONTRIBUTING.md) 。
+:+1::tada: 首先感谢你能看到这里，参与贡献 :tada::+1:
+
+参与贡献方式不限于：
+
+* 提各种issues（包括询问问题、提功能建议、性能建议等）
+* 提交bug
+* 提pull requests
+* 优化修改README文档
+
+详情参考英文版的 [CONTRIBUTING](https://github.com/xujiajun/nutsdb/blob/master/CONTRIBUTING.md) 。
 
 ### 致谢
 
