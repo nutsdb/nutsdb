@@ -451,7 +451,7 @@ if err != nil {
 
 ##### RPush
 
-Inserts the values at the tail of the list stored in the bucket at given bucket,key and values.
+从队列的右边入队一个或者多个元素。
 
 ```golang
 if err := db.Update(
@@ -467,7 +467,7 @@ if err := db.Update(
 
 ##### LPush 
 
-Inserts the values at the head of the list stored in the bucket at given bucket,key and values.
+从队列的左边入队一个或者多个元素。
 
 ```golang
 if err := db.Update(
@@ -483,7 +483,7 @@ if err := db.Update(
 
 ##### LPop 
 
-Removes and returns the first element of the list stored in the bucket at given bucket and key.
+从队列的左边出队一个元素，删除并返回。
 
 ```golang
 if err := db.Update(
@@ -503,7 +503,7 @@ if err := db.Update(
 
 ##### LPeek
 
-Returns the first element of the list stored in the bucket at given bucket and key.
+从队列的左边出队一个元素返回不删除。
 
 ```golang
 if err := db.View(
@@ -523,7 +523,7 @@ if err := db.View(
 
 ##### RPop 
 
-Removes and returns the last element of the list stored in the bucket at given bucket and key.
+从队列的右边出队一个元素，删除并返回。
 
 ```golang
 if err := db.Update(
@@ -543,7 +543,7 @@ if err := db.Update(
 
 ##### RPeek
 
-Returns the last element of the list stored in the bucket at given bucket and key.
+从队列的右边出队一个元素返回不删除。
 
 ```golang
 if err := db.View(
@@ -563,11 +563,8 @@ if err := db.View(
 
 ##### LRange 
 
-Returns the specified elements of the list stored in the bucket at given bucket,key, start and end.
-The offsets start and stop are zero-based indexes 0 being the first element of the list (the head of the list),
-1 being the next element and so on. 
-Start and end can also be negative numbers indicating offsets from the end of the list,
-where -1 is the last element of the list, -2 the penultimate element and so on.
+返回存储在 key 的列表里指定范围内的元素。 start 和 end 偏移量都是基于0的下标，即list的第一个元素下标是0（list的表头），第二个元素下标是1，以此类推。
+偏移量也可以是负数，表示偏移量是从list尾部开始计数。 例如， -1 表示列表的最后一个元素，-2 是倒数第二个，以此类推。
 
 ```golang
 if err := db.View(
@@ -589,12 +586,13 @@ if err := db.View(
 ```
 ##### LRem 
 
-Removes the first count occurrences of elements equal to value from the list stored in the bucket at given bucket,key,count.
-The count argument influences the operation in the following ways:
+从存于 key 的列表里移除前 count 次出现的值为 value 的元素。 这个 count 参数通过下面几种方式影响这个操作：
 
-* count > 0: Remove elements equal to value moving from head to tail.
-* count < 0: Remove elements equal to value moving from tail to head.
-* count = 0: Remove all elements equal to value.
+count > 0: 从头往尾移除值为 value 的元素。
+count < 0: 从尾往头移除值为 value 的元素。
+count = 0: 移除所有值为 value 的元素。
+
+下面的例子count=1：
 
 ```golang
 if err := db.Update(
@@ -609,7 +607,7 @@ if err := db.Update(
 
 ##### LSet 
 
-Sets the list element at index to value.
+设置 index 位置的list元素的值为 value。
 
 ```golang
 if err := db.Update(
@@ -629,10 +627,11 @@ if err := db.Update(
 
 ##### Ltrim 
 
-Trims an existing list so that it will contain only the specified range of elements specified.
-the offsets start and stop are zero-based indexes 0 being the first element of the list (the head of the list),
-1 being the next element and so on.Start and end can also be negative numbers indicating offsets from the end of the list,
-where -1 is the last element of the list, -2 the penultimate element and so on.
+修剪一个已存在的 list，这样 list 就会只包含指定范围的指定元素。start 和 stop 都是由0开始计数的， 这里的 0 是列表里的第一个元素（表头），1 是第二个元素，以此类推。
+
+例如： LTRIM foobar 0 2 将会对存储在 foobar 的列表进行修剪，只保留列表里的前3个元素。
+
+start 和 end 也可以用负数来表示与表尾的偏移量，比如 -1 表示列表里的最后一个元素， -2 表示倒数第二个，等等。
 
 ```golang
 if err := db.Update(
@@ -647,7 +646,7 @@ if err := db.Update(
 
 ##### LSize 
 
-Returns the size of key in the bucket in the bucket at given bucket and key.
+返回指定bucket下指定key的size大小
 
 ```golang
 if err := db.Update(
