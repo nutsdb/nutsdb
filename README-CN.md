@@ -61,9 +61,9 @@ Badger同样是基于LSM tree，不同的是他把key/value分离。据他官网
   - [对keys的扫描操作](#对keys的扫描操作)
     - [前缀扫描](#前缀扫描)
     - [范围扫描](#范围扫描)
-  - [Merge Operation](#merge-operation)
-  - [Database backup](#database-backup)
-- [Using Other data structures](#using-other-data-structures)
+  - [合并操作](#合并操作)
+  - [数据库备份](#数据库备份)
+- [使用其他数据结构](#使用其他数据结构)
    - [List](#list)
      - [RPush](#rpush)
      - [LPush](#lpush)
@@ -418,9 +418,10 @@ if err := db.View(
 }
 ```
 
-### Merge Operation
+### 合并操作
 
-NutsDB supports merge operation. you can use `db.Merge()` function removes dirty data and reduce data redundancy. Call this function from a read-write transaction. It will effect other write request. So you can execute it at the appropriate time.
+随着数据越来越多，特别是一些删除或者过期的数据占据着磁盘，清理这些NutsDB提供了`db.Merge()`方法，这个方法需要自己根据实际情况编写合并策略。
+一旦执行会影响到正常的写请求，所以最好避开高峰期，比如半夜定时执行等。
 
 ```golang
 err := db.Merge()
@@ -429,9 +430,9 @@ if err != nil {
 }
 ```
 
-### Database backup
+### 数据库备份
 
-NutsDB is easy to backup. You can use the `db.Backup()` function at given dir, call this function from a read-only transaction, it will perform a hot backup and not block your other database reads and writes.
+对于数据库的备份，你可以调用 `db.Backup()`方法，只要提供一个备份的文件目录地址即可。这个方法执行的是一个热备份，不会阻塞到数据库其他的读写事务操作。
 
 ```golang
 err = db.Backup(dir)
@@ -440,9 +441,11 @@ if err != nil {
 }
 ```
 
-### Using other data structures
+好了，入门指南已经完结。 散花~，到目前为止都是String类型的数据的crud操作，下面将学习其他更多的数据结构的操作。
 
-The syntax here is modeled after [Redis commands](https://redis.io/commands)
+### 使用其他数据结构
+
+看到这边我们将学习其他数据结构，Api命名风格模仿 [Redis 命令](https://redis.io/commands)。所以如果你熟悉Redis，将会很快掌握使用。
 
 #### List
 
