@@ -446,6 +446,7 @@ if err != nil {
 ### 使用其他数据结构
 
 看到这边我们将学习其他数据结构，Api命名风格模仿 [Redis 命令](https://redis.io/commands)。所以如果你熟悉Redis，将会很快掌握使用。
+其他方面继承了上面的bucket/key/value模型，所以你会看到和Redis的Api使用上稍微有些不同，会多一个bucket。
 
 #### List
 
@@ -668,7 +669,7 @@ if err := db.Update(
 
 ##### SAdd
 
-Adds the specified members to the set stored int the bucket at given bucket,key and items.
+添加一个指定的member元素到集合的key中。
 
 ```go
 if err := db.Update(
@@ -683,7 +684,7 @@ if err := db.Update(
 
 ##### SAreMembers 
 
-Returns if the specified members are the member of the set int the bucket at given bucket,key and items.
+返回多个成员member是否是存储的集合key的成员。
 
 ```go
 if err := db.View(
@@ -703,7 +704,7 @@ if err := db.View(
 
 ##### SCard 
 
-Returns the set cardinality (number of elements) of the set stored in the bucket at given bucket and key.
+返回集合存储的key的基数 (集合元素的数量)。
 
 ```go
 
