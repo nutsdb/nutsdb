@@ -55,9 +55,9 @@ Badger同样是基于LSM tree，不同的是他把key/value分离。据他官网
     - [读写事务](#读写事务)
     - [只读事务](#只读事务)
     - [手动管理事务](#手动管理事务)
-  - [Using buckets](#using-buckets)
-  - [Using key/value pairs](#using-keyvalue-pairs)
-  - [Using TTL(Time To Live)](#using-ttltime-to-live)
+  - [使用buckets](#使用buckets)
+  - [使用键值对](#使用键值对)
+  - [使用TTL](#使用ttl)
   - [Iterating over keys](#iterating-over-keys)
     - [Prefix scans](#prefix-scans)
     - [Range scans](#range-scans)
@@ -187,7 +187,7 @@ err := db.View(
 
 #### 手动管理事务
 
-从上面的例子看到 `DB.View()` 和`DB.Update()` 这两个是数据库调用事务的主要方法。他们本质上是基于 `DB.Begin()`方法进行的包装。他们可以帮你自动管理事务的生命周期，从事务的开始、事务的执行、事务提交或者回滚一直到事务的安全的关闭为止，如果中间有错误会返回。所以一般情况下推荐用这种方式去调用事务。
+从上面的例子看到 `DB.View()` 和`DB.Update()` 这两个是数据库调用事务的主要方法。他们本质上是基于 `DB.Begin()`方法进行的包装。他们可以帮你自动管理事务的生命周期，从事务的开始、事务的执行、事务提交或者回滚一直到事务的安全的关闭为止，如果中间有错误会返回。所以**一般情况下推荐用这种方式去调用事务**。
 
 这好比开车有手动挡和自动挡一样， `DB.View()` 和`DB.Update()`等于提供了自动档的效果。
 
@@ -219,10 +219,12 @@ if err = tx.Put(bucket, key, val, Persistent); err != nil {
 }
 ```
 
-### Using buckets
+### 使用buckets
 
-Buckets are collections of key/value pairs within the database. All keys in a bucket must be unique.
-Bucket can be interpreted as a table or namespace. So you can store the same key in different bucket. 
+buckets中文翻译过来是桶的意思，你可以理解成类似mysql的table表的概念，也可以理解成命名空间，或者多租户的概念。
+所以你可以用他存不同的key的键值对，也可以存相同的key的键值对。所有的key在一个bucket里面不能重复。
+
+例子：
 
 ```golang
 
@@ -253,9 +255,11 @@ if err := db.Update(
 
 ```
 
-### Using key/value pairs
+### 使用键值对
 
-To save a key/value pair to a bucket, use the `tx.Put` method:
+将key-value键值对保存在一个bucket, 你可以使用 `tx.Put` 这个函数方法:
+
+* 添加数据
 
 ```golang
 
@@ -274,15 +278,17 @@ if err := db.Update(
 
 ```
 
-This will set the value of the "name1" key to "val1" in the bucket1 bucket.
+* 更新数据
 
-To update the the value of the "name1" key,we can still use the `tx.Put` function:
+上面的代码执行之后key为"name1"和value值"val1"被保存在命名为bucket1的bucket里面。
+ 
+如果你要做更新操作，你可以仍然用`tx.Put`函数去执行，比如下面的例子把value的值改成"val1-modify"：
 
 ```golang
 if err := db.Update(
 	func(tx *nutsdb.Tx) error {
 	key := []byte("name1")
-	val := []byte("val1-modify") // Update the value
+	val := []byte("val1-modify") // 更新值
 	bucket: = "bucket1"
 	if err := tx.Put(bucket, key, val, 0); err != nil {
 		return err
@@ -294,7 +300,9 @@ if err := db.Update(
 
 ```
 
-To retrieve this value, we can use the `tx.Get` function:
+* 获取数据
+
+获取值可以用`tx.Get` 这个函数:
 
 ```golang
 if err := db.View(
@@ -312,7 +320,9 @@ func(tx *nutsdb.Tx) error {
 }
 ```
 
-Use the `tx.Delete()` function to delete a key from the bucket.
+* 删除数据
+
+删除使用`tx.Delete()` 函数：
 
 ```golang
 if err := db.Update(
@@ -328,9 +338,10 @@ if err := db.Update(
 }
 ```
 
-### Using TTL(Time To Live)
+### 使用TTL
 
-NusDB supports TTL(Time to Live) for keys, you can use `tx.Put` function with a `ttl` parameter.
+NusDB支持TTL(存活时间)的功能，可以对指定的bucket里的key过期时间的设置。使用`tx.Put`这个函数的使用`ttl`参数就可以了。
+如果设置 ttl = 0 或者 Persistent, 这个key就会永久存在。下面例子中ttl设置成 60 , 60s之后key就会过期，在查询的时候将不会被搜到。
 
 ```golang
 if err := db.Update(
@@ -339,8 +350,8 @@ if err := db.Update(
 	val := []byte("val1")
 	bucket: = "bucket1"
 	
-	// If set ttl = 0 or Persistent, this key will nerver expired.
-	// Set ttl = 60 , after 60 seconds, this key will expired.
+	// 如果设置 ttl = 0 or Persistent, 这个key就会永久不删除
+	// 这边 ttl = 60 , 60s之后就会过期。
 	if err := tx.Put(bucket, key, val, 60); err != nil {
 		return err
 	}
