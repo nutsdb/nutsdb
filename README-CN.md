@@ -50,11 +50,11 @@ Badger同样是基于LSM tree，不同的是他把key/value分离。据他官网
 
 - [入门指南](#入门指南)
   - [安装](#安装)
-  - [Opening a database](#opening-a-database)
-  - [Transactions](#transactions)
-    - [Read-write transactions](#read-write-transactions)
-    - [Read-only transactions](#read-only-transactions)
-    - [Managing transactions manually](#managing-transactions-manually)
+  - [开启数据库](#开启数据库)
+  - [使用事务](#使用事务)
+    - [读写事务](#读写事务)
+    - [只读事务](#只读事务)
+    - [手动管理事务](#手动管理事务)
   - [Using buckets](#using-buckets)
   - [Using key/value pairs](#using-keyvalue-pairs)
   - [Using TTL(Time To Live)](#using-ttltime-to-live)
@@ -129,9 +129,11 @@ NutsDB的安装很简单，首先保证 [Golang](https://golang.org/dl/) 已经�
 go get -u github.com/xujiajun/nutsdb
 ```
 
-### Opening a database
+### 开启数据库
 
-To open your database, use the nutsdb.Open() function,with the appropriate options.The `Dir` , `EntryIdxMode`  and  `SegmentSize`  options are must be specified by the client.
+要打开数据库需要使用` nutsdb.Open()`这个函数。其中用到的选项(options)包括 `Dir` , `EntryIdxMode`和 `SegmentSize`，在调用的时候这些参数必须设置。官方提供了`DefaultOptions`的选项，直接使用`nutsdb.DefaultOptions`即可。当然你也可以根据需要自己定义。
+
+例子： 
 
 ```golang
 package main
@@ -143,10 +145,8 @@ import (
 )
 
 func main() {
-	// Open the database located in the /tmp/nutsdb directory.
-	// It will be created if it doesn't exist.
 	opt := nutsdb.DefaultOptions
-	opt.Dir = "/tmp/nutsdb"
+	opt.Dir = "/tmp/nutsdb" //这边数据库会自动创建这个目录文件
 	db, err := nutsdb.Open(opt)
 	if err != nil {
 		log.Fatal(err)
@@ -157,16 +157,13 @@ func main() {
 }
 ```
 
-### Transactions
+### 使用事务
 
-NutsDB allows only one read-write transaction at a time but allows as many read-only transactions as you want at a time. Each transaction has a consistent view of the data as it existed when the transaction started.
+NutsDB为了保证隔离性，防止并发读写事务时候数据的不一致性，同一时间只能执行一个读写事务，但是允许同一时间执行多个只读事务。
+NutsDB遵循ACID原则。
 
-When a transaction fails, it will roll back, and revert all changes that occurred to the database during that transaction.
-When a read/write transaction succeeds all changes are persisted to disk.
 
-Creating transaction from the `DB` is thread safe.
-
-#### Read-write transactions
+#### 读写事务
 
 ```golang
 err := db.Update(
@@ -177,7 +174,7 @@ err := db.Update(
 
 ```
 
-#### Read-only transactions
+#### 只读事务
 
 ```golang
 err := db.View(
@@ -188,14 +185,18 @@ err := db.View(
 
 ```
 
-#### Managing transactions manually
+#### 手动管理事务
 
-The `DB.View()`  and  `DB.Update()`  functions are wrappers around the  `DB.Begin()`  function. These helper functions will start the transaction, execute a function, and then safely close your transaction if an error is returned. This is the recommended way to use NutsDB transactions.
+从上面的例子看到 `DB.View()` 和`DB.Update()` 这两个是数据库调用事务的主要方法。他们本质上是基于 `DB.Begin()`方法进行的包装。他们可以帮你自动管理事务的生命周期，从事务的开始、事务的执行、事务提交或者回滚一直到事务的安全的关闭为止，如果中间有错误会返回。所以一般情况下推荐用这种方式去调用事务。
 
-However, sometimes you may want to manually start and end your transactions. You can use the DB.Begin() function directly but please be sure to close the transaction. 
+这好比开车有手动挡和自动挡一样， `DB.View()` 和`DB.Update()`等于提供了自动档的效果。
+
+如果你需要手动去开启、执行、关闭事务，你会用到`DB.Begin()`开启一个事务，`tx.Commit()` 用来提交事务、`tx.Rollback()`用来回滚事务
+
+例子：
 
 ```golang
- // Start a write transaction.
+//开始事务
 tx, err := db.Begin(true)
 if err != nil {
     return err
@@ -205,12 +206,12 @@ bucket := "bucket1"
 key := []byte("foo")
 val := []byte("bar")
 
-// Use the transaction.
+// 使用事务
 if err = tx.Put(bucket, key, val, Persistent); err != nil {
-	// Rollback the transaction.
+	// 回滚事务
 	tx.Rollback()
 } else {
-	// Commit the transaction and check for error.
+	// 提交事务
 	if err = tx.Commit(); err != nil {
 		tx.Rollback()
 		return err
