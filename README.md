@@ -1091,7 +1091,7 @@ if err := db.View(
 
 ##### ZAdd
 
-Adds the specified member with the specified score and the specified value to the sorted set stored at key.
+Adds the specified member with the specified score and the specified value to the sorted set stored at bucket.
 
 ```go
 if err := db.Update(
@@ -1105,7 +1105,7 @@ if err := db.Update(
 ```
 ##### ZCard 
 
-Returns the sorted set cardinality (number of elements) of the sorted set stored at key.
+Returns the sorted set cardinality (number of elements) of the sorted set stored at bucket.
 
 ```go
 if err := db.View(
@@ -1124,7 +1124,7 @@ if err := db.View(
 
 ##### ZCount 
 
-Returns the number of elements in the sorted set at key with a score between min and max and opts.
+Returns the number of elements in the sorted set at bucket with a score between min and max and opts.
 
 Opts includes the following parameters:
 
@@ -1167,7 +1167,7 @@ if err := db.View(
 ```
 ##### ZMembers 
 
-Returns all the members of the set value stored at key.
+Returns all the members of the set value stored at bucket.
 
 ```go
 if err := db.View(
@@ -1189,7 +1189,7 @@ if err := db.View(
 ```
 ##### ZPeekMax 
 
-Returns up to count members with the highest scores in the sorted set stored at key.
+Returns the member with the highest score in the sorted set stored at bucket.
 
 ```go
 if err := db.View(
@@ -1208,7 +1208,7 @@ if err := db.View(
 
 ##### ZPeekMin 
 
-Returns up to count members with the lowest scores in the sorted set stored at key.
+Returns the member with lowest score in the sorted set stored at bucket.
 
 ```go
 if err := db.View(
@@ -1227,7 +1227,7 @@ if err := db.View(
 
 ##### ZPopMax 
 
-Removes and returns up to count members with the highest scores in the sorted set stored at key.
+Removes and returns the member with the highest score in the sorted set stored at bucket.
 
 ```go
 if err := db.Update(
@@ -1245,7 +1245,7 @@ if err := db.Update(
 ```
 ##### ZPopMin 
 
-Removes and returns up to count members with the lowest scores in the sorted set stored at key.
+Removes and returns the member with the lowest score in the sorted set stored at bucket.
 
 ```go
 if err := db.Update(
@@ -1264,7 +1264,7 @@ if err := db.Update(
 
 ##### ZRangeByRank 
 
-returns all the elements in the sorted set in one bucket at bucket and key with a rank between start and end (including elements with rank equal to start or end).
+Returns all the elements in the sorted set in one bucket at bucket and key with a rank between start and end (including elements with rank equal to start or end).
 
 ```go
 // ZAdd add items
