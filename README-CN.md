@@ -1695,7 +1695,7 @@ LevelDB 和 RocksDB 都是基于LSM tree模型.其中LevelDB 不支持事务. Ro
 
 #### Badger
 
-Badger也是基于LSM tree模型。但是写性能没有我想象中搞，具体看下面的Benchmarks压测报告。
+Badger也是基于LSM tree模型。但是写性能没有我想象中高，具体看下面的Benchmarks压测报告。
 
 另外，以上数据库均不支持多种数据结构如list、set、sorted set，而NutsDB支持这些数据结构。
 
