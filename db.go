@@ -41,6 +41,9 @@ var (
 
 	// ErrEntryIdxModeOpt is returned when set db EntryIdxMode option is wrong.
 	ErrEntryIdxModeOpt = errors.New("err EntryIdxMode option set")
+
+	// ErrFn is returned when fn is nil.
+	ErrFn = errors.New("err fn")
 )
 
 const (
@@ -175,11 +178,19 @@ func Open(opt Options) (*DB, error) {
 
 // Update executes a function within a managed read/write transaction.
 func (db *DB) Update(fn func(tx *Tx) error) error {
+	if fn == nil {
+		return ErrFn
+	}
+
 	return db.managed(true, fn)
 }
 
 // View executes a function within a managed read-only transaction.
 func (db *DB) View(fn func(tx *Tx) error) error {
+	if fn == nil {
+		return ErrFn
+	}
+
 	return db.managed(false, fn)
 }
 
