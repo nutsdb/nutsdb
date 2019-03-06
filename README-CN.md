@@ -58,9 +58,9 @@ Badger同样是基于LSM tree，不同的是他把key/value分离。据他官网
   - [使用buckets](#使用buckets)
   - [使用键值对](#使用键值对)
   - [使用TTL](#使用ttl)
-  - [Iterating over keys](#iterating-over-keys)
-    - [Prefix scans](#prefix-scans)
-    - [Range scans](#range-scans)
+  - [对keys的扫描操作](#对keys的扫描操作)
+    - [前缀扫描](#前缀扫描)
+    - [范围扫描](#范围扫描)
   - [Merge Operation](#merge-operation)
   - [Database backup](#database-backup)
 - [Using Other data structures](#using-other-data-structures)
@@ -131,7 +131,7 @@ go get -u github.com/xujiajun/nutsdb
 
 ### 开启数据库
 
-要打开数据库需要使用` nutsdb.Open()`这个函数。其中用到的选项(options)包括 `Dir` , `EntryIdxMode`和 `SegmentSize`，在调用的时候这些参数必须设置。官方提供了`DefaultOptions`的选项，直接使用`nutsdb.DefaultOptions`即可。当然你也可以根据需要自己定义。
+要打开数据库需要使用` nutsdb.Open()`这个方法。其中用到的选项(options)包括 `Dir` , `EntryIdxMode`和 `SegmentSize`，在调用的时候这些参数必须设置。官方提供了`DefaultOptions`的选项，直接使用`nutsdb.DefaultOptions`即可。当然你也可以根据需要自己定义。
 
 例子： 
 
@@ -191,7 +191,7 @@ err := db.View(
 
 这好比开车有手动挡和自动挡一样， `DB.View()` 和`DB.Update()`等于提供了自动档的效果。
 
-如果你需要手动去开启、执行、关闭事务，你会用到`DB.Begin()`开启一个事务，`tx.Commit()` 用来提交事务、`tx.Rollback()`用来回滚事务
+如果你需要手动去开启、执行、关闭事务，你会用到`DB.Begin()`方法开启一个事务，`tx.Commit()` 方法用来提交事务、`tx.Rollback()`方法用来回滚事务
 
 例子：
 
@@ -257,7 +257,7 @@ if err := db.Update(
 
 ### 使用键值对
 
-将key-value键值对保存在一个bucket, 你可以使用 `tx.Put` 这个函数方法:
+将key-value键值对保存在一个bucket, 你可以使用 `tx.Put` 这个方法:
 
 * 添加数据
 
@@ -282,7 +282,7 @@ if err := db.Update(
 
 上面的代码执行之后key为"name1"和value值"val1"被保存在命名为bucket1的bucket里面。
  
-如果你要做更新操作，你可以仍然用`tx.Put`函数去执行，比如下面的例子把value的值改成"val1-modify"：
+如果你要做更新操作，你可以仍然用`tx.Put`方法去执行，比如下面的例子把value的值改成"val1-modify"：
 
 ```golang
 if err := db.Update(
@@ -302,7 +302,7 @@ if err := db.Update(
 
 * 获取数据
 
-获取值可以用`tx.Get` 这个函数:
+获取值可以用`tx.Get` 这个方法:
 
 ```golang
 if err := db.View(
@@ -322,7 +322,7 @@ func(tx *nutsdb.Tx) error {
 
 * 删除数据
 
-删除使用`tx.Delete()` 函数：
+删除使用`tx.Delete()` 方法：
 
 ```golang
 if err := db.Update(
@@ -340,7 +340,7 @@ if err := db.Update(
 
 ### 使用TTL
 
-NusDB支持TTL(存活时间)的功能，可以对指定的bucket里的key过期时间的设置。使用`tx.Put`这个函数的使用`ttl`参数就可以了。
+NusDB支持TTL(存活时间)的功能，可以对指定的bucket里的key过期时间的设置。使用`tx.Put`这个方法的使用`ttl`参数就可以了。
 如果设置 ttl = 0 或者 Persistent, 这个key就会永久存在。下面例子中ttl设置成 60 , 60s之后key就会过期，在查询的时候将不会被搜到。
 
 ```golang
@@ -360,20 +360,21 @@ if err := db.Update(
 	log.Fatal(err)
 }
 ```
-### Iterating over keys
+### 对keys的扫描操作
 
-NutsDB stores its keys in byte-sorted order within a bucket. This makes sequential iteration over these keys extremely fast.
+key在一个bucket里面按照byte-sorted有序排序的，所以对于keys的扫描操作，在NutsDB里是很高效的。
+ 
 
-#### Prefix scans
+#### 前缀扫描
 
-To iterate over a key prefix, we can use `PrefixScan` function, and the paramter `limitNum` constrain the number of entries returned :
+对于前缀的扫描，我们可以用`PrefixScan` 方法, 使用参数 `limitNum` 来限制返回的结果的数量，比方下面例子限制100个entries:
 
 ```golang
 
 if err := db.View(
 	func(tx *nutsdb.Tx) error {
 		prefix := []byte("user_")
-		// Constrain 100 entries returned 
+		// 限制 100 entries 返回 
 		if entries, err := tx.PrefixScan(bucket, prefix, 100); err != nil {
 			return err
 		} else {
@@ -389,15 +390,17 @@ if err := db.View(
 
 ```
 
-#### Range scans
+#### 范围扫描
 
-To scan over a range, we can use `RangeScan` function. For example：
+对于范围的扫描，我们可以用 `RangeScan` 方法. 
+
+例子：
 
 ```golang
 if err := db.View(
 	func(tx *nutsdb.Tx) error {
-		// Assume key from user_0000000 to user_9999999.
-		// Query a specific user key range like this.
+		// 假设用户key从 user_0000000 to user_9999999.
+		// 执行区间扫描类似这样一个start和end作为主要参数.
 		start := []byte("user_0010001")
 		end := []byte("user_0010010")
 		bucket：= []byte("user_list)
