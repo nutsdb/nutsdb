@@ -725,7 +725,7 @@ if err := db.View(
 ```
 ##### SDiffByOneBucket 
 
-返回一个集合与给定集合的差集的元素.这两个集合都在一个bucket中。
+返回一个集合与给定集合的差集的元素。这两个集合都在一个bucket中。
 
 ```go
 
@@ -768,7 +768,7 @@ if err := db.View(
 
 ##### SDiffByTwoBuckets 
 
-返回一个集合与给定集合的差集的元素.这两个集合分别在不同bucket中。
+返回一个集合与给定集合的差集的元素。这两个集合分别在不同bucket中。
 
 ```go
 bucket1 := "bucket1"
@@ -851,7 +851,7 @@ if err := db.View(
 
 返回指定bucket的指定key集合所有的元素。
 
-```
+```go
 bucket := "bucketForSet"
 
 if err := db.View(
@@ -871,7 +871,7 @@ if err := db.View(
 ```
 ##### SMoveByOneBucket 
 
-将member从source集合移动到destination集合中。其中source集合和destination集合均在一个bucket中。
+将member从source集合移动到destination集合中，其中source集合和destination集合均在一个bucket中。
 
 ```go
 bucket3 := "bucket3"
@@ -1133,14 +1133,17 @@ if err := db.View(
 
 #### Sorted Set
 
+> 注意：这边的bucket是有序集合名。
+
 ##### ZAdd
 
-Adds the specified member with the specified score and the specified value to the sorted set stored at key.
+将指定成员（包括key、score、value）添加到指定bucket的有序集合（sorted set）里面。
+
 
 ```go
 if err := db.Update(
 	func(tx *nutsdb.Tx) error {
-		bucket := "myZSet1"
+		bucket := "myZSet1" // 注意：这边的bucket是有序集合名
 		key := []byte("key1")
 		return tx.ZAdd(bucket, key, 1, []byte("val1"))
 	}); err != nil {
@@ -1149,7 +1152,7 @@ if err := db.Update(
 ```
 ##### ZCard 
 
-Returns the sorted set cardinality (number of elements) of the sorted set stored at key.
+返回指定bucket的的有序集元素个数。
 
 ```go
 if err := db.View(
@@ -1168,13 +1171,13 @@ if err := db.View(
 
 ##### ZCount 
 
-Returns the number of elements in the sorted set at key with a score between min and max and opts.
+返回指定bucket的有序集，score值在min和max之间(默认包括score值等于start或end)的成员。
 
-Opts includes the following parameters:
+Opts包含的参数：
 
-* Limit        int  // limit the max nodes to return
-* ExcludeStart bool // exclude start value, so it search in interval (start, end] or (start, end)
-* ExcludeEnd   bool // exclude end value, so it search in interval [start, end) or (start, end)
+* Limit        int  // 限制返回的node数目
+* ExcludeStart bool // 排除start
+* ExcludeEnd   bool // 排除end
 
 ```go
 if err := db.View(
@@ -1192,7 +1195,7 @@ if err := db.View(
 ```
 ##### ZGetByKey 
 
-Returns node in the bucket at given bucket and key.
+返回一个节点通过指定的bucket有序集合和指定的key来获取。
 
 ```go
 if err := db.View(
@@ -1211,7 +1214,7 @@ if err := db.View(
 ```
 ##### ZMembers 
 
-Returns all the members of the set value stored at key.
+返回所有成员通过在指定的bucket。
 
 ```go
 if err := db.View(
@@ -1233,7 +1236,7 @@ if err := db.View(
 ```
 ##### ZPeekMax 
 
-Returns up to count members with the highest scores in the sorted set stored at key.
+返回指定bucket有序集合中的具有最高得分的成员。
 
 ```go
 if err := db.View(
@@ -1252,7 +1255,7 @@ if err := db.View(
 
 ##### ZPeekMin 
 
-Returns up to count members with the lowest scores in the sorted set stored at key.
+返回指定bucket有序集合中的具有最低得分的成员。
 
 ```go
 if err := db.View(
@@ -1271,7 +1274,7 @@ if err := db.View(
 
 ##### ZPopMax 
 
-Removes and returns up to count members with the highest scores in the sorted set stored at key.
+删除并返回指定bucket有序集合中的具有最高得分的成员。
 
 ```go
 if err := db.Update(
@@ -1289,7 +1292,7 @@ if err := db.Update(
 ```
 ##### ZPopMin 
 
-Removes and returns up to count members with the lowest scores in the sorted set stored at key.
+删除并返回指定bucket有序集合中的具有最低得分的成员。
 
 ```go
 if err := db.Update(
@@ -1308,7 +1311,7 @@ if err := db.Update(
 
 ##### ZRangeByRank 
 
-returns all the elements in the sorted set in one bucket at bucket and key with a rank between start and end (including elements with rank equal to start or end).
+返回指定bucket有序集合的排名start到end的范围（包括start和end）的所有元素。
 
 ```go
 // ZAdd add items
@@ -1362,8 +1365,7 @@ if err := db.View(
 
 ##### ZRangeByScore 
 
-Returns all the elements in the sorted set at key with a score between min and max.
-And the parameter `Opts` is the same as ZCount's.
+返回指定bucket有序集合的分数start到end的范围（包括start和end）的所有元素。其中有个`Opts`参数用法参考`ZCount`。
 
 ```go
 // ZAdd
@@ -1415,7 +1417,8 @@ if err := db.View(
 ```
 ##### ZRank
 
-Returns the rank of member in the sorted set stored in the bucket at given bucket and key, with the scores ordered from low to high.
+返回有序集bucket中成员指定成员key的排名。其中有序集成员按score值递增(从小到大)顺序排列。注意排名以1为底，也就是说，score值最小的成员排名为1。
+这点和Redis不同，Redis是从0开始的。
 
 ```go
 
@@ -1465,7 +1468,7 @@ if err := db.View(
 
 #### ZRevRank
 
-Returns the rank of member in the sorted set stored in the bucket at given bucket and key,with the scores ordered from high to low.
+返回有序集bucket中成员指定成员key的反向排名。其中有序集成员还是按score值递增(从小到大)顺序排列。但是获取反向排名，注意排名还是以1为开始，也就是说，但是这个时候score值最大的成员排名为1。
 
 ```go
 // ZAdd
@@ -1511,7 +1514,7 @@ if err := db.View(
 
 ##### ZRem 
 
-Removes the specified members from the sorted set stored in one bucket at given bucket and key.
+删除指定成员key在一个指定的有序集合bucket中。
 
 ```go
 if err := db.Update(
@@ -1584,8 +1587,7 @@ if err := db.View(
 
 ##### ZRemRangeByRank 
 
-Removes all elements in the sorted set stored in one bucket at given bucket with rank between start and end.
-The rank is 1-based integer. Rank 1 means the first node; Rank -1 means the last node.
+删除所有成员满足排名start到end（包括start和end）在一个指定的有序集合bucket中。其中排名以1开始，排名1表示第一个节点元素，排名-1表示最后的节点元素。
 
 ```go
 if err := db.Update(
@@ -1667,7 +1669,7 @@ if err := db.View(
 ```
 ##### ZScore
 
-Returns the score of member in the sorted set in the bucket at given bucket and key.
+返回指定有序集bucket中，成员key的score值。
 
 ```go
 if err := db.View(
