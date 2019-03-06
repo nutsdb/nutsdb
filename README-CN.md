@@ -4,7 +4,7 @@
 
 NutsDB是纯Go语言编写一个简单、高性能、内嵌型、持久化的key-value数据库。
 
-NutsDB支持ACID事务，所有的操作都在事务中执行，保证了数据的完整性。NutsDB从v0.2.0版本开始支持多种数据结构，如列表(list)、集合(set)、排序集(sorted set)。
+NutsDB支持ACID事务，所有的操作都在事务中执行，保证了数据的完整性。NutsDB从v0.2.0版本开始支持多种数据结构，如列表(list)、集合(set)、有序集合(sorted set)。
 
 ## 为什么有NutsDB
 
@@ -452,7 +452,7 @@ if err != nil {
 
 ##### RPush
 
-从队列的右边入队一个或者多个元素。
+从指定bucket里面的指定队列key的右边入队一个或者多个元素val。
 
 ```golang
 if err := db.Update(
@@ -468,7 +468,7 @@ if err := db.Update(
 
 ##### LPush 
 
-从队列的左边入队一个或者多个元素。
+从指定bucket里面的指定队列key的左边入队一个或者多个元素val。
 
 ```golang
 if err := db.Update(
@@ -484,7 +484,7 @@ if err := db.Update(
 
 ##### LPop 
 
-从队列的左边出队一个元素，删除并返回。
+从指定bucket里面的指定队列key的左边出队一个元素，删除并返回。
 
 ```golang
 if err := db.Update(
@@ -504,7 +504,7 @@ if err := db.Update(
 
 ##### LPeek
 
-从队列的左边出队一个元素返回不删除。
+从指定bucket里面的指定队列key的左边出队一个元素返回不删除。
 
 ```golang
 if err := db.View(
@@ -524,7 +524,7 @@ if err := db.View(
 
 ##### RPop 
 
-从队列的右边出队一个元素，删除并返回。
+从指定bucket里面的指定队列key的右边出队一个元素，删除并返回。
 
 ```golang
 if err := db.Update(
@@ -544,7 +544,7 @@ if err := db.Update(
 
 ##### RPeek
 
-从队列的右边出队一个元素返回不删除。
+从指定bucket里面的指定队列key的右边出队一个元素返回不删除。
 
 ```golang
 if err := db.View(
@@ -564,8 +564,8 @@ if err := db.View(
 
 ##### LRange 
 
-返回存储在 key 的列表里指定范围内的元素。 start 和 end 偏移量都是基于0的下标，即list的第一个元素下标是0（list的表头），第二个元素下标是1，以此类推。
-偏移量也可以是负数，表示偏移量是从list尾部开始计数。 例如， -1 表示列表的最后一个元素，-2 是倒数第二个，以此类推。
+返回指定bucket里面的指定队列key列表里指定范围内的元素。 start 和 end 偏移量都是基于0的下标，即list的第一个元素下标是0（list的表头），第二个元素下标是1，以此类推。
+偏移量也可以是负数，表示偏移量是从list尾部开始计数。 例如：-1 表示列表的最后一个元素，-2 是倒数第二个，以此类推。
 
 ```golang
 if err := db.View(
@@ -587,7 +587,7 @@ if err := db.View(
 ```
 ##### LRem 
 
-从存于 key 的列表里移除前 count 次出现的值为 value 的元素。 这个 count 参数通过下面几种方式影响这个操作：
+从指定bucket里面的指定的key的列表里移除前 count 次出现的值为 value 的元素。 这个 count 参数通过下面几种方式影响这个操作：
 
 count > 0: 从头往尾移除值为 value 的元素。
 count < 0: 从尾往头移除值为 value 的元素。
@@ -608,7 +608,7 @@ if err := db.Update(
 
 ##### LSet 
 
-设置 index 位置的list元素的值为 value。
+设置指定bucket的指定list的index位置的的值为value。
 
 ```golang
 if err := db.Update(
@@ -647,7 +647,7 @@ if err := db.Update(
 
 ##### LSize 
 
-返回指定bucket下指定key的size大小
+返回指定bucket下指定key列表的size大小
 
 ```golang
 if err := db.Update(
