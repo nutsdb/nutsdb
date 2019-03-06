@@ -108,7 +108,7 @@ Badger同样是基于LSM tree，不同的是他把key/value分离。据他官网
      - [ZRem](#zrem)
      - [ZRemRangeByRank](#zremrangebyrank)
      - [ZScore](#zscore)
-- [Comparison with other databases](#comparison-with-other-databases)
+- [与其他数据库的比较](#与其他数据库的比较)
    - [BoltDB](#boltdb)
    - [LevelDB, RocksDB](#leveldb-rocksdb)
    - [Badger](#badger)
@@ -1683,31 +1683,33 @@ if err := db.View(
 	log.Fatal(err)
 }
 ```
-### Comparison with other databases
+### 与其他数据库的比较
 
 #### BoltDB
 
-BoltDB is similar to NutsDB, both use B+tree and support transaction. However, Bolt uses a B+tree internally and only a single file, and NutsDB is based on bitcask model with  multiple log files. NutsDB supports TTL and many data structures, but BoltDB not supports them . NutsDB offers high-performance reads and writes, but BoltDb writes performance not so good.
+BoltDB和NutsDB很相似都是内嵌型的key-value数据库，同时支持事务。Bolt基于B+tree引擎模型，只有一个文件，NutsDB基于bitcask引擎模型，回生成多个文件。当然他们都支持范围扫描和前缀扫描这两个实用的特性。在写性能上，NutsDB在默认配置下，要比BoltDB好很多。
 
 #### LevelDB, RocksDB
 
-LevelDB and RocksDB are based on a log-structured merge-tree (LSM tree).An LSM tree optimizes random writes by using a write ahead log and multi-tiered, sorted files called SSTables. LevelDB does not have transactions. It supports batch writing of key/values pairs and it supports read snapshots but it will not give you the ability to do a compare-and-swap operation safely. NutsDB supports fully serializable ACID transactions.
+LevelDB 和 RocksDB 都是基于LSM tree模型.其中LevelDB 不支持事务. RocksDB目前还没看到golang实现的版本。
 
 #### Badger
 
-Badger is based in LSM tree with value log. It designed for SSDs. It also supports transaction and TTL. But in my benchmark its write performance is not as good as i thought. In addition, NutsDB supports data structures such as list、set、sorted set, but Badger not supports them.
+Badger也是基于LSM tree模型。但是写性能没有我想象中搞，具体看下面的Benchmarks压测报告。
+
+另外，以上数据库均不支持多种数据结构如list、set、sorted set，而NutsDB支持这些数据结构。
 
 ### Benchmarks
 
-#### Tested kvstore
+#### 被测试的数据库
 
-* [BadgerDB](https://github.com/dgraph-io/badger) (with default options)
-* [BoltDB](https://github.com/boltdb/bolt) (with default options)
-* [BuntDB](https://github.com/tidwall/buntdb) (with default options)
-* [LevelDB](https://github.com/syndtr/goleveldb) (with default options)
-* [NutsDB](https://github.com/xujiajun/nutsdb) (with default options or custom options)
+* [BadgerDB](https://github.com/dgraph-io/badger) (默认配置)
+* [BoltDB](https://github.com/boltdb/bolt) (默认配置)
+* [BuntDB](https://github.com/tidwall/buntdb) (默认配置)
+* [LevelDB](https://github.com/syndtr/goleveldb) (默认配置)
+* [NutsDB](https://github.com/xujiajun/nutsdb) (默认配置 or 自定义)
 
-#### Benchmark System:
+#### 压测用到的环境以及系统:
 
 * Go Version : go1.11.4 darwin/amd64
 * OS: Mac OS X 10.13.6
@@ -1715,7 +1717,7 @@ Badger is based in LSM tree with value log. It designed for SSDs. It also suppor
 * 16 GB 2133 MHz LPDDR3
 * CPU: 3.1 GHz Intel Core i7
 
-#### Benchmark results:
+#### 压测结果:
 
 ```
 BenchmarkBadgerDBPutValue64B-8    	   10000	    135431 ns/op	    2375 B/op	      74 allocs/op
@@ -1750,21 +1752,22 @@ BenchmarkNutsDBPrefixScan-8       	 1000000	      1293 ns/op	     656 B/op	     
 BenchmarkNutsDBRangeScan-8        	 1000000	      2250 ns/op	     752 B/op	      12 allocs/op
 ```
 
-#### Conclusions:
+#### 结论:
 
-* Put(write) Performance:  NutsDB、BuntDB、LevelDB are fast. And NutsDB is fastest. It is 5-10x faster than LevelDB, 5x faster than BuntDB.
+* 写性能: NutsDB、BuntDB、LevelDB 最快. 其中 NutsDB 最快，比LevelDB快近5-10x, 比BuntDB快近5x，比BadgerDB快近100x，比BoltDB快近200x！
 
-*  Get(read) Performance: All are fast. And NutsDB and BuntDB with default options are 2x faster than others.
-And NutsDB reads with MemoryMap option is slower 40x than its default option way. 
+* 读性能: 都很快. 其中NutsDB（默认配置下） 和 BuntDB 比其他数据库快 近2x。NutsDB使用`HintAndMemoryMapIdxMode`读性能下降很多，大概会下降默认配置的近40x。
+
+以上结果仅供参考，其实需要测试维度还有很多。
 
 
-The benchmarking code can be found in the [gokvstore-bench](https://github.com/xujiajun/gokvstore-bench) repo.
+附上：这个benchmark的源码[gokvstore-bench](https://github.com/xujiajun/gokvstore-bench)
 
 ### 警告和限制
 
 * 启动索引模式
 
-在基本的功能的string数据类型（put、get、delete）支持两种模式，一个`HintAndRAMIdxMode`，这是数据库默认的，他是全内存索引，读写性能都很高。他的瓶颈在于内存。如果你内存够的话，这种默认是适合的。如果你需要存下大于内存的数据，可以使用另一种模式`HintAndMemoryMapIdxMode`，他会把value存磁盘，通过索引去找offset，这种模式特别适合value远大于key的场景。他的写性能要逊色一点，但仍旧很快，具体看自己的要求。关于**其他的数据结构（list\set\sorted set）不支持HintAndMemoryMapIdxModee这个模式，只支持默认的HintAndRAMIdxMode，所以如果你要用到其他数据结构如list、set等。请根据需要选模式**。
+NutsDB在启动的时候提供了2种索引模式，`HintAndRAMIdxMode`和`HintAndMemoryMapIdxMode`，默认使用`HintAndRAMIdxMode`，在基本的功能的string数据类型（put、get、delete、rangeScan、PrefixScan）这两种模式都支持。`HintAndRAMIdxMode`，作为数据库默认选项，他是全内存索引，读写性能都很高。他的瓶颈在于内存。如果你内存够的话，这种默认是适合的。如果你需要存下大于内存的数据，可以使用另一种模式`HintAndMemoryMapIdxMode`，他会把value存磁盘，通过索引去找offset，这种模式特别适合value远大于key的场景。他的写性能要逊色一点，但仍旧很快，具体看自己的要求。关于**其他的数据结构（list\set\sorted set）不支持HintAndMemoryMapIdxModee这个模式，只支持默认的HintAndRAMIdxMode，所以如果你要用到其他数据结构如list、set等。请根据需要选模式**。
 
 * Segment配置问题
 
