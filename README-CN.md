@@ -44,7 +44,7 @@ Badger同样是基于LSM tree，不同的是他把key/value分离。据他官网
  
 天下没有银弹，NutsDB也有他的局限，比如随着数据量的增大，索引变大，启动会慢。只想说NutsDB还有很多优化和提高的空间，由于本人精力以及能力有限。所以把这个项目开源出来。更重要的是我认为一个项目需要有人去使用，有人提意见才会成长。
 
-> 希望看到这个文档的童鞋有兴趣的，一起来参与贡献，欢迎Star、提issues、提交PR ！ [contributions to NutsDB](https://github.com/xujiajun/nutsdb#contributing).
+> 希望看到这个文档的童鞋有兴趣的，一起来参与贡献，欢迎Star、提issues、提交PR ！ [参与贡献](https://github.com/xujiajun/nutsdb/blob/master/README-CN.md#%E5%8F%82%E4%B8%8E%E8%B4%A1%E7%8C%AE).
 
 ## 目录
 
@@ -113,10 +113,10 @@ Badger同样是基于LSM tree，不同的是他把key/value分离。据他官网
    - [LevelDB, RocksDB](#leveldb-rocksdb)
    - [Badger](#badger)
 - [Benchmarks](#benchmarks)
-- [Caveats & Limitations](#caveats--limitations)
-- [Contact](#contact)
-- [Contributing](#contributing)
-- [Acknowledgements](#acknowledgements)
+- [警告和限制](#警告和限制)
+- [联系作者](#联系作者)
+- [参与贡献](#参与贡献)
+- [致谢](#致谢)
 - [License](#license)
 
 ## 入门指南
@@ -1760,23 +1760,32 @@ And NutsDB reads with MemoryMap option is slower 40x than its default option way
 
 The benchmarking code can be found in the [gokvstore-bench](https://github.com/xujiajun/gokvstore-bench) repo.
 
-### Caveats & Limitations
+### 警告和限制
 
-NutsDB supports two modes about entry index: `HintAndRAMIdxMode`  and  `HintAndMemoryMapIdxMode`. The default mode use `HintAndRAMIdxMode`, entries are indexed base on RAM, so its read/write performance is fast. but can’t handle databases much larger than the available physical RAM. If you set the `HintAndMemoryMapIdxMode` mode, HintIndex will not cache the value of the entry. Its write performance is also fast. To retrieve a key by seeking to offset relative to the start of the data file, so its read performance more slowly that RAM way, but it can handle databases much larger than the available physical RAM. And other data structures such as ***list, set, sorted set only supported with mode HintAndRAMIdxMode***.
+* 启动索引模式
 
-NutsDB will truncate data file if the active file is larger than  `SegmentSize`, so the size of an entry can not be set larger than `SegmentSize` , defalut `SegmentSize` is 8MB, you can set it(opt.SegmentSize) as option before DB opening. ***Once set, it cannot be changed***.
+在基本的功能的string数据类型（put、get、delete）支持两种模式，一个`HintAndRAMIdxMode`，这是数据库默认的，他是全内存索引，读写性能都很高。他的瓶颈在于内存。如果你内存够的话，这种默认是适合的。如果你需要存下大于内存的数据，可以使用另一种模式`HintAndMemoryMapIdxMode`，他会把value存磁盘，通过索引去找offset，这种模式特别适合value远大于key的场景。他的写性能要逊色一点，但仍旧很快，具体看自己的要求。关于**其他的数据结构（list\set\sorted set）不支持HintAndMemoryMapIdxModee这个模式，只支持默认的HintAndRAMIdxMode，所以如果你要用到其他数据结构如list、set等。请根据需要选模式**。
 
-### Contact
+* Segment配置问题
+
+NutsDB会自动切割分成一个个块（Segment），默认`SegmentSize`是8MB，这个参数可以自己配置，但是**一旦配置不能修改**。
+
+* key和value的大小限制问题
+
+关于key和value的大小受到SegmentSize的大小的影响，比如SegmentSize为8M，key和value的大小肯定是小于8M的，不然会返回错误。在NutsDB里面entry是最小单位，只要保证entry不大于`SegmentSize`就可以了。（ps：entry=EntryHeaderSize+keySize+valueSize+bucketSize）
+ 
+
+### 联系作者
 
 * [xujiajun](https://github.com/xujiajun)
 
-### Contributing
+### 参与贡献
 
-See [CONTRIBUTING](https://github.com/xujiajun/nutsdb/blob/master/CONTRIBUTING.md) for details on submitting patches and the contribution workflow.
+详情参考 [CONTRIBUTING](https://github.com/xujiajun/nutsdb/blob/master/CONTRIBUTING.md) 。
 
-### Acknowledgements
+### 致谢
 
-This package is inspired by the following:
+这个项目受到以下项目或多或少的灵感和帮助：
 
 * [Bitcask-intro](https://github.com/basho/bitcask/blob/develop/doc/bitcask-intro.pdf)
 * [BoltDB](https://github.com/boltdb)
