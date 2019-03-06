@@ -1769,7 +1769,7 @@ BenchmarkNutsDBRangeScan-8        	 1000000	      2250 ns/op	     752 B/op	     
 
 * 启动索引模式
 
-NutsDB在启动的时候提供了2种索引模式，`HintAndRAMIdxMode`和`HintAndMemoryMapIdxMode`，默认使用`HintAndRAMIdxMode`，在基本的功能的string数据类型（put、get、delete、rangeScan、PrefixScan）这两种模式都支持。`HintAndRAMIdxMode`，作为数据库默认选项，他是全内存索引，读写性能都很高。他的瓶颈在于内存。如果你内存够的话，这种默认是适合的。如果你需要存下大于内存的数据，可以使用另一种模式`HintAndMemoryMapIdxMode`，他会把value存磁盘，通过索引去找offset，这种模式特别适合value远大于key的场景。他的写性能要逊色一点，但仍旧很快，具体看自己的要求。关于**其他的数据结构（list\set\sorted set）不支持HintAndMemoryMapIdxModee这个模式，只支持默认的HintAndRAMIdxMode，所以如果你要用到其他数据结构如list、set等。请根据需要选模式**。
+NutsDB在启动的时候提供了2种索引模式，`HintAndRAMIdxMode`和`HintAndMemoryMapIdxMode`，默认使用`HintAndRAMIdxMode`，在基本的功能的string数据类型（put、get、delete、rangeScan、PrefixScan）这两种模式都支持。`HintAndRAMIdxMode`，作为数据库默认选项，他是全内存索引，读写性能都很高。他的瓶颈在于内存。如果你内存够的话，这种默认是适合的。如果你需要存下大于内存的数据，可以使用另一种模式`HintAndMemoryMapIdxMode`，他会把value存磁盘，通过索引去找offset，这种模式特别适合value远大于key的场景。他的读性能要比起默认模式要降低不少，具体看自己的要求。关于**其他的数据结构（list\set\sorted set）不支持HintAndMemoryMapIdxModee这个模式，只支持默认的HintAndRAMIdxMode，所以如果你要用到其他数据结构如list、set等。请根据需要选模式**。
 
 * Segment配置问题
 
