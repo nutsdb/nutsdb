@@ -48,8 +48,8 @@ Badger同样是基于LSM tree，不同的是他把key/value分离。据他官网
 
 ## 目录
 
-- [Getting Started](#getting-started)
-  - [Installing](#installing)
+- [入门指南](#入门指南)
+  - [安装](#安装)
   - [Opening a database](#opening-a-database)
   - [Transactions](#transactions)
     - [Read-write transactions](#read-write-transactions)
@@ -119,11 +119,11 @@ Badger同样是基于LSM tree，不同的是他把key/value分离。据他官网
 - [Acknowledgements](#acknowledgements)
 - [License](#license)
 
-## Getting Started
+## 入门指南
 
-### Installing
+### 安装
 
-To start using NutsDB, first needs [Go](https://golang.org/dl/) installed (version 1.11+ is required).  and run go get:
+NutsDB的安装很简单，首先保证 [Golang](https://golang.org/dl/) 已经安装好 (版本要求1.11以上). 然后在终端执行命令:
 
 ```
 go get -u github.com/xujiajun/nutsdb
