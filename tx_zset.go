@@ -78,7 +78,7 @@ func (tx *Tx) ZCount(bucket string, start, end float64, opts *zset.GetByScoreRan
 	return len(nodes), nil
 }
 
-// ZPopMax removes and returns up to count members with the highest scores in the sorted set stored at bucket.
+// ZPopMax removes and returns the member with the highest score in the sorted set stored at bucket.
 func (tx *Tx) ZPopMax(bucket string) (*zset.SortedSetNode, error) {
 	item, err := tx.ZPeekMax(bucket)
 	if err != nil {
@@ -88,7 +88,7 @@ func (tx *Tx) ZPopMax(bucket string) (*zset.SortedSetNode, error) {
 	return item, tx.put(bucket, []byte(" "), []byte(""), Persistent, DataZPopMaxFlag, uint64(time.Now().Unix()), DataStructureSortedSet)
 }
 
-// ZPopMin removes and returns up to count members with the lowest scores in the sorted set stored at bucket.
+// ZPopMin removes and returns the member with the lowest score in the sorted set stored at bucket.
 func (tx *Tx) ZPopMin(bucket string) (*zset.SortedSetNode, error) {
 	item, err := tx.ZPeekMin(bucket)
 	if err != nil {
@@ -98,7 +98,7 @@ func (tx *Tx) ZPopMin(bucket string) (*zset.SortedSetNode, error) {
 	return item, tx.put(bucket, []byte(" "), []byte(""), Persistent, DataZPopMinFlag, uint64(time.Now().Unix()), DataStructureSortedSet)
 }
 
-// ZPeekMax returns up to count members with the highest scores in the sorted set stored at bucket.
+// ZPeekMax returns the member with the highest score in the sorted set stored at bucket.
 func (tx *Tx) ZPeekMax(bucket string) (*zset.SortedSetNode, error) {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return nil, err
@@ -111,7 +111,7 @@ func (tx *Tx) ZPeekMax(bucket string) (*zset.SortedSetNode, error) {
 	return tx.db.SortedSetIdx[bucket].PeekMax(), nil
 }
 
-// ZPeekMin returns up to count members with the lowest scores in the sorted set stored at bucket.
+// ZPeekMin returns the member with the lowest score in the sorted set stored at bucket.
 func (tx *Tx) ZPeekMin(bucket string) (*zset.SortedSetNode, error) {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return nil, err
