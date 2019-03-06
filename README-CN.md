@@ -669,7 +669,7 @@ if err := db.Update(
 
 ##### SAdd
 
-添加一个指定的member元素到集合的key中。
+添加一个指定的member元素到指定bucket的里的指定集合key中。
 
 ```go
 if err := db.Update(
@@ -684,7 +684,7 @@ if err := db.Update(
 
 ##### SAreMembers 
 
-返回多个成员member是否是存储的集合key的成员。
+返回多个成员member是否是指定bucket的里的指定集合key的成员。
 
 ```go
 if err := db.View(
@@ -704,7 +704,7 @@ if err := db.View(
 
 ##### SCard 
 
-返回集合存储的key的基数 (集合元素的数量)。
+返回指定bucket的指定的集合key的基数 (集合元素的数量)。
 
 ```go
 
@@ -725,12 +725,12 @@ if err := db.View(
 ```
 ##### SDiffByOneBucket 
 
-Returns the members of the set resulting from the difference between the first set and all the successive sets in one bucket.
+返回一个集合与给定集合的差集的元素.这两个集合都在一个bucket中。
 
 ```go
 
-key1 := []byte("mySet1")
-key2 := []byte("mySet2")
+key1 := []byte("mySet1") // 集合1
+key2 := []byte("mySet2") // 集合2
 bucket := "bucketForSet"
 
 if err := db.Update(
@@ -768,7 +768,7 @@ if err := db.View(
 
 ##### SDiffByTwoBuckets 
 
-Returns the members of the set resulting from the difference between the first set and all the successive sets in two buckets.
+返回一个集合与给定集合的差集的元素.这两个集合分别在不同bucket中。
 
 ```go
 bucket1 := "bucket1"
@@ -809,7 +809,7 @@ if err := db.View(
 ```
 ##### SHasKey 
 
-Returns if the set in the bucket at given bucket and key.
+判断是否指定的集合在指定的bucket中。
 
 ```go
 
@@ -830,7 +830,7 @@ if err := db.View(
 ```
 ##### SIsMember 
 
-Returns if member is a member of the set stored int the bucket at given bucket,key and item.
+返回成员member是否是指定bucket的存指定key集合的成员。
 
 ```go
 bucket := "bucketForSet"
@@ -849,7 +849,7 @@ if err := db.View(
 ```
 ##### SMembers 
 
-Returns all the members of the set value stored int the bucket at given bucket and key.
+返回指定bucket的指定key集合所有的元素。
 
 ```
 bucket := "bucketForSet"
@@ -871,7 +871,7 @@ if err := db.View(
 ```
 ##### SMoveByOneBucket 
 
-Moves member from the set at source to the set at destination in one bucket.
+将member从source集合移动到destination集合中。其中source集合和destination集合均在一个bucket中。
 
 ```go
 bucket3 := "bucket3"
@@ -933,7 +933,7 @@ if err := db.View(
 ```
 ##### SMoveByTwoBuckets 
 
-Moves member from the set at source to the set at destination in two buckets.
+将member从source集合移动到destination集合中。其中source集合和destination集合在两个不同的bucket中。
 
 ```go
 bucket4 := "bucket4"
@@ -995,7 +995,7 @@ if err := db.View(
 ```
 ##### SPop 
 
-Removes and returns one or more random elements from the set value store in the bucket at given bucket and key.
+从指定bucket里的指定key的集合中移除并返回一个或多个随机元素。
 
 ```go
 if err := db.Update(
@@ -1013,7 +1013,7 @@ if err := db.Update(
 ```
 ##### SRem 
 
-Removes the specified members from the set stored int the bucket at given bucket,key and items.
+在指定bucket里面移除指定的key集合中移除指定的一个或者多个元素。
 
 ```go
 bucket6:="bucket6"
@@ -1053,7 +1053,7 @@ if err := db.View(
 ```
 ##### SUnionByOneBucket 
 
-The members of the set resulting from the union of all the given sets in one bucket.
+返回指定一个bucket里面的给定的两个集合的并集中的所有成员。
 
 ```go
 bucket7 := "bucket1"
@@ -1092,7 +1092,7 @@ if err := db.View(
 
 ##### SUnionByTwoBuckets 
 
-The members of the set resulting from the union of all the given sets in two buckets.
+返回指定两个bucket里面的给定的两个集合的并集中的所有成员。
 
 ```go
 bucket8 := "bucket1"
