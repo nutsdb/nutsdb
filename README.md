@@ -1722,6 +1722,10 @@ NutsDB supports two modes about entry index: `HintAndRAMIdxMode`  and  `HintAndM
 
 NutsDB will truncate data file if the active file is larger than  `SegmentSize`, so the size of an entry can not be set larger than `SegmentSize` , defalut `SegmentSize` is 8MB, you can set it(opt.SegmentSize) as option before DB opening. ***Once set, it cannot be changed***.
 
+NutsDB currently works on Mac OS X and Linux. Windows not been tested.It may be does't work on windows.
+
+Current version no flush call (potential data loss likely). 
+
 ### Contact
 
 * [xujiajun](https://github.com/xujiajun)
