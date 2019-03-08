@@ -1645,11 +1645,11 @@ if err := db.View(
 
 #### BoltDB
 
-BoltDB is similar to NutsDB, both use B+tree and support transaction. However, Bolt uses a B+tree internally and only a single file, and NutsDB is based on bitcask model with  multiple log files. NutsDB supports TTL and many data structures, but BoltDB not supports them . NutsDB offers high-performance reads and writes, but BoltDb writes performance not so good.
+BoltDB is similar to NutsDB, both use B+tree and support transaction. However, Bolt uses a B+tree internally and only a single file, and NutsDB is based on bitcask model with  multiple log files. NutsDB supports TTL and many data structures, but BoltDB not supports them .
 
 #### LevelDB, RocksDB
 
-LevelDB and RocksDB are based on a log-structured merge-tree (LSM tree).An LSM tree optimizes random writes by using a write ahead log and multi-tiered, sorted files called SSTables. LevelDB does not have transactions. It supports batch writing of key/values pairs and it supports read snapshots but it will not give you the ability to do a compare-and-swap operation safely. NutsDB supports fully serializable transactions.
+LevelDB and RocksDB are based on a log-structured merge-tree (LSM tree).An LSM tree optimizes random writes by using a write ahead log and multi-tiered, sorted files called SSTables. LevelDB does not have transactions. It supports batch writing of key/values pairs and it supports read snapshots but it will not give you the ability to do a compare-and-swap operation safely. NutsDB supports many data structures, but they not support them.
 
 #### Badger
 
@@ -1674,6 +1674,9 @@ NutsDB currently works on Mac OS X and Linux. Windows not been tested.It may be 
 #### about transactions
 
 thanks @damnever submit [the issue](https://github.com/xujiajun/nutsdb/issues/10) about the ACID transactions.
+
+In the nutsdb , a transaction presents a unit of work be performed.
+
 The current version of nutsdb not promise data persistence， to provide high performance, there is no real time to do the sync operation, depends on the kernel to write, you can understand as a buffer, which is an optimistic operation, the kernel will be responsible for the "dirty" data will be written back to disk, but this point in time, the application not sure when to sync, when accumulated to a certain amount（segment size）for a munmap operation, will make the update data. This approach does not satisfy the D (persistence) nature. Later versions will provide a strongly synchronized policy.
 
 More waiting to be added.
