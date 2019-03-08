@@ -334,7 +334,7 @@ func (db *DB) getMaxFileIDAndFileIDs() (maxFileID int64, dataFileIds []int) {
 		dataFileIds = append(dataFileIds, idVal)
 	}
 
-	sort.Sort(sort.IntSlice(dataFileIds))
+	sort.Ints(dataFileIds)
 	maxFileID = int64(dataFileIds[len(dataFileIds)-1])
 
 	return
