@@ -4,7 +4,9 @@
 
 NutsDB是纯Go语言编写一个简单、高性能、内嵌型、持久化的key-value数据库。
 
-NutsDB支持ACID事务，所有的操作都在事务中执行，保证了数据的完整性。NutsDB从v0.2.0版本开始支持多种数据结构，如列表(list)、集合(set)、有序集合(sorted set)。
+NutsDB支持事务，但不是标准的ACID事务（参见[限制和警告](https://github.com/xujiajun/nutsdb/blob/master/README-CN.md#%E8%AD%A6%E5%91%8A%E5%92%8C%E9%99%90%E5%88%B6)）。所有的操作都在事务中执行。NutsDB从v0.2.0版本开始支持多种数据结构，如列表(list)、集合(set)、有序集合(sorted set)。
+
+> 目前项目还在试验阶段状态，没有经过实际生产环境考验。欢迎提issue，贡献！
 
 ## 为什么有NutsDB
 
@@ -42,7 +44,7 @@ Badger同样是基于LSM tree，不同的是他把key/value分离。据他官网
 他模型非常简单很好理解和实现，很快我就实现了一个版本。但是他的缺点是不支持范围扫描。我尝试去优化他，又开发一个版本，基于B+ tree作为索引，满足了范围扫描的问题
 ，读性能是够了，写性能很一般，又用mmap和对原模型作了精简，这样又实现了一版。写性能又提高了几十倍。现在这个版本基本上都实现上面提到的数据库的一些有用的特性，包括支持范围扫描和前缀扫描、包括支持bucket、事务等，还支持了更多的数据结构（list、set、sorted set）。从[benchmark](https://github.com/xujiajun/nutsdb#benchmarks)来看，NutsDB性能只高不低，100w条数据，我本机基本上2s跑完。写性能可达到40~50W+/秒。
  
-天下没有银弹，NutsDB也有他的局限，比如随着数据量的增大，索引变大，启动会慢。只想说NutsDB还有很多优化和提高的空间，由于本人精力以及能力有限。所以把这个项目开源出来。更重要的是我认为一个项目需要有人去使用，有人提意见才会成长。
+天下没有银弹，NutsDB也有他的局限，比如随着数据量的增大，索引变大，启动会慢, 还有为了保持保性能的写如，目前版本没有做实时的flush/sync操作，依赖内核的回写操作。只想说NutsDB还有很多优化和提高的空间，由于本人精力以及能力有限。所以把这个项目开源出来。更重要的是我认为一个项目需要有人去使用，有人提意见才会成长。
 
 > 希望看到这个文档的童鞋有兴趣的，一起来参与贡献，欢迎Star、提issues、提交PR ！ [参与贡献](https://github.com/xujiajun/nutsdb/blob/master/README-CN.md#%E5%8F%82%E4%B8%8E%E8%B4%A1%E7%8C%AE)
 
@@ -160,7 +162,7 @@ func main() {
 ### 使用事务
 
 NutsDB为了保证隔离性，防止并发读写事务时候数据的不一致性，同一时间只能执行一个读写事务，但是允许同一时间执行多个只读事务。
-NutsDB遵循ACID原则。
+不过目前版本的NutsDB不遵循标准的ACID原则。（参见[限制和警告](https://github.com/xujiajun/nutsdb/blob/master/README-CN.md#%E8%AD%A6%E5%91%8A%E5%92%8C%E9%99%90%E5%88%B6)）
 
 
 #### 读写事务
@@ -1784,6 +1786,13 @@ NutsDB会自动切割分成一个个块（Segment），默认`SegmentSize`是8MB
 
 entry的的大小=EntryHeader的大小+key的大小+value的大小+bucket的大小
  
+* 关于事务说明
+
+保证数据的可用可靠性，一般用ACID来衡量，目前版本的nutsdb不是标准的ACID，感谢 @damnever 提的[issue](https://github.com/xujiajun/nutsdb/issues/10)
+
+关于ACID的D（持久化）。目前版本的nutsdb为了提供高性能的写入，并没有实时的做sync操作，依赖于内核的回写（进程挂掉还是会回写的），你可以理解成作了缓冲，这是一个乐观的做法，这个时候同步工作交给内核，内核会负责将“脏”数据写回磁盘，但这个时间点，应用层没发确定，当积累到一定量（一个Segment大小），做一次munmap操作，将数据做update。这样的作法也就没有满足D（持久化）的特性。后面的版本会提供强同步的策略。
+
+关与其他信息待补充。
 
 ### 联系作者
 
