@@ -1732,7 +1732,7 @@ NutsDB currently works on Mac OS X and Linux. Windows not been tested.It may be 
 
 #### about transactions
 
-thanks @damnever submit the issue about [the transaction](https://github.com/xujiajun/nutsdb/issues/10)
+thanks @damnever submit [the issue](https://github.com/xujiajun/nutsdb/issues/10) about the ACID transactions.
 The current version of nutsdb supports transactions, but not a standard transaction， to provide high performance, there is no real time to do the sync operation, depends on the kernel to write, you can understand as a buffer, which is an optimistic operation, the kernel will be responsible for the "dirty" data will be written back to disk, but this point in time, the application not sure when to sync, when accumulated to a certain amount（segment size）for a munmap operation, will make the update data. This approach does not satisfy the D (persistence) nature. Later versions will provide a strongly synchronized policy.
 
 More waiting to be added.
