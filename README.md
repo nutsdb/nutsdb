@@ -1720,13 +1720,22 @@ The benchmarking code can be found in the [gokvstore-bench](https://github.com/x
 
 ### Caveats & Limitations
 
+#### Index mode
+
 NutsDB supports two modes about entry index: `HintAndRAMIdxMode`  and  `HintAndMemoryMapIdxMode`. The default mode use `HintAndRAMIdxMode`, entries are indexed base on RAM, so its read/write performance is fast. but can’t handle databases much larger than the available physical RAM. If you set the `HintAndMemoryMapIdxMode` mode, HintIndex will not cache the value of the entry. Its write performance is also fast. To retrieve a key by seeking to offset relative to the start of the data file, so its read performance more slowly that RAM way, but it can handle databases much larger than the available physical RAM. And other data structures such as ***list, set, sorted set only supported with mode HintAndRAMIdxMode***.
 
 NutsDB will truncate data file if the active file is larger than  `SegmentSize`, so the size of an entry can not be set larger than `SegmentSize` , defalut `SegmentSize` is 8MB, you can set it(opt.SegmentSize) as option before DB opening. ***Once set, it cannot be changed***.
 
+#### support OS
+
 NutsDB currently works on Mac OS X and Linux. Windows not been tested.It may be does't work on windows.
 
-Current version no flush call (potential data loss likely). 
+#### about transactions
+
+thanks @damnever submit the issue about [the transaction](https://github.com/xujiajun/nutsdb/issues/10)
+The current version of nutsdb supports transactions, but not a standard transaction， to provide high performance, there is no real time to do the sync operation, depends on the kernel to write, you can understand as a buffer, which is an optimistic operation, the kernel will be responsible for the "dirty" data will be written back to disk, but this point in time, the application not sure when to sync, when accumulated to a certain amount（segment size）for a munmap operation, will make the update data. This approach does not satisfy the D (persistence) nature. Later versions will provide a strongly synchronized policy.
+
+More waiting to be added.
 
 ### Contact
 
