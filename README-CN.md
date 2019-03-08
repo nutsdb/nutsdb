@@ -4,7 +4,7 @@
 
 NutsDB是纯Go语言编写一个简单、高性能、内嵌型、持久化的key-value数据库。
 
-NutsDB支持事务，但不是标准的ACID事务（参见[限制和警告](https://github.com/xujiajun/nutsdb/blob/master/README-CN.md#%E8%AD%A6%E5%91%8A%E5%92%8C%E9%99%90%E5%88%B6)）。所有的操作都在事务中执行。NutsDB从v0.2.0版本开始支持多种数据结构，如列表(list)、集合(set)、有序集合(sorted set)。
+NutsDB支持事务，但目前版本不完全支持ACID的特性（参见[限制和警告](https://github.com/xujiajun/nutsdb/blob/master/README-CN.md#%E8%AD%A6%E5%91%8A%E5%92%8C%E9%99%90%E5%88%B6)）。所有的操作都在事务中执行。NutsDB从v0.2.0版本开始支持多种数据结构，如列表(list)、集合(set)、有序集合(sorted set)。
 
 > 目前项目还在试验阶段状态，没有经过实际生产环境考验。欢迎提issue，贡献！
 
