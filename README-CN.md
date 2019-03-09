@@ -1695,11 +1695,11 @@ BoltDB和NutsDB很相似都是内嵌型的key-value数据库，同时支持事�
 
 #### LevelDB, RocksDB
 
-LevelDB 和 RocksDB 都是基于LSM tree模型.其中LevelDB 不支持事务. RocksDB目前还没看到golang实现的版本。
+LevelDB 和 RocksDB 都是基于LSM tree模型.其中LevelDB 不支持事务，不支持bucket。 RocksDB目前还没看到golang实现的版本。
 
 #### Badger
 
-Badger也是基于LSM tree模型。但是写性能没有我想象中高。
+Badger也是基于LSM tree模型。但是写性能没有我想象中高。不支持bucket。
 
 另外，以上数据库均不支持多种数据结构如list、set、sorted set，而NutsDB从0.2.0版本开始支持这些数据结构。
 
