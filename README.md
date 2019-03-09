@@ -364,7 +364,7 @@ if err := db.View(
 		// Query a specific user key range like this.
 		start := []byte("user_0010001")
 		end := []byte("user_0010010")
-		bucket：= []byte("user_list)
+		bucket：= []byte("user_list")
 		if entries, err := tx.RangeScan(bucket, start, end); err != nil {
 			return err
 		} else {
