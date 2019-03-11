@@ -53,7 +53,7 @@ func TestDataFile_Err(t *testing.T) {
 
 func TestDataFile1(t *testing.T) {
 	df, err := NewDataFile(filepath, 1024)
-	defer 	df.fd.Close()
+	defer df.fd.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
