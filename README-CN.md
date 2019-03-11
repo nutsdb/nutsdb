@@ -1705,7 +1705,7 @@ Badger也是基于LSM tree模型。但是写性能没有我想象中高。不支
 
 ### Benchmarks
 
-为了保证竟可能公平，找了2款关注度很高的内嵌型的kvstore，他们都支持事务、支持持久化。
+为了保证尽可能公平，找了2款关注度很高的内嵌型的kvstore，他们都支持事务、支持持久化。
 
 * [BadgerDB](https://github.com/dgraph-io/badger) (master branch with default options)
 * [BoltDB](https://github.com/boltdb/bolt) (master branch  with default options)
