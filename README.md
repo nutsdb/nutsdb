@@ -1719,7 +1719,7 @@ the benchmark code can be found in the [gokvstore-bench](https://github.com/xuji
 
 #### Index mode
 
-After the version v0.2.0, NutsDB supports two modes about entry index: `HintKeyValAndRAMIdxMode`  and  `HintKeyAndRAMIdxMode`. 
+From the version v0.3.0, NutsDB supports two modes about entry index: `HintKeyValAndRAMIdxMode`  and  `HintKeyAndRAMIdxMode`. 
 
 The default mode use `HintKeyValAndRAMIdxMode`, entries are indexed base on RAM, so its read/write performance is fast. but can’t handle databases much larger than the available physical RAM. If you set the `HintKeyAndRAMIdxMode` mode, HintIndex will not cache the value of the entry. Its write performance is also fast. To retrieve a key by seeking to offset relative to the start of the data file, so its read performance more slowly that RAM way, but it can handle databases much larger than the available physical RAM. And other data structures such as ***list, set, sorted set only supported with mode HintKeyValAndRAMIdxMode***.
 
@@ -1732,7 +1732,7 @@ NutsDB currently works on Mac OS X and Linux. Windows not been tested.It may be 
 
 #### about transactions
 
-After the version v0.2.0, NutsDB supports ACID.
+From the version v0.3.0, NutsDB supports ACID.
 
 
 ### Contact
