@@ -44,7 +44,7 @@ Badger同样是基于LSM tree，不同的是他把key/value分离。据他官网
 他模型非常简单很好理解和实现，很快我就实现了一个版本。但是他的缺点是不支持范围扫描。我尝试去优化他，又开发一个版本，基于B+ tree作为索引，满足了范围扫描的问题
 ，读性能是够了，写性能很一般，又用mmap和对原模型作了精简，这样又实现了一版。写性能又提高了几十倍。现在这个版本基本上都实现上面提到的数据库的一些有用的特性，包括支持范围扫描和前缀扫描、包括支持bucket、事务等，还支持了更多的数据结构（list、set、sorted set）。
  
-天下没有银弹，NutsDB也有他的局限，比如随着数据量的增大，索引变大，启动会慢, 还有为了保持高性能的写入，目前版本没有做实时的flush/sync操作，依赖内核的回写操作。只想说NutsDB还有很多优化和提高的空间，由于本人精力以及能力有限。所以把这个项目开源出来。更重要的是我认为一个项目需要有人去使用，有人提意见才会成长。
+天下没有银弹，NutsDB也有他的局限，比如随着数据量的增大，索引变大，启动会慢,只想说NutsDB还有很多优化和提高的空间，由于本人精力以及能力有限。所以把这个项目开源出来。更重要的是我认为一个项目需要有人去使用，有人提意见才会成长。
 
 > 希望看到这个文档的童鞋有兴趣的，一起来参与贡献，欢迎Star、提issues、提交PR ！ [参与贡献](https://github.com/xujiajun/nutsdb/blob/master/README-CN.md#%E5%8F%82%E4%B8%8E%E8%B4%A1%E7%8C%AE)
 
@@ -162,7 +162,7 @@ func main() {
 ### 使用事务
 
 NutsDB为了保证隔离性，防止并发读写事务时候数据的不一致性，同一时间只能执行一个读写事务，但是允许同一时间执行多个只读事务。
-不过目前版本的NutsDB不遵循标准的ACID原则。（参见[限制和警告](https://github.com/xujiajun/nutsdb/blob/master/README-CN.md#%E8%AD%A6%E5%91%8A%E5%92%8C%E9%99%90%E5%88%B6)）
+从v0.3.0版本开始，NutsDB遵循标准的ACID原则。（参见[限制和警告](https://github.com/xujiajun/nutsdb/blob/master/README-CN.md#%E8%AD%A6%E5%91%8A%E5%92%8C%E9%99%90%E5%88%B6)）
 
 
 #### 读写事务
@@ -1791,7 +1791,7 @@ entry的的大小=EntryHeader的大小+key的大小+value的大小+bucket的大�
 
 这这特别感谢 @damnever 给我提的[issue](https://github.com/xujiajun/nutsdb/issues/10)给我指出，特别在这说明下，免得误导大家。
 
-即将发布的v0.3.0版本开始NutsDB支持（A）原子性、C（一致性）、I（隔离性），并保证（D）持久化。以下参考[wiki百科](https://zh.wikipedia.org/wiki/ACID)的对ACID定义分别讲一下。如讲的有误，欢迎帮我指正。
+从v0.3.0版本起，NutsDB支持（A）原子性、C（一致性）、I（隔离性），并保证（D）持久化。以下参考[wiki百科](https://zh.wikipedia.org/wiki/ACID)的对ACID定义分别讲一下。如讲的有误，欢迎帮我指正。
 
 > （预告：一个版本会支持D特性）
 
