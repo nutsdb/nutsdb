@@ -1,10 +1,4 @@
 github.com/bwmarrin/snowflake v0.0.0-20180412010544-68117e6bbede h1:lTJlWdyhwqq7h29GtuIDHW/xi+sMN+JOLMgYAwQ5O74=
 github.com/bwmarrin/snowflake v0.0.0-20180412010544-68117e6bbede/go.mod h1:NdZxfVWX+oR6y2K0o6qAYv6gIOP9rjG0/E9WsDpxqwE=
-github.com/grandecola/mmap v0.2.0 h1:4s/zu5Cg/OwYf/DyTqoBYTjLi0r2yaoBNxQjtih4mMU=
-github.com/grandecola/mmap v0.2.0/go.mod h1:6Lhf+IGNm1y3FtzfdwcBnl+EGer5COf6SL6Nbh8FWwM=
-github.com/xujiajun/gorouter v1.1.0 h1:ox+vROTFcOT+ubw0fP5APLehifGXk95ZlIKVgfyYdTM=
-github.com/xujiajun/gorouter v1.1.0/go.mod h1:yJrIta+bTNpBM/2UT8hLOaEAFckO+m/qmR3luMIQygM=
-github.com/xujiajun/utils v0.0.0-20181129063021-62f2ed6b43d6 h1:Hiy6d2f4AEylIT0uY1+xpoW0Bz2OI/vzYEuAh5jqPxY=
-github.com/xujiajun/utils v0.0.0-20181129063021-62f2ed6b43d6/go.mod h1:AZd87GYJlUzl82Yab2kTjx1EyXSQCAfZDhpTo1SQC4k=
 github.com/xujiajun/utils v0.0.0-20190123093513-8bf096c4f53b h1:jKG9OiL4T4xQN3IUrhUpc1tG+HfDXppkgVcrAiiaI/0=
 github.com/xujiajun/utils v0.0.0-20190123093513-8bf096c4f53b/go.mod h1:AZd87GYJlUzl82Yab2kTjx1EyXSQCAfZDhpTo1SQC4k=

@@ -28,7 +28,7 @@ func main() {
 
 	if err := db.View(
 		func(tx *nutsdb.Tx) error {
-			for i := 0; i < 1000000; i++ {
+			for i := 0; i < 10000; i++ {
 				key := []byte("namename" + strconv2.IntToStr(i))
 				if _, err := tx.Get(bucket, key); err != nil {
 					log.Println("key", string(key))
