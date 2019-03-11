@@ -365,9 +365,9 @@ func TestTx_DeleteAndGet(t *testing.T) {
 	}
 }
 
-func TestTx_GetAndScansFromMmap(t *testing.T) {
+func TestTx_GetAndScansFromHintKey(t *testing.T) {
 	Init()
-	opt.EntryIdxMode = HintAndMemoryMapIdxMode
+	opt.EntryIdxMode = HintKeyAndRAMIdxMode
 	db, err = Open(opt)
 	defer db.Close()
 

@@ -253,18 +253,23 @@ func (db *DB) Merge() error {
 				if err == io.EOF {
 					break
 				}
+				f.fd.Close()
 				return fmt.Errorf("when merge operation build hintIndex readAt err: %s", err)
 			}
 		}
 
 		if err := db.reWriteData(pendingMergeEntries); err != nil {
+			f.fd.Close()
 			return err
 		}
 
 		if err := os.Remove(db.getDataPath(int64(pendingMergeFId))); err != nil {
 			db.isMerging = false
+			f.fd.Close()
 			return fmt.Errorf("when merge err: %s", err)
 		}
+
+		f.fd.Close()
 	}
 
 	return nil
@@ -292,6 +297,8 @@ func (db *DB) Close() error {
 	}
 
 	db.closed = true
+
+	db.ActiveFile.fd.Close()
 
 	db.ActiveFile = nil
 
@@ -389,7 +396,7 @@ func (db *DB) parseDataFiles(dataFileIds []int) (unconfirmedRecords []*Record, c
 				}
 
 				e = nil
-				if db.opt.EntryIdxMode == HintAndRAMIdxMode {
+				if db.opt.EntryIdxMode == HintKeyValAndRAMIdxMode {
 					e = &Entry{
 						Key:   entry.Key,
 						Value: entry.Value,
@@ -421,10 +428,12 @@ func (db *DB) parseDataFiles(dataFileIds []int) (unconfirmedRecords []*Record, c
 				if off >= db.opt.SegmentSize {
 					break
 				}
-
+				f.fd.Close()
 				return nil, nil, fmt.Errorf("when build hintIndex readAt err: %s", err)
 			}
 		}
+
+		f.fd.Close()
 	}
 
 	return

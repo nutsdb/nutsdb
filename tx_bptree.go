@@ -28,7 +28,7 @@ func (tx *Tx) Get(bucket string, key []byte) (e *Entry, err error) {
 	}
 
 	idxMode := tx.db.opt.EntryIdxMode
-	if idxMode == HintAndRAMIdxMode || idxMode == HintAndMemoryMapIdxMode {
+	if idxMode == HintKeyValAndRAMIdxMode || idxMode == HintKeyAndRAMIdxMode {
 		if idx, ok := tx.db.BPTreeIdx[bucket]; ok {
 			r, err := idx.Find(key)
 			if err != nil {
@@ -39,13 +39,14 @@ func (tx *Tx) Get(bucket string, key []byte) (e *Entry, err error) {
 				return nil, ErrNotFoundKey
 			}
 
-			if idxMode == HintAndRAMIdxMode {
+			if idxMode == HintKeyValAndRAMIdxMode {
 				return r.E, nil
 			}
 
-			if idxMode == HintAndMemoryMapIdxMode {
+			if idxMode == HintKeyAndRAMIdxMode {
 				path := tx.db.getDataPath(r.H.fileID)
 				df, err := NewDataFile(path, tx.db.opt.SegmentSize)
+				defer df.fd.Close()
 				if err != nil {
 					return nil, err
 				}
@@ -53,10 +54,6 @@ func (tx *Tx) Get(bucket string, key []byte) (e *Entry, err error) {
 				item, err := df.ReadAt(int(r.H.dataPos))
 				if err != nil {
 					return nil, fmt.Errorf("read err. pos %d, key %s, err %s", r.H.dataPos, string(key), err)
-				}
-
-				if err := df.m.Unmap(); err != nil {
-					return nil, err
 				}
 
 				return item, nil
@@ -140,20 +137,23 @@ func (tx *Tx) getHintIdxDataItemsWrapper(records Records, limitNum int, es Entri
 
 		if limitNum > 0 && len(es) < limitNum || limitNum == ScanNoLimit {
 			idxMode := tx.db.opt.EntryIdxMode
-			if idxMode == HintAndMemoryMapIdxMode {
+			if idxMode == HintKeyAndRAMIdxMode {
 				path := tx.db.getDataPath(r.H.fileID)
 				df, err := NewDataFile(path, tx.db.opt.SegmentSize)
+
 				if err != nil {
 					return nil, err
 				}
 				if item, err := df.ReadAt(int(r.H.dataPos)); err == nil {
 					es[k] = item
 				} else {
+					df.fd.Close()
 					return nil, fmt.Errorf("HintIdx r.Hi.dataPos %d, err %s", r.H.dataPos, err)
 				}
+				df.fd.Close()
 			}
 
-			if idxMode == HintAndRAMIdxMode {
+			if idxMode == HintKeyValAndRAMIdxMode {
 				es[k] = r.E
 			}
 		}

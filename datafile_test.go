@@ -53,6 +53,7 @@ func TestDataFile_Err(t *testing.T) {
 
 func TestDataFile1(t *testing.T) {
 	df, err := NewDataFile(filepath, 1024)
+	defer 	df.fd.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,6 +82,7 @@ func TestDataFile1(t *testing.T) {
 func TestDataFile2(t *testing.T) {
 	filepath2 := "/tmp/foo2"
 	df, err := NewDataFile(filepath2, 39)
+	defer df.fd.Close()
 	defer os.Remove(filepath2)
 	if err != nil {
 		t.Fatal(err)

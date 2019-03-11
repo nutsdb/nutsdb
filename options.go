@@ -18,11 +18,14 @@ package nutsdb
 type EntryIdxMode int
 
 const (
-	// HintAndRAMIdxMode represents ram index mode
-	HintAndRAMIdxMode EntryIdxMode = iota
+	// HintKeyValAndRAMIdxMode represents ram index (key and value) mode
+	HintKeyValAndRAMIdxMode EntryIdxMode = iota
 
-	// HintAndMemoryMapIdxMode represents memory map index mode
-	HintAndMemoryMapIdxMode
+	//// discard HintAndMemoryMapIdxMode represents memory map index mode
+	//HintAndMemoryMapIdxMode
+
+	// HintKeyAndRAMIdxMode represents represents ram index (only key) mode
+	HintKeyAndRAMIdxMode
 )
 
 // Options records params for creating DB object.
@@ -37,7 +40,7 @@ var defaultSegmentSize int64 = 8 * 1024 * 1024
 
 // DefaultOptions represents the default options
 var DefaultOptions = Options{
-	EntryIdxMode: HintAndRAMIdxMode,
+	EntryIdxMode: HintKeyValAndRAMIdxMode,
 	SegmentSize:  defaultSegmentSize,
 	NodeNum:      1,
 }
