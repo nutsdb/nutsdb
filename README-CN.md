@@ -1704,7 +1704,6 @@ Badger也是基于LSM tree模型。但是写性能没有我想象中高。不支
 另外，以上数据库均不支持多种数据结构如list、set、sorted set，而NutsDB从0.2.0版本开始支持这些数据结构。
 
 ### Benchmarks
-## Tested kvstore (which is embedded, persistence and support transactions)
 
 为了保证竟可能公平，找了2款关注度很高的内嵌型的kvstore，他们都支持事务、支持持久化。
 
@@ -1752,13 +1751,13 @@ ok  	github.com/xujiajun/kvstore-bench	83.856s
 
 ### 写性能: 
 
-NutsDB最快。 NutsDB比BoltDB快2-5倍 , 比BadgerDB快0.5-2x。
+NutsDB最快。 NutsDB比BoltDB快2-5倍 , 比BadgerDB快0.5-2倍。
 BadgerDB次之，他比BoltDB快1-3倍。
 BoltDB最慢。
 
 ### 读性能: 
 
-默认模式下，读都很快。其中NutsDB在默认配置下比其他数据库快一倍。但是如果使用`HintKeyAndRAMIdxMode`的选项，读速度比默认配置低很多。道理很简单，默认配置是全内存索引，但是`HintKeyAndRAMIdxMode`的模式，是内存索引+磁盘混合的方式，但是这个选项模式可以保存远大于内存的数据。特别是value远大于key的场景更加明显。
+默认模式下，读都很快。其中NutsDB在默认配置下比其他数据库快一倍。但是如果使用`HintKeyAndRAMIdxMode`的选项，读速度比默认配置低很多。道理很简单，默认配置是全内存索引，但是`HintKeyAndRAMIdxMode`的模式，是内存索引+磁盘混合的方式，但是这个选项模式可以保存远大于内存的数据。特别是value远大于key的场景效果更明显。
  
 
 ### 警告和限制
