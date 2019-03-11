@@ -1659,7 +1659,7 @@ Badger is based in LSM tree with value log. It designed for SSDs. It also suppor
 
 ## Tested kvstore 
 
-which is embedded, persistence and support transactions
+Selected kvstore which is embedded, persistence and support transactions.
 
 * [BadgerDB](https://github.com/dgraph-io/badger) (master branch with default options)
 * [BoltDB](https://github.com/boltdb/bolt) (master branch  with default options)
