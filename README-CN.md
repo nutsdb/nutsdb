@@ -1756,9 +1756,9 @@ NutsDB最快。 NutsDB比BoltDB快2-5倍 , 比BadgerDB快0.5-2x。
 BadgerDB次之，他比BoltDB快1-3倍。
 BoltDB最慢。
 
-### Get(read) Performance: 
+### 读性能: 
 
-默认模式下，都很快。其中NutsDB在默认配置下比其他数据库快一倍。但是如果使用`HintKeyAndRAMIdxMode`的选项，读速度比默认配置低很多。道理很简单，默认配置是全内存索引，但是`HintKeyAndRAMIdxMode`的模式，是内存索引+磁盘混合的方式，但是这个选项模式可以保存远大于内存的数据。特别是value远大于key的场景更加明显。
+默认模式下，读都很快。其中NutsDB在默认配置下比其他数据库快一倍。但是如果使用`HintKeyAndRAMIdxMode`的选项，读速度比默认配置低很多。道理很简单，默认配置是全内存索引，但是`HintKeyAndRAMIdxMode`的模式，是内存索引+磁盘混合的方式，但是这个选项模式可以保存远大于内存的数据。特别是value远大于key的场景更加明显。
  
 
 ### 警告和限制
