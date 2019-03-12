@@ -9,16 +9,18 @@ It supports fully serializable transactions and many data structures such as lis
 > This project is still in the experimental stage and has not passed the test of the actual production environment. Welcome to issue and contribute
 
 ## Motivation
-I wanted a simple, fast, embeddable and persistent key/value store written in pure Go. There are some options: 
+I wanted a simple, fast, embeddable and persistent key/value store written in pure Go. And if it supports more data structures such as list, set, sorted set，it will be better.
 
-BoltDB,it is based on B+ tree, has a good random read performance and awesome sequential scan performance, and it supports  ACID transactions with serializable isolation, but it is terrible at random write performance. 
+There are some options around the embeddable kv store in GO: 
 
-GoLevelDB is based on a log-structured merge-tree (LSM tree), but it not supports transactions.
+BoltDB,it is based on B+ tree, has a good random read performance and awesome sequential scan performance, and it supports  ACID transactions with serializable isolation, but it is terrible at random write performance and not supports more data structures such as list etc. 
 
-Badger is based on LSM tree with value log. It designed for SSDs. It also supports transactions. But its write performance is not as good as i thought. 
+GoLevelDB is based on a log-structured merge-tree (LSM tree), but it not supports transactions and more data structures.
+
+Badger is based on LSM tree with value log. It designed for SSDs. It also supports transactions. But its write performance is not as good as i thought.And it also not supports more data structures.
 
 So i tried to build a kv store by myself, i wanted to find a simple store engine model as reference. 
-Finally i found the bitcask model. It is very simple and easy to implement. Howerver it has its limition,like range or prefix queries are not effcient. For example, you can not easily scan over all keys between user000000 and user999999, you had to look up each key individully in the hashmap. 
+Finally i found the bitcask model. It is simple and easy to implement. Howerver it has its limition,like range or prefix queries are not effcient. For example, you can not easily scan over all keys between user000000 and user999999, you had to look up each key individully in the hashmap. 
 
 In order to break the limition, i tried to optimize them. Finally i did it and named `NutsDB`. NutsDB offers a high read/write performance and supports transactions. And it still has a lot of room for optimization. Welcome [contributions to NutsDB](https://github.com/xujiajun/nutsdb#contributing).
 
