@@ -15,7 +15,7 @@ There are some options around the embeddable kv store in Go:
 
 BoltDB,it is based on B+ tree, has a good random read performance and awesome sequential scan performance, and it supports  ACID transactions with serializable isolation, but it is terrible at random write performance and not supports more data structures such as list etc. 
 
-GoLevelDB is based on a log-structured merge-tree (LSM tree), but it not supports transactions and more data structures.
+GoLevelDB is based on a log-structured merge-tree (LSM tree), but it not supports more data structures.
 
 Badger is based on LSM tree with value log. It designed for SSDs. It also supports transactions. But its write performance is not as good as i thought.And it also not supports more data structures.
 
