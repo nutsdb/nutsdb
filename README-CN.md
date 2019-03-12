@@ -30,6 +30,8 @@ GoLevelDB是google开源的[leveldb](https://github.com/google/leveldb)的go语�
 
 Badger同样是基于LSM tree，不同的是他把key/value分离。据他官网描述是基于为SSD优化。同是他也支持事务。但是我自己测试发现他的写性能没我想象中高，具体见我的benchmark。
 
+此外，以上DB都不支持多种数据结构例如list、set等。
+
 ### 好奇心的驱使
 
 对于如何实现kv数据库的好奇心吧。数据库可以说是系统的核心，了解数据库的内核或者自己有实现，对更好的用轮子或者下次根据业务定制轮子都很有帮助。
