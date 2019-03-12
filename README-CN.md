@@ -24,7 +24,7 @@ BoltDB是一个基于B+ tree，有着非常好的读性能，还支持很实用�
 
 * GoLevelDB
 
-GoLevelDB是google开源的[leveldb](https://github.com/google/leveldb)的go语言版本的实现。他的性能很高，特别是写性能，他基于LSM tree实现。可惜他不支持事务。
+GoLevelDB是google开源的[leveldb](https://github.com/google/leveldb)的go语言版本的实现。他的性能很高，特别是写性能，他基于LSM tree实现。~~可惜他不支持事务~~(他的README没有提到，其实doc有api的)。
 
 * Badger
 
