@@ -11,7 +11,7 @@ It supports fully serializable transactions and many data structures such as lis
 ## Motivation
 I wanted a simple, fast, embeddable and persistent key/value store written in pure Go. And if it supports more data structures such as list, set, sorted set，it will be better.
 
-There are some options around the embeddable kv store in GO: 
+There are some options around the embeddable kv store in Go: 
 
 BoltDB,it is based on B+ tree, has a good random read performance and awesome sequential scan performance, and it supports  ACID transactions with serializable isolation, but it is terrible at random write performance and not supports more data structures such as list etc. 
 
