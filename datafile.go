@@ -44,7 +44,7 @@ type DataFile struct {
 	fileID     int64
 	writeOff   int64
 	ActualSize int64
-	rwManager RWManager
+	rwManager  RWManager
 }
 
 // NewDataFile returns a newly initialized DataFile object.
@@ -146,6 +146,11 @@ func (df *DataFile) Sync() (err error) {
 	return df.rwManager.Sync()
 }
 
+// Close closes the RWManager.
+// If RWManager is FileRWManager represents closes the File,
+// rendering it unusable for I/O.
+// If RWManager is a MMapRWManager represents Unmap deletes the memory mapped region,
+// flushes any remaining changes.
 func (df *DataFile) Close() (err error) {
 	return df.rwManager.Close()
 }
