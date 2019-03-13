@@ -16,6 +16,8 @@ var (
 
 func init() {
 	opt := nutsdb.DefaultOptions
+	//opt.RWMode = nutsdb.MMap
+	//opt.SyncEnable = false
 	opt.Dir = "/tmp/nutsdbexample/example_batch"
 	db, _ = nutsdb.Open(opt)
 	bucket = "bucket1"

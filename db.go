@@ -219,7 +219,7 @@ func (db *DB) Merge() error {
 
 	for _, pendingMergeFId := range pendingMergeFIds {
 		off = 0
-		f, err := NewDataFile(db.getDataPath(int64(pendingMergeFId)), db.opt.SegmentSize)
+		f, err := NewDataFile(db.getDataPath(int64(pendingMergeFId)), db.opt.SegmentSize, db.opt.RWMode)
 		if err != nil {
 			db.isMerging = false
 			return err
@@ -253,23 +253,23 @@ func (db *DB) Merge() error {
 				if err == io.EOF {
 					break
 				}
-				f.fd.Close()
+				f.rwManager.Close()
 				return fmt.Errorf("when merge operation build hintIndex readAt err: %s", err)
 			}
 		}
 
 		if err := db.reWriteData(pendingMergeEntries); err != nil {
-			f.fd.Close()
+			f.rwManager.Close()
 			return err
 		}
 
 		if err := os.Remove(db.getDataPath(int64(pendingMergeFId))); err != nil {
 			db.isMerging = false
-			f.fd.Close()
+			f.rwManager.Close()
 			return fmt.Errorf("when merge err: %s", err)
 		}
 
-		f.fd.Close()
+		f.rwManager.Close()
 	}
 
 	return nil
@@ -298,7 +298,7 @@ func (db *DB) Close() error {
 
 	db.closed = true
 
-	db.ActiveFile.fd.Close()
+	db.ActiveFile.rwManager.Close()
 
 	db.ActiveFile = nil
 
@@ -310,7 +310,7 @@ func (db *DB) Close() error {
 // setActiveFile sets the ActiveFile (DataFile object).
 func (db *DB) setActiveFile() (err error) {
 	filepath := db.getDataPath(db.MaxFileID)
-	db.ActiveFile, err = NewDataFile(filepath, db.opt.SegmentSize)
+	db.ActiveFile, err = NewDataFile(filepath, db.opt.SegmentSize, db.opt.RWMode)
 	if err != nil {
 		return
 	}
@@ -383,8 +383,7 @@ func (db *DB) parseDataFiles(dataFileIds []int) (unconfirmedRecords []*Record, c
 	for _, dataID := range dataFileIds {
 		off = 0
 		fID := int64(dataID)
-		f, err := NewDataFile(db.getDataPath(fID), db.opt.SegmentSize)
-
+		f, err := NewDataFile(db.getDataPath(fID), db.opt.SegmentSize, db.opt.StartFileLoadingMode)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -428,12 +427,12 @@ func (db *DB) parseDataFiles(dataFileIds []int) (unconfirmedRecords []*Record, c
 				if off >= db.opt.SegmentSize {
 					break
 				}
-				f.fd.Close()
+				f.rwManager.Close()
 				return nil, nil, fmt.Errorf("when build hintIndex readAt err: %s", err)
 			}
 		}
 
-		f.fd.Close()
+		f.rwManager.Close()
 	}
 
 	return

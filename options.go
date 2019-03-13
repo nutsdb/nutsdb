@@ -27,17 +27,23 @@ const (
 
 // Options records params for creating DB object.
 type Options struct {
-	Dir          string
-	EntryIdxMode EntryIdxMode
-	SegmentSize  int64
-	NodeNum      int64
+	Dir                  string
+	EntryIdxMode         EntryIdxMode
+	RWMode               RWMode
+	SegmentSize          int64
+	NodeNum              int64
+	SyncEnable           bool
+	StartFileLoadingMode RWMode
 }
 
 var defaultSegmentSize int64 = 8 * 1024 * 1024
 
 // DefaultOptions represents the default options
 var DefaultOptions = Options{
-	EntryIdxMode: HintKeyValAndRAMIdxMode,
-	SegmentSize:  defaultSegmentSize,
-	NodeNum:      1,
+	EntryIdxMode:         HintKeyValAndRAMIdxMode,
+	SegmentSize:          defaultSegmentSize,
+	NodeNum:              1,
+	RWMode:               FileIO,
+	SyncEnable:           true,
+	StartFileLoadingMode: MMap,
 }
