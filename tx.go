@@ -161,8 +161,10 @@ func (tx *Tx) Commit() error {
 			return err
 		}
 
-		if err := tx.db.ActiveFile.fd.Sync(); err != nil {
-			return err
+		if tx.db.opt.SyncEnable {
+			if err := tx.db.ActiveFile.rwManager.Sync(); err != nil {
+				return err
+			}
 		}
 
 		tx.db.ActiveFile.ActualSize += entrySize
@@ -295,12 +297,18 @@ func (tx *Tx) rotateActiveFile() error {
 	var err error
 	tx.db.MaxFileID++
 
-	if err := tx.db.ActiveFile.fd.Close(); err != nil {
+	if !tx.db.opt.SyncEnable && tx.db.opt.RWMode == MMap {
+		if err := tx.db.ActiveFile.rwManager.Sync(); err != nil {
+			return err
+		}
+	}
+
+	if err := tx.db.ActiveFile.rwManager.Close(); err != nil {
 		return err
 	}
 
 	path := tx.db.getDataPath(tx.db.MaxFileID)
-	tx.db.ActiveFile, err = NewDataFile(path, tx.db.opt.SegmentSize)
+	tx.db.ActiveFile, err = NewDataFile(path, tx.db.opt.SegmentSize, tx.db.opt.RWMode)
 	if err != nil {
 		return err
 	}

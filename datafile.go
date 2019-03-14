@@ -17,7 +17,6 @@ package nutsdb
 import (
 	"encoding/binary"
 	"errors"
-	"os"
 )
 
 var (
@@ -45,48 +44,44 @@ type DataFile struct {
 	fileID     int64
 	writeOff   int64
 	ActualSize int64
-	fd         *os.File
+	rwManager  RWManager
 }
 
 // NewDataFile returns a newly initialized DataFile object.
-func NewDataFile(path string, capacity int64) (df *DataFile, err error) {
+func NewDataFile(path string, capacity int64, rwMode RWMode) (df *DataFile, err error) {
+	var rwManager RWManager
+
 	if capacity <= 0 {
 		return nil, ErrCapacity
 	}
 
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0644)
-	if err != nil {
-		return nil, err
+	if rwMode == FileIO {
+		rwManager, err = NewFileIORWManager(path, capacity)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	err = truncate(path, capacity, f)
-	if err != nil {
-		return nil, err
+	if rwMode == MMap {
+		rwManager, err = NewMMapRWManager(path, capacity)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return &DataFile{
 		path:       path,
 		writeOff:   0,
 		ActualSize: 0,
-		fd:         f,
+		rwManager:  rwManager,
 	}, nil
-}
-
-func truncate(path string, capacity int64, f *os.File) error {
-	fileInfo, _ := os.Stat(path)
-	if fileInfo.Size() < capacity {
-		if err := f.Truncate(capacity); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 // ReadAt returns entry at the given off(offset).
 func (df *DataFile) ReadAt(off int) (e *Entry, err error) {
 	buf := make([]byte, DataEntryHeaderSize)
 
-	if _, err := df.fd.ReadAt(buf, int64(off)); err != nil {
+	if _, err := df.rwManager.ReadAt(buf, int64(off)); err != nil {
 		return nil, err
 	}
 
@@ -104,7 +99,7 @@ func (df *DataFile) ReadAt(off int) (e *Entry, err error) {
 	// read bucket
 	off += DataEntryHeaderSize
 	bucketBuf := make([]byte, meta.bucketSize)
-	_, err = df.fd.ReadAt(bucketBuf, int64(off))
+	_, err = df.rwManager.ReadAt(bucketBuf, int64(off))
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +110,7 @@ func (df *DataFile) ReadAt(off int) (e *Entry, err error) {
 	off += int(meta.bucketSize)
 	keyBuf := make([]byte, meta.keySize)
 
-	_, err = df.fd.ReadAt(keyBuf, int64(off))
+	_, err = df.rwManager.ReadAt(keyBuf, int64(off))
 	if err != nil {
 		return nil, err
 	}
@@ -124,7 +119,7 @@ func (df *DataFile) ReadAt(off int) (e *Entry, err error) {
 	// read value
 	off += int(meta.keySize)
 	valBuf := make([]byte, meta.valueSize)
-	_, err = df.fd.ReadAt(valBuf, int64(off))
+	_, err = df.rwManager.ReadAt(valBuf, int64(off))
 	if err != nil {
 		return nil, err
 	}
@@ -141,14 +136,23 @@ func (df *DataFile) ReadAt(off int) (e *Entry, err error) {
 // WriteAt copies data to mapped region from the b slice starting at
 // given off and returns number of bytes copied to the mapped region.
 func (df *DataFile) WriteAt(b []byte, off int64) (n int, err error) {
-	return df.fd.WriteAt(b, off)
+	return df.rwManager.WriteAt(b, off)
 }
 
 // Sync commits the current contents of the file to stable storage.
 // Typically, this means flushing the file system's in-memory copy
 // of recently written data to disk.
 func (df *DataFile) Sync() (err error) {
-	return df.fd.Sync()
+	return df.rwManager.Sync()
+}
+
+// Close closes the RWManager.
+// If RWManager is FileRWManager represents closes the File,
+// rendering it unusable for I/O.
+// If RWManager is a MMapRWManager represents Unmap deletes the memory mapped region,
+// flushes any remaining changes.
+func (df *DataFile) Close() (err error) {
+	return df.rwManager.Close()
 }
 
 // readMetaData returns MetaData at given buf slice.

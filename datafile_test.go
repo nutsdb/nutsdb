@@ -42,7 +42,7 @@ func init() {
 	}
 }
 func TestDataFile_Err(t *testing.T) {
-	_, err := NewDataFile(filepath, -1)
+	_, err := NewDataFile(filepath, -1, FileIO)
 	defer os.Remove(filepath)
 
 	if err == nil {
@@ -52,8 +52,8 @@ func TestDataFile_Err(t *testing.T) {
 }
 
 func TestDataFile1(t *testing.T) {
-	df, err := NewDataFile(filepath, 1024)
-	defer df.fd.Close()
+	df, err := NewDataFile(filepath, 1024, MMap)
+	defer df.rwManager.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,8 +81,8 @@ func TestDataFile1(t *testing.T) {
 
 func TestDataFile2(t *testing.T) {
 	filepath2 := "/tmp/foo2"
-	df, err := NewDataFile(filepath2, 39)
-	defer df.fd.Close()
+	df, err := NewDataFile(filepath2, 39, FileIO)
+	defer df.rwManager.Close()
 	defer os.Remove(filepath2)
 	if err != nil {
 		t.Fatal(err)
@@ -99,7 +99,7 @@ func TestDataFile2(t *testing.T) {
 	}
 
 	filepath3 := "/tmp/foo3"
-	df, err = NewDataFile(filepath3, 41)
+	df, err = NewDataFile(filepath3, 41, FileIO)
 	defer os.Remove(filepath3)
 	if err != nil {
 		t.Fatal(err)
@@ -117,7 +117,7 @@ func TestDataFile2(t *testing.T) {
 }
 
 func TestDataFile_ReadAt(t *testing.T) {
-	df, err := NewDataFile(filepath, 1024)
+	df, err := NewDataFile(filepath, 1024, FileIO)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -135,7 +135,7 @@ func TestDataFile_ReadAt(t *testing.T) {
 
 func TestDataFile_Err_Path(t *testing.T) {
 	filepath5 := ":/tmp/foo5"
-	df, err := NewDataFile(filepath5, entry.Size())
+	df, err := NewDataFile(filepath5, entry.Size(), FileIO)
 	if err == nil && df != nil {
 		t.Error("err TestDataFile_All open")
 	}
@@ -144,7 +144,7 @@ func TestDataFile_Err_Path(t *testing.T) {
 func TestDataFile_Crc_Err(t *testing.T) {
 	filepath4 := "/tmp/foo4"
 
-	df, err := NewDataFile(filepath4, entry.Size())
+	df, err := NewDataFile(filepath4, entry.Size(), FileIO)
 	defer os.Remove(filepath4)
 	if err != nil {
 		t.Fatal(err)

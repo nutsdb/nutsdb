@@ -45,8 +45,8 @@ func (tx *Tx) Get(bucket string, key []byte) (e *Entry, err error) {
 
 			if idxMode == HintKeyAndRAMIdxMode {
 				path := tx.db.getDataPath(r.H.fileID)
-				df, err := NewDataFile(path, tx.db.opt.SegmentSize)
-				defer df.fd.Close()
+				df, err := NewDataFile(path, tx.db.opt.SegmentSize,tx.db.opt.RWMode)
+				defer df.rwManager.Close()
 				if err != nil {
 					return nil, err
 				}
@@ -139,7 +139,7 @@ func (tx *Tx) getHintIdxDataItemsWrapper(records Records, limitNum int, es Entri
 			idxMode := tx.db.opt.EntryIdxMode
 			if idxMode == HintKeyAndRAMIdxMode {
 				path := tx.db.getDataPath(r.H.fileID)
-				df, err := NewDataFile(path, tx.db.opt.SegmentSize)
+				df, err := NewDataFile(path, tx.db.opt.SegmentSize,tx.db.opt.RWMode)
 
 				if err != nil {
 					return nil, err
@@ -147,10 +147,10 @@ func (tx *Tx) getHintIdxDataItemsWrapper(records Records, limitNum int, es Entri
 				if item, err := df.ReadAt(int(r.H.dataPos)); err == nil {
 					es[k] = item
 				} else {
-					df.fd.Close()
+					df.rwManager.Close()
 					return nil, fmt.Errorf("HintIdx r.Hi.dataPos %d, err %s", r.H.dataPos, err)
 				}
-				df.fd.Close()
+				df.rwManager.Close()
 			}
 
 			if idxMode == HintKeyValAndRAMIdxMode {

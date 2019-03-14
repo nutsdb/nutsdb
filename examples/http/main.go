@@ -61,7 +61,6 @@ func main() {
 	// For example you can visit like this: http://127.0.0.1:8181/test/get/key1
 	mux.GET("/test/get/:key", func(w http.ResponseWriter, r *http.Request) {
 		key := gorouter.GetParam(r, "key")
-		var value string
 		if err := db.View(
 			func(tx *nutsdb.Tx) error {
 				e, err := tx.Get(bucket, []byte(key))
@@ -69,7 +68,6 @@ func main() {
 					return err
 				}
 				fmt.Println("read data val:", string(e.Value))
-				value = string(e.Value)
 				return nil
 			}); err != nil {
 			log.Fatal(err)
