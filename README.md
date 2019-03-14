@@ -139,34 +139,42 @@ func main() {
 
 ### Options
 
-// Dir represents Open the database located in which dir
 * Dir                  string  
 
-// EntryIdxMode represents using which mode to index the entries.
+`Dir` represents Open the database located in which dir.
+
 * EntryIdxMode         EntryIdxMode 
 
-// RWMode represents the read and write mode.
+`EntryIdxMode` represents using which mode to index the entries.
+
 * RWMode               RWMode  
 
-// NutsDB will truncate data file if the active file is larger than SegmentSize.
-// Current verison default SegmentSize is 8MB,but you can custom it.
-// Once set, it cannot be changed. see [caveats--limitations](https://github.com/xujiajun/nutsdb#caveats--limitations) for detail.
+`RWMode` represents the read and write mode. `RWMode` includes two options: `FileIO` and `MMap`.
+FileIO represents the read and write mode using standard I/O. And MMap represents the read and write mode using mmap.
+
 * SegmentSize          int64 
 
-// NodeNum 
+NutsDB will truncate data file if the active file is larger than `SegmentSize`.
+Current verison default `SegmentSize` is 8MB,but you can custom it.
+Once set, it cannot be changed. see [caveats--limitations](https://github.com/xujiajun/nutsdb#caveats--limitations) for detail.
+
 * NodeNum              int64
 
-// SyncEnable represents if call Sync() function.
-// if SyncEnable is false, high write performance but potential data loss likely.
-// if SyncEnable is true, slower but persistent.
+`NodeNum` represents the node number.Default NodeNum is 1. `NodeNum` range [1,1023] .
+
 * SyncEnable           bool
 
-// StartFileLoadingMode represents when open the database which RWMode to load files.
+`SyncEnable` represents if call Sync() function.
+if `SyncEnable` is false, high write performance but potential data loss likely.
+if `SyncEnable` is true, slower but persistent.
+
 * StartFileLoadingMode RWMode
+
+`StartFileLoadingMode` represents when open a database which RWMode to load files.
 	
 #### Default Options
 
-recommend to use the `DefaultOptions` .
+Recommend to use the `DefaultOptions` . Unless you know what you're doing.
 
 ```
 var DefaultOptions = Options{
