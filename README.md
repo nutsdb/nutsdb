@@ -145,7 +145,8 @@ func main() {
 
 * EntryIdxMode         EntryIdxMode 
 
-`EntryIdxMode` represents using which mode to index the entries.
+`EntryIdxMode` represents using which mode to index the entries. `EntryIdxMode` includes two options: `HintKeyValAndRAMIdxMode` and `HintKeyAndRAMIdxMode`. `HintKeyValAndRAMIdxMode` represents ram index (key and value) mode.
+And `HintKeyAndRAMIdxMode` represents ram index (only key) mode
 
 * RWMode               RWMode  
 
