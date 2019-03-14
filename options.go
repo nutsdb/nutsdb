@@ -21,7 +21,7 @@ const (
 	// HintKeyValAndRAMIdxMode represents ram index (key and value) mode
 	HintKeyValAndRAMIdxMode EntryIdxMode = iota
 
-	// HintKeyAndRAMIdxMode represents represents ram index (only key) mode
+	// HintKeyAndRAMIdxMode represents ram index (only key) mode
 	HintKeyAndRAMIdxMode
 )
 
