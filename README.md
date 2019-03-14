@@ -29,6 +29,8 @@ In order to break the limition, i tried to optimize them. Finally i did it and n
 - [Getting Started](#getting-started)
   - [Installing](#installing)
   - [Opening a database](#opening-a-database)
+  - [Options](#options)
+    - [Default Options](#default-options)
   - [Transactions](#transactions)
     - [Read-write transactions](#read-write-transactions)
     - [Read-only transactions](#read-only-transactions)
@@ -132,6 +134,48 @@ func main() {
 	defer db.Close()
 
 	...
+}
+```
+
+### Options
+
+// Dir represents Open the database located in which dir
+* Dir                  string  
+
+// EntryIdxMode represents using which mode to index the entries.
+* EntryIdxMode         EntryIdxMode 
+
+// RWMode represents the read and write mode.
+* RWMode               RWMode  
+
+// NutsDB will truncate data file if the active file is larger than SegmentSize.
+// Current verison default SegmentSize is 8MB,but you can custom it.
+// Once set, it cannot be changed. see [caveats--limitations](https://github.com/xujiajun/nutsdb#caveats--limitations) for detail.
+* SegmentSize          int64 
+
+// NodeNum 
+* NodeNum              int64
+
+// SyncEnable represents if call Sync() function.
+// if SyncEnable is false, high write performance but potential data loss likely.
+// if SyncEnable is true, slower but persistent.
+* SyncEnable           bool
+
+// StartFileLoadingMode represents when open the database which RWMode to load files.
+* StartFileLoadingMode RWMode
+	
+#### Default Options
+
+recommend to use the `DefaultOptions` .
+
+```
+var DefaultOptions = Options{
+	EntryIdxMode:         HintKeyValAndRAMIdxMode,
+	SegmentSize:          defaultSegmentSize,
+	NodeNum:              1,
+	RWMode:               FileIO,
+	SyncEnable:           true,
+	StartFileLoadingMode: MMap,
 }
 ```
 
