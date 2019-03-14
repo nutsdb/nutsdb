@@ -27,12 +27,29 @@ const (
 
 // Options records params for creating DB object.
 type Options struct {
-	Dir                  string
-	EntryIdxMode         EntryIdxMode
-	RWMode               RWMode
-	SegmentSize          int64
-	NodeNum              int64
-	SyncEnable           bool
+	// Dir represents Open the database located in which dir.
+	Dir string
+
+	// EntryIdxMode represents using which mode to index the entries.
+	EntryIdxMode EntryIdxMode
+
+	// RWMode represents the read and write mode.
+	// RWMode includes two options: FileIO and MMap.
+	// FileIO represents the read and write mode using standard I/O.
+	// MMap represents the read and write mode using mmap.
+	RWMode      RWMode
+	SegmentSize int64
+
+	// NodeNum represents the node number.
+	// Default NodeNum is 1. NodeNum range [1,1023].
+	NodeNum int64
+
+	// SyncEnable represents if call Sync() function.
+	// if SyncEnable is false, high write performance but potential data loss likely.
+	// if SyncEnable is true, slower but persistent.
+	SyncEnable bool
+
+	// StartFileLoadingMode represents when open a database which RWMode to load files.
 	StartFileLoadingMode RWMode
 }
 
