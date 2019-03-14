@@ -192,6 +192,16 @@ func (tx *Tx) Commit() error {
 		}
 	}
 
+	tx.buildIdxes(writesLen)
+
+	tx.unlock()
+
+	tx.db = nil
+
+	return nil
+}
+
+func (tx *Tx) buildIdxes(writesLen int) {
 	for i := 0; i < writesLen; i++ {
 		entry := tx.pendingWrites[i]
 
@@ -211,12 +221,6 @@ func (tx *Tx) Commit() error {
 
 		tx.db.KeyCount++
 	}
-
-	tx.unlock()
-
-	tx.db = nil
-
-	return nil
 }
 
 func (tx *Tx) buildBPTreeIdx(bucket string, entry, e *Entry, off int64, countFlag bool) {
