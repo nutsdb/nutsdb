@@ -17,7 +17,7 @@ var (
 func init() {
 	time2.Start()
 	opt := nutsdb.DefaultOptions
-	opt.StartFileLoadingMode =nutsdb.MMap
+	opt.StartFileLoadingMode = nutsdb.MMap
 	//opt.RWMode = nutsdb.MMap
 	//opt.SyncEnable = false
 	opt.Dir = "/tmp/nutsdbexample/example_batch"

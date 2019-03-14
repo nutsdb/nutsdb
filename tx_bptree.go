@@ -45,7 +45,7 @@ func (tx *Tx) Get(bucket string, key []byte) (e *Entry, err error) {
 
 			if idxMode == HintKeyAndRAMIdxMode {
 				path := tx.db.getDataPath(r.H.fileID)
-				df, err := NewDataFile(path, tx.db.opt.SegmentSize,tx.db.opt.RWMode)
+				df, err := NewDataFile(path, tx.db.opt.SegmentSize, tx.db.opt.RWMode)
 				defer df.rwManager.Close()
 				if err != nil {
 					return nil, err
@@ -139,7 +139,7 @@ func (tx *Tx) getHintIdxDataItemsWrapper(records Records, limitNum int, es Entri
 			idxMode := tx.db.opt.EntryIdxMode
 			if idxMode == HintKeyAndRAMIdxMode {
 				path := tx.db.getDataPath(r.H.fileID)
-				df, err := NewDataFile(path, tx.db.opt.SegmentSize,tx.db.opt.RWMode)
+				df, err := NewDataFile(path, tx.db.opt.SegmentSize, tx.db.opt.RWMode)
 
 				if err != nil {
 					return nil, err
