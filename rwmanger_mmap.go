@@ -12,6 +12,14 @@ type MMapRWManager struct {
 	m mmap.MMap
 }
 
+var (
+	// ErrUnmappedMemory is returned when a function is called on unmapped memory
+	ErrUnmappedMemory = errors.New("unmapped memory")
+
+	// ErrIndexOutOfBound is returned when given offset out of mapped region
+	ErrIndexOutOfBound = errors.New("offset out of mapped region")
+)
+
 // NewMMapRWManager returns a newly initialized MMapRWManager.
 func NewMMapRWManager(path string, capacity int64) (*MMapRWManager, error) {
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0644)
@@ -36,9 +44,9 @@ func NewMMapRWManager(path string, capacity int64) (*MMapRWManager, error) {
 // given off and returns number of bytes copied to the mapped region.
 func (mm *MMapRWManager) WriteAt(b []byte, off int64) (n int, err error) {
 	if mm.m == nil {
-		return 0, errors.New("")
+		return 0, ErrUnmappedMemory
 	} else if off >= int64(len(mm.m)) || off < 0 {
-		return 0, errors.New("")
+		return 0, ErrIndexOutOfBound
 	}
 
 	return copy(mm.m[off:], b), nil
@@ -48,9 +56,9 @@ func (mm *MMapRWManager) WriteAt(b []byte, off int64) (n int, err error) {
 // given off and returns number of bytes copied to the b slice.
 func (mm *MMapRWManager) ReadAt(b []byte, off int64) (n int, err error) {
 	if mm.m == nil {
-		return 0, errors.New("")
+		return 0, ErrUnmappedMemory
 	} else if off >= int64(len(mm.m)) || off < 0 {
-		return 0, errors.New("")
+		return 0, ErrIndexOutOfBound
 	}
 
 	return copy(b, mm.m[off:]), nil
