@@ -121,17 +121,18 @@ const (
 type (
 	// DB represents a collection of buckets that persist on disk.
 	DB struct {
-		opt          Options   // the database options
-		BPTreeIdx    BPTreeIdx // Hint Index
-		SetIdx       SetIdx
-		SortedSetIdx SortedSetIdx
-		ListIdx      ListIdx
-		ActiveFile   *DataFile
-		MaxFileID    int64
-		mu           sync.RWMutex
-		KeyCount     int // total key number ,include expired, deleted, repeated.
-		closed       bool
-		isMerging    bool
+		opt            Options   // the database options
+		BPTreeIdx      BPTreeIdx // Hint Index
+		SetIdx         SetIdx
+		SortedSetIdx   SortedSetIdx
+		ListIdx        ListIdx
+		ActiveFile     *DataFile
+		MaxFileID      int64
+		mu             sync.RWMutex
+		KeyCount       int // total key number ,include expired, deleted, repeated.
+		closed         bool
+		isMerging      bool
+		committedTxIds map[uint64]struct{}
 	}
 
 	// BPTreeIdx represents the B+ tree index
@@ -153,14 +154,15 @@ type (
 // Open returns a newly initialized DB object.
 func Open(opt Options) (*DB, error) {
 	db := &DB{
-		BPTreeIdx:    make(BPTreeIdx),
-		SetIdx:       make(SetIdx),
-		SortedSetIdx: make(SortedSetIdx),
-		ListIdx:      make(ListIdx),
-		MaxFileID:    0,
-		opt:          opt,
-		KeyCount:     0,
-		closed:       false,
+		BPTreeIdx:      make(BPTreeIdx),
+		SetIdx:         make(SetIdx),
+		SortedSetIdx:   make(SortedSetIdx),
+		ListIdx:        make(ListIdx),
+		MaxFileID:      0,
+		opt:            opt,
+		KeyCount:       0,
+		closed:         false,
+		committedTxIds: make(map[uint64]struct{}),
 	}
 
 	if ok := filesystem.PathIsExist(db.opt.Dir); !ok {
@@ -441,6 +443,7 @@ func (db *DB) parseDataFiles(dataFileIds []int) (unconfirmedRecords []*Record, c
 // buildHintIdx builds the Hint Indexes.
 func (db *DB) buildHintIdx(dataFileIds []int) error {
 	unconfirmedRecords, committedTxIds, err := db.parseDataFiles(dataFileIds)
+	db.committedTxIds = committedTxIds
 
 	if err != nil {
 		return err
@@ -451,7 +454,7 @@ func (db *DB) buildHintIdx(dataFileIds []int) error {
 	}
 
 	for _, r := range unconfirmedRecords {
-		if _, ok := committedTxIds[r.H.meta.txID]; ok {
+		if _, ok := db.committedTxIds[r.H.meta.txID]; ok {
 			bucket := string(r.H.meta.bucket)
 
 			if r.H.meta.ds == DataStructureBPTree {

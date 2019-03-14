@@ -139,6 +139,7 @@ func (tx *Tx) Commit() error {
 		return nil
 	}
 
+	lastIndex := writesLen - 1
 	for i := 0; i < writesLen; i++ {
 		entry := tx.pendingWrites[i]
 		entrySize := entry.Size()
@@ -152,7 +153,7 @@ func (tx *Tx) Commit() error {
 			}
 		}
 
-		if i == writesLen-1 {
+		if i == lastIndex {
 			entry.Meta.status = Committed
 		}
 
@@ -167,12 +168,15 @@ func (tx *Tx) Commit() error {
 			}
 		}
 
+		if i == lastIndex {
+			tx.db.committedTxIds[entry.Meta.txID] = struct{}{}
+		}
+
 		tx.db.ActiveFile.ActualSize += entrySize
 		tx.db.ActiveFile.writeOff += entrySize
 
 		e = nil
 		if tx.db.opt.EntryIdxMode == HintKeyValAndRAMIdxMode {
-			entry.Meta.status = Committed
 			e = entry
 		}
 
@@ -186,6 +190,12 @@ func (tx *Tx) Commit() error {
 		if entry.Meta.ds == DataStructureBPTree {
 			tx.buildBPTreeIdx(bucket, entry, e, off, countFlag)
 		}
+	}
+
+	for i := 0; i < writesLen; i++ {
+		entry := tx.pendingWrites[i]
+
+		bucket := string(entry.Meta.bucket)
 
 		if entry.Meta.ds == DataStructureSet {
 			tx.buildSetIdx(bucket, entry)

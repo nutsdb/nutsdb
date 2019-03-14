@@ -35,6 +35,10 @@ func (tx *Tx) Get(bucket string, key []byte) (e *Entry, err error) {
 				return nil, err
 			}
 
+			if _, ok := tx.db.committedTxIds[r.H.meta.txID]; !ok {
+				return nil, ErrNotFoundKey
+			}
+
 			if r.H.meta.Flag == DataDeleteFlag || r.IsExpired() {
 				return nil, ErrNotFoundKey
 			}
