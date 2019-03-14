@@ -17,10 +17,6 @@ package nutsdb
 import (
 	"encoding/binary"
 	"errors"
-	"os"
-	"syscall"
-
-	"github.com/grandecola/mmap"
 )
 
 var (
@@ -29,6 +25,9 @@ var (
 
 	// ErrCrc is returned when crc is error
 	ErrCrc = errors.New(" crc error")
+
+	// ErrCapacity is returned when capacity is error.
+	ErrCapacity = errors.New("capacity error")
 )
 
 const (
@@ -41,47 +40,48 @@ const (
 
 // DataFile records about data file information.
 type DataFile struct {
-	fd         *os.File
-	m          mmap.IMmap
 	path       string
 	fileID     int64
 	writeOff   int64
 	ActualSize int64
+	rwManager  RWManager
 }
 
 // NewDataFile returns a newly initialized DataFile object.
-func NewDataFile(path string, capacity int64) (*DataFile, error) {
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
+func NewDataFile(path string, capacity int64, rwMode RWMode) (df *DataFile, err error) {
+	var rwManager RWManager
 
-	fileInfo, _ := os.Stat(path)
-	if fileInfo.Size() < capacity {
-		if err := f.Truncate(capacity); err != nil {
+	if capacity <= 0 {
+		return nil, ErrCapacity
+	}
+
+	if rwMode == FileIO {
+		rwManager, err = NewFileIORWManager(path, capacity)
+		if err != nil {
 			return nil, err
 		}
 	}
 
-	m, err := mmap.NewSharedFileMmap(f, 0, int(capacity), syscall.PROT_READ|syscall.PROT_WRITE)
-	if err != nil {
-		return nil, err
+	if rwMode == MMap {
+		rwManager, err = NewMMapRWManager(path, capacity)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return &DataFile{
-		fd:         f,
-		m:          m,
 		path:       path,
 		writeOff:   0,
 		ActualSize: 0,
+		rwManager:  rwManager,
 	}, nil
 }
 
 // ReadAt returns entry at the given off(offset).
 func (df *DataFile) ReadAt(off int) (e *Entry, err error) {
 	buf := make([]byte, DataEntryHeaderSize)
-	if _, err := df.m.Read(buf, off); err != nil {
+
+	if _, err := df.rwManager.ReadAt(buf, int64(off)); err != nil {
 		return nil, err
 	}
 
@@ -99,7 +99,7 @@ func (df *DataFile) ReadAt(off int) (e *Entry, err error) {
 	// read bucket
 	off += DataEntryHeaderSize
 	bucketBuf := make([]byte, meta.bucketSize)
-	_, err = df.m.Read(bucketBuf, off)
+	_, err = df.rwManager.ReadAt(bucketBuf, int64(off))
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +110,7 @@ func (df *DataFile) ReadAt(off int) (e *Entry, err error) {
 	off += int(meta.bucketSize)
 	keyBuf := make([]byte, meta.keySize)
 
-	_, err = df.m.Read(keyBuf, off)
+	_, err = df.rwManager.ReadAt(keyBuf, int64(off))
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +119,7 @@ func (df *DataFile) ReadAt(off int) (e *Entry, err error) {
 	// read value
 	off += int(meta.keySize)
 	valBuf := make([]byte, meta.valueSize)
-	_, err = df.m.Read(valBuf, off)
+	_, err = df.rwManager.ReadAt(valBuf, int64(off))
 	if err != nil {
 		return nil, err
 	}
@@ -136,7 +136,23 @@ func (df *DataFile) ReadAt(off int) (e *Entry, err error) {
 // WriteAt copies data to mapped region from the b slice starting at
 // given off and returns number of bytes copied to the mapped region.
 func (df *DataFile) WriteAt(b []byte, off int64) (n int, err error) {
-	return df.m.Write(b, int(off))
+	return df.rwManager.WriteAt(b, off)
+}
+
+// Sync commits the current contents of the file to stable storage.
+// Typically, this means flushing the file system's in-memory copy
+// of recently written data to disk.
+func (df *DataFile) Sync() (err error) {
+	return df.rwManager.Sync()
+}
+
+// Close closes the RWManager.
+// If RWManager is FileRWManager represents closes the File,
+// rendering it unusable for I/O.
+// If RWManager is a MMapRWManager represents Unmap deletes the memory mapped region,
+// flushes any remaining changes.
+func (df *DataFile) Close() (err error) {
+	return df.rwManager.Close()
 }
 
 // readMetaData returns MetaData at given buf slice.

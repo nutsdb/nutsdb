@@ -18,26 +18,32 @@ package nutsdb
 type EntryIdxMode int
 
 const (
-	// HintAndRAMIdxMode represents ram index mode
-	HintAndRAMIdxMode EntryIdxMode = iota
+	// HintKeyValAndRAMIdxMode represents ram index (key and value) mode
+	HintKeyValAndRAMIdxMode EntryIdxMode = iota
 
-	// HintAndMemoryMapIdxMode represents memory map index mode
-	HintAndMemoryMapIdxMode
+	// HintKeyAndRAMIdxMode represents represents ram index (only key) mode
+	HintKeyAndRAMIdxMode
 )
 
 // Options records params for creating DB object.
 type Options struct {
-	Dir          string
-	EntryIdxMode EntryIdxMode
-	SegmentSize  int64
-	NodeNum      int64
+	Dir             string
+	EntryIdxMode    EntryIdxMode
+	RWMode          RWMode
+	SegmentSize     int64
+	NodeNum         int64
+	SyncEnable      bool
+	FileLoadingMode RWMode
 }
 
 var defaultSegmentSize int64 = 8 * 1024 * 1024
 
 // DefaultOptions represents the default options
 var DefaultOptions = Options{
-	EntryIdxMode: HintAndRAMIdxMode,
-	SegmentSize:  defaultSegmentSize,
-	NodeNum:      1,
+	EntryIdxMode:    HintKeyValAndRAMIdxMode,
+	SegmentSize:     defaultSegmentSize,
+	NodeNum:         1,
+	RWMode:          FileIO,
+	SyncEnable:      true,
+	FileLoadingMode: MMap,
 }

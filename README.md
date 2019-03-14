@@ -1,22 +1,28 @@
-# NutsDB [![GoDoc](https://godoc.org/github.com/xujiajun/nutsdb?status.svg)](https://godoc.org/github.com/xujiajun/nutsdb)  [![Go Report Card](https://goreportcard.com/badge/github.com/xujiajun/nutsdb)](https://goreportcard.com/report/github.com/xujiajun/nutsdb) 
+# NutsDB [![GoDoc](https://godoc.org/github.com/xujiajun/nutsdb?status.svg)](https://godoc.org/github.com/xujiajun/nutsdb)  [![Go Report Card](https://goreportcard.com/badge/github.com/xujiajun/nutsdb)](https://goreportcard.com/report/github.com/xujiajun/nutsdb) <a href="https://travis-ci.org/xujiajun/nutsdb"><img src="https://travis-ci.org/xujiajun/nutsdb.svg?branch=master" alt="Build Status"></a> [![Coverage Status](https://coveralls.io/repos/github/xujiajun/nutsdb/badge.svg?branch=master)](https://coveralls.io/github/xujiajun/nutsdb?branch=master) [![License](http://img.shields.io/badge/license-Apache_2-blue.svg?style=flat-square)](https://raw.githubusercontent.com/xujiajun/nutsdb/master/LICENSE) [![Mentioned in Awesome Go](https://awesome.re/mentioned-badge.svg)](https://github.com/avelino/awesome-go#database)  
+
+English | [简体中文](https://github.com/xujiajun/nutsdb/blob/master/README-CN.md)
 
 NutsDB is a simple, fast, embeddable and persistent key/value store written in pure Go. 
 
 It supports fully serializable transactions and many data structures such as list、set、sorted set. All operations happen inside a Tx. Tx represents a transaction, which can be read-only or read-write. Read-only transactions can read values for a given bucket and given key or iterate over a set of key-value pairs. Read-write transactions can update and delete keys from the DB.
 
+> This project is still in the experimental stage and has not passed the test of the actual production environment. Welcome to issue and contribute
+
 ## Motivation
-I wanted a simple, fast, embeddable and persistent key/value store written in pure Go. There are some options: 
+I wanted a simple, fast, embeddable and persistent key/value store written in pure Go. And if it supports more data structures such as list, set, sorted set，it will be better.
 
-BoltDB,it is based on B+ tree, has a good random read performance and awesome sequential scan performance, and it supports  ACID transactions with serializable isolation, but it is terrible at random write performance. 
+There are some options around the embeddable kv store in Go: 
 
-GoLevelDB is based on a log-structured merge-tree (LSM tree), but it not supports transactions.
+BoltDB,it is based on B+ tree, has a good random read performance and awesome sequential scan performance, and it supports  ACID transactions with serializable isolation, but it is terrible at random write performance and not supports more data structures such as list etc. 
 
-Badger is based on LSM tree with value log. It designed for SSDs. It also supports transactions. But in my [benchmark](https://github.com/xujiajun/nutsdb#benchmarks) its write performance is not as good as i thought. 
+GoLevelDB is based on a log-structured merge-tree (LSM tree), but it not supports transactions and more data structures.
+
+Badger is based on LSM tree with value log. It designed for SSDs. It also supports transactions. But its write performance is not as good as i thought.And it also not supports more data structures.
 
 So i tried to build a kv store by myself, i wanted to find a simple store engine model as reference. 
-Finally i found the bitcask model. It is very simple and easy to implement. Howerver it has its limition,like range or prefix queries are not effcient. For example, you can not easily scan over all keys between user000000 and user999999, you had to look up each key individully in the hashmap. 
+Finally i found the bitcask model. It is simple and easy to implement. Howerver it has its limition,like range or prefix queries are not effcient. For example, you can not easily scan over all keys between user000000 and user999999, you had to look up each key individully in the hashmap. 
 
-In order to break the limition, i tried to optimize them. I tried to use B+ tree replace of hashmap and use mmap to optimize write performance. Finally i did it and named `NutsDB`. NutsDB offers a high read/write performance and supports ACID transactions. And it still has a lot of room for optimization. Welcome [contributions to NutsDB](https://github.com/xujiajun/nutsdb#contributing).
+In order to break the limition, i tried to optimize them. Finally i did it and named `NutsDB`. NutsDB offers a high read/write performance and supports transactions. And it still has a lot of room for optimization. Welcome [contributions to NutsDB](https://github.com/xujiajun/nutsdb#contributing).
 
 ## Table of Contents
 
@@ -360,7 +366,7 @@ if err := db.View(
 		// Query a specific user key range like this.
 		start := []byte("user_0010001")
 		end := []byte("user_0010010")
-		bucket：= []byte("user_list)
+		bucket：= []byte("user_list")
 		if entries, err := tx.RangeScan(bucket, start, end); err != nil {
 			return err
 		} else {
@@ -1089,7 +1095,7 @@ if err := db.View(
 
 ##### ZAdd
 
-Adds the specified member with the specified score and the specified value to the sorted set stored at key.
+Adds the specified member with the specified score and the specified value to the sorted set stored at bucket.
 
 ```go
 if err := db.Update(
@@ -1103,7 +1109,7 @@ if err := db.Update(
 ```
 ##### ZCard 
 
-Returns the sorted set cardinality (number of elements) of the sorted set stored at key.
+Returns the sorted set cardinality (number of elements) of the sorted set stored at bucket.
 
 ```go
 if err := db.View(
@@ -1122,7 +1128,7 @@ if err := db.View(
 
 ##### ZCount 
 
-Returns the number of elements in the sorted set at key with a score between min and max and opts.
+Returns the number of elements in the sorted set at bucket with a score between min and max and opts.
 
 Opts includes the following parameters:
 
@@ -1165,7 +1171,7 @@ if err := db.View(
 ```
 ##### ZMembers 
 
-Returns all the members of the set value stored at key.
+Returns all the members of the set value stored at bucket.
 
 ```go
 if err := db.View(
@@ -1187,7 +1193,7 @@ if err := db.View(
 ```
 ##### ZPeekMax 
 
-Returns up to count members with the highest scores in the sorted set stored at key.
+Returns the member with the highest score in the sorted set stored at bucket.
 
 ```go
 if err := db.View(
@@ -1206,7 +1212,7 @@ if err := db.View(
 
 ##### ZPeekMin 
 
-Returns up to count members with the lowest scores in the sorted set stored at key.
+Returns the member with lowest score in the sorted set stored at bucket.
 
 ```go
 if err := db.View(
@@ -1225,7 +1231,7 @@ if err := db.View(
 
 ##### ZPopMax 
 
-Removes and returns up to count members with the highest scores in the sorted set stored at key.
+Removes and returns the member with the highest score in the sorted set stored at bucket.
 
 ```go
 if err := db.Update(
@@ -1243,7 +1249,7 @@ if err := db.Update(
 ```
 ##### ZPopMin 
 
-Removes and returns up to count members with the lowest scores in the sorted set stored at key.
+Removes and returns the member with the lowest score in the sorted set stored at bucket.
 
 ```go
 if err := db.Update(
@@ -1262,7 +1268,7 @@ if err := db.Update(
 
 ##### ZRangeByRank 
 
-returns all the elements in the sorted set in one bucket at bucket and key with a rank between start and end (including elements with rank equal to start or end).
+Returns all the elements in the sorted set in one bucket at bucket and key with a rank between start and end (including elements with rank equal to start or end).
 
 ```go
 // ZAdd add items
@@ -1641,11 +1647,11 @@ if err := db.View(
 
 #### BoltDB
 
-BoltDB is similar to NutsDB, both use B+tree and support transaction. However, Bolt uses a B+tree internally and only a single file, and NutsDB is based on bitcask model with  multiple log files. NutsDB supports TTL and many data structures, but BoltDB not supports them . NutsDB offers high-performance reads and writes, but BoltDb writes performance not so good.
+BoltDB is similar to NutsDB, both use B+tree and support transaction. However, Bolt uses a B+tree internally and only a single file, and NutsDB is based on bitcask model with  multiple log files. NutsDB supports TTL and many data structures, but BoltDB not supports them .
 
 #### LevelDB, RocksDB
 
-LevelDB and RocksDB are based on a log-structured merge-tree (LSM tree).An LSM tree optimizes random writes by using a write ahead log and multi-tiered, sorted files called SSTables. LevelDB does not have transactions. It supports batch writing of key/values pairs and it supports read snapshots but it will not give you the ability to do a compare-and-swap operation safely. NutsDB supports fully serializable ACID transactions.
+LevelDB and RocksDB are based on a log-structured merge-tree (LSM tree).An LSM tree optimizes random writes by using a write ahead log and multi-tiered, sorted files called SSTables. LevelDB does not have transactions. It supports batch writing of key/values pairs and it supports read snapshots but it will not give you the ability to do a compare-and-swap operation safely. NutsDB supports many data structures, but they not support them.
 
 #### Badger
 
@@ -1653,15 +1659,15 @@ Badger is based in LSM tree with value log. It designed for SSDs. It also suppor
 
 ### Benchmarks
 
-#### Tested kvstore
+## Tested kvstore 
 
-* [BadgerDB](https://github.com/dgraph-io/badger) (with default options)
-* [BoltDB](https://github.com/boltdb/bolt) (with default options)
-* [BuntDB](https://github.com/tidwall/buntdb) (with default options)
-* [LevelDB](https://github.com/syndtr/goleveldb) (with default options)
-* [NutsDB](https://github.com/xujiajun/nutsdb) (with default options or custom options)
+Selected kvstore which is embedded, persistence and support transactions.
 
-#### Benchmark System:
+* [BadgerDB](https://github.com/dgraph-io/badger) (master branch with default options)
+* [BoltDB](https://github.com/boltdb/bolt) (master branch  with default options)
+* [NutsDB](https://github.com/xujiajun/nutsdb) (master branch with default options or custom options)
+
+## Benchmark System:
 
 * Go Version : go1.11.4 darwin/amd64
 * OS: Mac OS X 10.13.6
@@ -1669,56 +1675,67 @@ Badger is based in LSM tree with value log. It designed for SSDs. It also suppor
 * 16 GB 2133 MHz LPDDR3
 * CPU: 3.1 GHz Intel Core i7
 
-#### Benchmark results:
+##  Benchmark results:
 
 ```
-BenchmarkBadgerDBPutValue64B-8    	   10000	    135431 ns/op	    2375 B/op	      74 allocs/op
-BenchmarkBadgerDBPutValue128B-8   	   10000	    119450 ns/op	    2503 B/op	      74 allocs/op
-BenchmarkBadgerDBPutValue256B-8   	   10000	    142451 ns/op	    2759 B/op	      74 allocs/op
-BenchmarkBadgerDBPutValue512B-8   	   10000	    109066 ns/op	    3270 B/op	      74 allocs/op
-BenchmarkBadgerDBGet-8            	 1000000	      1679 ns/op	     416 B/op	       9 allocs/op
-BenchmarkBoltDBPutValue64B-8      	    5000	    200487 ns/op	   20005 B/op	      59 allocs/op
-BenchmarkBoltDBPutValue128B-8     	    5000	    230297 ns/op	   13703 B/op	      64 allocs/op
-BenchmarkBoltDBPutValue256B-8     	    5000	    207220 ns/op	   16708 B/op	      64 allocs/op
-BenchmarkBoltDBPutValue512B-8     	    5000	    262358 ns/op	   17768 B/op	      64 allocs/op
-BenchmarkBoltDBGet-8              	 1000000	      1163 ns/op	     592 B/op	      10 allocs/op
-BenchmarkBoltDBRangeScans-8       	 1000000	      1226 ns/op	     584 B/op	       9 allocs/op
-BenchmarkBoltDBPrefixScans-8      	 1000000	      1275 ns/op	     584 B/op	       9 allocs/op
-BenchmarkBuntDBPutValue64B-8      	  200000	      8930 ns/op	     927 B/op	      14 allocs/op
-BenchmarkBuntDBPutValue128B-8     	  200000	      8892 ns/op	    1015 B/op	      15 allocs/op
-BenchmarkBuntDBPutValue256B-8     	  200000	     11282 ns/op	    1274 B/op	      16 allocs/op
-BenchmarkBuntDBPutValue512B-8     	  200000	     12323 ns/op	    1794 B/op	      16 allocs/op
-BenchmarkBuntDBGet-8              	 2000000	       675 ns/op	     104 B/op	       4 allocs/op
-BenchmarkLevelDBPutValue64B-8     	  100000	     11909 ns/op	     476 B/op	       7 allocs/op
-BenchmarkLevelDBPutValue128B-8    	  200000	     10838 ns/op	     254 B/op	       7 allocs/op
-BenchmarkLevelDBPutValue256B-8    	  100000	     11510 ns/op	     445 B/op	       7 allocs/op
-BenchmarkLevelDBPutValue512B-8    	  100000	     12661 ns/op	     799 B/op	       8 allocs/op
-BenchmarkLevelDBGet-8             	 1000000	      1371 ns/op	     184 B/op	       5 allocs/op
-BenchmarkNutsDBPutValue64B-8      	 1000000	      2472 ns/op	     670 B/op	      14 allocs/op
-BenchmarkNutsDBPutValue128B-8     	 1000000	      2182 ns/op	     664 B/op	      13 allocs/op
-BenchmarkNutsDBPutValue256B-8     	 1000000	      2579 ns/op	     920 B/op	      13 allocs/op
-BenchmarkNutsDBPutValue512B-8     	 1000000	      3640 ns/op	    1432 B/op	      13 allocs/op
-BenchmarkNutsDBGet-8              	 2000000	       781 ns/op	      88 B/op	       3 allocs/op
-BenchmarkNutsDBGetByMemoryMap-8   	   50000	     40734 ns/op	     888 B/op	      17 allocs/op
-BenchmarkNutsDBPrefixScan-8       	 1000000	      1293 ns/op	     656 B/op	       9 allocs/op
-BenchmarkNutsDBRangeScan-8        	 1000000	      2250 ns/op	     752 B/op	      12 allocs/op
+badger 2019/03/11 18:06:05 INFO: All 0 tables opened in 0s
+goos: darwin
+goarch: amd64
+pkg: github.com/xujiajun/kvstore-bench
+BenchmarkBadgerDBPutValue64B-8    	   10000	    112382 ns/op	    2374 B/op	      74 allocs/op
+BenchmarkBadgerDBPutValue128B-8   	   20000	     94110 ns/op	    2503 B/op	      74 allocs/op
+BenchmarkBadgerDBPutValue256B-8   	   20000	     93480 ns/op	    2759 B/op	      74 allocs/op
+BenchmarkBadgerDBPutValue512B-8   	   10000	    101407 ns/op	    3271 B/op	      74 allocs/op
+BenchmarkBadgerDBGet-8            	 1000000	      1552 ns/op	     416 B/op	       9 allocs/op
+BenchmarkBoltDBPutValue64B-8      	   10000	    203128 ns/op	   21231 B/op	      62 allocs/op
+BenchmarkBoltDBPutValue128B-8     	    5000	    229568 ns/op	   13716 B/op	      64 allocs/op
+BenchmarkBoltDBPutValue256B-8     	   10000	    196513 ns/op	   17974 B/op	      64 allocs/op
+BenchmarkBoltDBPutValue512B-8     	   10000	    199805 ns/op	   17064 B/op	      64 allocs/op
+BenchmarkBoltDBGet-8              	 1000000	      1122 ns/op	     592 B/op	      10 allocs/op
+BenchmarkNutsDBPutValue64B-8      	   30000	     53614 ns/op	     626 B/op	      14 allocs/op
+BenchmarkNutsDBPutValue128B-8     	   30000	     51998 ns/op	     664 B/op	      13 allocs/op
+BenchmarkNutsDBPutValue256B-8     	   30000	     53958 ns/op	     920 B/op	      13 allocs/op
+BenchmarkNutsDBPutValue512B-8     	   30000	     55787 ns/op	    1432 B/op	      13 allocs/op
+BenchmarkNutsDBGet-8              	 2000000	       661 ns/op	      88 B/op	       3 allocs/op
+BenchmarkNutsDBGetByHintKey-8     	   50000	     27255 ns/op	     840 B/op	      16 allocs/op
+PASS
+ok  	github.com/xujiajun/kvstore-bench	83.856s
 ```
 
-#### Conclusions:
+## Conclusions:
 
-* Put(write) Performance:  NutsDB、BuntDB、LevelDB are fast. And NutsDB is fastest. It is 5-10x faster than LevelDB, 5x faster than BuntDB.
+### Put(write) Performance: 
 
-*  Get(read) Performance: All are fast. And NutsDB and BuntDB with default options are 2x faster than others.
-And NutsDB reads with MemoryMap option is slower 40x than its default option way. 
+NutsDB is fastest. NutsDB is 2-5x faster than BoltDB, 0.5-2x faster than BadgerDB.
+And BadgerDB is 1-3x faster than BoltDB.
+
+### Get(read) Performance: 
+
+All are fast. And NutsDB is 1x faster than others.
+And NutsDB reads with HintKey option is much slower than its default option way. 
 
 
-The benchmarking code can be found in the [gokvstore-bench](https://github.com/xujiajun/gokvstore-bench) repo.
+the benchmark code can be found in the [gokvstore-bench](https://github.com/xujiajun/gokvstore-bench) repo.
 
 ### Caveats & Limitations
 
-NutsDB supports two modes about entry index: `HintAndRAMIdxMode`  and  `HintAndMemoryMapIdxMode`. The default mode use `HintAndRAMIdxMode`, entries are indexed base on RAM, so its read/write performance is fast. but can’t handle databases much larger than the available physical RAM. If you set the `HintAndMemoryMapIdxMode` mode, HintIndex will not cache the value of the entry. Its write performance is also fast. To retrieve a key by seeking to offset relative to the start of the data file, so its read performance more slowly that RAM way, but it can handle databases much larger than the available physical RAM. And other data structures such as ***list, set, sorted set only supported with mode HintAndRAMIdxMode***.
+#### Index mode
 
-NutsDB will truncate data file if the active file is larger than  `SegmentSize`, so the size of an entry can not be set larger than `SegmentSize` , defalut `SegmentSize` is 64MB, you can set it(opt.SegmentSize) as option before DB opening. Once set, it cannot be changed.
+From the version v0.3.0, NutsDB supports two modes about entry index: `HintKeyValAndRAMIdxMode`  and  `HintKeyAndRAMIdxMode`. 
+
+The default mode use `HintKeyValAndRAMIdxMode`, entries are indexed base on RAM, so its read/write performance is fast. but can’t handle databases much larger than the available physical RAM. If you set the `HintKeyAndRAMIdxMode` mode, HintIndex will not cache the value of the entry. Its write performance is also fast. To retrieve a key by seeking to offset relative to the start of the data file, so its read performance more slowly that RAM way, but it can handle databases much larger than the available physical RAM. And other data structures such as ***list, set, sorted set only supported with mode HintKeyValAndRAMIdxMode***.
+
+NutsDB will truncate data file if the active file is larger than  `SegmentSize`, so the size of an entry can not be set larger than `SegmentSize` , defalut `SegmentSize` is 8MB, you can set it(opt.SegmentSize) as option before DB opening. ***Once set, it cannot be changed***.
+
+#### support OS
+
+NutsDB currently works on Mac OS X and Linux. Windows not been tested.It may be does't work on windows.
+
+
+#### about transactions
+
+From the version v0.3.0, NutsDB supports ACID.
+
 
 ### Contact
 

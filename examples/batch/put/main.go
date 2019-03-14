@@ -16,6 +16,8 @@ var (
 
 func init() {
 	opt := nutsdb.DefaultOptions
+	//opt.RWMode = nutsdb.MMap
+	//opt.SyncEnable = false
 	opt.Dir = "/tmp/nutsdbexample/example_batch"
 	db, _ = nutsdb.Open(opt)
 	bucket = "bucket1"
@@ -29,7 +31,7 @@ func main() {
 	for j := 1; j <= end; j++ {
 		if err := db.Update(
 			func(tx *nutsdb.Tx) error {
-				for i := (j - 1) * 1000000; i < j*1000000; i++ {
+				for i := (j - 1) * 10000; i < j*10000; i++ {
 					key := []byte("namename" + strconv2.IntToStr(i))
 					val := []byte("valvalvavalvalvalvavalvalvalvavalvalvalvaval" + strconv2.IntToStr(i))
 					if err := tx.Put(bucket, key, val, 0); err != nil {
@@ -44,6 +46,4 @@ func main() {
 	}
 
 	fmt.Println("batch put data cost: ", time2.End())
-	// MacBook Pro (15-inch, 2017),3.1 GHz Intel Core i7, 16 GB 2133 MHz LPDDR3
-	// 100w data batch put data cost:  2.066787s
 }

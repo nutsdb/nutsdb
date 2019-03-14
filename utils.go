@@ -15,6 +15,7 @@
 package nutsdb
 
 import (
+	"os"
 	"sort"
 )
 
@@ -27,4 +28,15 @@ func SortedEntryKeys(m map[string]*Entry) (keys []string, es map[string]*Entry) 
 	sort.Strings(keys)
 
 	return keys, m
+}
+
+// Truncate changes the size of the file.
+func Truncate(path string, capacity int64, f *os.File) error {
+	fileInfo, _ := os.Stat(path)
+	if fileInfo.Size() < capacity {
+		if err := f.Truncate(capacity); err != nil {
+			return err
+		}
+	}
+	return nil
 }

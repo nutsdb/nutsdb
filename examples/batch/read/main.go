@@ -17,6 +17,9 @@ var (
 func init() {
 	time2.Start()
 	opt := nutsdb.DefaultOptions
+	opt.StartFileLoadingMode =nutsdb.MMap
+	//opt.RWMode = nutsdb.MMap
+	//opt.SyncEnable = false
 	opt.Dir = "/tmp/nutsdbexample/example_batch"
 	db, _ = nutsdb.Open(opt)
 	bucket = "bucket1"
@@ -28,7 +31,7 @@ func main() {
 
 	if err := db.View(
 		func(tx *nutsdb.Tx) error {
-			for i := 0; i < 1000000; i++ {
+			for i := 0; i < 10000; i++ {
 				key := []byte("namename" + strconv2.IntToStr(i))
 				if _, err := tx.Get(bucket, key); err != nil {
 					log.Println("key", string(key))

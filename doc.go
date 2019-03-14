@@ -3,10 +3,6 @@ Package nutsdb implements a simple, fast, embeddable and persistent key/value st
 written in pure Go. It supports fully serializable transactions.
 And it also supports data structure such as list、set、sorted set etc.
 
-The design of NutsDB is based on the bitcask storage engine model, and to do some optimization,
-using B+ tree instead of hash index, so it supports range scanning and prefix scanning,
-using mmap technology to improve write performance.
-
 NutsDB currently works on Mac OS X and Linux. Windows not been tested.
 
 Usage
