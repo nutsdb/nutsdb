@@ -113,7 +113,7 @@ go get -u github.com/xujiajun/nutsdb
 
 ### Opening a database
 
-To open your database, use the nutsdb.Open() function,with the appropriate options.The `Dir` , `EntryIdxMode`  and  `SegmentSize`  options are must be specified by the client.
+To open your database, use the nutsdb.Open() function,with the appropriate options.The `Dir` , `EntryIdxMode`  and  `SegmentSize`  options are must be specified by the client. About options see [here](https://github.com/xujiajun/nutsdb#options) for detail.
 
 ```golang
 package main
