@@ -195,7 +195,7 @@ var DefaultOptions = Options{
 NutsDB allows only one read-write transaction at a time but allows as many read-only transactions as you want at a time. Each transaction has a consistent view of the data as it existed when the transaction started.
 
 When a transaction fails, it will roll back, and revert all changes that occurred to the database during that transaction.
-When a read/write transaction succeeds all changes are persisted to disk.
+if set the option `SyncEnable` true When a read/write transaction succeeds all changes are persisted to disk.
 
 Creating transaction from the `DB` is thread safe.
 
