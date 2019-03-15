@@ -1789,8 +1789,7 @@ NutsDB currently works on Mac OS X and Linux. Windows not been tested.It may be 
 
 #### about transactions
 
-From the version v0.3.0, NutsDB supports ACID.
-
+Recommend use the latest version.
 
 ### Contact
 
