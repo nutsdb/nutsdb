@@ -1820,12 +1820,12 @@ BoltDB最慢。
 
 * 启动索引模式
 
-从v0.3.0开始不再支持MMap的模式，使用`HintKeyValAndRAMIdxMode`和 `HintKeyAndRAMIdxMode` 这两种作为db启动的时候索引模式。
-默认使用`HintKeyValAndRAMIdxMode`。在基本的功能的string数据类型（put、get、delete、rangeScan、PrefixScan）这两种模式都支持。`HintKeyValAndRAMIdxMode`，作为数据库默认选项，他是全内存索引，读写性能都很高。他的瓶颈在于内存。如果你内存够的话，这种默认是适合的。如果你需要存下大于内存的数据，可以使用另一种模式`HintKeyAndRAMIdxMode`，他会把value存磁盘，通过索引去找offset，这种模式特别适合value远大于key的场景。他的读性能要比起默认模式要降低不少，具体看自己的要求。关于**其他的数据结构（list\set\sorted set）不支持HintKeyAndRAMIdxMode这个模式，只支持默认的HintKeyValAndRAMIdxMode，所以如果你要用到其他数据结构如list、set等。请根据需要选模式**。
+使用`HintKeyValAndRAMIdxMode`和 `HintKeyAndRAMIdxMode` 这两种作为db启动的时候索引模式。
+默认使用`HintKeyValAndRAMIdxMode`。在基本的功能的string数据类型（put、get、delete、rangeScan、PrefixScan）这两种模式都支持。`HintKeyValAndRAMIdxMode`，作为数据库默认选项，他是全内存索引，读写性能都很高。他的瓶颈在于内存。如果你内存够的话，这种默认是适合的。如果你需要存下大于内存的数据，可以使用另一种模式`HintKeyAndRAMIdxMode`，他会把value存磁盘，通过索引去找offset，这种模式特别适合value远大于key的场景。他的读性能要比起默认模式要降低不少，具体看自己的要求。关于**其他的数据结构（list\set\sorted set）不支持HintKeyAndRAMIdxMode这个模式，只支持默认的HintKeyValAndRAMIdxMode。请根据需要选模式**。
 
 * Segment配置问题
 
-NutsDB会自动切割分成一个个块（Segment），默认`SegmentSize`是8MB，这个参数可以自己配置，但是**一旦配置不能修改**。
+NutsDB会自动切割分成一个个块（Segment），默认`SegmentSize`是8MB，这个参数可以自己配置（比如16MB、64MB等），但是**一旦配置不能修改**。
 
 * key和value的大小限制问题
 
