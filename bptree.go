@@ -55,7 +55,6 @@ type (
 	BPTree struct {
 		root          *Node
 		ValidKeyCount int // the number of the key that not expired or deleted
-		idxType       int
 	}
 
 	// Records records multi-records as result when is called Range or PrefixScan.
