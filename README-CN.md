@@ -1836,7 +1836,7 @@ entry的的大小=EntryHeader的大小+key的大小+value的大小+bucket的大�
 
 * 关于支持的操作系统
 
-目前对Mac OS X 和 Linux 支持，Windows平台暂时不予支持。
+支持 Mac OS 、Linux 、Windows 三个平台。
 
 * 关于事务说明
 
