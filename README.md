@@ -1782,7 +1782,7 @@ NutsDB will truncate data file if the active file is larger than  `SegmentSize`,
 
 #### support OS
 
-NutsDB currently works on Mac OS X and Linux. Windows not been tested.It may be does't work on windows.
+NutsDB currently works on Mac OS, Linux and Windows.  
 
 
 #### about transactions
