@@ -3,7 +3,7 @@ Package nutsdb implements a simple, fast, embeddable and persistent key/value st
 written in pure Go. It supports fully serializable transactions.
 And it also supports data structure such as list、set、sorted set etc.
 
-NutsDB currently works on Mac OS X and Linux. Windows not been tested.
+NutsDB currently works on Mac OS, Linux and Windows.
 
 Usage
 
