@@ -103,6 +103,67 @@ func TestTx_PutAndGet(t *testing.T) {
 
 }
 
+func TestTx_GetAll(t *testing.T) {
+	Init()
+	db, err = Open(opt)
+	defer db.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bucket := "bucket_for_scanAll"
+
+	tx, err = db.Begin(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_,err:=tx.GetAll(bucket)
+	if err == nil {
+		t.Error("err TestTx_GetAll")
+	}
+	tx.Commit()
+
+	tx, err := db.Begin(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	key0 := []byte("key_" + fmt.Sprintf("%07d", 0))
+	val0 := []byte("val" + fmt.Sprintf("%07d", 0))
+	if err = tx.Put(bucket, key0, val0, Persistent); err != nil {
+		err = tx.Rollback()
+		t.Fatal(err)
+	}
+
+	key1 := []byte("key_" + fmt.Sprintf("%07d", 1))
+	val1 := []byte("val" + fmt.Sprintf("%07d", 1))
+	if err = tx.Put(bucket, key1, val1, Persistent); err != nil {
+		err = tx.Rollback()
+		t.Fatal(err)
+	}
+
+	tx.Commit()
+
+	tx, err = db.Begin(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if entries, err := tx.GetAll(bucket); err != nil {
+		tx.Rollback()
+		t.Error(err)
+	} else {
+		keys, _ := SortedEntryKeys(entries)
+		for i, k := range keys {
+			key := []byte("key_" + fmt.Sprintf("%07d", i))
+			if string(key) != k {
+				t.Error("err get all")
+			}
+		}
+
+		tx.Commit()
+	}
+}
+
 func TestTx_RangeScan_Err(t *testing.T) {
 	Init()
 	db, err = Open(opt)

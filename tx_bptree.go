@@ -68,6 +68,33 @@ func (tx *Tx) Get(bucket string, key []byte) (e *Entry, err error) {
 	return nil, errors.New("not found bucket:" + bucket + ",key:" + string(key))
 }
 
+//GetAll returns all keys and values of the bucket stored at given bucket.
+func (tx *Tx) GetAll(bucket string) (entries Entries, err error) {
+	if err := tx.checkTxIsClosed(); err != nil {
+		return nil, err
+	}
+
+	entries = make(Entries)
+
+	if index, ok := tx.db.BPTreeIdx[bucket]; ok {
+		records, err := index.All()
+		if err != nil {
+			return nil, ErrBucketEmpty
+		}
+
+		entries, err = tx.getHintIdxDataItemsWrapper(records, ScanNoLimit, entries, RangeScan)
+		if err != nil {
+			return nil, ErrBucketEmpty
+		}
+	}
+
+	if len(entries) == 0 {
+		return nil, ErrBucketEmpty
+	}
+
+	return
+}
+
 // RangeScan query a range at given bucket, start and end slice.
 func (tx *Tx) RangeScan(bucket string, start, end []byte) (entries Entries, err error) {
 	if err := tx.checkTxIsClosed(); err != nil {

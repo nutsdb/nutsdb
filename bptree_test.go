@@ -110,6 +110,22 @@ func TestBPTree_PrefixScan(t *testing.T) {
 	}
 }
 
+func TestBPTree_All(t *testing.T) {
+	tree = NewTree()
+	_, err := tree.All()
+	if err == nil {
+		t.Fatal("err scan all")
+	}
+	setup(t, 100)
+	rs, err := tree.All()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(expected, rs) {
+		t.Errorf("err scan all. got %v want %v", rs, expected)
+	}
+}
+
 func TestBPTree_Range(t *testing.T) {
 	tree = NewTree()
 	_, err := tree.Range([]byte("key_001"), []byte("key_010"))
