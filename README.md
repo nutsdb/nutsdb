@@ -437,9 +437,11 @@ if err := db.View(
 #### Get all
 
 To scan all keys and values of the bucket stored, we can use `GetAll` function. For example:
-```
+
+```go
 if err := db.View(
 	func(tx *nutsdb.Tx) error {
+		bucket := "user_list"
 		es, err := tx.GetAll(bucket)
 		if err != nil {
 			return err
