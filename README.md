@@ -294,7 +294,7 @@ if err := db.Update(
 	func(tx *nutsdb.Tx) error {
 	key := []byte("name1")
 	val := []byte("val1")
-	bucket: = "bucket1"
+	bucket := "bucket1"
 	if err := tx.Put(bucket, key, val, 0); err != nil {
 		return err
 	}
@@ -314,7 +314,7 @@ if err := db.Update(
 	func(tx *nutsdb.Tx) error {
 	key := []byte("name1")
 	val := []byte("val1-modify") // Update the value
-	bucket: = "bucket1"
+	bucket := "bucket1"
 	if err := tx.Put(bucket, key, val, 0); err != nil {
 		return err
 	}
@@ -331,7 +331,7 @@ To retrieve this value, we can use the `tx.Get` function:
 if err := db.View(
 func(tx *nutsdb.Tx) error {
 	key := []byte("name1")
-	bucket: = "bucket1"
+	bucket := "bucket1"
 	if e, err := tx.Get(bucket, key); err != nil {
 		return err
 	} else {
@@ -349,7 +349,7 @@ Use the `tx.Delete()` function to delete a key from the bucket.
 if err := db.Update(
 	func(tx *nutsdb.Tx) error {
 	key := []byte("name1")
-	bucket: = "bucket1"
+	bucket := "bucket1"
 	if err := tx.Delete(bucket, key); err != nil {
 		return err
 	}
@@ -368,7 +368,7 @@ if err := db.Update(
 	func(tx *nutsdb.Tx) error {
 	key := []byte("name1")
 	val := []byte("val1")
-	bucket: = "bucket1"
+	bucket := "bucket1"
 	
 	// If set ttl = 0 or Persistent, this key will nerver expired.
 	// Set ttl = 60 , after 60 seconds, this key will expired.
@@ -442,12 +442,12 @@ To scan all keys and values of the bucket stored, we can use `GetAll` function. 
 if err := db.View(
 	func(tx *nutsdb.Tx) error {
 		bucket := "user_list"
-		es, err := tx.GetAll(bucket)
+		entries, err := tx.GetAll(bucket)
 		if err != nil {
 			return err
 		}
 
-		for _,entry := range es {
+		for _, entry := range entries {
 			fmt.Println(string(entry.Key),string(entry.Value))
 		}
 
