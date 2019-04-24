@@ -103,6 +103,65 @@ func TestTx_PutAndGet(t *testing.T) {
 
 }
 
+func TestTx_GetAll(t *testing.T) {
+	Init()
+	db, err = Open(opt)
+	defer db.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bucket := "bucket_for_scanAll"
+
+	tx, err = db.Begin(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err := tx.GetAll(bucket)
+	if err == nil {
+		t.Error("err TestTx_GetAll")
+	}
+	tx.Commit()
+
+	tx, err := db.Begin(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	key0 := []byte("key_" + fmt.Sprintf("%07d", 0))
+	val0 := []byte("val" + fmt.Sprintf("%07d", 0))
+	if err = tx.Put(bucket, key0, val0, Persistent); err != nil {
+		err = tx.Rollback()
+		t.Fatal(err)
+	}
+
+	key1 := []byte("key_" + fmt.Sprintf("%07d", 1))
+	val1 := []byte("val" + fmt.Sprintf("%07d", 1))
+	if err = tx.Put(bucket, key1, val1, Persistent); err != nil {
+		err = tx.Rollback()
+		t.Fatal(err)
+	}
+
+	tx.Commit()
+
+	tx, err = db.Begin(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if entries, err := tx.GetAll(bucket); err != nil {
+		tx.Rollback()
+		t.Error(err)
+	} else {
+		for i, entry := range entries {
+			key := []byte("key_" + fmt.Sprintf("%07d", i))
+			if string(key) != string(entry.Key) {
+				t.Error("err get all")
+			}
+		}
+		tx.Commit()
+	}
+}
+
 func TestTx_RangeScan_Err(t *testing.T) {
 	Init()
 	db, err = Open(opt)
@@ -219,12 +278,11 @@ func TestTx_RangeScan(t *testing.T) {
 		//tx rollback
 		tx.Rollback()
 	} else {
-		keys, _ := SortedEntryKeys(entries)
 		j := 0
 		for i := 1; i <= 2; i++ {
 			key := []byte("key_" + fmt.Sprintf("%07d", i))
-			if string(key) != keys[j] {
-				t.Errorf("err tx RangeScan. got %s want %s", keys[j], string(key))
+			if string(key) != string(entries[j].Key) {
+				t.Errorf("err tx RangeScan. got %s want %s", string(entries[j].Key), string(key))
 			}
 			j++
 		}
@@ -287,12 +345,11 @@ func TestTx_PrefixScan(t *testing.T) {
 		//tx rollback
 		tx.Rollback()
 	} else {
-		keys, _ := SortedEntryKeys(entries)
 		j := 0
 		for i := 0; i < 2; i++ {
 			key := []byte("key_" + fmt.Sprintf("%07d", i))
-			if string(key) != keys[j] {
-				t.Errorf("err tx RangeScan. got %s want %s", keys[j], string(key))
+			if string(key) != string(entries[j].Key) {
+				t.Errorf("err tx RangeScan. got %s want %s", string(entries[j].Key), string(key))
 			}
 			j++
 		}
@@ -424,12 +481,11 @@ func TestTx_GetAndScansFromHintKey(t *testing.T) {
 		//tx rollback
 		tx.Rollback()
 	} else {
-		keys, _ := SortedEntryKeys(entries)
 		j := 0
 		for i := 1; i <= 10; i++ {
 			key := []byte("key_" + fmt.Sprintf("%07d", i))
-			if string(key) != keys[j] {
-				t.Errorf("err tx RangeScan. got %s want %s", keys[j], string(key))
+			if string(key) != string(entries[j].Key) {
+				t.Errorf("err tx RangeScan. got %s want %s", string(entries[j].Key), string(key))
 			}
 			j++
 		}

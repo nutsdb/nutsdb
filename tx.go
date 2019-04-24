@@ -41,6 +41,9 @@ var (
 	// ErrKeyEmpty is returned if an empty key is passed on an update function.
 	ErrKeyEmpty = errors.New("key cannot be empty")
 
+	// ErrBucketEmpty is returned if bucket is empty.
+	ErrBucketEmpty = errors.New("bucket is empty")
+
 	// ErrRangeScan is returned when range scanning not found the result
 	ErrRangeScan = errors.New("range scans not found")
 

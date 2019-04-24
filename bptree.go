@@ -55,10 +55,11 @@ type (
 	BPTree struct {
 		root          *Node
 		ValidKeyCount int // the number of the key that not expired or deleted
+		FirstKey      []byte
 	}
 
 	// Records records multi-records as result when is called Range or PrefixScan.
-	Records map[string]*Record
+	Records []*Record
 
 	// Node records keys and pointers and parent node.
 	Node struct {
@@ -126,6 +127,33 @@ func compare(a, b []byte) int {
 	return bytes.Compare(a, b)
 }
 
+func (t *BPTree) getAll() (numFound int, keys [][]byte, pointers []interface{}) {
+	var (
+		n    *Node
+		i, j int
+	)
+
+	if n = t.FindLeaf(t.FirstKey); n == nil {
+		return 0, nil, nil
+	}
+
+	j = 0
+
+	for n != nil {
+		for i = j; i < n.KeysNum; i++ {
+			keys = append(keys, n.Keys[i])
+			pointers = append(pointers, n.pointers[i])
+			numFound++
+		}
+
+		n, _ = n.pointers[order-1].(*Node)
+
+		j = 0
+	}
+
+	return
+}
+
 // findRange returns numFound,keys and pointers at the given start key and end key.
 func (t *BPTree) findRange(start, end []byte) (numFound int, keys [][]byte, pointers []interface{}) {
 	var (
@@ -162,6 +190,11 @@ func (t *BPTree) findRange(start, end []byte) (numFound int, keys [][]byte, poin
 	return
 }
 
+// All returns all records in the b+ tree.
+func (t *BPTree) All() (records Records, err error) {
+	return getRecordWrapper(t.getAll())
+}
+
 // Range returns records at the given start key and end key.
 func (t *BPTree) Range(start, end []byte) (records Records, err error) {
 	if compare(start, end) > 0 {
@@ -177,9 +210,9 @@ func getRecordWrapper(numFound int, keys [][]byte, pointers []interface{}) (reco
 		return nil, ErrScansNoResult
 	}
 
-	records = make(Records)
+	records = Records{}
 	for i := 0; i < numFound; i++ {
-		records[string(keys[i])] = pointers[i].(*Record)
+		records = append(records, pointers[i].(*Record))
 	}
 
 	return records, nil
@@ -272,6 +305,10 @@ func (t *BPTree) startNewTree(key []byte, pointer *Record) error {
 // Insert inserts record to the b+ tree,
 // and if the key exists, update the record and the counter(if countFlag set true,it will start count).
 func (t *BPTree) Insert(key []byte, e *Entry, h *Hint, countFlag bool) error {
+	if compare(key, t.FirstKey) < 0 {
+		t.FirstKey = key
+	}
+
 	if r, err := t.Find(key); err == nil && r != nil {
 		if countFlag && h.meta.Flag == DataDeleteFlag && r.H.meta.Flag != DataDeleteFlag && t.ValidKeyCount > 0 {
 			t.ValidKeyCount--

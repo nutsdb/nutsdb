@@ -68,13 +68,40 @@ func (tx *Tx) Get(bucket string, key []byte) (e *Entry, err error) {
 	return nil, errors.New("not found bucket:" + bucket + ",key:" + string(key))
 }
 
+//GetAll returns all keys and values of the bucket stored at given bucket.
+func (tx *Tx) GetAll(bucket string) (entries Entries, err error) {
+	if err := tx.checkTxIsClosed(); err != nil {
+		return nil, err
+	}
+
+	entries = Entries{}
+
+	if index, ok := tx.db.BPTreeIdx[bucket]; ok {
+		records, err := index.All()
+		if err != nil {
+			return nil, ErrBucketEmpty
+		}
+
+		entries, err = tx.getHintIdxDataItemsWrapper(records, ScanNoLimit, entries, RangeScan)
+		if err != nil {
+			return nil, ErrBucketEmpty
+		}
+	}
+
+	if len(entries) == 0 {
+		return nil, ErrBucketEmpty
+	}
+
+	return
+}
+
 // RangeScan query a range at given bucket, start and end slice.
 func (tx *Tx) RangeScan(bucket string, start, end []byte) (entries Entries, err error) {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return nil, err
 	}
 
-	entries = make(Entries)
+	entries = Entries{}
 
 	if index, ok := tx.db.BPTreeIdx[bucket]; ok {
 		records, err := index.Range(start, end)
@@ -102,7 +129,7 @@ func (tx *Tx) PrefixScan(bucket string, prefix []byte, limitNum int) (es Entries
 		return nil, err
 	}
 
-	es = make(Entries)
+	es = Entries{}
 
 	if idx, ok := tx.db.BPTreeIdx[bucket]; ok {
 		records, err := idx.PrefixScan(prefix, limitNum)
@@ -134,7 +161,7 @@ func (tx *Tx) Delete(bucket string, key []byte) error {
 
 // getHintIdxDataItemsWrapper returns wrapped entries when prefix scanning or range scanning.
 func (tx *Tx) getHintIdxDataItemsWrapper(records Records, limitNum int, es Entries, scanMode string) (Entries, error) {
-	for k, r := range records {
+	for _, r := range records {
 		if r.H.meta.Flag == DataDeleteFlag || r.IsExpired() {
 			continue
 		}
@@ -149,7 +176,7 @@ func (tx *Tx) getHintIdxDataItemsWrapper(records Records, limitNum int, es Entri
 					return nil, err
 				}
 				if item, err := df.ReadAt(int(r.H.dataPos)); err == nil {
-					es[k] = item
+					es = append(es, item)
 				} else {
 					df.rwManager.Close()
 					return nil, fmt.Errorf("HintIdx r.Hi.dataPos %d, err %s", r.H.dataPos, err)
@@ -158,7 +185,7 @@ func (tx *Tx) getHintIdxDataItemsWrapper(records Records, limitNum int, es Entri
 			}
 
 			if idxMode == HintKeyValAndRAMIdxMode {
-				es[k] = r.E
+				es = append(es, r.E)
 			}
 		}
 	}

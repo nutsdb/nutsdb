@@ -147,9 +147,10 @@ type (
 	// ListIdx represents the list index
 	ListIdx map[string]*list.List
 
-	// Entries represents entry map
-	Entries map[string]*Entry
+	// Entries represents entries
+	Entries []*Entry
 )
+
 
 // Open returns a newly initialized DB object.
 func Open(opt Options) (*DB, error) {
