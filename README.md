@@ -41,6 +41,7 @@ In order to break the limition, i tried to optimize them. Finally i did it and n
   - [Iterating over keys](#iterating-over-keys)
     - [Prefix scans](#prefix-scans)
     - [Range scans](#range-scans)
+    - [Get all](#get-all)
   - [Merge Operation](#merge-operation)
   - [Database backup](#database-backup)
 - [Using Other data structures](#using-other-data-structures)
@@ -433,6 +434,26 @@ if err := db.View(
 }
 ```
 
+#### Get all
+
+To scan all keys and values of the bucket stored, we can use `GetAll` function. For example:
+```
+if err := db.View(
+	func(tx *nutsdb.Tx) error {
+		es, err := tx.GetAll(bucket)
+		if err != nil {
+			return err
+		}
+
+		for _,entry := range es {
+			fmt.Println(string(entry.Key),string(entry.Value))
+		}
+
+		return nil
+	}); err != nil {
+	log.Println(err)
+}
+```
 ### Merge Operation
 
 NutsDB supports merge operation. you can use `db.Merge()` function removes dirty data and reduce data redundancy. Call this function from a read-write transaction. It will effect other write request. So you can execute it at the appropriate time.
