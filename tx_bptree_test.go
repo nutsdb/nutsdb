@@ -117,7 +117,7 @@ func TestTx_GetAll(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_,err:=tx.GetAll(bucket)
+	_, err := tx.GetAll(bucket)
 	if err == nil {
 		t.Error("err TestTx_GetAll")
 	}
@@ -152,14 +152,12 @@ func TestTx_GetAll(t *testing.T) {
 		tx.Rollback()
 		t.Error(err)
 	} else {
-		keys, _ := SortedEntryKeys(entries)
-		for i, k := range keys {
+		for i, entry := range entries {
 			key := []byte("key_" + fmt.Sprintf("%07d", i))
-			if string(key) != k {
+			if string(key) != string(entry.Key) {
 				t.Error("err get all")
 			}
 		}
-
 		tx.Commit()
 	}
 }
@@ -280,12 +278,11 @@ func TestTx_RangeScan(t *testing.T) {
 		//tx rollback
 		tx.Rollback()
 	} else {
-		keys, _ := SortedEntryKeys(entries)
 		j := 0
 		for i := 1; i <= 2; i++ {
 			key := []byte("key_" + fmt.Sprintf("%07d", i))
-			if string(key) != keys[j] {
-				t.Errorf("err tx RangeScan. got %s want %s", keys[j], string(key))
+			if string(key) != string(entries[j].Key) {
+				t.Errorf("err tx RangeScan. got %s want %s", string(entries[j].Key), string(key))
 			}
 			j++
 		}
@@ -348,12 +345,11 @@ func TestTx_PrefixScan(t *testing.T) {
 		//tx rollback
 		tx.Rollback()
 	} else {
-		keys, _ := SortedEntryKeys(entries)
 		j := 0
 		for i := 0; i < 2; i++ {
 			key := []byte("key_" + fmt.Sprintf("%07d", i))
-			if string(key) != keys[j] {
-				t.Errorf("err tx RangeScan. got %s want %s", keys[j], string(key))
+			if string(key) != string(entries[j].Key) {
+				t.Errorf("err tx RangeScan. got %s want %s", string(entries[j].Key), string(key))
 			}
 			j++
 		}
@@ -485,12 +481,11 @@ func TestTx_GetAndScansFromHintKey(t *testing.T) {
 		//tx rollback
 		tx.Rollback()
 	} else {
-		keys, _ := SortedEntryKeys(entries)
 		j := 0
 		for i := 1; i <= 10; i++ {
 			key := []byte("key_" + fmt.Sprintf("%07d", i))
-			if string(key) != keys[j] {
-				t.Errorf("err tx RangeScan. got %s want %s", keys[j], string(key))
+			if string(key) != string(entries[j].Key) {
+				t.Errorf("err tx RangeScan. got %s want %s", string(entries[j].Key), string(key))
 			}
 			j++
 		}

@@ -27,7 +27,7 @@ var (
 
 func setup(t *testing.T, limit int) {
 	tree = NewTree()
-	for i := 1; i <= 100; i++ {
+	for i := 0; i < 100; i++ {
 		key := []byte("key_" + fmt.Sprintf("%03d", i))
 		val := []byte("val_" + fmt.Sprintf("%03d", i))
 		err := tree.Insert(key, &Entry{Key: key, Value: val}, &Hint{key: key, meta: &MetaData{
@@ -38,13 +38,14 @@ func setup(t *testing.T, limit int) {
 		}
 	}
 
-	expected = make(Records, limit)
-	for i := 1; i <= limit; i++ {
+	expected = Records{}
+	for i := 0; i < limit; i++ {
 		key := []byte("key_" + fmt.Sprintf("%03d", i))
 		val := []byte("val_" + fmt.Sprintf("%03d", i))
-		expected[string(key)] = &Record{E: &Entry{Key: key, Value: val}, H: &Hint{key: key, meta: &MetaData{
+
+		expected = append(expected, &Record{E: &Entry{Key: key, Value: val}, H: &Hint{key: key, meta: &MetaData{
 			Flag: DataSetFlag,
-		}}}
+		}}})
 	}
 }
 
@@ -80,8 +81,10 @@ func TestBPTree_PrefixScan(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !reflect.DeepEqual(expected, rs) {
-		t.Errorf("err prefix Scan. got %v want %v", rs, expected)
+	for i, e := range rs {
+		if string(expected[i].E.Key) != string(e.E.Key) {
+			t.Errorf("err prefix Scan. got %v want %v", string(expected[i].E.Key), string(e.E.Key))
+		}
 	}
 
 	_, err = tree.PrefixScan([]byte("key_xx"), limit)
@@ -104,7 +107,7 @@ func TestBPTree_PrefixScan(t *testing.T) {
 	if err != nil {
 		t.Error("err prefix Scan")
 	}
-	_, err = tree.PrefixScan([]byte("key_100"), limit)
+	_, err = tree.PrefixScan([]byte("key_099"), limit)
 	if err != nil {
 		t.Error("err prefix Scan")
 	}
@@ -136,13 +139,15 @@ func TestBPTree_Range(t *testing.T) {
 	limit := 10
 	setup(t, limit)
 	// range scan
-	rs, err := tree.Range([]byte("key_001"), []byte("key_010"))
+	rs, err := tree.Range([]byte("key_000"), []byte("key_009"))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if !reflect.DeepEqual(expected, rs) {
-		t.Errorf("err range Scan. got %v want %v", rs, expected)
+	for i, e := range rs {
+		if string(expected[i].E.Key) != string(e.E.Key) {
+			t.Errorf("err prefix Scan. got %v want %v", string(expected[i].E.Key), string(e.E.Key))
+		}
 	}
 
 	_, err = tree.Range([]byte("key_101"), []byte("key_110"))
@@ -161,7 +166,7 @@ func TestBPTree_FindLeaf(t *testing.T) {
 	setup(t, limit)
 
 	node := tree.FindLeaf([]byte("key_001"))
-	if string(node.Keys[0]) != "key_001" {
+	if string(node.Keys[0]) != "key_000" {
 		t.Error("err TestBPTree_FindLeaf")
 	}
 }
@@ -190,7 +195,7 @@ func TestBPTree_Update(t *testing.T) {
 	limit := 10
 	setup(t, limit)
 
-	for i := 1; i <= 100; i++ {
+	for i := 0; i <= 100; i++ {
 		key := []byte("key_" + fmt.Sprintf("%03d", i))
 		val := []byte("val_modify" + fmt.Sprintf("%03d", i))
 		err := tree.Insert(key, &Entry{Key: key, Value: val}, &Hint{key: key, meta: &MetaData{
@@ -201,22 +206,25 @@ func TestBPTree_Update(t *testing.T) {
 		}
 	}
 
-	expected = make(Records, limit)
-	for i := 1; i <= limit; i++ {
+	expected = Records{}
+	for i := 0; i <= limit; i++ {
 		key := []byte("key_" + fmt.Sprintf("%03d", i))
 		val := []byte("val_modify" + fmt.Sprintf("%03d", i))
-		expected[string(key)] = &Record{E: &Entry{Key: key, Value: val}, H: &Hint{key: key, meta: &MetaData{
+
+		expected = append(expected, &Record{E: &Entry{Key: key, Value: val}, H: &Hint{key: key, meta: &MetaData{
 			Flag: DataSetFlag}},
-		}
+		})
 	}
 
-	rs, err := tree.Range([]byte("key_001"), []byte("key_010"))
+	rs, err := tree.Range([]byte("key_000"), []byte("key_009"))
 	if err != nil {
 		t.Error("err TestBPTree_Update tree.Range scan")
 	}
 
-	if !reflect.DeepEqual(expected, rs) {
-		t.Errorf("err TestBPTree_Update range Scan. got %v want %v", rs, expected)
+	for i, e := range rs {
+		if string(expected[i].E.Key) != string(e.E.Key) {
+			t.Errorf("err prefix Scan. got %v want %v", string(expected[i].E.Key), string(e.E.Key))
+		}
 	}
 
 	//delete

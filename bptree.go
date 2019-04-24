@@ -59,7 +59,7 @@ type (
 	}
 
 	// Records records multi-records as result when is called Range or PrefixScan.
-	Records map[string]*Record
+	Records []*Record
 
 	// Node records keys and pointers and parent node.
 	Node struct {
@@ -210,9 +210,9 @@ func getRecordWrapper(numFound int, keys [][]byte, pointers []interface{}) (reco
 		return nil, ErrScansNoResult
 	}
 
-	records = make(Records)
+	records = Records{}
 	for i := 0; i < numFound; i++ {
-		records[string(keys[i])] = pointers[i].(*Record)
+		records = append(records, pointers[i].(*Record))
 	}
 
 	return records, nil

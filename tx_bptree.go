@@ -74,7 +74,7 @@ func (tx *Tx) GetAll(bucket string) (entries Entries, err error) {
 		return nil, err
 	}
 
-	entries = make(Entries)
+	entries = Entries{}
 
 	if index, ok := tx.db.BPTreeIdx[bucket]; ok {
 		records, err := index.All()
@@ -101,7 +101,7 @@ func (tx *Tx) RangeScan(bucket string, start, end []byte) (entries Entries, err 
 		return nil, err
 	}
 
-	entries = make(Entries)
+	entries = Entries{}
 
 	if index, ok := tx.db.BPTreeIdx[bucket]; ok {
 		records, err := index.Range(start, end)
@@ -129,7 +129,7 @@ func (tx *Tx) PrefixScan(bucket string, prefix []byte, limitNum int) (es Entries
 		return nil, err
 	}
 
-	es = make(Entries)
+	es = Entries{}
 
 	if idx, ok := tx.db.BPTreeIdx[bucket]; ok {
 		records, err := idx.PrefixScan(prefix, limitNum)
@@ -161,7 +161,7 @@ func (tx *Tx) Delete(bucket string, key []byte) error {
 
 // getHintIdxDataItemsWrapper returns wrapped entries when prefix scanning or range scanning.
 func (tx *Tx) getHintIdxDataItemsWrapper(records Records, limitNum int, es Entries, scanMode string) (Entries, error) {
-	for k, r := range records {
+	for _, r := range records {
 		if r.H.meta.Flag == DataDeleteFlag || r.IsExpired() {
 			continue
 		}
@@ -176,7 +176,7 @@ func (tx *Tx) getHintIdxDataItemsWrapper(records Records, limitNum int, es Entri
 					return nil, err
 				}
 				if item, err := df.ReadAt(int(r.H.dataPos)); err == nil {
-					es[k] = item
+					es = append(es, item)
 				} else {
 					df.rwManager.Close()
 					return nil, fmt.Errorf("HintIdx r.Hi.dataPos %d, err %s", r.H.dataPos, err)
@@ -185,7 +185,7 @@ func (tx *Tx) getHintIdxDataItemsWrapper(records Records, limitNum int, es Entri
 			}
 
 			if idxMode == HintKeyValAndRAMIdxMode {
-				es[k] = r.E
+				es = append(es, r.E)
 			}
 		}
 	}
