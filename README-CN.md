@@ -64,6 +64,7 @@ Badger同样是基于LSM tree，不同的是他把key/value分离。据他官网
   - [对keys的扫描操作](#对keys的扫描操作)
     - [前缀扫描](#前缀扫描)
     - [范围扫描](#范围扫描)
+    - [获取全部的key和value](#获取全部的key和value)
   - [合并操作](#合并操作)
   - [数据库备份](#数据库备份)
 - [使用其他数据结构](#使用其他数据结构)
@@ -430,13 +431,13 @@ key在一个bucket里面按照byte-sorted有序排序的，所以对于keys的�
 if err := db.View(
 	func(tx *nutsdb.Tx) error {
 		prefix := []byte("user_")
+		bucket := "user_list"
 		// 限制 100 entries 返回 
 		if entries, err := tx.PrefixScan(bucket, prefix, 100); err != nil {
 			return err
 		} else {
-			keys, es := nutsdb.SortedEntryKeys(entries)
-			for _, key := range keys {
-				fmt.Println(key, string(es[key].Value))
+			for _, entry := range entries {
+				fmt.Println(string(entry.Key), string(entry.Value))
 			}
 		}
 		return nil
@@ -459,13 +460,12 @@ if err := db.View(
 		// 执行区间扫描类似这样一个start和end作为主要参数.
 		start := []byte("user_0010001")
 		end := []byte("user_0010010")
-		bucket：= []byte("user_list)
+		bucket := "user_list"
 		if entries, err := tx.RangeScan(bucket, start, end); err != nil {
 			return err
 		} else {
-			keys, es := nutsdb.SortedEntryKeys(entries)
-			for _, key := range keys {
-				fmt.Println(key, string(es[key].Value))
+			for _, entry := range entries {
+				fmt.Println(string(entry.Key), string(entry.Value))
 			}
 		}
 		return nil
@@ -473,7 +473,27 @@ if err := db.View(
 	log.Fatal(err)
 }
 ```
+### 获取全部的key和value
 
+对于获取一个bucket的所有key和value，可以使用`GetAll`方法。
+
+```
+	if err := db.View(
+		func(tx *nutsdb.Tx) error {
+			es, err := tx.GetAll(bucket)
+			if err != nil {
+				return err
+			}
+
+			for _,entry := range es {
+				fmt.Println(string(entry.Key),string(entry.Value))
+			}
+
+			return nil
+		}); err != nil {
+		log.Println(err)
+	}
+```
 ### 合并操作
 
 随着数据越来越多，特别是一些删除或者过期的数据占据着磁盘，清理这些NutsDB提供了`db.Merge()`方法，这个方法需要自己根据实际情况编写合并策略。
