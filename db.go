@@ -151,7 +151,6 @@ type (
 	Entries []*Entry
 )
 
-
 // Open returns a newly initialized DB object.
 func Open(opt Options) (*DB, error) {
 	db := &DB{
