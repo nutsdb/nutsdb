@@ -324,7 +324,7 @@ if err := db.Update(
 	func(tx *nutsdb.Tx) error {
 	key := []byte("name1")
 	val := []byte("val1")
-	bucket: = "bucket1"
+	bucket := "bucket1"
 	if err := tx.Put(bucket, key, val, 0); err != nil {
 		return err
 	}
@@ -346,7 +346,7 @@ if err := db.Update(
 	func(tx *nutsdb.Tx) error {
 	key := []byte("name1")
 	val := []byte("val1-modify") // 更新值
-	bucket: = "bucket1"
+	bucket := "bucket1"
 	if err := tx.Put(bucket, key, val, 0); err != nil {
 		return err
 	}
@@ -365,7 +365,7 @@ if err := db.Update(
 if err := db.View(
 func(tx *nutsdb.Tx) error {
 	key := []byte("name1")
-	bucket: = "bucket1"
+	bucket := "bucket1"
 	if e, err := tx.Get(bucket, key); err != nil {
 		return err
 	} else {
@@ -385,7 +385,7 @@ func(tx *nutsdb.Tx) error {
 if err := db.Update(
 	func(tx *nutsdb.Tx) error {
 	key := []byte("name1")
-	bucket: = "bucket1"
+	bucket := "bucket1"
 	if err := tx.Delete(bucket, key); err != nil {
 		return err
 	}
@@ -405,7 +405,7 @@ if err := db.Update(
 	func(tx *nutsdb.Tx) error {
 	key := []byte("name1")
 	val := []byte("val1")
-	bucket: = "bucket1"
+	bucket := "bucket1"
 	
 	// 如果设置 ttl = 0 or Persistent, 这个key就会永久不删除
 	// 这边 ttl = 60 , 60s之后就会过期。
@@ -449,7 +449,7 @@ if err := db.View(
 
 #### 范围扫描
 
-对于范围的扫描，我们可以用 `RangeScan` 方法. 
+对于范围的扫描，我们可以用 `RangeScan` 方法。
 
 例子：
 
@@ -477,15 +477,18 @@ if err := db.View(
 
 对于获取一个bucket的所有key和value，可以使用`GetAll`方法。
 
+例子：
+
 ```go
 if err := db.View(
 	func(tx *nutsdb.Tx) error {
-		es, err := tx.GetAll(bucket)
+		bucket := "user_list"
+		entries, err := tx.GetAll(bucket)
 		if err != nil {
 			return err
 		}
 
-		for _,entry := range es {
+		for _, entry := range entries {
 			fmt.Println(string(entry.Key),string(entry.Value))
 		}
 
