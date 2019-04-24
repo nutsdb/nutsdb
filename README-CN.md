@@ -477,22 +477,22 @@ if err := db.View(
 
 对于获取一个bucket的所有key和value，可以使用`GetAll`方法。
 
-```
-	if err := db.View(
-		func(tx *nutsdb.Tx) error {
-			es, err := tx.GetAll(bucket)
-			if err != nil {
-				return err
-			}
+```go
+if err := db.View(
+	func(tx *nutsdb.Tx) error {
+		es, err := tx.GetAll(bucket)
+		if err != nil {
+			return err
+		}
 
-			for _,entry := range es {
-				fmt.Println(string(entry.Key),string(entry.Value))
-			}
+		for _,entry := range es {
+			fmt.Println(string(entry.Key),string(entry.Value))
+		}
 
-			return nil
-		}); err != nil {
-		log.Println(err)
-	}
+		return nil
+	}); err != nil {
+	log.Println(err)
+}
 ```
 ### 合并操作
 
