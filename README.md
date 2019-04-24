@@ -392,13 +392,13 @@ To iterate over a key prefix, we can use `PrefixScan` function, and the paramter
 if err := db.View(
 	func(tx *nutsdb.Tx) error {
 		prefix := []byte("user_")
+		bucket := "user_list"
 		// Constrain 100 entries returned 
 		if entries, err := tx.PrefixScan(bucket, prefix, 100); err != nil {
 			return err
 		} else {
-			keys, es := nutsdb.SortedEntryKeys(entries)
-			for _, key := range keys {
-				fmt.Println(key, string(es[key].Value))
+			for _, entry := range entries {
+				fmt.Println(string(entry.Key), string(entry.Value))
 			}
 		}
 		return nil
@@ -419,13 +419,12 @@ if err := db.View(
 		// Query a specific user key range like this.
 		start := []byte("user_0010001")
 		end := []byte("user_0010010")
-		bucket：= []byte("user_list")
+		bucket := "user_list"
 		if entries, err := tx.RangeScan(bucket, start, end); err != nil {
 			return err
 		} else {
-			keys, es := nutsdb.SortedEntryKeys(entries)
-			for _, key := range keys {
-				fmt.Println(key, string(es[key].Value))
+			for _, entry := range entries {
+				fmt.Println(string(entry.Key), string(entry.Value))
 			}
 		}
 		return nil
