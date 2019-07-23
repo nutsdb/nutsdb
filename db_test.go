@@ -1,4 +1,4 @@
-// Copyright 2019 The nutsdb Authors. All rights reserved.
+// Copyright 2019 The nutsdb Author. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -38,7 +38,7 @@ func InitOpt(fileDir string, isRemoveFiles bool) {
 		for _, f := range files {
 			name := f.Name()
 			if name != "" {
-				err := os.Remove(fileDir + "/" + name)
+				err := os.RemoveAll(fileDir + "/" + name)
 				if err != nil {
 					panic(err)
 				}
@@ -139,7 +139,7 @@ func TestDB_Merge_For_string(t *testing.T) {
 	for _, f := range files {
 		name := f.Name()
 		if name != "" {
-			err := os.Remove(fileDir + "/" + name)
+			err := os.RemoveAll(fileDir + "/" + name)
 			if err != nil {
 				panic(err)
 			}
@@ -987,4 +987,8 @@ func TestDB_Close(t *testing.T) {
 	if err == nil {
 		t.Error("err TestDB_Close")
 	}
+}
+
+func TestBPTreeSparse_Persistence(t *testing.T) {
+
 }

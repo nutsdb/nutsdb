@@ -1,4 +1,4 @@
-// Copyright 2019 The nutsdb Authors. All rights reserved.
+// Copyright 2019 The nutsdb Author. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,7 +16,13 @@ package nutsdb
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
+	"fmt"
+	"os"
+	"unsafe"
+
+	"github.com/xujiajun/utils/strconv2"
 )
 
 var (
@@ -48,14 +54,32 @@ const (
 
 	// CountFlagDisabled returns disabled CountFlag
 	CountFlagDisabled = false
+
+	// BPTIndexSuffix returns b+ tree index suffix
+	BPTIndexSuffix = ".bptidx"
+
+	// BPTRootIndexSuffix returns b+ tree root index suffix
+	BPTRootIndexSuffix = ".bptridx"
+
+	// BPTRootIndexSuffix returns b+ tree tx ID index suffix
+	BPTTxIdIndexSuffix = ".bpttxid"
+
+	// BPTRootTxIdIndexSuffix returns b+ tree root tx ID index suffix
+	BPTRootTxIdIndexSuffix = ".bptrtxid"
 )
 
 type (
 	// BPTree records root node and valid key number.
 	BPTree struct {
-		root          *Node
-		ValidKeyCount int // the number of the key that not expired or deleted
-		FirstKey      []byte
+		root             *Node
+		ValidKeyCount    int // the number of the key that not expired or deleted
+		FirstKey         []byte
+		LastKey          []byte
+		LastAddress      int64
+		Filepath         string
+		bucketSize       uint32
+		keyPosMap        map[string]int64
+		enabledKeyPosMap bool
 	}
 
 	// Records records multi-records as result when is called Range or PrefixScan.
@@ -68,30 +92,79 @@ type (
 		parent   *Node
 		isLeaf   bool
 		KeysNum  int
+		Next     *Node
+		Address  int64
+	}
+
+	// BinaryNode
+	BinaryNode struct {
+		// hint offset
+		Keys [order - 1]int64
+		// 1. not leaf node represents node address
+		// 2. leaf node represents data address
+		Pointers    [order]int64
+		IsLeaf      uint16
+		KeysNum     uint16
+		Address     int64
+		NextAddress int64
 	}
 )
 
+func getBinaryNodeSize() int64 {
+	return int64(unsafe.Sizeof(BinaryNode{}))
+}
+
 // newNode returns a newly initialized Node object that implements the Node.
-func newNode() *Node {
-	return &Node{
+func (t *BPTree) newNode() *Node {
+	node := &Node{
 		Keys:     make([][]byte, order-1),
 		pointers: make([]interface{}, order),
 		isLeaf:   false,
 		parent:   nil,
 		KeysNum:  0,
+		Address:  t.LastAddress,
 	}
+	size := getBinaryNodeSize()
+	t.LastAddress += size
+
+	return node
 }
 
 // newLeaf returns a newly initialized Node object that implements the Node and set isLeaf flag.
-func newLeaf() *Node {
-	leaf := newNode()
+func (t *BPTree) newLeaf() *Node {
+	leaf := t.newNode()
 	leaf.isLeaf = true
 	return leaf
 }
 
 // NewTree returns a newly initialized BPTree Object that implements the BPTree.
 func NewTree() *BPTree {
-	return &BPTree{}
+	return &BPTree{LastAddress: 0, keyPosMap: make(map[string]int64), enabledKeyPosMap: false}
+}
+
+var queue *Node
+
+func enqueue(node *Node) {
+	var c *Node
+
+	if queue == nil {
+		queue = node
+		queue.Next = nil
+	} else {
+		c = queue
+		for c.Next != nil {
+			c = c.Next
+		}
+		c.Next = node
+		node.Next = nil
+	}
+}
+
+func dequeue() *Node {
+	n := queue
+	queue = queue.Next
+
+	return n
 }
 
 // FindLeaf returns leaf at the given key.
@@ -118,6 +191,197 @@ func (t *BPTree) FindLeaf(key []byte) *Node {
 	}
 
 	return curr
+}
+
+// SetKeyPosMap sets the key offset of all entries in the b+ tree.
+func (t *BPTree) SetKeyPosMap(keyPosMap map[string]int64) {
+	t.keyPosMap = keyPosMap
+}
+
+// ToBinary represents convert to a binary node.
+func (t *BPTree) ToBinary(n *Node) (result []byte, err error) {
+	var i int
+	var keys [order - 1]int64
+
+	for i = 0; i < n.KeysNum; i++ {
+		if t.enabledKeyPosMap {
+			if len(t.keyPosMap) == 0 {
+				return nil, errors.New("not set keyPosMap")
+			}
+			keys[i] = t.keyPosMap[string(n.Keys[i])]
+		} else {
+			key, _ := strconv2.StrToInt64(string(n.Keys[i]))
+
+			keys[i] = key
+		}
+	}
+
+	var pointers [order]int64
+
+	if !n.isLeaf {
+		for i = 0; i < n.KeysNum+1; i++ {
+			pointers[i] = n.pointers[i].(*Node).Address
+		}
+	} else {
+		for i = 0; i < n.KeysNum; i++ {
+			if n.pointers[i].(*Record).H != nil {
+				dataPos := n.pointers[i].(*Record).H.dataPos
+				pointers[i] = int64(dataPos)
+			} else {
+				pointers[i] = 0
+			}
+		}
+	}
+
+	var nextAddress int64
+	nextAddress = -1
+
+	if n.Next != nil {
+		nextAddress = n.Next.Address
+	}
+
+	var isLeaf uint16
+	isLeaf = 0
+
+	if n.isLeaf {
+		isLeaf = 1
+	}
+
+	binNode := BinaryNode{
+		Keys:        keys,
+		Pointers:    pointers,
+		IsLeaf:      isLeaf,
+		Address:     n.Address,
+		NextAddress: nextAddress,
+		KeysNum:     uint16(n.KeysNum),
+	}
+
+	buf := new(bytes.Buffer)
+
+	err = binary.Write(buf, binary.LittleEndian, binNode)
+
+	if err != nil {
+		return result, err
+	}
+
+	return buf.Bytes(), nil
+}
+
+// WriteNode writes a binary node to the File starting at byte offset off.
+// It returns the number of bytes written and an error, if any.
+// WriteAt returns a non-nil error when n != len(b).
+func (t *BPTree) WriteNode(n *Node, off int64, syncEnable bool, fd *os.File) (number int, err error) {
+	bn, err := t.ToBinary(n)
+
+	if err != nil {
+		return 0, err
+	}
+
+	if off == -1 {
+		off = n.Address
+	}
+
+	number, err = fd.WriteAt(bn, off)
+	if err != nil {
+		return 0, err
+	}
+
+	if syncEnable {
+		err = fd.Sync()
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	return
+}
+
+// WriteNode writes all nodes in the b+ tree to the File starting at byte offset off.
+func (t *BPTree) WriteNodes(rwMode RWMode, syncEnable bool, flag int) error {
+	var (
+		n   *Node
+		i   int
+		err error
+	)
+
+	fd, err := os.OpenFile(t.Filepath, os.O_CREATE|os.O_RDWR, 0644)
+	defer fd.Close()
+
+	if err != nil {
+		return err
+	}
+
+	queue = nil
+
+	enqueue(t.root)
+
+	for queue != nil {
+		n = dequeue()
+
+		_, err := t.WriteNode(n, -1, syncEnable, fd)
+		if err != nil {
+			return err
+		}
+
+		if n != nil {
+			if !n.isLeaf {
+				for i = 0; i <= n.KeysNum; i++ {
+					c, _ := n.pointers[i].(*Node)
+					enqueue(c)
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// isValidAddress checks if the address is invalidate.
+func isValidAddress(addr int64) bool {
+	if addr >= 0 && addr%getBinaryNodeSize() == 0 {
+		return true
+	}
+	return false
+}
+
+// ReadNode reads a binary node at given Filepath and address.
+func ReadNode(Filepath string, address int64) (bn *BinaryNode, err error) {
+	if !isValidAddress(address) {
+		return nil, fmt.Errorf("Invalid address. Cannot read node at %v ", address)
+	}
+
+	f, err := os.Open(Filepath)
+	defer f.Close()
+	if os.IsNotExist(err) {
+		return nil, err
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	size := int64(unsafe.Sizeof(BinaryNode{}))
+
+	data := make([]byte, size)
+	_, err = f.Seek(address, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = f.Read(data)
+	if err != nil {
+		return nil, err
+	}
+
+	buf := bytes.NewBuffer(data)
+	bn = new(BinaryNode)
+
+	err = binary.Read(buf, binary.LittleEndian, bn)
+	if err != nil {
+		return nil, err
+	}
+
+	return bn, nil
 }
 
 // Compare returns an integer comparing two byte slices lexicographically.
@@ -294,7 +558,7 @@ func (t *BPTree) Find(key []byte) (*Record, error) {
 
 // startNewTree returns a start new tree.
 func (t *BPTree) startNewTree(key []byte, pointer *Record) error {
-	t.root = newLeaf()
+	t.root = t.newLeaf()
 	t.root.Keys[0] = key
 	t.root.pointers[0] = pointer
 	t.root.KeysNum = 1
@@ -305,8 +569,16 @@ func (t *BPTree) startNewTree(key []byte, pointer *Record) error {
 // Insert inserts record to the b+ tree,
 // and if the key exists, update the record and the counter(if countFlag set true,it will start count).
 func (t *BPTree) Insert(key []byte, e *Entry, h *Hint, countFlag bool) error {
-	if compare(key, t.FirstKey) < 0 {
+	if len(t.FirstKey) == 0 {
 		t.FirstKey = key
+	} else {
+		if compare(key, t.FirstKey) < 0 && h.meta.Flag != DataDeleteFlag {
+			t.FirstKey = key
+		}
+	}
+
+	if compare(key, t.LastKey) > 0 && h.meta.Flag != DataDeleteFlag {
+		t.LastKey = key
 	}
 
 	if r, err := t.Find(key); err == nil && r != nil {
@@ -402,7 +674,7 @@ func (t *BPTree) splitLeaf(leaf *Node, key []byte, pointer *Record) error {
 
 	// Set the keys and pointers for the new leaf.
 	j = 0
-	newLeaf := newLeaf()
+	newLeaf := t.newLeaf()
 	for i = splitIndex; i < order; i++ {
 		newLeaf.Keys[j] = tmpKeys[i]
 		newLeaf.pointers[j] = tmpPointers[i]
@@ -427,7 +699,7 @@ func (t *BPTree) splitLeaf(leaf *Node, key []byte, pointer *Record) error {
 
 // insertIntoNewRoot returns a now root when the insertIntoParent is called
 func (t *BPTree) insertIntoNewRoot(left *Node, key []byte, right *Node) error {
-	t.root = newNode()
+	t.root = t.newNode()
 
 	t.root.Keys[0] = key
 	t.root.pointers[0] = left
@@ -529,7 +801,7 @@ func (t *BPTree) splitParent(node *Node, leftIndex int, key []byte, right *Node)
 	// Reset the last pointer of the node.
 	node.pointers[i] = tmpPointers[i]
 
-	newNode := newNode()
+	newNode := t.newNode()
 
 	j = 0
 	for i++; i < order; i++ {

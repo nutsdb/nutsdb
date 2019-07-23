@@ -1,4 +1,4 @@
-// Copyright 2019 The nutsdb Authors. All rights reserved.
+// Copyright 2019 The nutsdb Author. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -56,10 +56,11 @@ var (
 
 // Tx represents a transaction.
 type Tx struct {
-	id            uint64
-	db            *DB
-	writable      bool
-	pendingWrites []*Entry
+	id                     uint64
+	db                     *DB
+	writable               bool
+	pendingWrites          []*Entry
+	ReservedStoreTxIDIdxes map[int64]*BPTree
 }
 
 // Begin opens a new transaction.
@@ -89,9 +90,10 @@ func newTx(db *DB, writable bool) (tx *Tx, err error) {
 	var txID uint64
 
 	tx = &Tx{
-		db:            db,
-		writable:      writable,
-		pendingWrites: []*Entry{},
+		db:                     db,
+		writable:               writable,
+		pendingWrites:          []*Entry{},
+		ReservedStoreTxIDIdxes: make(map[int64]*BPTree),
 	}
 
 	txID, err = tx.getTxID()
@@ -129,7 +131,7 @@ func (tx *Tx) getTxID() (id uint64, err error) {
 // 5. Unlock the database and clear the db field.
 func (tx *Tx) Commit() error {
 	var e *Entry
-
+	var off int64
 	if tx.db == nil {
 		return ErrDBClosed
 	}
@@ -143,6 +145,11 @@ func (tx *Tx) Commit() error {
 	}
 
 	lastIndex := writesLen - 1
+	countFlag := CountFlagEnabled
+	if tx.db.isMerging {
+		countFlag = CountFlagDisabled
+	}
+
 	for i := 0; i < writesLen; i++ {
 		entry := tx.pendingWrites[i]
 		entrySize := entry.Size()
@@ -150,18 +157,25 @@ func (tx *Tx) Commit() error {
 			return ErrKeyAndValSize
 		}
 
+		bucket := string(entry.Meta.bucket)
+
 		if tx.db.ActiveFile.ActualSize+entrySize > tx.db.opt.SegmentSize {
 			if err := tx.rotateActiveFile(); err != nil {
 				return err
 			}
 		}
 
+		if entry.Meta.ds == DataStructureBPTree {
+			tx.db.BPTreeKeyEntryPosMap[string(entry.Meta.bucket)+string(entry.Key)] = tx.db.ActiveFile.writeOff
+		}
+
 		if i == lastIndex {
 			entry.Meta.status = Committed
 		}
 
-		off := tx.db.ActiveFile.writeOff
-		if _, err := tx.db.ActiveFile.WriteAt(entry.Encode(), off); err != nil {
+		off = tx.db.ActiveFile.writeOff
+
+		if _, err := tx.db.ActiveFile.WriteAt(entry.Encode(), tx.db.ActiveFile.writeOff); err != nil {
 			return err
 		}
 
@@ -171,24 +185,51 @@ func (tx *Tx) Commit() error {
 			}
 		}
 
-		if i == lastIndex {
-			tx.db.committedTxIds[entry.Meta.txID] = struct{}{}
-		}
-
 		tx.db.ActiveFile.ActualSize += entrySize
+
 		tx.db.ActiveFile.writeOff += entrySize
+
+		if i == lastIndex {
+			txId := entry.Meta.txID
+			if tx.db.opt.EntryIdxMode == HintBPTSparseIdxMode {
+				txIdStr := strconv2.IntToStr(int(txId))
+
+				tx.db.ActiveCommittedTxIdsIdx.Insert([]byte(txIdStr), nil, &Hint{meta: &MetaData{Flag: DataSetFlag}}, countFlag)
+
+				if len(tx.ReservedStoreTxIDIdxes) > 0 {
+					for fID, txIDIdx := range tx.ReservedStoreTxIDIdxes {
+						filePath := tx.db.getBPTTxIdPath(fID)
+
+						txIDIdx.Insert([]byte(txIdStr), nil, &Hint{meta: &MetaData{Flag: DataSetFlag}}, countFlag)
+						txIDIdx.Filepath = filePath
+
+						err := txIDIdx.WriteNodes(tx.db.opt.RWMode, tx.db.opt.SyncEnable, 2)
+						if err != nil {
+							return err
+						}
+
+						filePath = tx.db.getBPTRootTxIdPath(fID)
+						txIDRootIdx := NewTree()
+						rootAddress := strconv2.Int64ToStr(txIDIdx.root.Address)
+
+						txIDRootIdx.Insert([]byte(rootAddress), nil, &Hint{meta: &MetaData{Flag: DataSetFlag}}, countFlag)
+						txIDRootIdx.Filepath = filePath
+
+						err = txIDRootIdx.WriteNodes(tx.db.opt.RWMode, tx.db.opt.SyncEnable, 2)
+						if err != nil {
+							return err
+						}
+					}
+				}
+			} else {
+				tx.db.committedTxIds[txId] = struct{}{}
+			}
+		}
 
 		e = nil
 		if tx.db.opt.EntryIdxMode == HintKeyValAndRAMIdxMode {
 			e = entry
 		}
-
-		countFlag := CountFlagEnabled
-		if tx.db.isMerging {
-			countFlag = CountFlagDisabled
-		}
-
-		bucket := string(entry.Meta.bucket)
 
 		if entry.Meta.ds == DataStructureBPTree {
 			tx.buildBPTreeIdx(bucket, entry, e, off, countFlag)
@@ -200,6 +241,9 @@ func (tx *Tx) Commit() error {
 	tx.unlock()
 
 	tx.db = nil
+
+	tx.pendingWrites = nil
+	tx.ReservedStoreTxIDIdxes = nil
 
 	return nil
 }
@@ -227,15 +271,30 @@ func (tx *Tx) buildIdxes(writesLen int) {
 }
 
 func (tx *Tx) buildBPTreeIdx(bucket string, entry, e *Entry, off int64, countFlag bool) {
-	if _, ok := tx.db.BPTreeIdx[bucket]; !ok {
-		tx.db.BPTreeIdx[bucket] = NewTree()
+	if tx.db.opt.EntryIdxMode == HintBPTSparseIdxMode {
+		newKey := []byte(bucket)
+		newKey = append(newKey, entry.Key...)
+		tx.db.ActiveBPTreeIdx.Insert(newKey, e, &Hint{
+			fileID:  tx.db.ActiveFile.fileID,
+			key:     newKey,
+			meta:    entry.Meta,
+			dataPos: uint64(off),
+		}, countFlag)
+	} else {
+		if _, ok := tx.db.BPTreeIdx[bucket]; !ok {
+			tx.db.BPTreeIdx[bucket] = NewTree()
+		}
+
+		if tx.db.BPTreeIdx[bucket] == nil {
+			tx.db.BPTreeIdx[bucket] = NewTree()
+		}
+		_ = tx.db.BPTreeIdx[bucket].Insert(entry.Key, e, &Hint{
+			fileID:  tx.db.ActiveFile.fileID,
+			key:     entry.Key,
+			meta:    entry.Meta,
+			dataPos: uint64(off),
+		}, countFlag)
 	}
-	_ = tx.db.BPTreeIdx[bucket].Insert(entry.Key, e, &Hint{
-		fileID:  tx.db.ActiveFile.fileID,
-		key:     entry.Key,
-		meta:    entry.Meta,
-		dataPos: uint64(off),
-	}, countFlag)
 }
 
 func (tx *Tx) buildSetIdx(bucket string, entry *Entry) {
@@ -312,6 +371,7 @@ func (tx *Tx) buildListIdx(bucket string, entry *Entry) {
 // rotateActiveFile rotates log file when active file is not enough space to store the entry.
 func (tx *Tx) rotateActiveFile() error {
 	var err error
+	fID := tx.db.MaxFileID
 	tx.db.MaxFileID++
 
 	if !tx.db.opt.SyncEnable && tx.db.opt.RWMode == MMap {
@@ -324,6 +384,49 @@ func (tx *Tx) rotateActiveFile() error {
 		return err
 	}
 
+	if tx.db.opt.EntryIdxMode == HintBPTSparseIdxMode {
+		tx.db.ActiveBPTreeIdx.Filepath = tx.db.getBPTPath(fID)
+		tx.db.ActiveBPTreeIdx.enabledKeyPosMap = true
+		tx.db.ActiveBPTreeIdx.SetKeyPosMap(tx.db.BPTreeKeyEntryPosMap)
+
+		err = tx.db.ActiveBPTreeIdx.WriteNodes(tx.db.opt.RWMode, tx.db.opt.SyncEnable, 1)
+		if err != nil {
+			return err
+		}
+
+		BPTreeRootIdx := &BPTreeRootIdx{
+			rootOff:   uint64(tx.db.ActiveBPTreeIdx.root.Address),
+			fID:       uint64(fID),
+			startSize: uint32(len(tx.db.ActiveBPTreeIdx.FirstKey)),
+			endSize:   uint32(len(tx.db.ActiveBPTreeIdx.LastKey)),
+			start:     tx.db.ActiveBPTreeIdx.FirstKey,
+			end:       tx.db.ActiveBPTreeIdx.LastKey,
+		}
+
+		_, err := BPTreeRootIdx.Persistence(tx.db.getBPTRootPath(fID),
+			0, tx.db.opt.SyncEnable)
+		if err != nil {
+			return err
+		}
+
+		tx.db.BPTreeRootIdxes = append(tx.db.BPTreeRootIdxes, BPTreeRootIdx)
+
+		// clear and reset BPTreeKeyEntryPosMap
+		tx.db.BPTreeKeyEntryPosMap = nil
+		tx.db.BPTreeKeyEntryPosMap = make(map[string]int64)
+
+		// clear and reset ActiveBPTreeIdx
+		tx.db.ActiveBPTreeIdx = nil
+		tx.db.ActiveBPTreeIdx = NewTree()
+
+		tx.ReservedStoreTxIDIdxes[fID] = tx.db.ActiveCommittedTxIdsIdx
+
+		// clear and reset ActiveCommittedTxIdsIdx
+		tx.db.ActiveCommittedTxIdsIdx = nil
+		tx.db.ActiveCommittedTxIdsIdx = NewTree()
+	}
+
+	// reset ActiveFile
 	path := tx.db.getDataPath(tx.db.MaxFileID)
 	tx.db.ActiveFile, err = NewDataFile(path, tx.db.opt.SegmentSize, tx.db.opt.RWMode)
 	if err != nil {
@@ -331,7 +434,6 @@ func (tx *Tx) rotateActiveFile() error {
 	}
 
 	tx.db.ActiveFile.fileID = tx.db.MaxFileID
-
 	return nil
 }
 
@@ -344,6 +446,7 @@ func (tx *Tx) Rollback() error {
 	tx.unlock()
 
 	tx.db = nil
+	tx.pendingWrites = nil
 
 	return nil
 }
