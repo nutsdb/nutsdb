@@ -288,7 +288,7 @@ type GetByScoreRangeOptions struct {
 //
 // Time complexity of this method is : O(log(N)).
 func (ss *SortedSet) GetByScoreRange(start SCORE, end SCORE, options *GetByScoreRangeOptions) []*SortedSetNode {
-	limit := 1 << 31
+	limit := 1<<31 - 1
 	if options != nil && options.Limit > 0 {
 		limit = options.Limit
 	}

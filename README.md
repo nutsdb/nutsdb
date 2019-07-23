@@ -4,25 +4,25 @@ English | [简体中文](https://github.com/xujiajun/nutsdb/blob/master/README-C
 
 NutsDB is a simple, fast, embeddable and persistent key/value store written in pure Go. 
 
-It supports fully serializable transactions and many data structures such as list、set、sorted set. All operations happen inside a Tx. Tx represents a transaction, which can be read-only or read-write. Read-only transactions can read values for a given bucket and given key or iterate over a set of key-value pairs. Read-write transactions can read, update and delete keys from the DB.
+It supports fully serializable transactions and many data structures such as list、set、sorted set. All operations happen inside a Tx. Tx represents a transaction, which can be read-only or read-write. Read-only transactions can read values for a given bucket and a given key or iterate over a set of key-value pairs. Read-write transactions can read, update and delete keys from the DB.
 
 ## Motivation
 I wanted a simple, fast, embeddable and persistent key/value store written in pure Go. And if it supports more data structures such as list, set, sorted set，it will be better.
 
-There are some options around the embeddable kv store in Go: 
+There are some options around the embeddable key/value store in Go: 
 
-BoltDB,it is based on B+ tree, has a good random read performance and awesome sequential scan performance, and it supports  ACID transactions with serializable isolation, but it is terrible at random write performance and not supports more data structures such as list etc. 
+BoltDB is based on B+ tree, has a good random read performance and awesome sequential scan performance, and it supports  ACID transactions with serializable isolation, but it is terrible at random write performance and not supports more data structures such as list, etc. 
 
-GoLevelDB is based on a log-structured merge-tree (LSM tree), but it not supports more data structures.
+GoLevelDB is based on a log-structured merge-tree (LSM tree), but it does not support more data structures.
 
-Badger is based on LSM tree with value log. It designed for SSDs. It also supports transactions. But its write performance is not as good as i thought.And it also not supports more data structures.
+Badger is based on LSM tree with value log. It designed for SSDs. It also supports transactions. But its write performance is not as good as I thought. And it also does not support more data structures.
 
-Moreover, i was curious about how to implement a kv database. Database can be said to be the core of the system, to understand the database kernel or their own implementation, better use of the same kind of database or the next time according to the business custom database is very helpful.
+Moreover, I was curious about how to implement a key/value database. The database can be said to be the core of the system, to understand the database kernel or their own implementation, better use of the same kind of database or the next time according to the business custom database is very helpful.
 
-So i tried to build a kv store by myself, i wanted to find a simple store engine model as reference. 
-Finally i found the bitcask model. It is simple and easy to implement. Howerver it has its limition,like range or prefix queries are not effcient. For example, you can not easily scan over all keys between user000000 and user999999, you had to look up each key individully in the hashmap. 
+So I tried to build a key/value store by myself, I wanted to find a simple store engine model as a reference. 
+Finally, I found the Bitcask model. It is simple and easy to implement. However, it has its limitation, like range or prefix queries, are not efficient. For example, you cannot easily scan over all keys between user000000 and user999999, you had to look up each key individually in the hashmap. 
 
-In order to break the limition, i tried to optimize them. Finally i did it and named `NutsDB`. NutsDB offers a high read/write performance and supports transactions. And it still has a lot of room for optimization. Welcome [contributions to NutsDB](https://github.com/xujiajun/nutsdb#contributing).
+In order to break the limitation, I tried to optimize them. Finally, I did it and named `NutsDB`. NutsDB offers a high read/write performance and supports transactions. And it still has a lot of room for optimization. Welcome [contributions to NutsDB](https://github.com/xujiajun/nutsdb#contributing).
 
 ## Table of Contents
 
