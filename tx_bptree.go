@@ -182,7 +182,6 @@ func (tx *Tx) RangeScan(bucket string, start, end []byte) (es Entries, err error
 	if tx.db.opt.EntryIdxMode == HintBPTSparseIdxMode {
 		newStart, newEnd := getNewKey(bucket, start), getNewKey(bucket, end)
 		records, err := tx.db.ActiveBPTreeIdx.Range(newStart, newEnd)
-
 		if err == nil && records != nil {
 			for _, r := range records {
 				path := tx.db.getDataPath(r.H.fileID)
@@ -203,6 +202,9 @@ func (tx *Tx) RangeScan(bucket string, start, end []byte) (es Entries, err error
 
 		es = append(es, tx.rangeScanOnDisk(bucket, start, end)...)
 
+		if len(es) == 0 {
+			return nil, ErrRangeScan
+		}
 		return processEntriesScanOnDisk(es), nil
 	}
 
@@ -237,7 +239,7 @@ func (tx *Tx) rangeScanOnDisk(bucket string, start, end []byte) []*Entry {
 	newStart, newEnd := getNewKey(bucket, start), getNewKey(bucket, end)
 
 	for _, bptSparseIdx := range bptSparseIdxGroup {
-		if compare(newStart, bptSparseIdx.start) >= 0 && compare(newEnd, bptSparseIdx.end) <= 0 {
+		if compare(newStart, bptSparseIdx.start) >= 0 {
 			entries := tx.findRangeOnDisk(int64(bptSparseIdx.fID), int64(bptSparseIdx.rootOff), newStart, newEnd)
 			result = append(
 				result,
@@ -389,6 +391,7 @@ func (tx *Tx) findRangeOnDisk(fID, rootOff int64, start, end []byte) (es []*Entr
 		df.rwManager.Close()
 
 		newStart := getNewKey(string(entry.Meta.bucket), entry.Key)
+
 		if compare(newStart, start) >= 0 {
 			break
 		}
@@ -408,6 +411,7 @@ func (tx *Tx) findRangeOnDisk(fID, rootOff int64, start, end []byte) (es []*Entr
 			df.rwManager.Close()
 
 			newEnd := getNewKey(string(entry.Meta.bucket), entry.Key)
+
 			if compare(newEnd, end) > 0 {
 				scanFlag = false
 				break
@@ -462,6 +466,9 @@ func (tx *Tx) PrefixScan(bucket string, prefix []byte, limitNum int) (es Entries
 			es = append(es, tx.prefixScanOnDisk(bucket, prefix, leftNum)...)
 		}
 
+		if len(es) == 0 {
+			return nil, ErrPrefixScan
+		}
 		return processEntriesScanOnDisk(es), nil
 	}
 
