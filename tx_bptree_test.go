@@ -42,6 +42,26 @@ func Init() {
 	return
 }
 
+func InitForBPTSparseIdxMode() {
+	fileDir := "/tmp/nutsdbtesttx2"
+	files, _ := ioutil.ReadDir(fileDir)
+	for _, f := range files {
+		name := f.Name()
+		if name != "" {
+			err := os.RemoveAll(fileDir + "/" + name)
+			if err != nil {
+				panic(err)
+			}
+		}
+	}
+
+	opt = DefaultOptions
+	opt.Dir = fileDir
+	opt.SegmentSize = 1024
+	opt.EntryIdxMode = HintBPTSparseIdxMode
+	return
+}
+
 func TestTx_PutAndGet(t *testing.T) {
 	Init()
 	db, err = Open(opt)
@@ -672,4 +692,148 @@ func TestTx_RangeScan_NotFound(t *testing.T) {
 		tx.Commit()
 		t.Error("err TestTx_RangeScan_NotFound")
 	}
+}
+
+func TestTx_Get_SCan_For_BPTSparseIdxMode(t *testing.T) {
+	InitForBPTSparseIdxMode()
+
+	db, err = Open(opt)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tx, err := db.Begin(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bucket := "bucket_get_test3"
+
+	for i := 0; i <= 10; i++ {
+		key := []byte("key_" + fmt.Sprintf("%07d", i))
+		val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", i))
+		if err = tx.Put(bucket, key, val, Persistent); err != nil {
+			err = tx.Rollback()
+			t.Fatal(err)
+		}
+	}
+	tx.Commit()
+
+	tx, err = db.Begin(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i := 0; i <= 10; i++ {
+		key := []byte("key_" + fmt.Sprintf("%07d", i))
+		if e, err := tx.Get(bucket, key); err != nil {
+			err = tx.Rollback()
+			t.Fatal(err)
+		} else {
+
+			val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", i))
+
+			if string(val) != string(e.Value) {
+				t.Error("err TestTx_Get")
+			}
+
+		}
+	}
+	tx.Commit()
+
+	// range scans
+	tx, err = db.Begin(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	startKey := []byte("key_" + fmt.Sprintf("%07d", 1))
+	endKey := []byte("key_" + fmt.Sprintf("%07d", 9))
+	es, err := tx.RangeScan(bucket, startKey, endKey)
+
+	for i := 0; i <= 8; i++ {
+		expectedVal := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", i+1))
+		if string(es[i].Value) != string(expectedVal) {
+			t.Error("err BPTSparseIdxMode RangeScan")
+		}
+	}
+
+	tx.Commit()
+
+	// prefix scans
+	tx, err = db.Begin(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	limit := 5
+	es, err = tx.PrefixScan(bucket, []byte("key_"), limit)
+
+	if len(es) != limit || err != nil {
+		t.Error("err BPTSparseIdxMode prefixScan")
+	}
+	tx.Commit()
+
+	db.Close()
+
+	// reopen
+	db, err = Open(opt)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	db.Close()
+}
+
+func TestTx_Notfound_For_BPTSparseIdxMode(t *testing.T) {
+	InitForBPTSparseIdxMode()
+	db, err = Open(opt)
+	defer db.Close()
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// get not found
+	tx, err := db.Begin(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bucket := "bucket_get_test3"
+
+	e, err := tx.Get(bucket, []byte("key_fake"))
+
+	if err == nil || e != nil {
+		t.Error("err BPTSparseIdxMode get")
+	}
+
+	tx.Commit()
+
+	// prefix scan not found
+	tx, err = db.Begin(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	es, err := tx.PrefixScan(bucket, []byte("key_prefix_fake"), 10)
+
+	if es != nil || err == nil {
+		t.Error("err BPTSparseIdxMode PrefixScan")
+	}
+	tx.Commit()
+
+	// range scan not found
+	tx, err = db.Begin(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	es, err = tx.RangeScan(bucket, []byte("key_start_fake"), []byte("key_end_fake"))
+	if es != nil || err == nil {
+		t.Error("err BPTSparseIdxMode get")
+	}
+	tx.Commit()
 }
