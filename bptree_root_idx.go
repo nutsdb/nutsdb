@@ -92,38 +92,38 @@ func ReadBPTreeRootIdxAt(path string, off int64) (*BPTreeRootIdx, error) {
 	if err != nil {
 		return nil, err
 	}
-	brs := &BPTreeRootIdx{}
-	brs.fID = binary.LittleEndian.Uint64(buf[4:12])
-	brs.rootOff = binary.LittleEndian.Uint64(buf[12:20])
-	brs.startSize = binary.LittleEndian.Uint32(buf[20:24])
-	brs.endSize = binary.LittleEndian.Uint32(buf[24:28])
+	bri := &BPTreeRootIdx{}
+	bri.fID = binary.LittleEndian.Uint64(buf[4:12])
+	bri.rootOff = binary.LittleEndian.Uint64(buf[12:20])
+	bri.startSize = binary.LittleEndian.Uint32(buf[20:24])
+	bri.endSize = binary.LittleEndian.Uint32(buf[24:28])
 
-	if brs.IsZero() {
+	if bri.IsZero() {
 		return nil, nil
 	}
 
 	off += BPTreeRootIdxHeaderSize
-	startBuf := make([]byte, brs.startSize)
+	startBuf := make([]byte, bri.startSize)
 	_, err = fd.ReadAt(startBuf, off)
 	if err != nil {
 		return nil, err
 	}
-	brs.start = startBuf
+	bri.start = startBuf
 
-	off += int64(brs.startSize)
-	endBuf := make([]byte, brs.endSize)
+	off += int64(bri.startSize)
+	endBuf := make([]byte, bri.endSize)
 	_, err = fd.ReadAt(endBuf, off)
 	if err != nil {
 		return nil, err
 	}
-	brs.end = endBuf
+	bri.end = endBuf
 
-	brs.crc = binary.LittleEndian.Uint32(buf[0:4])
-	if brs.GetCrc(buf) != brs.crc {
+	bri.crc = binary.LittleEndian.Uint32(buf[0:4])
+	if bri.GetCrc(buf) != bri.crc {
 		return nil, ErrCrc
 	}
 
-	return brs, nil
+	return bri, nil
 }
 
 // Persistence writes BPTreeRootIdx entry to the File starting at byte offset off.
