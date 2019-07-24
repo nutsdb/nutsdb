@@ -35,6 +35,9 @@ func TestBPTreeRootIdx_All(t *testing.T) {
 	}
 
 	idx, err := ReadBPTreeRootIdxAt(path, 0)
+	if err != nil {
+		t.Error(err)
+	}
 	if string(idx.start) != "key001" || string(idx.end) != "key010" {
 		t.Error("err ReadBPTreeRootIdxAt")
 	}

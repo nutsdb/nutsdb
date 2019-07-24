@@ -752,6 +752,10 @@ func TestTx_Get_SCan_For_BPTSparseIdxMode(t *testing.T) {
 	endKey := []byte("key_" + fmt.Sprintf("%07d", 9))
 	es, err := tx.RangeScan(bucket, startKey, endKey)
 
+	if err != nil {
+		t.Error(err)
+	}
+
 	for i := 0; i <= 8; i++ {
 		expectedVal := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", i+1))
 		if string(es[i].Value) != string(expectedVal) {

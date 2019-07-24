@@ -200,7 +200,11 @@ func (tx *Tx) RangeScan(bucket string, start, end []byte) (es Entries, err error
 			}
 		}
 
-		es = append(es, tx.rangeScanOnDisk(bucket, start, end)...)
+		entries, err := tx.rangeScanOnDisk(bucket, start, end)
+		if err != nil {
+			return nil, err
+		}
+		es = append(es, entries...)
 
 		if len(es) == 0 {
 			return nil, ErrRangeScan
@@ -227,7 +231,7 @@ func (tx *Tx) RangeScan(bucket string, start, end []byte) (es Entries, err error
 	return
 }
 
-func (tx *Tx) rangeScanOnDisk(bucket string, start, end []byte) []*Entry {
+func (tx *Tx) rangeScanOnDisk(bucket string, start, end []byte) ([]*Entry, error) {
 	var result []*Entry
 
 	bptSparseIdxGroup := tx.db.BPTreeRootIdxes
@@ -240,7 +244,11 @@ func (tx *Tx) rangeScanOnDisk(bucket string, start, end []byte) []*Entry {
 
 	for _, bptSparseIdx := range bptSparseIdxGroup {
 		if compare(newStart, bptSparseIdx.start) >= 0 {
-			entries := tx.findRangeOnDisk(int64(bptSparseIdx.fID), int64(bptSparseIdx.rootOff), newStart, newEnd)
+			entries, err := tx.findRangeOnDisk(int64(bptSparseIdx.fID), int64(bptSparseIdx.rootOff), newStart, newEnd)
+
+			if err != nil {
+				return nil, err
+			}
 			result = append(
 				result,
 				entries...,
@@ -248,10 +256,10 @@ func (tx *Tx) rangeScanOnDisk(bucket string, start, end []byte) []*Entry {
 		}
 	}
 
-	return result
+	return result, nil
 }
 
-func (tx *Tx) prefixScanOnDisk(bucket string, prefix []byte, limitNum int) []*Entry {
+func (tx *Tx) prefixScanOnDisk(bucket string, prefix []byte, limitNum int) ([]*Entry, error) {
 	var result []*Entry
 	bptSparseIdxGroup := tx.db.BPTreeRootIdxes
 	SortFID(bptSparseIdxGroup, func(p, q *BPTreeRootIdx) bool {
@@ -261,17 +269,20 @@ func (tx *Tx) prefixScanOnDisk(bucket string, prefix []byte, limitNum int) []*En
 	newPrefix := getNewKey(bucket, prefix)
 	for _, bptSparseIdx := range bptSparseIdxGroup {
 		if compare(newPrefix, bptSparseIdx.end) <= 0 {
-			entries := tx.findPrefixOnDisk(int64(bptSparseIdx.fID), int64(bptSparseIdx.rootOff), prefix, limitNum)
+			entries, err := tx.findPrefixOnDisk(int64(bptSparseIdx.fID), int64(bptSparseIdx.rootOff), prefix, limitNum)
+			if err != nil {
+				return nil, err
+			}
 			result = append(
 				result,
 				entries...,
 			)
 			if len(result) == limitNum {
-				return result
+				return result, nil
 			}
 		}
 	}
-	return result
+	return result, nil
 }
 
 func processEntriesScanOnDisk(entriesTemp []*Entry) (result []*Entry) {
@@ -302,29 +313,31 @@ func processEntriesScanOnDisk(entriesTemp []*Entry) (result []*Entry) {
 	return result
 }
 
-func (tx *Tx) findPrefixOnDisk(fID, rootOff int64, prefix []byte, limitNum int) (es []*Entry) {
+func (tx *Tx) findPrefixOnDisk(fID, rootOff int64, prefix []byte, limitNum int) (es []*Entry, err error) {
 	var (
 		i, j     uint16
 		entry    *Entry
 		scanFlag bool
 		curr     *BinaryNode
-		err      error
 		numFound int
 	)
 
 	es = []*Entry{}
 	if curr, err = tx.FindLeafOnDisk(fID, rootOff, prefix); err != nil && curr == nil {
-		return nil
+		return nil, err
 	}
 
 	for j = 0; j < curr.KeysNum; j++ {
 		df, err := NewDataFile(tx.db.getDataPath(int64(fID)), tx.db.opt.SegmentSize, tx.db.opt.RWMode)
 		if err != nil {
-			return nil
+			return nil, err
 		}
 
 		entry, err = df.ReadAt(int(curr.Keys[j]))
 		df.rwManager.Close()
+		if err != nil {
+			return nil, err
+		}
 
 		if compare(entry.Key, prefix) >= 0 {
 			break
@@ -339,11 +352,14 @@ func (tx *Tx) findPrefixOnDisk(fID, rootOff int64, prefix []byte, limitNum int) 
 		for i = j; i < curr.KeysNum; i++ {
 			df, err := NewDataFile(tx.db.getDataPath(int64(fID)), tx.db.opt.SegmentSize, tx.db.opt.RWMode)
 			if err != nil {
-				return nil
+				return nil, err
 			}
 
 			entry, err = df.ReadAt(int(curr.Keys[i]))
 			df.rwManager.Close()
+			if err != nil {
+				return nil, err
+			}
 
 			if !bytes.HasPrefix(entry.Key, prefix) {
 				scanFlag = false
@@ -360,35 +376,43 @@ func (tx *Tx) findPrefixOnDisk(fID, rootOff int64, prefix []byte, limitNum int) 
 		}
 
 		address := curr.NextAddress
+		if address == DefaultInvalidAddress {
+			break
+		}
 		curr, err = ReadNode(filepath, address)
-
+		if err != nil {
+			return nil, err
+		}
 		j = 0
 	}
 
 	return
 }
 
-func (tx *Tx) findRangeOnDisk(fID, rootOff int64, start, end []byte) (es []*Entry) {
+func (tx *Tx) findRangeOnDisk(fID, rootOff int64, start, end []byte) (es []*Entry, err error) {
 	var (
 		i, j     uint16
 		entry    *Entry
 		scanFlag bool
 		curr     *BinaryNode
-		err      error
 	)
 
 	if curr, err = tx.FindLeafOnDisk(fID, rootOff, start); err != nil && curr == nil {
-		return nil
+		return nil, err
 	}
 
 	for j = 0; j < curr.KeysNum; j++ {
 		df, err := NewDataFile(tx.db.getDataPath(int64(fID)), tx.db.opt.SegmentSize, tx.db.opt.RWMode)
 		if err != nil {
-			return nil
+			return nil, err
 		}
 
 		entry, err = df.ReadAt(int(curr.Keys[j]))
 		df.rwManager.Close()
+
+		if err != nil {
+			return nil, err
+		}
 
 		newStart := getNewKey(string(entry.Meta.bucket), entry.Key)
 
@@ -404,11 +428,15 @@ func (tx *Tx) findRangeOnDisk(fID, rootOff int64, start, end []byte) (es []*Entr
 		for i = j; i < curr.KeysNum; i++ {
 			df, err := NewDataFile(tx.db.getDataPath(int64(fID)), tx.db.opt.SegmentSize, tx.db.opt.RWMode)
 			if err != nil {
-				return nil
+				return nil, err
 			}
 
 			entry, err = df.ReadAt(int(curr.Keys[i]))
 			df.rwManager.Close()
+
+			if err != nil {
+				return nil, err
+			}
 
 			newEnd := getNewKey(string(entry.Meta.bucket), entry.Key)
 
@@ -422,7 +450,13 @@ func (tx *Tx) findRangeOnDisk(fID, rootOff int64, start, end []byte) (es []*Entr
 		}
 
 		address := curr.NextAddress
+		if address == DefaultInvalidAddress {
+			break
+		}
 		curr, err = ReadNode(filepath, address)
+		if err != nil {
+			return nil, err
+		}
 
 		j = 0
 	}
@@ -463,7 +497,11 @@ func (tx *Tx) PrefixScan(bucket string, prefix []byte, limitNum int) (es Entries
 
 		leftNum := limitNum - len(es)
 		if leftNum > 0 {
-			es = append(es, tx.prefixScanOnDisk(bucket, prefix, leftNum)...)
+			entries, err := tx.prefixScanOnDisk(bucket, prefix, leftNum)
+			if err != nil {
+				return nil, err
+			}
+			es = append(es, entries...)
 		}
 
 		if len(es) == 0 {
@@ -607,6 +645,7 @@ func (tx *Tx) FindOnDisk(fID uint64, rootOff uint64, key []byte) (entry *Entry, 
 
 		entry, err = df.ReadAt(int(bnLeaf.Keys[i]))
 		df.rwManager.Close()
+
 		if err != nil {
 			return nil, err
 		}

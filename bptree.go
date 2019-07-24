@@ -40,31 +40,34 @@ var (
 )
 
 const (
-	// Default number of b+ tree orders
+	// Default number of b+ tree orders.
 	order = 8
 
-	// RangeScan returns range scanMode flag
+	// DefaultInvalidAddress returns default invalid node address.
+	DefaultInvalidAddress = -1
+
+	// RangeScan returns range scanMode flag.
 	RangeScan = "RangeScan"
 
-	// PrefixScan returns prefix scanMode flag
+	// PrefixScan returns prefix scanMode flag.
 	PrefixScan = "PrefixScan"
 
-	// CountFlagEnabled returns enabled CountFlag
+	// CountFlagEnabled returns enabled CountFlag.
 	CountFlagEnabled = true
 
-	// CountFlagDisabled returns disabled CountFlag
+	// CountFlagDisabled returns disabled CountFlag.
 	CountFlagDisabled = false
 
-	// BPTIndexSuffix returns b+ tree index suffix
+	// BPTIndexSuffix returns b+ tree index suffix.
 	BPTIndexSuffix = ".bptidx"
 
-	// BPTRootIndexSuffix returns b+ tree root index suffix
+	// BPTRootIndexSuffix returns b+ tree root index suffix.
 	BPTRootIndexSuffix = ".bptridx"
 
-	// BPTTxIdIndexSuffix returns b+ tree tx ID index suffix
+	// BPTTxIdIndexSuffix returns b+ tree tx ID index suffix.
 	BPTTxIdIndexSuffix = ".bpttxid"
 
-	// BPTRootTxIdIndexSuffix returns b+ tree root tx ID index suffix
+	// BPTRootTxIdIndexSuffix returns b+ tree root tx ID index suffix.
 	BPTRootTxIdIndexSuffix = ".bptrtxid"
 )
 
@@ -234,7 +237,7 @@ func (t *BPTree) ToBinary(n *Node) (result []byte, err error) {
 	}
 
 	var nextAddress int64
-	nextAddress = -1
+	nextAddress = DefaultInvalidAddress
 
 	if n.Next != nil {
 		nextAddress = n.Next.Address
