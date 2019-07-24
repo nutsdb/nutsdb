@@ -25,7 +25,7 @@ func init() {
 		name := f.Name()
 		if name != "" {
 			fmt.Println(fileDir + "/" + name)
-			err := os.Remove(fileDir + "/" + name)
+			err := os.RemoveAll(fileDir + "/" + name)
 			if err != nil {
 				panic(err)
 			}

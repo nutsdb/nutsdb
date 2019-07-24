@@ -1,4 +1,4 @@
-// Copyright 2019 The nutsdb Authors. All rights reserved.
+// Copyright 2019 The nutsdb Author. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -121,18 +121,22 @@ const (
 type (
 	// DB represents a collection of buckets that persist on disk.
 	DB struct {
-		opt            Options   // the database options
-		BPTreeIdx      BPTreeIdx // Hint Index
-		SetIdx         SetIdx
-		SortedSetIdx   SortedSetIdx
-		ListIdx        ListIdx
-		ActiveFile     *DataFile
-		MaxFileID      int64
-		mu             sync.RWMutex
-		KeyCount       int // total key number ,include expired, deleted, repeated.
-		closed         bool
-		isMerging      bool
-		committedTxIds map[uint64]struct{}
+		opt                     Options   // the database options
+		BPTreeIdx               BPTreeIdx // Hint Index
+		BPTreeRootIdxes         []*BPTreeRootIdx
+		BPTreeKeyEntryPosMap    map[string]int64 // key = bucket+key  val = EntryPos
+		SetIdx                  SetIdx
+		SortedSetIdx            SortedSetIdx
+		ListIdx                 ListIdx
+		ActiveFile              *DataFile
+		ActiveBPTreeIdx         *BPTree
+		ActiveCommittedTxIdsIdx *BPTree
+		committedTxIds          map[uint64]struct{}
+		MaxFileID               int64
+		mu                      sync.RWMutex
+		KeyCount                int // total key number ,include expired, deleted, repeated.
+		closed                  bool
+		isMerging               bool
 	}
 
 	// BPTreeIdx represents the B+ tree index
@@ -154,15 +158,18 @@ type (
 // Open returns a newly initialized DB object.
 func Open(opt Options) (*DB, error) {
 	db := &DB{
-		BPTreeIdx:      make(BPTreeIdx),
-		SetIdx:         make(SetIdx),
-		SortedSetIdx:   make(SortedSetIdx),
-		ListIdx:        make(ListIdx),
-		MaxFileID:      0,
-		opt:            opt,
-		KeyCount:       0,
-		closed:         false,
-		committedTxIds: make(map[uint64]struct{}),
+		BPTreeIdx:               make(BPTreeIdx),
+		SetIdx:                  make(SetIdx),
+		SortedSetIdx:            make(SortedSetIdx),
+		ListIdx:                 make(ListIdx),
+		ActiveBPTreeIdx:         NewTree(),
+		MaxFileID:               0,
+		opt:                     opt,
+		KeyCount:                0,
+		closed:                  false,
+		committedTxIds:          make(map[uint64]struct{}),
+		BPTreeKeyEntryPosMap:    make(map[string]int64),
+		ActiveCommittedTxIdsIdx: NewTree(),
 	}
 
 	if ok := filesystem.PathIsExist(db.opt.Dir); !ok {
@@ -171,11 +178,67 @@ func Open(opt Options) (*DB, error) {
 		}
 	}
 
+	if err := db.checkEntryIdxMode(); err != nil {
+		return nil, err
+	}
+
+	if opt.EntryIdxMode == HintBPTSparseIdxMode {
+		bptRootIdxDir := db.opt.Dir + "/" + bptDir + "/root"
+		if ok := filesystem.PathIsExist(bptRootIdxDir); !ok {
+			if err := os.MkdirAll(bptRootIdxDir, os.ModePerm); err != nil {
+				return nil, err
+			}
+		}
+
+		bptTxIDIdxDir := db.opt.Dir + "/" + bptDir + "/txid"
+		if ok := filesystem.PathIsExist(bptTxIDIdxDir); !ok {
+			if err := os.MkdirAll(bptTxIDIdxDir, os.ModePerm); err != nil {
+				return nil, err
+			}
+		}
+	}
+
 	if err := db.buildIndexes(); err != nil {
 		return nil, fmt.Errorf("db.buildIndexes error: %s", err)
 	}
 
 	return db, nil
+}
+
+func (db *DB) checkEntryIdxMode() error {
+	hasDataFlag := false
+	hasBptDirFlag := false
+
+	files, err := ioutil.ReadDir(db.opt.Dir)
+	if err != nil {
+		return err
+	}
+
+	for _, f := range files {
+		id := f.Name()
+
+		fileSuffix := path.Ext(path.Base(id))
+		if fileSuffix == DataSuffix {
+			hasDataFlag = true
+			if hasBptDirFlag {
+				break
+			}
+		}
+
+		if id == bptDir {
+			hasBptDirFlag = true
+		}
+	}
+
+	if db.opt.EntryIdxMode != HintBPTSparseIdxMode && hasDataFlag && hasBptDirFlag {
+		return errors.New("not support HintBPTSparseIdxMode switch to the other EntryIdxMode")
+	}
+
+	if db.opt.EntryIdxMode == HintBPTSparseIdxMode && hasBptDirFlag == false && hasDataFlag == true {
+		return errors.New("not support the other EntryIdxMode switch to HintBPTSparseIdxMode")
+	}
+
+	return nil
 }
 
 // Update executes a function within a managed read/write transaction.
@@ -215,6 +278,10 @@ func (db *DB) Merge() error {
 		pendingMergeEntries []*Entry
 	)
 
+	if db.opt.EntryIdxMode == HintBPTSparseIdxMode {
+		return errors.New("not support mode `HintBPTSparseIdxMode`")
+	}
+
 	db.isMerging = true
 
 	_, pendingMergeFIds = db.getMaxFileIDAndFileIDs()
@@ -226,7 +293,7 @@ func (db *DB) Merge() error {
 			db.isMerging = false
 			return err
 		}
-		readEntriesNum := 0
+
 		pendingMergeEntries = []*Entry{}
 
 		for {
@@ -234,7 +301,6 @@ func (db *DB) Merge() error {
 				if entry == nil {
 					break
 				}
-				readEntriesNum++
 
 				if db.isFilterEntry(entry) {
 					off += entry.Size()
@@ -343,6 +409,10 @@ func (db *DB) getMaxFileIDAndFileIDs() (maxFileID int64, dataFileIds []int) {
 		dataFileIds = append(dataFileIds, idVal)
 	}
 
+	if len(dataFileIds) == 0 {
+		return 0, nil
+	}
+
 	sort.Ints(dataFileIds)
 	maxFileID = int64(dataFileIds[len(dataFileIds)-1])
 
@@ -382,6 +452,10 @@ func (db *DB) parseDataFiles(dataFileIds []int) (unconfirmedRecords []*Record, c
 
 	committedTxIds = make(map[uint64]struct{})
 
+	if db.opt.EntryIdxMode == HintBPTSparseIdxMode {
+		dataFileIds = dataFileIds[len(dataFileIds)-1:]
+	}
+
 	for _, dataID := range dataFileIds {
 		off = 0
 		fID := int64(dataID)
@@ -407,6 +481,8 @@ func (db *DB) parseDataFiles(dataFileIds []int) (unconfirmedRecords []*Record, c
 
 				if entry.Meta.status == Committed {
 					committedTxIds[entry.Meta.txID] = struct{}{}
+					db.ActiveCommittedTxIdsIdx.Insert([]byte(strconv2.Int64ToStr(int64(entry.Meta.txID))), nil,
+						&Hint{meta: &MetaData{Flag: DataSetFlag}}, CountFlagEnabled)
 				}
 
 				unconfirmedRecords = append(unconfirmedRecords, &Record{
@@ -418,6 +494,10 @@ func (db *DB) parseDataFiles(dataFileIds []int) (unconfirmedRecords []*Record, c
 					},
 					E: e,
 				})
+
+				if db.opt.EntryIdxMode == HintBPTSparseIdxMode {
+					db.BPTreeKeyEntryPosMap[string(entry.Meta.bucket)+string(entry.Key)] = off
+				}
 
 				off += entry.Size()
 
@@ -458,13 +538,23 @@ func (db *DB) buildHintIdx(dataFileIds []int) error {
 			bucket := string(r.H.meta.bucket)
 
 			if r.H.meta.ds == DataStructureBPTree {
-				if _, ok := db.BPTreeIdx[bucket]; !ok {
-					db.BPTreeIdx[bucket] = NewTree()
-				}
+
 				r.H.meta.status = Committed
 
-				if err := db.BPTreeIdx[bucket].Insert(r.H.key, r.E, r.H, CountFlagEnabled); err != nil {
-					return fmt.Errorf("when build BPTreeIdx insert index err: %s", err)
+				if db.opt.EntryIdxMode == HintBPTSparseIdxMode {
+					newKey := []byte(bucket)
+					newKey = append(newKey, r.H.key...)
+					if err := db.ActiveBPTreeIdx.Insert(newKey, r.E, r.H, CountFlagEnabled); err != nil {
+						return fmt.Errorf("when build BPTreeIdx insert index err: %s", err)
+					}
+				} else {
+					if _, ok := db.BPTreeIdx[bucket]; !ok {
+						db.BPTreeIdx[bucket] = NewTree()
+					}
+
+					if err := db.BPTreeIdx[bucket].Insert(r.H.key, r.E, r.H, CountFlagEnabled); err != nil {
+						return fmt.Errorf("when build BPTreeIdx insert index err: %s", err)
+					}
 				}
 			}
 
@@ -488,6 +578,38 @@ func (db *DB) buildHintIdx(dataFileIds []int) error {
 
 			db.KeyCount++
 		}
+	}
+
+	if HintBPTSparseIdxMode == db.opt.EntryIdxMode {
+		var off int64
+
+		dataFileIdsSize := len(dataFileIds)
+
+		if dataFileIdsSize == 1 {
+			return nil
+		}
+
+		for i := 0; i < len(dataFileIds[0:dataFileIdsSize-1]); i++ {
+			fID := dataFileIds[i]
+			off = 0
+			for {
+				bs, err := ReadBPTreeRootIdxAt(db.getBPTRootPath(int64(fID)), off)
+				if err == io.EOF || err == nil && bs == nil {
+					break
+				}
+				if err != nil {
+					return err
+				}
+
+				if err == nil && bs != nil {
+					db.BPTreeRootIdxes = append(db.BPTreeRootIdxes, bs)
+					off += bs.Size()
+				}
+
+			}
+		}
+
+		db.committedTxIds = nil
 	}
 
 	return nil
@@ -661,9 +783,31 @@ func (db *DB) managed(writable bool, fn func(tx *Tx) error) error {
 	return nil
 }
 
+const bptDir = "bpt"
+
 // getDataPath returns the data path at given fid.
 func (db *DB) getDataPath(fID int64) string {
 	return db.opt.Dir + "/" + strconv2.Int64ToStr(fID) + DataSuffix
+}
+
+func (db *DB) getBPTDir() string {
+	return db.opt.Dir + "/" + bptDir
+}
+
+func (db *DB) getBPTPath(fID int64) string {
+	return db.getBPTDir() + "/" + strconv2.Int64ToStr(fID) + BPTIndexSuffix
+}
+
+func (db *DB) getBPTRootPath(fID int64) string {
+	return db.getBPTDir() + "/root/" + strconv2.Int64ToStr(fID) + BPTRootIndexSuffix
+}
+
+func (db *DB) getBPTTxIdPath(fID int64) string {
+	return db.getBPTDir() + "/txid/" + strconv2.Int64ToStr(fID) + BPTTxIdIndexSuffix
+}
+
+func (db *DB) getBPTRootTxIdPath(fID int64) string {
+	return db.getBPTDir() + "/txid/" + strconv2.Int64ToStr(fID) + BPTRootTxIdIndexSuffix
 }
 
 func (db *DB) getPendingMergeEntries(entry *Entry, pendingMergeEntries []*Entry) []*Entry {

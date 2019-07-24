@@ -22,7 +22,7 @@ func init() {
 	for _, f := range files {
 		name := f.Name()
 		if name != "" {
-			err := os.Remove(fileDir + "/" + name)
+			err := os.RemoveAll(fileDir + "/" + name)
 			if err != nil {
 				panic(err)
 			}
