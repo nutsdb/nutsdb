@@ -520,6 +520,85 @@ func (db *DB) parseDataFiles(dataFileIds []int) (unconfirmedRecords []*Record, c
 	return
 }
 
+func (db *DB) buildBPTreeRootIdxes(dataFileIds []int) error {
+	var off int64
+
+	dataFileIdsSize := len(dataFileIds)
+
+	if dataFileIdsSize == 1 {
+		return nil
+	}
+
+	for i := 0; i < len(dataFileIds[0:dataFileIdsSize-1]); i++ {
+		fID := dataFileIds[i]
+		off = 0
+		for {
+			bs, err := ReadBPTreeRootIdxAt(db.getBPTRootPath(int64(fID)), off)
+			if err == io.EOF || err == nil && bs == nil {
+				break
+			}
+			if err != nil {
+				return err
+			}
+
+			if err == nil && bs != nil {
+				db.BPTreeRootIdxes = append(db.BPTreeRootIdxes, bs)
+				off += bs.Size()
+			}
+
+		}
+	}
+
+	db.committedTxIds = nil
+
+	return nil
+}
+
+func (db *DB) buildBPTreeIdx(bucket string, r *Record) error {
+	if _, ok := db.BPTreeIdx[bucket]; !ok {
+		db.BPTreeIdx[bucket] = NewTree()
+	}
+
+	if err := db.BPTreeIdx[bucket].Insert(r.H.key, r.E, r.H, CountFlagEnabled); err != nil {
+		return fmt.Errorf("when build BPTreeIdx insert index err: %s", err)
+	}
+
+	return nil
+}
+
+func (db *DB) buildActiveBPTreeIdx(r *Record) error {
+	newKey := r.H.meta.bucket
+	newKey = append(newKey, r.H.key...)
+
+	if err := db.ActiveBPTreeIdx.Insert(newKey, r.E, r.H, CountFlagEnabled); err != nil {
+		return fmt.Errorf("when build BPTreeIdx insert index err: %s", err)
+	}
+
+	return nil
+}
+
+func (db *DB) buildOtherIdxes(bucket string, r *Record) error {
+	if r.H.meta.ds == DataStructureSet {
+		if err := db.buildSetIdx(bucket, r); err != nil {
+			return err
+		}
+	}
+
+	if r.H.meta.ds == DataStructureSortedSet {
+		if err := db.buildSortedSetIdx(bucket, r); err != nil {
+			return err
+		}
+	}
+
+	if r.H.meta.ds == DataStructureList {
+		if err := db.buildListIdx(bucket, r); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // buildHintIdx builds the Hint Indexes.
 func (db *DB) buildHintIdx(dataFileIds []int) error {
 	unconfirmedRecords, committedTxIds, err := db.parseDataFiles(dataFileIds)
@@ -538,42 +617,21 @@ func (db *DB) buildHintIdx(dataFileIds []int) error {
 			bucket := string(r.H.meta.bucket)
 
 			if r.H.meta.ds == DataStructureBPTree {
-
 				r.H.meta.status = Committed
 
 				if db.opt.EntryIdxMode == HintBPTSparseIdxMode {
-					newKey := []byte(bucket)
-					newKey = append(newKey, r.H.key...)
-					if err := db.ActiveBPTreeIdx.Insert(newKey, r.E, r.H, CountFlagEnabled); err != nil {
-						return fmt.Errorf("when build BPTreeIdx insert index err: %s", err)
+					if err = db.buildActiveBPTreeIdx(r); err != nil {
+						return err
 					}
 				} else {
-					if _, ok := db.BPTreeIdx[bucket]; !ok {
-						db.BPTreeIdx[bucket] = NewTree()
-					}
-
-					if err := db.BPTreeIdx[bucket].Insert(r.H.key, r.E, r.H, CountFlagEnabled); err != nil {
-						return fmt.Errorf("when build BPTreeIdx insert index err: %s", err)
+					if err = db.buildBPTreeIdx(bucket, r); err != nil {
+						return err
 					}
 				}
 			}
 
-			if r.H.meta.ds == DataStructureSet {
-				if err := db.buildSetIdx(bucket, r); err != nil {
-					return err
-				}
-			}
-
-			if r.H.meta.ds == DataStructureSortedSet {
-				if err := db.buildSortedSetIdx(bucket, r); err != nil {
-					return err
-				}
-			}
-
-			if r.H.meta.ds == DataStructureList {
-				if err := db.buildListIdx(bucket, r); err != nil {
-					return err
-				}
+			if err = db.buildOtherIdxes(bucket, r); err != nil {
+				return err
 			}
 
 			db.KeyCount++
@@ -581,35 +639,9 @@ func (db *DB) buildHintIdx(dataFileIds []int) error {
 	}
 
 	if HintBPTSparseIdxMode == db.opt.EntryIdxMode {
-		var off int64
-
-		dataFileIdsSize := len(dataFileIds)
-
-		if dataFileIdsSize == 1 {
-			return nil
+		if err = db.buildBPTreeRootIdxes(dataFileIds); err != nil {
+			return err
 		}
-
-		for i := 0; i < len(dataFileIds[0:dataFileIdsSize-1]); i++ {
-			fID := dataFileIds[i]
-			off = 0
-			for {
-				bs, err := ReadBPTreeRootIdxAt(db.getBPTRootPath(int64(fID)), off)
-				if err == io.EOF || err == nil && bs == nil {
-					break
-				}
-				if err != nil {
-					return err
-				}
-
-				if err == nil && bs != nil {
-					db.BPTreeRootIdxes = append(db.BPTreeRootIdxes, bs)
-					off += bs.Size()
-				}
-
-			}
-		}
-
-		db.committedTxIds = nil
 	}
 
 	return nil
