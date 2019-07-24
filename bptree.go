@@ -569,9 +569,7 @@ func (t *BPTree) startNewTree(key []byte, pointer *Record) error {
 	return nil
 }
 
-// Insert inserts record to the b+ tree,
-// and if the key exists, update the record and the counter(if countFlag set true,it will start count).
-func (t *BPTree) Insert(key []byte, e *Entry, h *Hint, countFlag bool) error {
+func (t *BPTree) checkAndSetFirstKey(key []byte, h *Hint) {
 	if len(t.FirstKey) == 0 {
 		t.FirstKey = key
 	} else {
@@ -579,10 +577,20 @@ func (t *BPTree) Insert(key []byte, e *Entry, h *Hint, countFlag bool) error {
 			t.FirstKey = key
 		}
 	}
+}
 
+func (t *BPTree) checkAndSetLastKey(key []byte, h *Hint) {
 	if compare(key, t.LastKey) > 0 && h.meta.Flag != DataDeleteFlag {
 		t.LastKey = key
 	}
+}
+
+// Insert inserts record to the b+ tree,
+// and if the key exists, update the record and the counter(if countFlag set true,it will start count).
+func (t *BPTree) Insert(key []byte, e *Entry, h *Hint, countFlag bool) error {
+	t.checkAndSetFirstKey(key, h)
+
+	t.checkAndSetLastKey(key, h)
 
 	if r, err := t.Find(key); err == nil && r != nil {
 		if countFlag && h.meta.Flag == DataDeleteFlag && r.H.meta.Flag != DataDeleteFlag && t.ValidKeyCount > 0 {
