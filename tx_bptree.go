@@ -533,6 +533,7 @@ func (tx *Tx) getHintIdxDataItemsWrapper(records Records, limitNum int, es Entri
 	return es, nil
 }
 
+// FindTxIdOnDisk returns if txId on disk at given fid and txID.
 func (tx *Tx) FindTxIdOnDisk(fID, txId uint64) (ok bool, err error) {
 	var i uint16
 
@@ -584,6 +585,7 @@ func (tx *Tx) FindTxIdOnDisk(fID, txId uint64) (ok bool, err error) {
 	return true, nil
 }
 
+// FindOnDisk returns entry on disk at given fID, rootOff and key.
 func (tx *Tx) FindOnDisk(fID uint64, rootOff uint64, key []byte) (entry *Entry, err error) {
 	var (
 		bnLeaf *BinaryNode
@@ -622,6 +624,7 @@ func (tx *Tx) FindOnDisk(fID uint64, rootOff uint64, key []byte) (entry *Entry, 
 	return
 }
 
+// FindLeafOnDisk returns binary leaf node on disk at given fId, rootOff and key.
 func (tx *Tx) FindLeafOnDisk(fId int64, rootOff int64, key []byte) (bn *BinaryNode, err error) {
 	var i uint16
 	var curr *BinaryNode

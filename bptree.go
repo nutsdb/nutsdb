@@ -61,7 +61,7 @@ const (
 	// BPTRootIndexSuffix returns b+ tree root index suffix
 	BPTRootIndexSuffix = ".bptridx"
 
-	// BPTRootIndexSuffix returns b+ tree tx ID index suffix
+	// BPTTxIdIndexSuffix returns b+ tree tx ID index suffix
 	BPTTxIdIndexSuffix = ".bpttxid"
 
 	// BPTRootTxIdIndexSuffix returns b+ tree root tx ID index suffix
@@ -96,7 +96,7 @@ type (
 		Address  int64
 	}
 
-	// BinaryNode
+	// BinaryNode represents binary node.
 	BinaryNode struct {
 		// hint offset
 		Keys [order - 1]int64
@@ -296,7 +296,7 @@ func (t *BPTree) WriteNode(n *Node, off int64, syncEnable bool, fd *os.File) (nu
 	return
 }
 
-// WriteNode writes all nodes in the b+ tree to the File starting at byte offset off.
+// WriteNodes writes all nodes in the b+ tree to the File starting at byte offset off.
 func (t *BPTree) WriteNodes(rwMode RWMode, syncEnable bool, flag int) error {
 	var (
 		n   *Node
