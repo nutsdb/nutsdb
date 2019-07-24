@@ -685,6 +685,10 @@ func (tx *Tx) FindLeafOnDisk(fId int64, rootOff int64, key []byte) (bn *BinaryNo
 			item, err := df.ReadAt(int(curr.Keys[i]))
 			df.rwManager.Close()
 
+			if err != nil {
+				return nil, err
+			}
+
 			newKey := getNewKey(string(item.Meta.bucket), item.Key)
 			if compare(key, newKey) >= 0 {
 				i++
