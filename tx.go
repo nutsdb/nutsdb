@@ -130,8 +130,9 @@ func (tx *Tx) getTxID() (id uint64, err error) {
 //
 // 5. Unlock the database and clear the db field.
 func (tx *Tx) Commit() error {
-	var e *Entry
 	var off int64
+	var e *Entry
+
 	if tx.db == nil {
 		return ErrDBClosed
 	}
@@ -192,34 +193,8 @@ func (tx *Tx) Commit() error {
 		if i == lastIndex {
 			txId := entry.Meta.txID
 			if tx.db.opt.EntryIdxMode == HintBPTSparseIdxMode {
-				txIdStr := strconv2.IntToStr(int(txId))
-
-				tx.db.ActiveCommittedTxIdsIdx.Insert([]byte(txIdStr), nil, &Hint{meta: &MetaData{Flag: DataSetFlag}}, countFlag)
-
-				if len(tx.ReservedStoreTxIDIdxes) > 0 {
-					for fID, txIDIdx := range tx.ReservedStoreTxIDIdxes {
-						filePath := tx.db.getBPTTxIdPath(fID)
-
-						txIDIdx.Insert([]byte(txIdStr), nil, &Hint{meta: &MetaData{Flag: DataSetFlag}}, countFlag)
-						txIDIdx.Filepath = filePath
-
-						err := txIDIdx.WriteNodes(tx.db.opt.RWMode, tx.db.opt.SyncEnable, 2)
-						if err != nil {
-							return err
-						}
-
-						filePath = tx.db.getBPTRootTxIdPath(fID)
-						txIDRootIdx := NewTree()
-						rootAddress := strconv2.Int64ToStr(txIDIdx.root.Address)
-
-						txIDRootIdx.Insert([]byte(rootAddress), nil, &Hint{meta: &MetaData{Flag: DataSetFlag}}, countFlag)
-						txIDRootIdx.Filepath = filePath
-
-						err = txIDRootIdx.WriteNodes(tx.db.opt.RWMode, tx.db.opt.SyncEnable, 2)
-						if err != nil {
-							return err
-						}
-					}
+				if err := tx.buildTxIDRootIdx(txId, countFlag); err != nil {
+					return err
 				}
 			} else {
 				tx.db.committedTxIds[txId] = struct{}{}
@@ -244,6 +219,39 @@ func (tx *Tx) Commit() error {
 
 	tx.pendingWrites = nil
 	tx.ReservedStoreTxIDIdxes = nil
+
+	return nil
+}
+
+func (tx *Tx) buildTxIDRootIdx(txId uint64, countFlag bool) error {
+	txIdStr := strconv2.IntToStr(int(txId))
+
+	tx.db.ActiveCommittedTxIdsIdx.Insert([]byte(txIdStr), nil, &Hint{meta: &MetaData{Flag: DataSetFlag}}, countFlag)
+	if len(tx.ReservedStoreTxIDIdxes) > 0 {
+		for fID, txIDIdx := range tx.ReservedStoreTxIDIdxes {
+			filePath := tx.db.getBPTTxIdPath(fID)
+
+			txIDIdx.Insert([]byte(txIdStr), nil, &Hint{meta: &MetaData{Flag: DataSetFlag}}, countFlag)
+			txIDIdx.Filepath = filePath
+
+			err := txIDIdx.WriteNodes(tx.db.opt.RWMode, tx.db.opt.SyncEnable, 2)
+			if err != nil {
+				return err
+			}
+
+			filePath = tx.db.getBPTRootTxIdPath(fID)
+			txIDRootIdx := NewTree()
+			rootAddress := strconv2.Int64ToStr(txIDIdx.root.Address)
+
+			txIDRootIdx.Insert([]byte(rootAddress), nil, &Hint{meta: &MetaData{Flag: DataSetFlag}}, countFlag)
+			txIDRootIdx.Filepath = filePath
+
+			err = txIDRootIdx.WriteNodes(tx.db.opt.RWMode, tx.db.opt.SyncEnable, 2)
+			if err != nil {
+				return err
+			}
+		}
+	}
 
 	return nil
 }
