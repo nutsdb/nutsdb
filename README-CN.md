@@ -1865,7 +1865,11 @@ entry的的大小=EntryHeader的大小+key的大小+value的大小+bucket的大�
 
 * 关于支持的操作系统
 
-支持 Mac OS 、Linux 、Windows 三个平台。
+支持 Mac OS 、Linux 、Windows 三大平台。
+
+* 关于合并操作
+
+`HintBPTSparseIdxMode` 这个模式在当前版本还没有支持。
 
 * 关于事务说明
 
