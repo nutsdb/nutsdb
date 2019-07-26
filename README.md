@@ -1804,15 +1804,15 @@ The default mode use `HintKeyValAndRAMIdxMode`, entries are indexed base on RAM,
 
 NutsDB will truncate data file if the active file is larger than  `SegmentSize`, so the size of an entry can not be set larger than `SegmentSize` , defalut `SegmentSize` is 8MB, you can set it(opt.SegmentSize) as option before DB opening. ***Once set, it cannot be changed***.
 
-#### support OS
+#### Support OS
 
 NutsDB currently works on Mac OS, Linux and Windows.  
 
-### about merge operation
+#### About merge operation
 
-the HintBPTSparseIdxMode mode does not support the merge operation of the current version.
+The HintBPTSparseIdxMode mode does not support the merge operation of the current version.
 
-#### about transactions
+#### About transactions
 
 Recommend use the latest version.
 
