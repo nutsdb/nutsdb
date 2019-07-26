@@ -1808,6 +1808,9 @@ NutsDB will truncate data file if the active file is larger than  `SegmentSize`,
 
 NutsDB currently works on Mac OS, Linux and Windows.  
 
+### about merge operation
+
+the HintBPTSparseIdxMode mode does not support the merge operation of the current version.
 
 #### about transactions
 
