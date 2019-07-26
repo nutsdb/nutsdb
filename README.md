@@ -466,6 +466,8 @@ if err != nil {
 }
 ```
 
+Notice: the `HintBPTSparseIdxMode` mode does not support the merge operation of the current version.
+
 ### Database backup
 
 NutsDB is easy to backup. You can use the `db.Backup()` function at given dir, call this function from a read-only transaction, it will perform a hot backup and not block your other database reads and writes.
