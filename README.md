@@ -146,8 +146,7 @@ func main() {
 
 * EntryIdxMode         EntryIdxMode 
 
-`EntryIdxMode` represents using which mode to index the entries. `EntryIdxMode` includes two options: `HintKeyValAndRAMIdxMode` and `HintKeyAndRAMIdxMode`. `HintKeyValAndRAMIdxMode` represents ram index (key and value) mode.
-And `HintKeyAndRAMIdxMode` represents ram index (only key) mode
+`EntryIdxMode` represents using which mode to index the entries. `EntryIdxMode` includes three options: `HintKeyValAndRAMIdxMode`,`HintKeyAndRAMIdxMode` and `HintBPTSparseIdxMode`. `HintKeyValAndRAMIdxMode` represents ram index (key and value) mode, `HintKeyAndRAMIdxMode` represents ram index (only key) mode and `HintBPTSparseIdxMode` represents b+ tree sparse index mode.
 
 * RWMode               RWMode  
 
@@ -1796,9 +1795,10 @@ the benchmark code can be found in the [gokvstore-bench](https://github.com/xuji
 
 #### Index mode
 
-From the version v0.3.0, NutsDB supports two modes about entry index: `HintKeyValAndRAMIdxMode`  and  `HintKeyAndRAMIdxMode`. 
+From the version v0.3.0, NutsDB supports two modes about entry index: `HintKeyValAndRAMIdxMode`  and  `HintKeyAndRAMIdxMode`. From the version v0.5.0, NutsDB supports `HintBPTSparseIdxMode` mode.
 
-The default mode use `HintKeyValAndRAMIdxMode`, entries are indexed base on RAM, so its read/write performance is fast. but can’t handle databases much larger than the available physical RAM. If you set the `HintKeyAndRAMIdxMode` mode, HintIndex will not cache the value of the entry. Its write performance is also fast. To retrieve a key by seeking to offset relative to the start of the data file, so its read performance more slowly that RAM way, but it can handle databases much larger than the available physical RAM. And other data structures such as ***list, set, sorted set only supported with mode HintKeyValAndRAMIdxMode***.
+The default mode use `HintKeyValAndRAMIdxMode`, entries are indexed base on RAM, so its read/write performance is fast. but can’t handle databases much larger than the available physical RAM. If you set the `HintKeyAndRAMIdxMode` mode, HintIndex will not cache the value of the entry. Its write performance is also fast. To retrieve a key by seeking to offset relative to the start of the data file, so its read performance more slowly that RAM way, but it can save memory. The mode `HintBPTSparseIdxMode` is based b+ tree sparse index, this mode saves memory very much (1 billion data only uses about 80MB of memory). And other data structures such as ***list, set, sorted set only supported with mode HintKeyValAndRAMIdxMode***.
+***It cannot switch back and forth between modes because the index structure is different***.
 
 NutsDB will truncate data file if the active file is larger than  `SegmentSize`, so the size of an entry can not be set larger than `SegmentSize` , defalut `SegmentSize` is 8MB, you can set it(opt.SegmentSize) as option before DB opening. ***Once set, it cannot be changed***.
 
