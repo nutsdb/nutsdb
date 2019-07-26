@@ -1846,7 +1846,7 @@ BoltDB最慢。
 当前版本使用`HintKeyValAndRAMIdxMode`、 `HintKeyAndRAMIdxMode`和`HintBPTSparseIdxMode` 这三种作为db启动的时候索引模式。
 默认使用`HintKeyValAndRAMIdxMode`。在基本的功能的string数据类型（put、get、delete、rangeScan、PrefixScan）这三种模式都支持。`HintKeyValAndRAMIdxMode`，作为数据库默认选项，他是全内存索引，读写性能都很高。他的瓶颈在于内存。如果你内存够的话，这种默认是适合的。另一种模式`HintKeyAndRAMIdxMode`，他会把value存磁盘，通过索引去找offset，这种模式特别适合value远大于key的场景，他的读性能要比起默认模式要降低不少。`HintBPTSparseIdxMode`这个模式（v0.4.0之后支持）这个模式非常省内存，使用多级索引，测试10亿数据，只占用80几MB的内存，但是读性能比较差，需要自己加缓存加速。具体看自己的要求选择模式。
 
-关于**其他的数据结构（list\set\sorted set）只支持默认的HintKeyValAndRAMIdxMode。请根据需要选模式**。还有 `HintBPTSparseIdxMode` 这个模式一旦开启不能切换到其他模式，因为索引结构不一样，不能来回切换模式。`HintKeyValAndRAMIdxMode`和 `HintKeyAndRAMIdxMode`可以来回切换。
+关于**其他的数据结构（list\set\sorted set）只支持默认的HintKeyValAndRAMIdxMode。请根据需要选模式**。**还有一个启动索引模式一旦开启不要来回切换到其他模式，因为索引结构不一样，可能导致数据读不出来**。 
 
 * Segment配置问题
 
