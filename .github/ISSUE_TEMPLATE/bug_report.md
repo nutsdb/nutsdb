@@ -10,16 +10,26 @@ assignees: xujiajun
 **Describe the bug**
 A clear and concise description of what the bug is.
 
-### Write bug reports with detail, background, and sample code
+**To Reproduce**
+Steps to reproduce the behavior(Be specific!):
+1.   [...]
+2.  [...]
+3.  [...]
 
-**Great Bug Reports** tend to have:
+Give sample code if you can.
 
-- A quick summary and/or background
-- Steps to reproduce
-  - Be specific!
-  - Give sample code if you can.
-- What you expected would happen
-- What actually happens
-- Notes (possibly including why you think this might be happening, or stuff you tried that didn't work)
+**Expected behavior**
+A clear and concise description of what you expected to happen.
 
-People *love* thorough bug reports.
+**What actually happens**
+A clear and concise description of what actually happens.
+
+**Screenshots**
+If applicable, add screenshots to help explain your problem.
+
+**please complete the following information :**
+ - OS: [e.g. Ubuntu 16.04]
+ - NutsDB Version [e.g. 0.4.0]
+
+**Additional context**
+Add any other context about the problem here.
