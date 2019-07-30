@@ -1,5 +1,14 @@
-## Reporting bugs
-We use GitHub issues to track public bugs. Report a bug by [opening a new issue](https://github.com/xujiajun/nutsdb/issues); it's that easy!
+---
+name: Bug report
+about: Create a report to help us improve
+title: ''
+labels: ''
+assignees: xujiajun
+
+---
+
+**Describe the bug**
+A clear and concise description of what the bug is.
 
 ### Write bug reports with detail, background, and sample code
 
