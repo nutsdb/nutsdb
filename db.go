@@ -286,6 +286,11 @@ func (db *DB) Merge() error {
 
 	_, pendingMergeFIds = db.getMaxFileIDAndFileIDs()
 
+	if len(pendingMergeFIds) < 2 {
+		db.isMerging = false
+		return errors.New("the number of files waiting to be merged is at least 2")
+	}
+
 	for _, pendingMergeFId := range pendingMergeFIds {
 		off = 0
 		f, err := NewDataFile(db.getDataPath(int64(pendingMergeFId)), db.opt.SegmentSize, db.opt.RWMode)
