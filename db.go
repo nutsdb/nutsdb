@@ -899,6 +899,14 @@ func (db *DB) reWriteData(pendingMergeEntries []*Entry) error {
 		return err
 	}
 
+	dataFile, err := NewDataFile(db.getDataPath(db.MaxFileID+1), db.opt.SegmentSize, db.opt.RWMode)
+	if err != nil {
+		db.isMerging = false
+		return err
+	}
+	db.ActiveFile = dataFile
+	db.MaxFileID++
+
 	for _, e := range pendingMergeEntries {
 		err := tx.put(string(e.Meta.bucket), e.Key, e.Value, e.Meta.TTL, e.Meta.Flag, e.Meta.timestamp, e.Meta.ds)
 		if err != nil {
