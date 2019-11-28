@@ -573,14 +573,14 @@ func (t *BPTree) checkAndSetFirstKey(key []byte, h *Hint) {
 	if len(t.FirstKey) == 0 {
 		t.FirstKey = key
 	} else {
-		if compare(key, t.FirstKey) < 0 && h.meta.Flag != DataDeleteFlag {
+		if compare(key, t.FirstKey) < 0 {
 			t.FirstKey = key
 		}
 	}
 }
 
 func (t *BPTree) checkAndSetLastKey(key []byte, h *Hint) {
-	if compare(key, t.LastKey) > 0 && h.meta.Flag != DataDeleteFlag {
+	if compare(key, t.LastKey) > 0 {
 		t.LastKey = key
 	}
 }

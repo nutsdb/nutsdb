@@ -125,6 +125,7 @@ type (
 		BPTreeIdx               BPTreeIdx // Hint Index
 		BPTreeRootIdxes         []*BPTreeRootIdx
 		BPTreeKeyEntryPosMap    map[string]int64 // key = bucket+key  val = EntryPos
+		bucketMetas             BucketMetasIdx
 		SetIdx                  SetIdx
 		SortedSetIdx            SortedSetIdx
 		ListIdx                 ListIdx
@@ -153,6 +154,9 @@ type (
 
 	// Entries represents entries
 	Entries []*Entry
+
+	// BucketMetasIdx represents the index of the bucket's meta-information
+	BucketMetasIdx map[string]*BucketMeta
 )
 
 // Open returns a newly initialized DB object.
@@ -169,6 +173,7 @@ func Open(opt Options) (*DB, error) {
 		closed:                  false,
 		committedTxIds:          make(map[uint64]struct{}),
 		BPTreeKeyEntryPosMap:    make(map[string]int64),
+		bucketMetas:             make(map[string]*BucketMeta),
 		ActiveCommittedTxIdsIdx: NewTree(),
 	}
 
@@ -193,6 +198,13 @@ func Open(opt Options) (*DB, error) {
 		bptTxIDIdxDir := db.opt.Dir + "/" + bptDir + "/txid"
 		if ok := filesystem.PathIsExist(bptTxIDIdxDir); !ok {
 			if err := os.MkdirAll(bptTxIDIdxDir, os.ModePerm); err != nil {
+				return nil, err
+			}
+		}
+
+		bucketMetaDir := db.opt.Dir + "/meta/bucket"
+		if ok := filesystem.PathIsExist(bucketMetaDir); !ok {
+			if err := os.MkdirAll(bucketMetaDir, os.ModePerm); err != nil {
 				return nil, err
 			}
 		}
@@ -582,6 +594,36 @@ func (db *DB) buildActiveBPTreeIdx(r *Record) error {
 	return nil
 }
 
+func (db *DB) buildBucketMetaIdx() error {
+	if db.opt.EntryIdxMode == HintBPTSparseIdxMode {
+		files, err := ioutil.ReadDir(db.getBucketMetaPath())
+		if err != nil {
+			return err
+		}
+
+		if len(files) != 0 {
+			for _, f := range files {
+				name := f.Name()
+				fileSuffix := path.Ext(path.Base(name))
+				if fileSuffix != BucketMetaSuffix {
+					continue
+				}
+
+				name = strings.TrimSuffix(name, BucketMetaSuffix)
+
+				bucketMeta, err := ReadBucketMeta(db.getBucketMetaFilePath(name))
+				if err != nil {
+					return err
+				}
+
+				db.bucketMetas[name] = bucketMeta
+			}
+		}
+	}
+
+	return nil
+}
+
 func (db *DB) buildOtherIdxes(bucket string, r *Record) error {
 	if r.H.meta.ds == DataStructureSet {
 		if err := db.buildSetIdx(bucket, r); err != nil {
@@ -790,6 +832,10 @@ func (db *DB) buildIndexes() (err error) {
 		return
 	}
 
+	if err = db.buildBucketMetaIdx(); err != nil {
+		return
+	}
+
 	// build hint index
 	return db.buildHintIdx(dataFileIds)
 }
@@ -825,6 +871,18 @@ const bptDir = "bpt"
 // getDataPath returns the data path at given fid.
 func (db *DB) getDataPath(fID int64) string {
 	return db.opt.Dir + "/" + strconv2.Int64ToStr(fID) + DataSuffix
+}
+
+func (db *DB) getMetaPath() string {
+	return db.opt.Dir + "/meta"
+}
+
+func (db *DB) getBucketMetaPath() string {
+	return db.getMetaPath() + "/bucket"
+}
+
+func (db *DB) getBucketMetaFilePath(name string) string {
+	return db.getBucketMetaPath() + "/" + name + BucketMetaSuffix
 }
 
 func (db *DB) getBPTDir() string {
