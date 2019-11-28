@@ -897,12 +897,12 @@ func (db *DB) getBPTRootPath(fID int64) string {
 	return db.getBPTDir() + "/root/" + strconv2.Int64ToStr(fID) + BPTRootIndexSuffix
 }
 
-func (db *DB) getBPTTxIdPath(fID int64) string {
-	return db.getBPTDir() + "/txid/" + strconv2.Int64ToStr(fID) + BPTTxIdIndexSuffix
+func (db *DB) getBPTTxIDPath(fID int64) string {
+	return db.getBPTDir() + "/txid/" + strconv2.Int64ToStr(fID) + BPTTxIDIndexSuffix
 }
 
-func (db *DB) getBPTRootTxIdPath(fID int64) string {
-	return db.getBPTDir() + "/txid/" + strconv2.Int64ToStr(fID) + BPTRootTxIdIndexSuffix
+func (db *DB) getBPTRootTxIDPath(fID int64) string {
+	return db.getBPTDir() + "/txid/" + strconv2.Int64ToStr(fID) + BPTRootTxIDIndexSuffix
 }
 
 func (db *DB) getPendingMergeEntries(entry *Entry, pendingMergeEntries []*Entry) []*Entry {

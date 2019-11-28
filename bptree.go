@@ -64,11 +64,11 @@ const (
 	// BPTRootIndexSuffix returns b+ tree root index suffix.
 	BPTRootIndexSuffix = ".bptridx"
 
-	// BPTTxIdIndexSuffix returns b+ tree tx ID index suffix.
-	BPTTxIdIndexSuffix = ".bpttxid"
+	// BPTTxIDIndexSuffix returns b+ tree tx ID index suffix.
+	BPTTxIDIndexSuffix = ".bpttxid"
 
-	// BPTRootTxIdIndexSuffix returns b+ tree root tx ID index suffix.
-	BPTRootTxIdIndexSuffix = ".bptrtxid"
+	// BPTRootTxIDIndexSuffix returns b+ tree root tx ID index suffix.
+	BPTRootTxIDIndexSuffix = ".bptrtxid"
 )
 
 type (

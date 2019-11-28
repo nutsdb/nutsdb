@@ -28,6 +28,7 @@ const (
 	BucketMetaSuffix = ".meta"
 )
 
+// BucketMeta represents the bucket's meta-information.
 type BucketMeta struct {
 	startSize uint32
 	endSize   uint32
@@ -67,6 +68,7 @@ func (bm *BucketMeta) Size() int64 {
 	return int64(BucketMetaHeaderSize + bm.startSize + bm.endSize)
 }
 
+// ReadBucketMeta returns bucketMeta at given file path name.
 func ReadBucketMeta(name string) (bucketMeta *BucketMeta, err error) {
 	var off int64
 	fd, err := os.OpenFile(name, os.O_CREATE|os.O_RDWR, 0644)

@@ -83,7 +83,7 @@ func (tx *Tx) getByHintBPTSparseIdxOnDisk(bucket string, key []byte) (e *Entry, 
 				if _, err := tx.db.ActiveCommittedTxIdsIdx.Find([]byte(txIDStr)); err == nil {
 					return e, err
 				}
-				if ok, _ := tx.FindTxIdOnDisk(fID, e.Meta.txID); !ok {
+				if ok, _ := tx.FindTxIDOnDisk(fID, e.Meta.txID); !ok {
 					return nil, ErrNotFoundKey
 				}
 
@@ -637,18 +637,18 @@ func (tx *Tx) getHintIdxDataItemsWrapper(records Records, limitNum int, es Entri
 	return es, nil
 }
 
-// FindTxIdOnDisk returns if txId on disk at given fid and txID.
-func (tx *Tx) FindTxIdOnDisk(fID, txId uint64) (ok bool, err error) {
+// FindTxIDOnDisk returns if txId on disk at given fid and txID.
+func (tx *Tx) FindTxIDOnDisk(fID, txID uint64) (ok bool, err error) {
 	var i uint16
 
-	filepath := tx.db.getBPTRootTxIdPath(int64(fID))
+	filepath := tx.db.getBPTRootTxIDPath(int64(fID))
 	node, err := ReadNode(filepath, 0)
 
 	if err != nil {
 		return false, err
 	}
 
-	filepath = tx.db.getBPTTxIdPath(int64(fID))
+	filepath = tx.db.getBPTTxIDPath(int64(fID))
 	rootAddress := node.Keys[0]
 	curr, err := ReadNode(filepath, rootAddress)
 
@@ -656,12 +656,12 @@ func (tx *Tx) FindTxIdOnDisk(fID, txId uint64) (ok bool, err error) {
 		return false, err
 	}
 
-	txIdStr := strconv2.IntToStr(int(txId))
+	txIDStr := strconv2.IntToStr(int(txID))
 
 	for curr.IsLeaf != 1 {
 		i = 0
 		for i < curr.KeysNum {
-			if compare([]byte(txIdStr), []byte(strconv2.Int64ToStr(curr.Keys[i]))) >= 0 {
+			if compare([]byte(txIDStr), []byte(strconv2.Int64ToStr(curr.Keys[i]))) >= 0 {
 				i++
 			} else {
 				break
@@ -677,7 +677,7 @@ func (tx *Tx) FindTxIdOnDisk(fID, txId uint64) (ok bool, err error) {
 	}
 
 	for i = 0; i < curr.KeysNum; i++ {
-		if compare([]byte(txIdStr), []byte(strconv2.Int64ToStr(curr.Keys[i]))) == 0 {
+		if compare([]byte(txIDStr), []byte(strconv2.Int64ToStr(curr.Keys[i]))) == 0 {
 			break
 		}
 	}
@@ -730,11 +730,11 @@ func (tx *Tx) FindOnDisk(fID uint64, rootOff uint64, key, newKey []byte) (entry 
 }
 
 // FindLeafOnDisk returns binary leaf node on disk at given fId, rootOff and key.
-func (tx *Tx) FindLeafOnDisk(fId int64, rootOff int64, key, newKey []byte) (bn *BinaryNode, err error) {
+func (tx *Tx) FindLeafOnDisk(fID int64, rootOff int64, key, newKey []byte) (bn *BinaryNode, err error) {
 	var i uint16
 	var curr *BinaryNode
 
-	filepath := tx.db.getBPTPath(fId)
+	filepath := tx.db.getBPTPath(fID)
 	curr, err = ReadNode(filepath, rootOff)
 	if err != nil {
 		return nil, err
@@ -743,7 +743,7 @@ func (tx *Tx) FindLeafOnDisk(fId int64, rootOff int64, key, newKey []byte) (bn *
 	for curr.IsLeaf != 1 {
 		i = 0
 		for i < curr.KeysNum {
-			df, err := NewDataFile(tx.db.getDataPath(fId), tx.db.opt.SegmentSize, tx.db.opt.RWMode)
+			df, err := NewDataFile(tx.db.getDataPath(fID), tx.db.opt.SegmentSize, tx.db.opt.RWMode)
 			if err != nil {
 				return nil, err
 			}
