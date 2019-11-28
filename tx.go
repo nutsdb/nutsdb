@@ -16,6 +16,7 @@ package nutsdb
 
 import (
 	"errors"
+	"os"
 	"strings"
 	"time"
 
@@ -130,8 +131,11 @@ func (tx *Tx) getTxID() (id uint64, err error) {
 //
 // 5. Unlock the database and clear the db field.
 func (tx *Tx) Commit() error {
-	var off int64
-	var e *Entry
+	var (
+		off            int64
+		e              *Entry
+		bucketMetaTemp BucketMeta
+	)
 
 	if tx.db == nil {
 		return ErrDBClosed
@@ -190,14 +194,22 @@ func (tx *Tx) Commit() error {
 
 		tx.db.ActiveFile.writeOff += entrySize
 
+		if tx.db.opt.EntryIdxMode == HintBPTSparseIdxMode {
+			bucketMetaTemp = tx.buildTempBucketMetaIdx(bucket, entry.Key, bucketMetaTemp)
+		}
+
 		if i == lastIndex {
-			txId := entry.Meta.txID
+			txID := entry.Meta.txID
 			if tx.db.opt.EntryIdxMode == HintBPTSparseIdxMode {
-				if err := tx.buildTxIDRootIdx(txId, countFlag); err != nil {
+				if err := tx.buildTxIDRootIdx(txID, countFlag); err != nil {
+					return err
+				}
+
+				if err := tx.buildBucketMetaIdx(bucket, entry.Key, bucketMetaTemp); err != nil {
 					return err
 				}
 			} else {
-				tx.db.committedTxIds[txId] = struct{}{}
+				tx.db.committedTxIds[txID] = struct{}{}
 			}
 		}
 
@@ -223,15 +235,82 @@ func (tx *Tx) Commit() error {
 	return nil
 }
 
-func (tx *Tx) buildTxIDRootIdx(txId uint64, countFlag bool) error {
-	txIdStr := strconv2.IntToStr(int(txId))
+func (tx *Tx) buildTempBucketMetaIdx(bucket string, key []byte, bucketMetaTemp BucketMeta) BucketMeta {
+	keySize := uint32(len(key))
+	if bucketMetaTemp.start == nil {
+		bucketMetaTemp = BucketMeta{start: key, end: key, startSize: keySize, endSize: keySize}
+	} else {
+		if compare(bucketMetaTemp.start, key) > 0 {
+			bucketMetaTemp.start = key
+			bucketMetaTemp.startSize = keySize
+		}
 
-	tx.db.ActiveCommittedTxIdsIdx.Insert([]byte(txIdStr), nil, &Hint{meta: &MetaData{Flag: DataSetFlag}}, countFlag)
+		if compare(bucketMetaTemp.end, key) < 0 {
+			bucketMetaTemp.end = key
+			bucketMetaTemp.endSize = keySize
+		}
+	}
+
+	return bucketMetaTemp
+}
+
+func (tx *Tx) buildBucketMetaIdx(bucket string, key []byte, bucketMetaTemp BucketMeta) error {
+	bucketMeta, ok := tx.db.bucketMetas[bucket]
+
+	start := bucketMetaTemp.start
+	startSize := uint32(len(start))
+	end := bucketMetaTemp.end
+	endSize := uint32(len(end))
+	var updateFlag bool
+
+	if !ok {
+		bucketMeta = &BucketMeta{start: start, end: end, startSize: startSize, endSize: endSize}
+		updateFlag = true
+	} else {
+		if compare(bucketMeta.start, bucketMetaTemp.start) > 0 {
+			bucketMeta.start = start
+			bucketMeta.startSize = startSize
+			updateFlag = true
+		}
+
+		if compare(bucketMeta.end, bucketMetaTemp.end) < 0 {
+			bucketMeta.end = end
+			bucketMeta.endSize = endSize
+			updateFlag = true
+		}
+	}
+
+	if updateFlag {
+		fd, err := os.OpenFile(tx.db.getBucketMetaFilePath(bucket), os.O_CREATE|os.O_RDWR, 0644)
+		defer fd.Close()
+		if err != nil {
+			return err
+		}
+
+		if _, err = fd.WriteAt(bucketMeta.Encode(), 0); err != nil {
+			return err
+		}
+
+		if tx.db.opt.SyncEnable {
+			if err = fd.Sync(); err != nil {
+				return err
+			}
+		}
+		tx.db.bucketMetas[bucket] = bucketMeta
+	}
+
+	return nil
+}
+
+func (tx *Tx) buildTxIDRootIdx(txID uint64, countFlag bool) error {
+	txIDStr := strconv2.IntToStr(int(txID))
+
+	tx.db.ActiveCommittedTxIdsIdx.Insert([]byte(txIDStr), nil, &Hint{meta: &MetaData{Flag: DataSetFlag}}, countFlag)
 	if len(tx.ReservedStoreTxIDIdxes) > 0 {
 		for fID, txIDIdx := range tx.ReservedStoreTxIDIdxes {
-			filePath := tx.db.getBPTTxIdPath(fID)
+			filePath := tx.db.getBPTTxIDPath(fID)
 
-			txIDIdx.Insert([]byte(txIdStr), nil, &Hint{meta: &MetaData{Flag: DataSetFlag}}, countFlag)
+			txIDIdx.Insert([]byte(txIDStr), nil, &Hint{meta: &MetaData{Flag: DataSetFlag}}, countFlag)
 			txIDIdx.Filepath = filePath
 
 			err := txIDIdx.WriteNodes(tx.db.opt.RWMode, tx.db.opt.SyncEnable, 2)
@@ -239,7 +318,7 @@ func (tx *Tx) buildTxIDRootIdx(txId uint64, countFlag bool) error {
 				return err
 			}
 
-			filePath = tx.db.getBPTRootTxIdPath(fID)
+			filePath = tx.db.getBPTRootTxIDPath(fID)
 			txIDRootIdx := NewTree()
 			rootAddress := strconv2.Int64ToStr(txIDIdx.root.Address)
 

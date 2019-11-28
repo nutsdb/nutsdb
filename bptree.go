@@ -64,11 +64,11 @@ const (
 	// BPTRootIndexSuffix returns b+ tree root index suffix.
 	BPTRootIndexSuffix = ".bptridx"
 
-	// BPTTxIdIndexSuffix returns b+ tree tx ID index suffix.
-	BPTTxIdIndexSuffix = ".bpttxid"
+	// BPTTxIDIndexSuffix returns b+ tree tx ID index suffix.
+	BPTTxIDIndexSuffix = ".bpttxid"
 
-	// BPTRootTxIdIndexSuffix returns b+ tree root tx ID index suffix.
-	BPTRootTxIdIndexSuffix = ".bptrtxid"
+	// BPTRootTxIDIndexSuffix returns b+ tree root tx ID index suffix.
+	BPTRootTxIDIndexSuffix = ".bptrtxid"
 )
 
 type (
@@ -573,14 +573,14 @@ func (t *BPTree) checkAndSetFirstKey(key []byte, h *Hint) {
 	if len(t.FirstKey) == 0 {
 		t.FirstKey = key
 	} else {
-		if compare(key, t.FirstKey) < 0 && h.meta.Flag != DataDeleteFlag {
+		if compare(key, t.FirstKey) < 0 {
 			t.FirstKey = key
 		}
 	}
 }
 
 func (t *BPTree) checkAndSetLastKey(key []byte, h *Hint) {
-	if compare(key, t.LastKey) > 0 && h.meta.Flag != DataDeleteFlag {
+	if compare(key, t.LastKey) > 0 {
 		t.LastKey = key
 	}
 }
