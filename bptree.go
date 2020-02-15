@@ -36,7 +36,7 @@ var (
 	// ErrPrefixScansNoResult is returned when prefixScan is called no result to found.
 	ErrPrefixScansNoResult = errors.New("prefix scans no result")
 
-	// ErrPrefixSearchScansNoResult is returned when prefixSearcScan is called no result to found.
+	// ErrPrefixSearchScansNoResult is returned when prefixSearchScan is called no result to found.
 	ErrPrefixSearchScansNoResult = errors.New("prefix and search scans no result")
 
 	// ErrKeyNotFound is returned when the key is not in the b+ tree.
