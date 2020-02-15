@@ -51,6 +51,9 @@ var (
 	// ErrPrefixScan is returned when prefix scanning not found the result
 	ErrPrefixScan = errors.New("prefix scans not found")
 
+	// ErrPrefixScan is returned when prefix and search scanning not found the result
+	ErrPrefixSearchScan = errors.New("prefix and search scans not found")
+
 	// ErrNotFoundKey is returned when key not found int the bucket on an view function.
 	ErrNotFoundKey = errors.New("key not found in the bucket")
 )
