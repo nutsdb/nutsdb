@@ -40,6 +40,7 @@ In order to break the limitation, I tried to optimize them. Finally, I did it an
   - [Using TTL(Time To Live)](#using-ttltime-to-live)
   - [Iterating over keys](#iterating-over-keys)
     - [Prefix scans](#prefix-scans)
+    - [Prefix with regexp search scans](#prefix-search-scans)
     - [Range scans](#range-scans)
     - [Get all](#get-all)
   - [Merge Operation](#merge-operation)
@@ -54,9 +55,9 @@ In order to break the limitation, I tried to optimize them. Finally, I did it an
      - [RPeek](#rpeek)
      - [LRange](#lrange)
      - [LRem](#lrem)
-     - [LSet](#lset)	
+     - [LSet](#lset)
      - [Ltrim](#ltrim)
-     - [LSize](#lsize)  	
+     - [LSize](#lsize)
    - [Set](#set)
      - [SAdd](#sadd)
      - [SAreMembers](#saremembers)
@@ -385,7 +386,7 @@ NutsDB stores its keys in byte-sorted order within a bucket. This makes sequenti
 
 #### Prefix scans
 
-To iterate over a key prefix, we can use `PrefixScan` function, and the paramter `limitNum` constrain the number of entries returned :
+To iterate over a key prefix, we can use `PrefixScan` function, and the parameter `limitNum` constrain the number of entries returned :
 
 ```golang
 
@@ -395,6 +396,32 @@ if err := db.View(
 		bucket := "user_list"
 		// Constrain 100 entries returned 
 		if entries, err := tx.PrefixScan(bucket, prefix, 100); err != nil {
+			return err
+		} else {
+			for _, entry := range entries {
+				fmt.Println(string(entry.Key), string(entry.Value))
+			}
+		}
+		return nil
+	}); err != nil {
+		log.Fatal(err)
+}
+
+```
+
+#### Prefix search scans
+
+To iterate over a key prefix with search by regular expression on a second part of key without prefix, we can use `PrefixSearchScan` function, and the parameter `limitNum` constrain the number of entries returned :
+
+```golang
+
+if err := db.View(
+	func(tx *nutsdb.Tx) error {
+		prefix := []byte("user_")
+		reg := "username"
+		bucket := "user_list"
+		// Constrain 100 entries returned 
+		if entries, err := tx.PrefixSearchScan(bucket, prefix, reg, 100); err != nil {
 			return err
 		} else {
 			for _, entry := range entries {

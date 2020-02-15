@@ -17,6 +17,7 @@ package nutsdb
 import (
 	"fmt"
 	"reflect"
+	"regexp"
 	"testing"
 )
 
@@ -110,6 +111,117 @@ func TestBPTree_PrefixScan(t *testing.T) {
 	_, err = tree.PrefixScan([]byte("key_099"), limit)
 	if err != nil {
 		t.Error("err prefix Scan")
+	}
+}
+
+func TestBPTree_PrefixSearchScan(t *testing.T) {
+
+	regs := "001"
+	regm := "005"
+	regl := "099"
+
+	tree = NewTree()
+	_, err := tree.PrefixSearchScan([]byte("key_"), regs, 10)
+	if err == nil {
+		t.Fatal("err prefix search Scan")
+	}
+	limit := 10
+	setup(t, limit)
+
+	rgxs := regexp.MustCompile(regs)
+	rgxm := regexp.MustCompile(regm)
+	rgxl := regexp.MustCompile(regl)
+
+	// prefix search scan
+	rss, err := tree.PrefixSearchScan([]byte("key_"), regs, limit)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// prefix search scan
+	rsm, err := tree.PrefixSearchScan([]byte("key_"), regm, limit)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// prefix search scan
+	rsl, err := tree.PrefixSearchScan([]byte("key_"), regl, limit)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i, e := range rss {
+
+		if !rgxs.Match(expected[i].E.Key) {
+			continue
+		}
+
+		if string(expected[i].E.Key) != string(e.E.Key) {
+			t.Errorf("err prefix Scan. got %v want %v", string(expected[i].E.Key), string(e.E.Key))
+		}
+
+		if string(expected[i].E.Key) == string(e.E.Key) {
+			break
+		}
+
+		t.Errorf("err prefix search Scan. Regexp not found")
+
+	}
+
+	for i, e := range rsm {
+
+		if !rgxm.Match(expected[i].E.Key) {
+			continue
+		}
+
+		if string(expected[i].E.Key) != string(e.E.Key) {
+			t.Errorf("err prefix Scan. got %v want %v", string(expected[i].E.Key), string(e.E.Key))
+		}
+
+		if string(expected[i].E.Key) == string(e.E.Key) {
+			break
+		}
+
+		t.Errorf("err prefix search Scan. Regexp not found")
+
+	}
+
+	for i, e := range rsl {
+
+		if !rgxl.Match(expected[i].E.Key) {
+			continue
+		}
+
+		if string(expected[i].E.Key) != string(e.E.Key) {
+			t.Errorf("err prefix search Scan. got %v want %v", string(expected[i].E.Key), string(e.E.Key))
+		}
+
+		if string(expected[i].E.Key) == string(e.E.Key) {
+			break
+		}
+
+		t.Errorf("err prefix search Scan. Regexp not found")
+
+	}
+
+	for i := 1; i <= 100; i++ {
+		key := []byte("name_" + fmt.Sprintf("%03d", i))
+		val := []byte("val_" + fmt.Sprintf("%03d", i))
+		err := tree.Insert(key, &Entry{Key: key, Value: val}, &Hint{key: key, meta: &MetaData{
+			Flag: DataSetFlag,
+		}}, CountFlagEnabled)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	_, err = tree.PrefixSearchScan([]byte("name_"), "005", limit)
+	if err != nil {
+		t.Error("err prefix search Scan")
+	}
+	_, err = tree.PrefixSearchScan([]byte("key_"), "099", limit)
+	if err != nil {
+		t.Error("err prefix search Scan")
 	}
 }
 
