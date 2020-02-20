@@ -69,7 +69,7 @@ func TestBPTree_Find(t *testing.T) {
 
 func TestBPTree_PrefixScan(t *testing.T) {
 	tree = NewTree()
-	_, err := tree.PrefixScan([]byte("key_001"), 10)
+	_, _, err := tree.PrefixScan([]byte("key_001"), 0, 10)
 	if err == nil {
 		t.Fatal("err prefix Scan")
 	}
@@ -77,7 +77,7 @@ func TestBPTree_PrefixScan(t *testing.T) {
 	setup(t, limit)
 
 	// prefix scan
-	rs, err := tree.PrefixScan([]byte("key_"), limit)
+	rs, _, err := tree.PrefixScan([]byte("key_"), 0, limit)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,12 +88,12 @@ func TestBPTree_PrefixScan(t *testing.T) {
 		}
 	}
 
-	_, err = tree.PrefixScan([]byte("key_xx"), limit)
+	_, _, err = tree.PrefixScan([]byte("key_xx"), 0, limit)
 	if err == nil {
 		t.Error("err prefix Scan")
 	}
 
-	for i := 1; i <= 100; i++ {
+	for i := 0; i <= 100; i++ {
 		key := []byte("name_" + fmt.Sprintf("%03d", i))
 		val := []byte("val_" + fmt.Sprintf("%03d", i))
 		err := tree.Insert(key, &Entry{Key: key, Value: val}, &Hint{key: key, meta: &MetaData{
@@ -104,11 +104,11 @@ func TestBPTree_PrefixScan(t *testing.T) {
 		}
 	}
 
-	_, err = tree.PrefixScan([]byte("name_"), limit)
+	_, _, err = tree.PrefixScan([]byte("name_"), 5, limit)
 	if err != nil {
 		t.Error("err prefix Scan")
 	}
-	_, err = tree.PrefixScan([]byte("key_099"), limit)
+	_, _, err = tree.PrefixScan([]byte("key_099"), 0, limit)
 	if err != nil {
 		t.Error("err prefix Scan")
 	}
@@ -121,7 +121,7 @@ func TestBPTree_PrefixSearchScan(t *testing.T) {
 	regl := "099"
 
 	tree = NewTree()
-	_, err := tree.PrefixSearchScan([]byte("key_"), regs, 10)
+	_, _, err := tree.PrefixSearchScan([]byte("key_"), regs, 1, 10)
 	if err == nil {
 		t.Fatal("err prefix search Scan")
 	}
@@ -133,19 +133,19 @@ func TestBPTree_PrefixSearchScan(t *testing.T) {
 	rgxl := regexp.MustCompile(regl)
 
 	// prefix search scan
-	rss, err := tree.PrefixSearchScan([]byte("key_"), regs, limit)
+	rss, _, err := tree.PrefixSearchScan([]byte("key_"), regs, 1, limit)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// prefix search scan
-	rsm, err := tree.PrefixSearchScan([]byte("key_"), regm, limit)
+	rsm, _, err := tree.PrefixSearchScan([]byte("key_"), regm, 5, limit)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// prefix search scan
-	rsl, err := tree.PrefixSearchScan([]byte("key_"), regl, limit)
+	rsl, _, err := tree.PrefixSearchScan([]byte("key_"), regl, 99, limit)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -204,7 +204,7 @@ func TestBPTree_PrefixSearchScan(t *testing.T) {
 
 	}
 
-	for i := 1; i <= 100; i++ {
+	for i := 0; i <= 100; i++ {
 		key := []byte("name_" + fmt.Sprintf("%03d", i))
 		val := []byte("val_" + fmt.Sprintf("%03d", i))
 		err := tree.Insert(key, &Entry{Key: key, Value: val}, &Hint{key: key, meta: &MetaData{
@@ -215,11 +215,11 @@ func TestBPTree_PrefixSearchScan(t *testing.T) {
 		}
 	}
 
-	_, err = tree.PrefixSearchScan([]byte("name_"), "005", limit)
+	_, _, err = tree.PrefixSearchScan([]byte("name_"), "005", 5, limit)
 	if err != nil {
 		t.Error("err prefix search Scan")
 	}
-	_, err = tree.PrefixSearchScan([]byte("key_"), "099", limit)
+	_, _, err = tree.PrefixSearchScan([]byte("key_"), "099", 99, limit)
 	if err != nil {
 		t.Error("err prefix search Scan")
 	}

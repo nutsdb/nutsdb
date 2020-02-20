@@ -497,7 +497,7 @@ func getRecordWrapper(numFound int, keys [][]byte, pointers []interface{}) (reco
 
 // PrefixScan returns records at the given prefix and limitNum
 // limitNum: limit the number of the scanned records return.
-func (t *BPTree) PrefixScan(prefix []byte, limitNum int) (records Records, err error) {
+func (t *BPTree) PrefixScan(prefix []byte, offsetNum int, limitNum int) (records Records, off int, err error) {
 	var (
 		n              *Node
 		scanFlag       bool
@@ -509,7 +509,7 @@ func (t *BPTree) PrefixScan(prefix []byte, limitNum int) (records Records, err e
 	n = t.FindLeaf(prefix)
 
 	if n == nil {
-		return nil, ErrPrefixScansNoResult
+		return nil, off, ErrPrefixScansNoResult
 	}
 
 	for j = 0; j < n.KeysNum && compare(n.Keys[j], prefix) < 0; {
@@ -518,8 +518,17 @@ func (t *BPTree) PrefixScan(prefix []byte, limitNum int) (records Records, err e
 
 	scanFlag = true
 	numFound = 0
+
+	coff := 0
+
 	for n != nil && scanFlag {
 		for i = j; i < n.KeysNum; i++ {
+
+			if coff < offsetNum {
+				coff++
+				continue
+			}
+
 			if !bytes.HasPrefix(n.Keys[i], prefix) {
 				scanFlag = false
 				break
@@ -539,12 +548,15 @@ func (t *BPTree) PrefixScan(prefix []byte, limitNum int) (records Records, err e
 		j = 0
 	}
 
-	return getRecordWrapper(numFound, keys, pointers)
+	off = coff
+
+	esr, err := getRecordWrapper(numFound, keys, pointers)
+	return esr, off, err
 }
 
 // PrefixSearchScan returns records at the given prefix, match regular expression and limitNum
 // limitNum: limit the number of the scanned records return.
-func (t *BPTree) PrefixSearchScan(prefix []byte, reg string, limitNum int) (records Records, err error) {
+func (t *BPTree) PrefixSearchScan(prefix []byte, reg string, offsetNum int, limitNum int) (records Records, off int, err error) {
 	var (
 		n              *Node
 		scanFlag       bool
@@ -555,13 +567,13 @@ func (t *BPTree) PrefixSearchScan(prefix []byte, reg string, limitNum int) (reco
 
 	rgx, err := regexp.Compile(reg)
 	if err != nil {
-		return nil, ErrBadRegexp
+		return nil, off, ErrBadRegexp
 	}
 
 	n = t.FindLeaf(prefix)
 
 	if n == nil {
-		return nil, ErrPrefixSearchScansNoResult
+		return nil, off, ErrPrefixSearchScansNoResult
 	}
 
 	for j = 0; j < n.KeysNum && compare(n.Keys[j], prefix) < 0; {
@@ -570,8 +582,17 @@ func (t *BPTree) PrefixSearchScan(prefix []byte, reg string, limitNum int) (reco
 
 	scanFlag = true
 	numFound = 0
+
+	coff := 0
+
 	for n != nil && scanFlag {
 		for i = j; i < n.KeysNum; i++ {
+
+			if coff < offsetNum {
+				coff++
+				continue
+			}
+
 			if !bytes.HasPrefix(n.Keys[i], prefix) {
 				scanFlag = false
 				break
@@ -595,7 +616,10 @@ func (t *BPTree) PrefixSearchScan(prefix []byte, reg string, limitNum int) (reco
 		j = 0
 	}
 
-	return getRecordWrapper(numFound, keys, pointers)
+	off = coff
+
+	esr, err := getRecordWrapper(numFound, keys, pointers)
+	return esr, off, err
 }
 
 // Find retrieves record at the given key.

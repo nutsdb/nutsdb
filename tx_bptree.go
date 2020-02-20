@@ -304,8 +304,9 @@ func (tx *Tx) rangeScanOnDisk(bucket string, start, end []byte) ([]*Entry, error
 	return result, nil
 }
 
-func (tx *Tx) prefixScanOnDisk(bucket string, prefix []byte, limitNum int) ([]*Entry, error) {
+func (tx *Tx) prefixScanOnDisk(bucket string, prefix []byte, offsetNum int, limitNum int) ([]*Entry, int, error) {
 	var result []*Entry
+	var off int
 
 	bptSparseIdxGroup := tx.db.BPTreeRootIdxes
 	SortFID(bptSparseIdxGroup, func(p, q *BPTreeRootIdx) bool {
@@ -317,9 +318,9 @@ func (tx *Tx) prefixScanOnDisk(bucket string, prefix []byte, limitNum int) ([]*E
 
 	for _, bptSparseIdx := range bptSparseIdxGroup {
 		if compare(newPrefix, bptSparseIdx.start) <= 0 || compare(newPrefix, bptSparseIdx.end) <= 0 {
-			entries, err := tx.findPrefixOnDisk(bucket, int64(bptSparseIdx.fID), int64(bptSparseIdx.rootOff), prefix, newPrefix, leftNum)
+			entries, voff, err := tx.findPrefixOnDisk(bucket, int64(bptSparseIdx.fID), int64(bptSparseIdx.rootOff), prefix, newPrefix, offsetNum, leftNum)
 			if err != nil {
-				return nil, err
+				return nil, off, err
 			}
 
 			leftNum -= len(entries)
@@ -329,17 +330,20 @@ func (tx *Tx) prefixScanOnDisk(bucket string, prefix []byte, limitNum int) ([]*E
 				entries...,
 			)
 
+			off = off + voff
+
 			if len(result) == limitNum {
-				return result, nil
+				return result, off, nil
 			}
 		}
 	}
 
-	return result, nil
+	return result, off, nil
 }
 
-func (tx *Tx) prefixSearchScanOnDisk(bucket string, prefix []byte, reg string, limitNum int) ([]*Entry, error) {
+func (tx *Tx) prefixSearchScanOnDisk(bucket string, prefix []byte, reg string, offsetNum int, limitNum int) ([]*Entry, int, error) {
 	var result []*Entry
+	var off int
 
 	bptSparseIdxGroup := tx.db.BPTreeRootIdxes
 	SortFID(bptSparseIdxGroup, func(p, q *BPTreeRootIdx) bool {
@@ -351,9 +355,9 @@ func (tx *Tx) prefixSearchScanOnDisk(bucket string, prefix []byte, reg string, l
 
 	for _, bptSparseIdx := range bptSparseIdxGroup {
 		if compare(newPrefix, bptSparseIdx.start) <= 0 || compare(newPrefix, bptSparseIdx.end) <= 0 {
-			entries, err := tx.findPrefixSearchOnDisk(bucket, int64(bptSparseIdx.fID), int64(bptSparseIdx.rootOff), prefix, reg, newPrefix, leftNum)
+			entries, voff, err := tx.findPrefixSearchOnDisk(bucket, int64(bptSparseIdx.fID), int64(bptSparseIdx.rootOff), prefix, reg, newPrefix, offsetNum, leftNum)
 			if err != nil {
-				return nil, err
+				return nil, off, err
 			}
 
 			leftNum -= len(entries)
@@ -363,13 +367,15 @@ func (tx *Tx) prefixSearchScanOnDisk(bucket string, prefix []byte, reg string, l
 				entries...,
 			)
 
+			off = off + voff
+
 			if len(result) == limitNum {
-				return result, nil
+				return result, off, nil
 			}
 		}
 	}
 
-	return result, nil
+	return result, off, nil
 }
 
 func processEntriesScanOnDisk(entriesTemp []*Entry) (result []*Entry) {
@@ -417,7 +423,7 @@ func (tx *Tx) getStartIndexForFindPrefix(fID int64, curr *BinaryNode, prefix []b
 	return j, nil
 }
 
-func (tx *Tx) findPrefixOnDisk(bucket string, fID, rootOff int64, prefix, newPrefix []byte, limitNum int) (es []*Entry, err error) {
+func (tx *Tx) findPrefixOnDisk(bucket string, fID, rootOff int64, prefix, newPrefix []byte, offsetNum int, limitNum int) (es []*Entry, off int, err error) {
 	var (
 		i, j  uint16
 		entry *Entry
@@ -425,28 +431,36 @@ func (tx *Tx) findPrefixOnDisk(bucket string, fID, rootOff int64, prefix, newPre
 	)
 
 	if curr, err = tx.FindLeafOnDisk(fID, rootOff, prefix, newPrefix); err != nil && curr == nil {
-		return nil, err
+		return nil, off, err
 	}
 
 	if j, err = tx.getStartIndexForFindPrefix(fID, curr, newPrefix); err != nil {
-		return nil, err
+		return nil, off, err
 	}
 
 	scanFlag := true
 	numFound := 0
 	filepath := tx.db.getBPTPath(fID)
 
+	coff := 0
+
 	for curr != nil && scanFlag {
 		for i = j; i < curr.KeysNum; i++ {
+
+			if coff < offsetNum {
+				coff++
+				continue
+			}
+
 			df, err := NewDataFile(tx.db.getDataPath(fID), tx.db.opt.SegmentSize, tx.db.opt.RWMode)
 			if err != nil {
-				return nil, err
+				return nil, off, err
 			}
 
 			entry, err = df.ReadAt(int(curr.Keys[i]))
 			df.rwManager.Close()
 			if err != nil {
-				return nil, err
+				return nil, off, err
 			}
 
 			if !bytes.HasPrefix(entry.Key, prefix) || string(entry.Meta.bucket) != bucket {
@@ -469,15 +483,17 @@ func (tx *Tx) findPrefixOnDisk(bucket string, fID, rootOff int64, prefix, newPre
 		}
 		curr, err = ReadNode(filepath, address)
 		if err != nil {
-			return nil, err
+			return nil, off, err
 		}
 		j = 0
 	}
 
+	off = coff
+
 	return
 }
 
-func (tx *Tx) findPrefixSearchOnDisk(bucket string, fID, rootOff int64, prefix []byte, reg string, newPrefix []byte, limitNum int) (es []*Entry, err error) {
+func (tx *Tx) findPrefixSearchOnDisk(bucket string, fID, rootOff int64, prefix []byte, reg string, newPrefix []byte, offsetNum int, limitNum int) (es []*Entry, off int, err error) {
 	var (
 		i, j  uint16
 		entry *Entry
@@ -486,32 +502,40 @@ func (tx *Tx) findPrefixSearchOnDisk(bucket string, fID, rootOff int64, prefix [
 
 	rgx, err := regexp.Compile(reg)
 	if err != nil {
-		return nil, ErrBadRegexp
+		return nil, off, ErrBadRegexp
 	}
 
 	if curr, err = tx.FindLeafOnDisk(fID, rootOff, prefix, newPrefix); err != nil && curr == nil {
-		return nil, err
+		return nil, off, err
 	}
 
 	if j, err = tx.getStartIndexForFindPrefix(fID, curr, newPrefix); err != nil {
-		return nil, err
+		return nil, off, err
 	}
 
 	scanFlag := true
 	numFound := 0
 	filepath := tx.db.getBPTPath(fID)
 
+	coff := 0
+
 	for curr != nil && scanFlag {
 		for i = j; i < curr.KeysNum; i++ {
+
+			if coff < offsetNum {
+				coff++
+				continue
+			}
+
 			df, err := NewDataFile(tx.db.getDataPath(fID), tx.db.opt.SegmentSize, tx.db.opt.RWMode)
 			if err != nil {
-				return nil, err
+				return nil, off, err
 			}
 
 			entry, err = df.ReadAt(int(curr.Keys[i]))
 			df.rwManager.Close()
 			if err != nil {
-				return nil, err
+				return nil, off, err
 			}
 
 			if !bytes.HasPrefix(entry.Key, prefix) || string(entry.Meta.bucket) != bucket {
@@ -538,10 +562,12 @@ func (tx *Tx) findPrefixSearchOnDisk(bucket string, fID, rootOff int64, prefix [
 		}
 		curr, err = ReadNode(filepath, address)
 		if err != nil {
-			return nil, err
+			return nil, off, err
 		}
 		j = 0
 	}
+
+	off = coff
 
 	return
 }
@@ -629,25 +655,26 @@ func (tx *Tx) findRangeOnDisk(fID, rootOff int64, start, end, newStart, newEnd [
 	return
 }
 
-func (tx *Tx) prefixScanByHintBPTSparseIdx(bucket string, prefix []byte, limitNum int) (es Entries, err error) {
+func (tx *Tx) prefixScanByHintBPTSparseIdx(bucket string, prefix []byte, offsetNum int, limitNum int) (es Entries, off int, err error) {
 	newPrefix := getNewKey(bucket, prefix)
-	records, err := tx.db.ActiveBPTreeIdx.PrefixScan(newPrefix, limitNum)
+	records, voff, err := tx.db.ActiveBPTreeIdx.PrefixScan(newPrefix, offsetNum, limitNum)
 	if err == nil && records != nil {
 		for _, r := range records {
 			path := tx.db.getDataPath(r.H.fileID)
 			df, err := NewDataFile(path, tx.db.opt.SegmentSize, tx.db.opt.RWMode)
 			if err != nil {
 				df.rwManager.Close()
-				return nil, err
+				return nil, off, err
 			}
 			if item, err := df.ReadAt(int(r.H.dataPos)); err == nil {
 				es = append(es, item)
 				if len(es) == limitNum {
-					return es, nil
+					off = voff
+					return es, off, nil
 				}
 			} else {
 				df.rwManager.Close()
-				return nil, fmt.Errorf("HintIdx r.Hi.dataPos %d, err %s", r.H.dataPos, err)
+				return nil, off, fmt.Errorf("HintIdx r.Hi.dataPos %d, err %s", r.H.dataPos, err)
 			}
 			df.rwManager.Close()
 		}
@@ -655,39 +682,43 @@ func (tx *Tx) prefixScanByHintBPTSparseIdx(bucket string, prefix []byte, limitNu
 
 	leftNum := limitNum - len(es)
 	if leftNum > 0 {
-		entries, err := tx.prefixScanOnDisk(bucket, prefix, leftNum)
+		entries, voff, err := tx.prefixScanOnDisk(bucket, prefix, offsetNum, leftNum)
 		if err != nil {
-			return nil, err
+			return nil, off, err
 		}
 		es = append(es, entries...)
+		off = voff
 	}
+
+	off = voff
 
 	if len(es) == 0 {
-		return nil, ErrPrefixScan
+		return nil, off, ErrPrefixScan
 	}
 
-	return processEntriesScanOnDisk(es), nil
+	return processEntriesScanOnDisk(es), off, nil
 }
 
-func (tx *Tx) prefixSearchScanByHintBPTSparseIdx(bucket string, prefix []byte, reg string, limitNum int) (es Entries, err error) {
+func (tx *Tx) prefixSearchScanByHintBPTSparseIdx(bucket string, prefix []byte, reg string, offsetNum int, limitNum int) (es Entries, off int, err error) {
 	newPrefix := getNewKey(bucket, prefix)
-	records, err := tx.db.ActiveBPTreeIdx.PrefixSearchScan(newPrefix, reg, limitNum)
+	records, voff, err := tx.db.ActiveBPTreeIdx.PrefixSearchScan(newPrefix, reg, offsetNum, limitNum)
 	if err == nil && records != nil {
 		for _, r := range records {
 			path := tx.db.getDataPath(r.H.fileID)
 			df, err := NewDataFile(path, tx.db.opt.SegmentSize, tx.db.opt.RWMode)
 			if err != nil {
 				df.rwManager.Close()
-				return nil, err
+				return nil, off, err
 			}
 			if item, err := df.ReadAt(int(r.H.dataPos)); err == nil {
 				es = append(es, item)
 				if len(es) == limitNum {
-					return es, nil
+					off = voff
+					return es, off, nil
 				}
 			} else {
 				df.rwManager.Close()
-				return nil, fmt.Errorf("HintIdx r.Hi.dataPos %d, err %s", r.H.dataPos, err)
+				return nil, off, fmt.Errorf("HintIdx r.Hi.dataPos %d, err %s", r.H.dataPos, err)
 			}
 			df.rwManager.Close()
 		}
@@ -695,45 +726,54 @@ func (tx *Tx) prefixSearchScanByHintBPTSparseIdx(bucket string, prefix []byte, r
 
 	leftNum := limitNum - len(es)
 	if leftNum > 0 {
-		entries, err := tx.prefixSearchScanOnDisk(bucket, prefix, reg, leftNum)
+		entries, voff, err := tx.prefixSearchScanOnDisk(bucket, prefix, reg, offsetNum, leftNum)
 		if err != nil {
-			return nil, err
+			return nil, off, err
 		}
 		es = append(es, entries...)
+		off = voff
 	}
+
+	off = voff
 
 	if len(es) == 0 {
-		return nil, ErrPrefixSearchScan
+		return nil, off, ErrPrefixSearchScan
 	}
 
-	return processEntriesScanOnDisk(es), nil
+	return processEntriesScanOnDisk(es), off, nil
 }
 
 // PrefixScan iterates over a key prefix at given bucket, prefix and limitNum.
 // LimitNum will limit the number of entries return.
-func (tx *Tx) PrefixScan(bucket string, prefix []byte, limitNum int) (es Entries, err error) {
+func (tx *Tx) PrefixScan(bucket string, prefix []byte, offsetNum int, limitNum int) (es Entries, off int, err error) {
+
 	if err := tx.checkTxIsClosed(); err != nil {
-		return nil, err
+		return nil, off, err
 	}
 
 	if tx.db.opt.EntryIdxMode == HintBPTSparseIdxMode {
-		return tx.prefixScanByHintBPTSparseIdx(bucket, prefix, limitNum)
+		return tx.prefixScanByHintBPTSparseIdx(bucket, prefix, offsetNum, limitNum)
 	}
 
 	if idx, ok := tx.db.BPTreeIdx[bucket]; ok {
-		records, err := idx.PrefixScan(prefix, limitNum)
+		records, voff, err := idx.PrefixScan(prefix, offsetNum, limitNum)
 		if err != nil {
-			return nil, ErrPrefixScan
+			off = voff
+			return nil, off, ErrPrefixScan
 		}
 
 		es, err = tx.getHintIdxDataItemsWrapper(records, limitNum, es, PrefixScan)
 		if err != nil {
-			return nil, ErrPrefixScan
+			off = voff
+			return nil, off, ErrPrefixScan
 		}
+
+		off = voff
+
 	}
 
 	if len(es) == 0 {
-		return nil, ErrPrefixScan
+		return nil, off, ErrPrefixScan
 	}
 
 	return
@@ -741,29 +781,35 @@ func (tx *Tx) PrefixScan(bucket string, prefix []byte, limitNum int) (es Entries
 
 // PrefixSearchScan iterates over a key prefix at given bucket, prefix, match regular expression and limitNum.
 // LimitNum will limit the number of entries return.
-func (tx *Tx) PrefixSearchScan(bucket string, prefix []byte, reg string, limitNum int) (es Entries, err error) {
+func (tx *Tx) PrefixSearchScan(bucket string, prefix []byte, reg string, offsetNum int, limitNum int) (es Entries, off int, err error) {
+
 	if err := tx.checkTxIsClosed(); err != nil {
-		return nil, err
+		return nil, off, err
 	}
 
 	if tx.db.opt.EntryIdxMode == HintBPTSparseIdxMode {
-		return tx.prefixSearchScanByHintBPTSparseIdx(bucket, prefix, reg, limitNum)
+		return tx.prefixSearchScanByHintBPTSparseIdx(bucket, prefix, reg, offsetNum, limitNum)
 	}
 
 	if idx, ok := tx.db.BPTreeIdx[bucket]; ok {
-		records, err := idx.PrefixSearchScan(prefix, reg, limitNum)
+		records, voff, err := idx.PrefixSearchScan(prefix, reg, offsetNum, limitNum)
 		if err != nil {
-			return nil, ErrPrefixSearchScan
+			off = voff
+			return nil, off, ErrPrefixSearchScan
 		}
 
 		es, err = tx.getHintIdxDataItemsWrapper(records, limitNum, es, PrefixSearchScan)
 		if err != nil {
-			return nil, ErrPrefixSearchScan
+			off = voff
+			return nil, off, ErrPrefixSearchScan
 		}
+
+		off = voff
+
 	}
 
 	if len(es) == 0 {
-		return nil, ErrPrefixSearchScan
+		return nil, off, ErrPrefixSearchScan
 	}
 
 	return

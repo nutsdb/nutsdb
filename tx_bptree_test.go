@@ -361,7 +361,7 @@ func TestTx_PrefixScan(t *testing.T) {
 	}
 
 	prefix := []byte("key_")
-	if entries, err := tx.PrefixScan(bucket, prefix, 2); err != nil {
+	if entries, _, err := tx.PrefixScan(bucket, prefix, 0, 2); err != nil {
 		//tx rollback
 		tx.Rollback()
 	} else {
@@ -424,7 +424,7 @@ func TestTx_PrefixSearchScan(t *testing.T) {
 	}
 
 	prefix := []byte("key_")
-	if entries, err := tx.PrefixSearchScan(bucket, prefix, regs, 1); err != nil {
+	if entries, _, err := tx.PrefixSearchScan(bucket, prefix, regs, 0, 1); err != nil {
 		//tx rollback
 		tx.Rollback()
 	} else {
@@ -655,7 +655,7 @@ func TestTx_PrefixScan_NotFound(t *testing.T) {
 	}
 
 	prefix := []byte("key_")
-	if entries, err := tx.PrefixScan("foobucket", prefix, 10); err != nil {
+	if entries, _, err := tx.PrefixScan("foobucket", prefix, 0, 10); err != nil {
 		//tx rollback
 		if entries != nil {
 			t.Error("err TestTx_PrefixScan_NotFound")
@@ -693,7 +693,7 @@ func TestTx_PrefixScan_NotFound(t *testing.T) {
 	}
 
 	prefix = []byte("key_foo")
-	if entries, err := tx.PrefixScan(bucket, prefix, 10); err != nil {
+	if entries, _, err := tx.PrefixScan(bucket, prefix, 0, 10); err != nil {
 		//tx rollback
 		if entries != nil {
 			t.Error("err TestTx_PrefixScan_NotFound")
@@ -708,14 +708,14 @@ func TestTx_PrefixScan_NotFound(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	entries, err := tx.PrefixScan(bucket, []byte("key_"), 10)
+	entries, _, err := tx.PrefixScan(bucket, []byte("key_"), 0, 10)
 	if len(entries) == 0 || err != nil {
 		t.Error("err TestTx_PrefixScan_NotFound")
 	}
 
 	tx.Commit()
 
-	entries, err = tx.PrefixScan(bucket, []byte("key_"), 10)
+	entries, _, err = tx.PrefixScan(bucket, []byte("key_"), 0, 10)
 	if len(entries) > 0 || err == nil {
 		t.Error("err TestTx_PrefixScan_NotFound")
 	}
@@ -733,7 +733,7 @@ func TestTx_PrefixSearchScan_NotFound(t *testing.T) {
 	regs := "(.+)"
 
 	prefix := []byte("key_")
-	if entries, err := tx.PrefixSearchScan("foobucket", prefix, regs, 10); err != nil {
+	if entries, _, err := tx.PrefixSearchScan("foobucket", prefix, regs, 0, 10); err != nil {
 		//tx rollback
 		if entries != nil {
 			t.Error("err TestTx_PrefixSearchScan_NotFound")
@@ -771,7 +771,7 @@ func TestTx_PrefixSearchScan_NotFound(t *testing.T) {
 	}
 
 	prefix = []byte("key_foo")
-	if entries, err := tx.PrefixSearchScan(bucket, prefix, regs, 10); err != nil {
+	if entries, _, err := tx.PrefixSearchScan(bucket, prefix, regs, 0, 10); err != nil {
 		//tx rollback
 		if entries != nil {
 			t.Error("err TestTx_PrefixSearchScan_NotFound")
@@ -786,14 +786,14 @@ func TestTx_PrefixSearchScan_NotFound(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	entries, err := tx.PrefixSearchScan(bucket, []byte("key_"), regs, 10)
+	entries, _, err := tx.PrefixSearchScan(bucket, []byte("key_"), regs, 0, 10)
 	if len(entries) == 0 || err != nil {
 		t.Error("err TestTx_PrefixSearchScan_NotFound")
 	}
 
 	tx.Commit()
 
-	entries, err = tx.PrefixSearchScan(bucket, []byte("key_"), regs, 10)
+	entries, _, err = tx.PrefixSearchScan(bucket, []byte("key_"), regs, 0, 10)
 	if len(entries) > 0 || err == nil {
 		t.Error("err TestTx_PrefixSearchScan_NotFound")
 	}
@@ -956,7 +956,7 @@ func TestTx_SCan_For_BPTSparseIdxMode(t *testing.T) {
 	}
 
 	limit := 5
-	es, err = tx.PrefixScan(bucket, []byte("key_"), limit)
+	es, _, err = tx.PrefixScan(bucket, []byte("key_"), 0, limit)
 
 	if len(es) != limit || err != nil {
 		t.Error("err BPTSparseIdxMode prefixScan")
@@ -973,7 +973,7 @@ func TestTx_SCan_For_BPTSparseIdxMode(t *testing.T) {
 	}
 
 	limit = 5
-	es, err = tx.PrefixSearchScan(bucket, []byte("key_"), regs, limit)
+	es, _, err = tx.PrefixSearchScan(bucket, []byte("key_"), regs, 0, limit)
 
 	if len(es) != limit || err != nil {
 		t.Error("err BPTSparseIdxMode prefixSearchScan")
@@ -1013,7 +1013,7 @@ func TestTx_Notfound_For_BPTSparseIdxMode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	es, err := tx.PrefixScan(bucket, []byte("key_prefix_fake"), 10)
+	es, _, err := tx.PrefixScan(bucket, []byte("key_prefix_fake"), 0, 10)
 
 	if es != nil || err == nil {
 		t.Error("err BPTSparseIdxMode PrefixScan")
@@ -1029,7 +1029,7 @@ func TestTx_Notfound_For_BPTSparseIdxMode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	es, err = tx.PrefixSearchScan(bucket, []byte("key_prefix_fake"), regs, 10)
+	es, _, err = tx.PrefixSearchScan(bucket, []byte("key_prefix_fake"), regs, 0, 10)
 
 	if es != nil || err == nil {
 		t.Error("err BPTSparseIdxMode PrefixSearchScan")
