@@ -524,14 +524,14 @@ func (t *BPTree) PrefixScan(prefix []byte, offsetNum int, limitNum int) (records
 	for n != nil && scanFlag {
 		for i = j; i < n.KeysNum; i++ {
 
-			if coff < offsetNum {
-				coff++
-				continue
-			}
-
 			if !bytes.HasPrefix(n.Keys[i], prefix) {
 				scanFlag = false
 				break
+			}
+
+			if coff < offsetNum {
+				coff++
+				continue
 			}
 
 			keys = append(keys, n.Keys[i])
@@ -588,17 +588,17 @@ func (t *BPTree) PrefixSearchScan(prefix []byte, reg string, offsetNum int, limi
 	for n != nil && scanFlag {
 		for i = j; i < n.KeysNum; i++ {
 
-			if coff < offsetNum {
-				coff++
-				continue
-			}
-
 			if !bytes.HasPrefix(n.Keys[i], prefix) {
 				scanFlag = false
 				break
 			}
 
 			if !rgx.Match(bytes.TrimPrefix(n.Keys[i], prefix)) {
+				continue
+			}
+
+			if coff < offsetNum {
+				coff++
 				continue
 			}
 
