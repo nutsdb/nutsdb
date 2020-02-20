@@ -593,12 +593,12 @@ func (t *BPTree) PrefixSearchScan(prefix []byte, reg string, offsetNum int, limi
 				break
 			}
 
-			if !rgx.Match(bytes.TrimPrefix(n.Keys[i], prefix)) {
+			if coff < offsetNum {
+				coff++
 				continue
 			}
 
-			if coff < offsetNum {
-				coff++
+			if !rgx.Match(bytes.TrimPrefix(n.Keys[i], prefix)) {
 				continue
 			}
 
