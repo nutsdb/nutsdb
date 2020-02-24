@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"regexp"
 	"unsafe"
 
 	"github.com/xujiajun/utils/strconv2"
@@ -29,14 +30,20 @@ var (
 	// ErrStartKey is returned when Range is called by a error start key.
 	ErrStartKey = errors.New("err start key")
 
-	// ErrScansNoResult is returned when Range or prefixScan are called no result to found.
-	ErrScansNoResult = errors.New("range scans or prefix scans no result")
+	// ErrScansNoResult is returned when Range or prefixScan or prefixSearchScan are called no result to found.
+	ErrScansNoResult = errors.New("range scans or prefix or prefix and search scans no result")
 
 	// ErrPrefixScansNoResult is returned when prefixScan is called no result to found.
 	ErrPrefixScansNoResult = errors.New("prefix scans no result")
 
+	// ErrPrefixSearchScansNoResult is returned when prefixSearchScan is called no result to found.
+	ErrPrefixSearchScansNoResult = errors.New("prefix and search scans no result")
+
 	// ErrKeyNotFound is returned when the key is not in the b+ tree.
 	ErrKeyNotFound = errors.New("key not found")
+
+	// ErrBadRegexp is returned when bad regular expression given.
+	ErrBadRegexp = errors.New("bad regular expression")
 )
 
 const (
@@ -51,6 +58,9 @@ const (
 
 	// PrefixScan returns prefix scanMode flag.
 	PrefixScan = "PrefixScan"
+
+	// PrefixSearchScan returns prefix and search scanMode flag.
+	PrefixSearchScan = "PrefixSearchScan"
 
 	// CountFlagEnabled returns enabled CountFlag.
 	CountFlagEnabled = true
@@ -487,7 +497,7 @@ func getRecordWrapper(numFound int, keys [][]byte, pointers []interface{}) (reco
 
 // PrefixScan returns records at the given prefix and limitNum
 // limitNum: limit the number of the scanned records return.
-func (t *BPTree) PrefixScan(prefix []byte, limitNum int) (records Records, err error) {
+func (t *BPTree) PrefixScan(prefix []byte, offsetNum int, limitNum int) (records Records, off int, err error) {
 	var (
 		n              *Node
 		scanFlag       bool
@@ -499,7 +509,7 @@ func (t *BPTree) PrefixScan(prefix []byte, limitNum int) (records Records, err e
 	n = t.FindLeaf(prefix)
 
 	if n == nil {
-		return nil, ErrPrefixScansNoResult
+		return nil, off, ErrPrefixScansNoResult
 	}
 
 	for j = 0; j < n.KeysNum && compare(n.Keys[j], prefix) < 0; {
@@ -508,11 +518,20 @@ func (t *BPTree) PrefixScan(prefix []byte, limitNum int) (records Records, err e
 
 	scanFlag = true
 	numFound = 0
+
+	coff := 0
+
 	for n != nil && scanFlag {
 		for i = j; i < n.KeysNum; i++ {
+
 			if !bytes.HasPrefix(n.Keys[i], prefix) {
 				scanFlag = false
 				break
+			}
+
+			if coff < offsetNum {
+				coff++
+				continue
 			}
 
 			keys = append(keys, n.Keys[i])
@@ -529,7 +548,78 @@ func (t *BPTree) PrefixScan(prefix []byte, limitNum int) (records Records, err e
 		j = 0
 	}
 
-	return getRecordWrapper(numFound, keys, pointers)
+	off = coff
+
+	esr, err := getRecordWrapper(numFound, keys, pointers)
+	return esr, off, err
+}
+
+// PrefixSearchScan returns records at the given prefix, match regular expression and limitNum
+// limitNum: limit the number of the scanned records return.
+func (t *BPTree) PrefixSearchScan(prefix []byte, reg string, offsetNum int, limitNum int) (records Records, off int, err error) {
+	var (
+		n              *Node
+		scanFlag       bool
+		keys           [][]byte
+		pointers       []interface{}
+		i, j, numFound int
+	)
+
+	rgx, err := regexp.Compile(reg)
+	if err != nil {
+		return nil, off, ErrBadRegexp
+	}
+
+	n = t.FindLeaf(prefix)
+
+	if n == nil {
+		return nil, off, ErrPrefixSearchScansNoResult
+	}
+
+	for j = 0; j < n.KeysNum && compare(n.Keys[j], prefix) < 0; {
+		j++
+	}
+
+	scanFlag = true
+	numFound = 0
+
+	coff := 0
+
+	for n != nil && scanFlag {
+		for i = j; i < n.KeysNum; i++ {
+
+			if !bytes.HasPrefix(n.Keys[i], prefix) {
+				scanFlag = false
+				break
+			}
+
+			if coff < offsetNum {
+				coff++
+				continue
+			}
+
+			if !rgx.Match(bytes.TrimPrefix(n.Keys[i], prefix)) {
+				continue
+			}
+
+			keys = append(keys, n.Keys[i])
+			pointers = append(pointers, n.pointers[i])
+			numFound++
+
+			if limitNum > 0 && numFound == limitNum {
+				scanFlag = false
+				break
+			}
+		}
+
+		n, _ = n.pointers[order-1].(*Node)
+		j = 0
+	}
+
+	off = coff
+
+	esr, err := getRecordWrapper(numFound, keys, pointers)
+	return esr, off, err
 }
 
 // Find retrieves record at the given key.

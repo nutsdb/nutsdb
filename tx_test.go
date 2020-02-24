@@ -145,8 +145,14 @@ func TestTx_Close(t *testing.T) {
 		t.Error("err TestTx_Close")
 	}
 
-	_, err = tx.PrefixScan(bucket, []byte("foo"), 1)
+	_, _, err = tx.PrefixScan(bucket, []byte("foo"), 0, 1)
 	if err == nil {
 		t.Error("err TestTx_Close")
 	}
+
+	_, _, err = tx.PrefixSearchScan(bucket, []byte("f"), "oo", 0, 1)
+	if err == nil {
+		t.Error("err TestTx_Close")
+	}
+
 }

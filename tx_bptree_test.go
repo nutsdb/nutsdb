@@ -361,7 +361,7 @@ func TestTx_PrefixScan(t *testing.T) {
 	}
 
 	prefix := []byte("key_")
-	if entries, err := tx.PrefixScan(bucket, prefix, 2); err != nil {
+	if entries, _, err := tx.PrefixScan(bucket, prefix, 0, 2); err != nil {
 		//tx rollback
 		tx.Rollback()
 	} else {
@@ -373,6 +373,74 @@ func TestTx_PrefixScan(t *testing.T) {
 			}
 			j++
 		}
+	}
+	//tx commit
+	tx.Commit()
+}
+
+func TestTx_PrefixSearchScan(t *testing.T) {
+	Init()
+	db, err = Open(opt)
+	defer db.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bucket := "bucket_for_prefix_search_scan"
+
+	regs := "1"
+
+	tx, err := db.Begin(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	key := []byte("key_" + fmt.Sprintf("%07d", 0))
+	val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 0))
+	if err = tx.Put(bucket, key, val, Persistent); err != nil {
+		//tx rollback
+		err = tx.Rollback()
+		t.Fatal(err)
+	}
+	//tx commit
+	tx.Commit()
+
+	tx, err = db.Begin(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	key = []byte("key_" + fmt.Sprintf("%07d", 1))
+	val = []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 1))
+	if err = tx.Put(bucket, key, val, Persistent); err != nil {
+		//tx rollback
+		err = tx.Rollback()
+		t.Fatal(err)
+	}
+	//tx commit
+	tx.Commit()
+
+	tx, err = db.Begin(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	prefix := []byte("key_")
+	if entries, _, err := tx.PrefixSearchScan(bucket, prefix, regs, 0, 1); err != nil {
+		//tx rollback
+		tx.Rollback()
+	} else {
+		c := 0
+		for _, entry := range entries {
+			key := []byte("key_" + fmt.Sprintf("%07d", 1))
+			if string(key) != string(entry.Key) {
+				continue
+			}
+			c++
+		}
+
+		if c == 0 || c > 1 {
+			t.Errorf("err tx PrefixSearchScan. Regexp trouble, or Not found key [%s]", string(key))
+		}
+
 	}
 	//tx commit
 	tx.Commit()
@@ -587,7 +655,7 @@ func TestTx_PrefixScan_NotFound(t *testing.T) {
 	}
 
 	prefix := []byte("key_")
-	if entries, err := tx.PrefixScan("foobucket", prefix, 10); err != nil {
+	if entries, _, err := tx.PrefixScan("foobucket", prefix, 0, 10); err != nil {
 		//tx rollback
 		if entries != nil {
 			t.Error("err TestTx_PrefixScan_NotFound")
@@ -625,7 +693,7 @@ func TestTx_PrefixScan_NotFound(t *testing.T) {
 	}
 
 	prefix = []byte("key_foo")
-	if entries, err := tx.PrefixScan(bucket, prefix, 10); err != nil {
+	if entries, _, err := tx.PrefixScan(bucket, prefix, 0, 10); err != nil {
 		//tx rollback
 		if entries != nil {
 			t.Error("err TestTx_PrefixScan_NotFound")
@@ -640,16 +708,94 @@ func TestTx_PrefixScan_NotFound(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	entries, err := tx.PrefixScan(bucket, []byte("key_"), 10)
+	entries, _, err := tx.PrefixScan(bucket, []byte("key_"), 0, 10)
 	if len(entries) == 0 || err != nil {
 		t.Error("err TestTx_PrefixScan_NotFound")
 	}
 
 	tx.Commit()
 
-	entries, err = tx.PrefixScan(bucket, []byte("key_"), 10)
+	entries, _, err = tx.PrefixScan(bucket, []byte("key_"), 0, 10)
 	if len(entries) > 0 || err == nil {
 		t.Error("err TestTx_PrefixScan_NotFound")
+	}
+}
+
+func TestTx_PrefixSearchScan_NotFound(t *testing.T) {
+	Init()
+	db, err = Open(opt)
+	defer db.Close()
+	tx, err := db.Begin(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	regs := "(.+)"
+
+	prefix := []byte("key_")
+	if entries, _, err := tx.PrefixSearchScan("foobucket", prefix, regs, 0, 10); err != nil {
+		//tx rollback
+		if entries != nil {
+			t.Error("err TestTx_PrefixSearchScan_NotFound")
+		}
+		tx.Rollback()
+	} else {
+		t.Error("err TestTx_PrefixSearchScan_NotFound")
+	}
+	//tx commit
+	tx.Commit()
+
+	//write tx begin
+	tx, err = db.Begin(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bucket := "bucket_prefix_search_scan_test"
+
+	for i := 0; i <= 10; i++ {
+		key := []byte("key_" + fmt.Sprintf("%07d", i))
+		val := []byte("val" + fmt.Sprintf("%07d", i))
+		if err = tx.Put(bucket, key, val, Persistent); err != nil {
+			//tx rollback
+			err = tx.Rollback()
+			t.Fatal(err)
+		}
+	}
+	//tx commit
+	tx.Commit()
+
+	tx, err = db.Begin(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	prefix = []byte("key_foo")
+	if entries, _, err := tx.PrefixSearchScan(bucket, prefix, regs, 0, 10); err != nil {
+		//tx rollback
+		if entries != nil {
+			t.Error("err TestTx_PrefixSearchScan_NotFound")
+		}
+		tx.Rollback()
+	} else {
+		t.Error("err TestTx_PrefixSearchScan_NotFound")
+	}
+
+	tx, err = db.Begin(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	entries, _, err := tx.PrefixSearchScan(bucket, []byte("key_"), regs, 0, 10)
+	if len(entries) == 0 || err != nil {
+		t.Error("err TestTx_PrefixSearchScan_NotFound")
+	}
+
+	tx.Commit()
+
+	entries, _, err = tx.PrefixSearchScan(bucket, []byte("key_"), regs, 0, 10)
+	if len(entries) > 0 || err == nil {
+		t.Error("err TestTx_PrefixSearchScan_NotFound")
 	}
 }
 
@@ -810,12 +956,30 @@ func TestTx_SCan_For_BPTSparseIdxMode(t *testing.T) {
 	}
 
 	limit := 5
-	es, err = tx.PrefixScan(bucket, []byte("key_"), limit)
+	es, _, err = tx.PrefixScan(bucket, []byte("key_"), 0, limit)
 
 	if len(es) != limit || err != nil {
 		t.Error("err BPTSparseIdxMode prefixScan")
 	}
 	tx.Commit()
+
+	// prefix search scans
+
+	regs := "(.+)"
+
+	tx, err = db.Begin(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	limit = 5
+	es, _, err = tx.PrefixSearchScan(bucket, []byte("key_"), regs, 0, limit)
+
+	if len(es) != limit || err != nil {
+		t.Error("err BPTSparseIdxMode prefixSearchScan")
+	}
+	tx.Commit()
+
 }
 
 func TestTx_Notfound_For_BPTSparseIdxMode(t *testing.T) {
@@ -849,10 +1013,26 @@ func TestTx_Notfound_For_BPTSparseIdxMode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	es, err := tx.PrefixScan(bucket, []byte("key_prefix_fake"), 10)
+	es, _, err := tx.PrefixScan(bucket, []byte("key_prefix_fake"), 0, 10)
 
 	if es != nil || err == nil {
 		t.Error("err BPTSparseIdxMode PrefixScan")
+	}
+	tx.Commit()
+
+	// prefix search scan not found
+
+	regs := "(.+)"
+
+	tx, err = db.Begin(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	es, _, err = tx.PrefixSearchScan(bucket, []byte("key_prefix_fake"), regs, 0, 10)
+
+	if es != nil || err == nil {
+		t.Error("err BPTSparseIdxMode PrefixSearchScan")
 	}
 	tx.Commit()
 
