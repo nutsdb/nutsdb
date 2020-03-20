@@ -314,6 +314,7 @@ if err := db.Update(
 }
 
 ```
+这边注意下，这个bucket和你使用数据结构有关，不同数据索引结构，用同一个bucket，也是不同的。比如你定义了一个bucket，命名为`bucket_foo`，比如你要用`list`这个数据结构，使用 `tx.RPush`加数据，必须对应他的数据结构去从这个`bucket_foo`查询或者取出，比如用 `tx.RPop`，`tx.LRange` 等，不能用`tx.Get`（和GetAll、Put、Delete、RangeScan等同一索引类型）去读取这个`bucket_foo`里面的数据，因为索引结构不同。其他数据结构如`Set`、`Sorted Set`同理。
 
 ### 使用键值对
 
