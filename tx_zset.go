@@ -51,6 +51,10 @@ func (tx *Tx) ZMembers(bucket string) (map[string]*zset.SortedSetNode, error) {
 		return nil, err
 	}
 
+	if _, ok := tx.db.SortedSetIdx[bucket]; !ok {
+		return nil, ErrBucket
+	}
+
 	return tx.db.SortedSetIdx[bucket].Dict, nil
 }
 
