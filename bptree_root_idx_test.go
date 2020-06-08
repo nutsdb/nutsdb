@@ -15,6 +15,7 @@
 package nutsdb
 
 import (
+	"os"
 	"testing"
 )
 
@@ -34,7 +35,8 @@ func TestBPTreeRootIdx_All(t *testing.T) {
 		t.Error("err Persistence")
 	}
 
-	idx, err := ReadBPTreeRootIdxAt(path, 0)
+	fd, _ := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0644)
+	idx, err := ReadBPTreeRootIdxAt(fd, 0)
 	if err != nil {
 		t.Error(err)
 	}
@@ -74,7 +76,8 @@ func TestBPTreeRootIdx_All(t *testing.T) {
 
 func TestBPTreeRootIdx_errors(t *testing.T) {
 	path := "/tmp/bri_test.idx"
-	idx, err := ReadBPTreeRootIdxAt(path, 100)
+	fd, _ := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0644)
+	idx, err := ReadBPTreeRootIdxAt(fd, 100)
 	if err == nil || idx != nil {
 		t.Error("err TestBPTreeRootIdx_errors")
 	}

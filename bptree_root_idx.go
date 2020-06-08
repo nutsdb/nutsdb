@@ -80,15 +80,9 @@ func (bri *BPTreeRootIdx) IsZero() bool {
 }
 
 // ReadBPTreeRootIdxAt reads BPTreeRootIdx entry from the File starting at byte offset off.
-func ReadBPTreeRootIdxAt(path string, off int64) (*BPTreeRootIdx, error) {
+func ReadBPTreeRootIdxAt(fd *os.File, off int64) (*BPTreeRootIdx, error) {
 	buf := make([]byte, BPTreeRootIdxHeaderSize)
-
-	fd, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0644)
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = fd.ReadAt(buf, off)
+	_, err := fd.ReadAt(buf, off)
 	if err != nil {
 		return nil, err
 	}
@@ -130,6 +124,9 @@ func ReadBPTreeRootIdxAt(path string, off int64) (*BPTreeRootIdx, error) {
 func (bri *BPTreeRootIdx) Persistence(path string, offset int64, syncEnable bool) (number int, err error) {
 	fd, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0644)
 	defer fd.Close()
+	if err != nil {
+		return 0, err
+	}
 
 	data := bri.Encode()
 
