@@ -547,10 +547,15 @@ func (db *DB) buildBPTreeRootIdxes(dataFileIds []int) error {
 	}
 
 	for i := 0; i < len(dataFileIds[0:dataFileIdsSize-1]); i++ {
-		fID := dataFileIds[i]
 		off = 0
+		path := db.getBPTRootPath(int64(dataFileIds[i]))
+		fd, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0644)
+		if err != nil {
+			return err
+		}
+
 		for {
-			bs, err := ReadBPTreeRootIdxAt(db.getBPTRootPath(int64(fID)), off)
+			bs, err := ReadBPTreeRootIdxAt(fd, off)
 			if err == io.EOF || err == nil && bs == nil {
 				break
 			}
@@ -564,6 +569,8 @@ func (db *DB) buildBPTreeRootIdxes(dataFileIds []int) error {
 			}
 
 		}
+
+		fd.Close()
 	}
 
 	db.committedTxIds = nil
