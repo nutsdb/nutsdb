@@ -250,19 +250,34 @@ func TestTx_LRem(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	bucket := "myBucket"
+	key := []byte("myList")
+	InitDataForList(bucket, key, t)
 
-	tx, err = db.Begin(true)
+	tx, _ = db.Begin(true)
+	// 3 items was in the bucket, remove 1, should be 2 left
+	err := tx.LRem(bucket, key, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
+	tx.Commit()
+	tx, _ = db.Begin(true)
+	size, _ := tx.LSize(bucket, key)
+	if size != 2 {
+		t.Fatalf("TestTx_LRem: size after commit != 2, actual: %v", size)
+	}
 
-	bucket := "myBucket"
-	key := []byte("myList")
-	err := tx.LRem(bucket, key, 1)
-	if err == nil {
+	// remove the other 2, should be none left
+	err = tx.LRem(bucket, key, 2)
+	if err != nil {
 		t.Fatal(err)
 	}
-	tx.Rollback()
+	tx.Commit()
+	tx, _ = db.Begin(false)
+	size, _ = tx.LSize(bucket, key)
+	if size != 0 {
+		t.Fatalf("TestTx_LRem: size after commit != 0, actual: %v", size)
+	}
 }
 
 func TestTx_LRem2(t *testing.T) {

@@ -158,7 +158,7 @@ func (tx *Tx) LRem(bucket string, key []byte, count int) error {
 		return err
 	}
 
-	if count >= size {
+	if count > size {
 		return list.ErrCount
 	}
 

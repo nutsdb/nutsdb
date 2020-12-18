@@ -190,7 +190,7 @@ func (l *List) LRem(key string, count int) (int, error) {
 	}
 
 	size, _ := l.Size(key)
-	if count >= size {
+	if count > size {
 		return 0, ErrCount
 	}
 
