@@ -15,9 +15,11 @@
 package nutsdb
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
+	"reflect"
 	"testing"
 
 	"github.com/xujiajun/utils/strconv2"
@@ -201,6 +203,66 @@ func TestDB_Merge_For_string(t *testing.T) {
 
 	if err = db2.Merge(); err != nil {
 		t.Error("err merge", err)
+	}
+}
+
+func Test_MergeRepeated(t *testing.T) {
+	InitOpt("", true)
+	opt.SegmentSize = 120
+	db, err = Open(opt)
+	if err != nil {
+		t.Errorf("wanted nil, got %v", err)
+	}
+	for i:=0; i<20; i++ {
+		err = db.Update(func(tx *Tx) error {
+			if err := tx.Put("bucket", []byte("hello"), []byte("world"), Persistent); err != nil {
+				return err
+			}
+			return nil
+		})
+		if err != nil {
+			t.Errorf("wanted nil, got %v", err)
+		}
+	}
+	if db.MaxFileID != 9 {
+		t.Errorf("wanted fileID: %d, got :%d", 9, db.MaxFileID)
+	}
+	err = db.View(func(tx *Tx) error {
+		e, err := tx.Get("bucket", []byte("hello"))
+		if err != nil {
+			return err
+		}
+		if reflect.DeepEqual(e.Value, []byte("value")) {
+			return errors.New(fmt.Sprintf("wanted value: %v, got :%v", []byte("value"), e.Value))
+		}
+		return nil
+	})
+	if err != nil {
+		t.Errorf("wanted nil, got %v", err)
+	}
+	err = db.Merge()
+	if err != nil {
+		t.Errorf("wanted nil, got %v", err)
+	}
+	if db.MaxFileID != 10 {
+		t.Errorf("wanted fileID: %d, got :%d", 10, db.MaxFileID)
+	}
+	err = db.View(func(tx *Tx) error {
+		e, err := tx.Get("bucket", []byte("hello"))
+		if err != nil {
+			return err
+		}
+		if reflect.DeepEqual(e.Value, []byte("value")) {
+			return errors.New(fmt.Sprintf("wanted value: %v, got :%v", []byte("value"), e.Value))
+		}
+		return nil
+	})
+	if err != nil {
+		t.Errorf("wanted nil, got %v", err)
+	}
+	err = db.Close()
+	if err != nil {
+		t.Errorf("wanted nil, got %v", err)
 	}
 }
 
@@ -985,5 +1047,41 @@ func TestDB_Close(t *testing.T) {
 	err = db.Close()
 	if err == nil {
 		t.Error("err TestDB_Close")
+	}
+}
+
+func Test_getRecordFromKey(t *testing.T) {
+	InitOpt("", true)
+	opt.SegmentSize = 120
+	opt.EntryIdxMode = HintKeyAndRAMIdxMode
+	db, err = Open(opt)
+	if err != nil {
+		t.Errorf("wanted nil, got %v", err)
+	}
+	_, err = db.getRecordFromKey([]byte("bucket"), []byte("hello"))
+	if err != ErrBucketNotFound {
+		t.Errorf("wanted ErrBucketNotFound, got %v", err)
+	}
+	for i:=0; i<10; i++ {
+		err = db.Update(func(tx *Tx) error {
+			if err := tx.Put("bucket", []byte("hello"), []byte("world"), Persistent); err != nil {
+				return err
+			}
+			return nil
+		})
+		if err != nil {
+			t.Errorf("wanted nil, got %v", err)
+		}
+	}
+	r, err := db.getRecordFromKey([]byte("bucket"), []byte("hello"))
+	if err != nil {
+		t.Errorf("wanted nil, got %v", err)
+	}
+	if r.H.dataPos != 58 || r.H.fileID != 4 {
+		t.Errorf("wanted fileID: %d, got: %d\nwanted dataPos: %d, got: %d", 4, r.H.fileID, 58, r.H.dataPos)
+	}
+	err = db.Close()
+	if err != nil {
+		t.Errorf("wanted nil, got %v", err)
 	}
 }

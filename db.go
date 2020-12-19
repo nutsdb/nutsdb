@@ -44,6 +44,9 @@ var (
 
 	// ErrFn is returned when fn is nil.
 	ErrFn = errors.New("err fn")
+
+	// ErrBucketNotFound is returned when looking for bucket that does not exist
+	ErrBucketNotFound = errors.New("bucket not found")
 )
 
 const (
@@ -319,7 +322,22 @@ func (db *DB) Merge() error {
 					break
 				}
 
+				var skipEntry bool
+
 				if db.isFilterEntry(entry) {
+					skipEntry = true
+				}
+
+				// check if we have a new entry with same key and bucket
+				if r, _ := db.getRecordFromKey(entry.Meta.bucket, entry.Key); r != nil && !skipEntry {
+					if r.H.fileID > int64(pendingMergeFId) {
+						skipEntry = true
+					} else if r.H.fileID == int64(pendingMergeFId) && r.H.dataPos > uint64(off) {
+						skipEntry = true
+					}
+				}
+
+				if skipEntry {
 					off += entry.Size()
 					if off >= db.opt.SegmentSize {
 						break
@@ -958,6 +976,9 @@ func (db *DB) getPendingMergeEntries(entry *Entry, pendingMergeEntries []*Entry)
 }
 
 func (db *DB) reWriteData(pendingMergeEntries []*Entry) error {
+	if len(pendingMergeEntries) == 0 {
+		return nil
+	}
 	tx, err := db.Begin(true)
 	if err != nil {
 		db.isMerging = false
@@ -994,4 +1015,18 @@ func (db *DB) isFilterEntry(entry *Entry) bool {
 	}
 
 	return false
+}
+
+// getRecordFromKey fetches Record for given key and bucket
+// this is a helper function used in Merge so it does not work if index mode is HintBPTSparseIdxMode
+func (db *DB) getRecordFromKey(bucket, key []byte) (record *Record, err error) {
+	idxMode := db.opt.EntryIdxMode
+	if !(idxMode == HintKeyValAndRAMIdxMode || idxMode == HintKeyAndRAMIdxMode) {
+		return nil, errors.New("not implemented")
+	}
+	idx, ok := db.BPTreeIdx[string(bucket)]
+	if !ok {
+		return nil, ErrBucketNotFound
+	}
+	return idx.Find(key)
 }
