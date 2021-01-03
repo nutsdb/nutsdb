@@ -213,7 +213,7 @@ func Test_MergeRepeated(t *testing.T) {
 	if err != nil {
 		t.Errorf("wanted nil, got %v", err)
 	}
-	for i:=0; i<20; i++ {
+	for i := 0; i < 20; i++ {
 		err = db.Update(func(tx *Tx) error {
 			if err := tx.Put("bucket", []byte("hello"), []byte("world"), Persistent); err != nil {
 				return err
@@ -1062,7 +1062,7 @@ func Test_getRecordFromKey(t *testing.T) {
 	if err != ErrBucketNotFound {
 		t.Errorf("wanted ErrBucketNotFound, got %v", err)
 	}
-	for i:=0; i<10; i++ {
+	for i := 0; i < 10; i++ {
 		err = db.Update(func(tx *Tx) error {
 			if err := tx.Put("bucket", []byte("hello"), []byte("world"), Persistent); err != nil {
 				return err
