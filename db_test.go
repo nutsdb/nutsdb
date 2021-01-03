@@ -15,7 +15,6 @@
 package nutsdb
 
 import (
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -233,7 +232,7 @@ func Test_MergeRepeated(t *testing.T) {
 			return err
 		}
 		if reflect.DeepEqual(e.Value, []byte("value")) {
-			return errors.New(fmt.Sprintf("wanted value: %v, got :%v", []byte("value"), e.Value))
+			return fmt.Errorf("wanted value: %v, got :%v", []byte("value"), e.Value)
 		}
 		return nil
 	})
@@ -253,7 +252,7 @@ func Test_MergeRepeated(t *testing.T) {
 			return err
 		}
 		if reflect.DeepEqual(e.Value, []byte("value")) {
-			return errors.New(fmt.Sprintf("wanted value: %v, got :%v", []byte("value"), e.Value))
+			return fmt.Errorf("wanted value: %v, got :%v", []byte("value"), e.Value)
 		}
 		return nil
 	})
