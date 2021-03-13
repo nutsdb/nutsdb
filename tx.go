@@ -559,6 +559,10 @@ func (tx *Tx) unlock() {
 	}
 }
 
+func (tx *Tx) PutWithTimestamp(bucket string, key, value []byte, ttl uint32, timestamp uint64) error {
+	return tx.put(bucket, key, value, ttl, DataSetFlag, timestamp, DataStructureBPTree)
+}
+
 // Put sets the value for a key in the bucket.
 // a wrapper of the function put.
 func (tx *Tx) Put(bucket string, key, value []byte, ttl uint32) error {
