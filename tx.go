@@ -438,8 +438,11 @@ func (tx *Tx) buildListIdx(bucket string, entry *Entry) {
 	case DataRPushFlag:
 		_, _ = tx.db.ListIdx[bucket].RPush(string(key), value)
 	case DataLRemFlag:
-		count, _ := strconv2.StrToInt(string(value))
-		_, _ = tx.db.ListIdx[bucket].LRem(string(key), count)
+		countAndValue := strings.Split(string(value), SeparatorForListKey)
+		count, _ := strconv2.StrToInt(countAndValue[0])
+		newValue := countAndValue[1]
+
+		_, _ = tx.db.ListIdx[bucket].LRem(string(key), count, []byte(newValue))
 	case DataLPopFlag:
 		_, _ = tx.db.ListIdx[bucket].LPop(string(key))
 	case DataRPopFlag:

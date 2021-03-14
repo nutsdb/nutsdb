@@ -15,6 +15,7 @@
 package list
 
 import (
+	"bytes"
 	"errors"
 )
 
@@ -49,7 +50,7 @@ func (l *List) RPop(key string) (item []byte, err error) {
 		return
 	}
 
-	l.Items[key] = l.Items[key][0 : size-1]
+	l.Items[key] = append(l.Items[key][:0:0], l.Items[key][0:size-1]...)
 
 	return
 }
@@ -116,7 +117,7 @@ func (l *List) LPop(key string) (item []byte, err error) {
 	}
 
 	if l.Items[key] != nil {
-		l.Items[key] = l.Items[key][1:]
+		l.Items[key] = append(l.Items[key][:0:0], l.Items[key][1:]...)
 		return
 	}
 
@@ -184,37 +185,85 @@ func (l *List) LRange(key string, start, end int) (list [][]byte, err error) {
 // count > 0: Remove elements equal to value moving from head to tail.
 // count < 0: Remove elements equal to value moving from tail to head.
 // count = 0: Remove all elements equal to value.
-func (l *List) LRem(key string, count int) (int, error) {
+func (l *List) LRem(key string, count int, value []byte) (int, error) {
+	if _, ok := l.Items[key]; !ok {
+		return 0, ErrListNotFound
+	}
+	size, _ := l.Size(key)
+
+	needRemovedNum, err := l.LRemNum(key, count, value)
+
+	if err != nil {
+		return 0, err
+	}
+
+	var newTempVal [][]byte
+	var realRemovedNum int
+	newTempVal = make([][]byte, size-needRemovedNum)
+	tempVal := l.Items[key]
+	idx := 0
+	if count > 0 {
+		for _, v := range tempVal {
+			if realRemovedNum < count && bytes.Equal(v, value) {
+				realRemovedNum++
+			} else {
+				newTempVal[idx] = v
+				idx++
+			}
+		}
+	}
+
+	if count < 0 {
+		count = -count
+		for i := size - 1; i >= 0; i-- {
+			if realRemovedNum == count {
+				break
+			}
+			v := tempVal[i]
+			if realRemovedNum < count && bytes.Equal(v, value) {
+				realRemovedNum++
+			} else {
+				newTempVal[idx] = v
+				idx++
+			}
+		}
+	}
+
+	l.Items[key] = newTempVal
+	tempVal = nil
+
+	return realRemovedNum, nil
+}
+
+func (l *List) LRemNum(key string, count int, value []byte) (int, error) {
 	if _, ok := l.Items[key]; !ok {
 		return 0, ErrListNotFound
 	}
 
+	removedNum := 0
+
 	size, _ := l.Size(key)
-	if count >= size {
+	if count > size {
 		return 0, ErrCount
 	}
 
-	if count == 0 {
-		delete(l.Items, key)
-		return size, nil
-	}
-
-	if count > 0 {
-		l.Items[key] = l.Items[key][count:]
-	}
+	tempVal := l.Items[key]
 
 	if count < 0 {
-		index := size + count
-		if 0 < index && index <= size {
-			l.Items[key] = l.Items[key][0:index]
-		} else {
-			return 0, ErrCount
+		count = -count
+	}
+
+	for _, v := range tempVal {
+		if count > 0 && (removedNum == count) {
+			break
+		}
+
+		if bytes.Equal(v, value) {
+			removedNum++
 		}
 	}
 
-	newSize, _ := l.Size(key)
-
-	return size - newSize, nil
+	return removedNum, nil
 }
 
 // LSet sets the list element at index to value.
@@ -235,16 +284,16 @@ func (l *List) LSet(key string, index int, value []byte) error {
 
 // Ltrim trim an existing list so that it will contain only the specified range of elements specified.
 func (l *List) Ltrim(key string, start, end int) error {
-	var err error
-
 	if _, ok := l.Items[key]; !ok {
 		return ErrListNotFound
 	}
 
-	l.Items[key], err = l.LRange(key, start, end)
+	newItems, err := l.LRange(key, start, end)
 	if err != nil {
 		return err
 	}
+
+	l.Items[key] = append(l.Items[key][:0:0], newItems...)
 
 	return nil
 }

@@ -214,11 +214,11 @@ func TestList_LRange4(t *testing.T) {
 func TestList_LRem(t *testing.T) {
 	list, key := InitListData()
 
-	if num, err := list.LRem("key_fake", 1); err == nil || num != 0 {
+	if num, err := list.LRem("key_fake", 1, []byte("a")); err == nil || num != 0 {
 		t.Error("TestList_LRem err")
 	}
 
-	if num, err := list.LRem(key, 1); err != nil && num != 1 {
+	if num, err := list.LRem(key, 1, []byte("a")); err != nil && num != 1 {
 		t.Error("TestList_LRem err")
 	}
 
@@ -238,7 +238,7 @@ func TestList_LRem(t *testing.T) {
 func TestList_LRem2(t *testing.T) {
 	list, key := InitListData()
 
-	if num, err := list.LRem(key, -1); err != nil || num == 0 {
+	if num, err := list.LRem(key, -1, []byte("d")); err != nil || num == 0 {
 		t.Error("TestList_LRem err")
 	}
 
@@ -257,15 +257,15 @@ func TestList_LRem2(t *testing.T) {
 
 func TestList_LRem3(t *testing.T) {
 	list, key := InitListData()
-
-	if num, err := list.LRem(key, -2); num != 2 || err != nil {
+	list.RPush(key, []byte("b"))
+	if num, err := list.LRem(key, -2, []byte("b")); num != 2 || err != nil {
 		t.Error("TestList_LRem err")
 	}
 
 	if items, err := list.LRange(key, 0, -1); err != nil {
 		t.Error("TestList_LRem err")
 	} else {
-		expectResult := getExpectResult("a", "b")
+		expectResult := getExpectResult("a", "c", "d")
 		for _, item := range items {
 			if _, ok := expectResult[string(item)]; !ok {
 				t.Error("TestList_LRem err")
@@ -275,33 +275,43 @@ func TestList_LRem3(t *testing.T) {
 }
 
 func TestList_LRem4(t *testing.T) {
-	list, key := InitListData()
-	num, err := list.LRem(key, -10)
-	if err == nil || num != 0 {
-		t.Error("TestList_LRem err")
+	{
+		list, key := InitListData()
+		num, err := list.LRem(key, -10, []byte("b"))
+		if err != nil || num != 1 {
+			t.Error("TestList_LRem err")
+		}
+	}
+	{
+		list, key := InitListData()
+		list.RPush(key, []byte("b"))
+		num, err := list.LRem(key, 4, []byte("b"))
+		if err != nil || num != 2 {
+			t.Error("TestList_LRem err")
+		}
 	}
 
-	list, key = InitListData()
-	num, err = list.LRem(key, 4)
-	if err == nil || num != 0 {
-		t.Error("TestList_LRem err")
-	}
-
-	list, key = InitListData()
-	num, err = list.LRem(key, 3)
-	if err != nil || num == 0 {
-		t.Error(err)
+	{
+		list, key := InitListData()
+		list.RPush(key, []byte("b"))
+		num, err := list.LRem(key, 2, []byte("b"))
+		if err != nil || num != 2 {
+			t.Error(err)
+		}
 	}
 }
 
 func TestList_LRem5(t *testing.T) {
 	list, key := InitListData()
-	num, err := list.LRem(key, 0)
-	if err != nil && num != 4 {
+	list.RPush(key, []byte("b"))
+	list.RPush(key, []byte("b"))
+	num, err := list.LRem(key, 0, []byte("b"))
+
+	if err != nil && num != 3 {
 		t.Error("TestList_LRem err")
 	}
 	size, err := list.Size(key)
-	if err == nil || size != 0 {
+	if err != nil || size != 3 {
 		t.Error("TestList_LRem err")
 	}
 }
