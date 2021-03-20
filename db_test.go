@@ -658,7 +658,10 @@ func TestDB_Merge_For_List(t *testing.T) {
 	opLPopAndRPopForTestMerge(bucketForList, key, t)
 
 	if err := db.Update(func(tx *Tx) error {
-		err := tx.LRem(bucketForList, key, 1)
+		removedNum, err := tx.LRem(bucketForList, key, 1, []byte("listVal"+fmt.Sprintf("%07d", 33)))
+		if removedNum != 1 {
+			t.Fatal("removedNum err")
+		}
 		if err != nil {
 			return err
 		}
@@ -800,7 +803,7 @@ func opListDataForTestOpen(t *testing.T) {
 	opRPushForTestOpen(listBucket, t)
 
 	if err := db.Update(func(tx *Tx) error {
-		err := tx.LRem(listBucket, []byte("myList"), 1)
+		_, err := tx.LRem(listBucket, []byte("myList"), 1, []byte("val1"))
 		if err != nil {
 			return err
 		}

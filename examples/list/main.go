@@ -80,6 +80,32 @@ func testRPushAndLPush() {
 	if err := db.Update(
 		func(tx *nutsdb.Tx) error {
 			key := []byte("myList")
+			val := []byte("val4")
+			return tx.RPush(bucket, key, val)
+		}); err != nil {
+		log.Fatal(err)
+	}
+
+	if err := db.Update(
+		func(tx *nutsdb.Tx) error {
+			key := []byte("myList")
+			val := []byte("val3")
+			return tx.RPush(bucket, key, val)
+		}); err != nil {
+		log.Fatal(err)
+	}
+	if err := db.Update(
+		func(tx *nutsdb.Tx) error {
+			key := []byte("myList")
+			val := []byte("val2")
+			return tx.RPush(bucket, key, val)
+		}); err != nil {
+		log.Fatal(err)
+	}
+
+	if err := db.Update(
+		func(tx *nutsdb.Tx) error {
+			key := []byte("myList")
 			val := []byte("val1")
 			return tx.LPush(bucket, key, val)
 		}); err != nil {
@@ -136,11 +162,13 @@ func testRPop() {
 }
 
 func testRPushItems() {
+	val1 := []byte("val1")
+	val2 := []byte("val2")
+	val3 := []byte("val3")
 	if err := db.Update(
 		func(tx *nutsdb.Tx) error {
 			key := []byte("myList")
-			val := []byte("val1")
-			return tx.RPush(bucket, key, val)
+			return tx.RPush(bucket, key, val1)
 		}); err != nil {
 		log.Fatal(err)
 	}
@@ -148,32 +176,45 @@ func testRPushItems() {
 	if err := db.Update(
 		func(tx *nutsdb.Tx) error {
 			key := []byte("myList")
-			val := []byte("val2")
-			return tx.RPush(bucket, key, val)
+			return tx.RPush(bucket, key, val2)
 		}); err != nil {
 		log.Fatal(err)
 	}
 	if err := db.Update(
 		func(tx *nutsdb.Tx) error {
 			key := []byte("myList")
-			val := []byte("val3")
-			return tx.RPush(bucket, key, val)
+			return tx.RPush(bucket, key, val3)
+		}); err != nil {
+		log.Fatal(err)
+	}
+	if err := db.Update(
+		func(tx *nutsdb.Tx) error {
+			key := []byte("myList")
+			return tx.RPush(bucket, key, val2)
 		}); err != nil {
 		log.Fatal(err)
 	}
 
-	fmt.Println("RPushItems 3 items ok")
+	fmt.Println("RPushItems 4 items: ", string(val1), string(val2), string(val3), string(val2))
 }
 
 func testLRem() {
-	fmt.Println("LRem count 1: ")
+	value := []byte("val2")
+	count := -1
+	//count := 1
 	if err := db.Update(
 		func(tx *nutsdb.Tx) error {
 			key := []byte("myList")
-			return tx.LRem(bucket, key, 1)
+			num, err := tx.LRem(bucket, key, count, value)
+			fmt.Println("removed num: ", num)
+			return err
 		}); err != nil {
 		log.Fatal(err)
 	}
+	if count < 0 {
+		count = -count
+	}
+	fmt.Println("LRem count : ", count, string(value))
 }
 
 func testLSet() {
@@ -228,7 +269,7 @@ func testLTrim() {
 	if err := db.Update(
 		func(tx *nutsdb.Tx) error {
 			key := []byte("myList")
-			return tx.LTrim(bucket, key, 0, 1)
+			return tx.LTrim(bucket, key, 0, 2)
 		}); err != nil {
 		log.Fatal(err)
 	}

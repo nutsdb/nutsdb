@@ -258,7 +258,7 @@ func TestTx_LRem(t *testing.T) {
 
 	bucket := "myBucket"
 	key := []byte("myList")
-	err := tx.LRem(bucket, key, 1)
+	_, err := tx.LRem(bucket, key, 1, []byte("val"))
 	if err == nil {
 		t.Fatal(err)
 	}
@@ -276,42 +276,66 @@ func TestTx_LRem2(t *testing.T) {
 
 	InitDataForList(bucket, key, t)
 
-	tx, err = db.Begin(true)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err = tx.LRem(bucket, []byte("fake_key"), 1); err == nil {
-		t.Error("TestTx_LRem err")
-	}
-
-	if err = tx.LRem(bucket, key, 1); err != nil {
-		tx.Rollback()
-		t.Fatal(err)
-	} else {
-		tx.Commit()
-		err = tx.LRem(bucket, key, 1)
-		if err == nil {
-			t.Error("TestTx_LRem err")
+	{
+		tx, err = db.Begin(false)
+		if err != nil {
+			t.Fatal(err)
 		}
-	}
 
-	tx, err = db.Begin(false)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if list, err := tx.LRange(bucket, key, 0, -1); err != nil {
-		tx.Rollback()
-		t.Fatal(err)
-	} else {
-		expectResult := []string{"b", "c"}
-		for i := 0; i < len(expectResult); i++ {
-			if string(list[i]) != string(expectResult[i]) {
-				t.Error("TestTx_LRem err")
+		if list, err := tx.LRange(bucket, key, 0, -1); err != nil {
+			tx.Rollback()
+			t.Fatal(err)
+		} else {
+			expectResult := []string{"a", "b", "c"}
+			for i := 0; i < len(expectResult); i++ {
+				if string(list[i]) != expectResult[i] {
+					t.Error("TestTx_LRem err")
+				}
 			}
+			tx.Commit()
 		}
-		tx.Commit()
+	}
+
+	{
+		tx, err = db.Begin(true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err = tx.LRem(bucket, []byte("fake_key"), 1, []byte("fake_val")); err == nil {
+			t.Fatal("TestTx_LRem err")
+		} else {
+			tx.Rollback()
+		}
+	}
+
+	{
+		tx, err = db.Begin(true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err = tx.LRem(bucket, key, 1, []byte("a")); err != nil {
+			tx.Rollback()
+			t.Fatal(err)
+		} else {
+			tx.Commit()
+		}
+
+		tx, err = db.Begin(false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if list, err := tx.LRange(bucket, key, 0, -1); err != nil {
+			tx.Rollback()
+			t.Fatal(err)
+		} else {
+			expectResult := []string{"b", "c"}
+			for i := 0; i < len(expectResult); i++ {
+				if string(list[i]) != expectResult[i] {
+					t.Error("TestTx_LRem err")
+				}
+			}
+			tx.Commit()
+		}
 	}
 }
 
@@ -326,16 +350,44 @@ func TestTx_LRem3(t *testing.T) {
 
 	InitDataForList(bucket, []byte("myList2"), t)
 
-	tx, err = db.Begin(true)
-	if err != nil {
-		t.Fatal(err)
+	{
+		tx, err = db.Begin(true)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		_, err := tx.LRem(bucket, key, 4, []byte("b"))
+		if err == nil {
+			t.Error("TestTx_LRem err")
+		}
+		tx.Rollback()
 	}
 
-	err = tx.LRem(bucket, key, 3)
-	if err == nil {
-		t.Error("TestTx_LRem err")
+	{
+		tx, err = db.Begin(true)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		_, err := tx.LRem(bucket, []byte("myList2"), 4, []byte("b"))
+		if err == nil {
+			t.Error("TestTx_LRem err")
+		}
+		tx.Rollback()
 	}
-	tx.Rollback()
+
+	{
+		tx, err = db.Begin(true)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		num, err := tx.LRem(bucket, []byte("myList2"), 1, []byte("b"))
+		if err != nil || num != 1 {
+			t.Error("TestTx_LRem err")
+		}
+		tx.Rollback()
+	}
 
 	InitDataForList(bucket, []byte("myList3"), t)
 
@@ -343,9 +395,21 @@ func TestTx_LRem3(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	err = tx.RPush(bucket, []byte("myList3"), []byte("b"))
+	if err != nil {
+		tx.Rollback()
+		t.Error(err)
+	} else {
+		tx.Commit()
+	}
 
-	err = tx.LRem(bucket, key, -4)
-	if err == nil {
+	tx, err = db.Begin(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	num, err := tx.LRem(bucket, []byte("myList3"), 0, []byte("b"))
+	if err != nil || num != 2 {
 		t.Error("TestTx_LRem err")
 	}
 	tx.Rollback()

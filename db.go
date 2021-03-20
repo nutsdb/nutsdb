@@ -795,8 +795,11 @@ func (db *DB) buildListIdx(bucket string, r *Record) error {
 	case DataRPushFlag:
 		_, _ = db.ListIdx[bucket].RPush(string(r.E.Key), r.E.Value)
 	case DataLRemFlag:
-		count, _ := strconv2.StrToInt(string(r.E.Value))
-		if _, err := db.ListIdx[bucket].LRem(string(r.E.Key), count); err != nil {
+		countAndValueIndex := strings.Split(string(r.E.Value), SeparatorForListKey)
+		count, _ := strconv2.StrToInt(countAndValueIndex[0])
+		value := []byte(countAndValueIndex[1])
+
+		if _, err := db.ListIdx[bucket].LRem(string(r.E.Key), count, value); err != nil {
 			return ErrWhenBuildListIdx(err)
 		}
 	case DataLPopFlag:

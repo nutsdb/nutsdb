@@ -150,26 +150,32 @@ func (tx *Tx) LRange(bucket string, key []byte, start, end int) (list [][]byte, 
 // count > 0: Remove elements equal to value moving from head to tail.
 // count < 0: Remove elements equal to value moving from tail to head.
 // count = 0: Remove all elements equal to value.
-func (tx *Tx) LRem(bucket string, key []byte, count int) error {
-	var err error
-
-	size, err := tx.LSize(bucket, key)
+func (tx *Tx) LRem(bucket string, key []byte, count int, value []byte) (removedNum int, err error) {
+	var (
+		buffer bytes.Buffer
+		size   int
+	)
+	size, err = tx.LSize(bucket, key)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
-	if count >= size {
-		return list.ErrCount
+	if count > size || -count > size {
+		return 0, list.ErrCount
 	}
 
-	if count < 0 {
-		index := size + count
-		if index < 0 || index > size {
-			return list.ErrCount
-		}
+	buffer.Write([]byte(strconv2.IntToStr(count)))
+	buffer.Write([]byte(SeparatorForListKey))
+	buffer.Write(value)
+	newValue := buffer.Bytes()
+
+	err = tx.push(bucket, key, DataLRemFlag, newValue)
+	if err != nil {
+		return 0, err
 	}
 
-	return tx.push(bucket, key, DataLRemFlag, []byte(strconv2.IntToStr(count)))
+	removedNum, err = tx.db.ListIdx[bucket].LRemNum(string(key), count, value)
+	return
 }
 
 // LSet sets the list element at index to value.
