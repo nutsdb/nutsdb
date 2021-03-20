@@ -80,6 +80,32 @@ func testRPushAndLPush() {
 	if err := db.Update(
 		func(tx *nutsdb.Tx) error {
 			key := []byte("myList")
+			val := []byte("val4")
+			return tx.RPush(bucket, key, val)
+		}); err != nil {
+		log.Fatal(err)
+	}
+
+	if err := db.Update(
+		func(tx *nutsdb.Tx) error {
+			key := []byte("myList")
+			val := []byte("val3")
+			return tx.RPush(bucket, key, val)
+		}); err != nil {
+		log.Fatal(err)
+	}
+	if err := db.Update(
+		func(tx *nutsdb.Tx) error {
+			key := []byte("myList")
+			val := []byte("val2")
+			return tx.RPush(bucket, key, val)
+		}); err != nil {
+		log.Fatal(err)
+	}
+
+	if err := db.Update(
+		func(tx *nutsdb.Tx) error {
+			key := []byte("myList")
 			val := []byte("val1")
 			return tx.LPush(bucket, key, val)
 		}); err != nil {
@@ -174,7 +200,8 @@ func testRPushItems() {
 
 func testLRem() {
 	value := []byte("val2")
-	count := 2
+	count := -1
+	//count := 1
 	if err := db.Update(
 		func(tx *nutsdb.Tx) error {
 			key := []byte("myList")
@@ -183,6 +210,9 @@ func testLRem() {
 			return err
 		}); err != nil {
 		log.Fatal(err)
+	}
+	if count < 0 {
+		count = -count
 	}
 	fmt.Println("LRem count : ", count, string(value))
 }

@@ -160,11 +160,7 @@ func (tx *Tx) LRem(bucket string, key []byte, count int, value []byte) (removedN
 		return 0, err
 	}
 
-	if count < 0 {
-		count = -count
-	}
-
-	if count > size {
+	if count > size || -count > size {
 		return 0, list.ErrCount
 	}
 

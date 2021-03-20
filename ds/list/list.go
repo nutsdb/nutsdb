@@ -216,9 +216,6 @@ func (l *List) LRem(key string, count int, value []byte) (int, error) {
 	if count < 0 {
 		count = -count
 		for i := size - 1; i >= 0; i-- {
-			if realRemovedNum == count {
-				break
-			}
 			v := tempVal[i]
 			if realRemovedNum < count && bytes.Equal(v, value) {
 				realRemovedNum++
@@ -226,6 +223,11 @@ func (l *List) LRem(key string, count int, value []byte) (int, error) {
 				newTempVal[idx] = v
 				idx++
 			}
+		}
+
+		newTempValLen := len(newTempVal)
+		for i := 0; i < newTempValLen/2; i++ {
+			newTempVal[i], newTempVal[newTempValLen-i-1] = newTempVal[newTempValLen-i-1], newTempVal[i]
 		}
 	}
 
