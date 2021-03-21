@@ -332,6 +332,22 @@ func TestList_LRem6(t *testing.T) {
 	}
 }
 
+func TestList_LRem7(t *testing.T) {
+	list, key := InitListData()
+	list.RPush(key, []byte("b"))
+	list.RPush(key, []byte("b"))
+	num, err := list.LRem(key, 0, []byte("b"))
+
+	if err != nil && num != 3 {
+		t.Error("TestList_LRem err")
+	}
+
+	size, err := list.Size(key)
+	if err != nil || size != 3 {
+		t.Error("TestList_LRem err")
+	}
+}
+
 func TestList_LSet(t *testing.T) {
 	list, key := InitListData()
 
