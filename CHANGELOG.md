@@ -42,3 +42,12 @@
 * [Change] Rename variable for func ReadBPTreeRootIdxAt
 * [Change] Add issue templates
 * [Change] Update README && CHANGELOG
+
+## v0.6.0 (2021-03-21)
+* [New Feature] Add PrefixSearchScan() with regexp search ability（#53）
+* [New Feature] Allow put with timestamp (#88 )
+* [Bug Fix] Fix ZMembers bug (#58 )
+* [Bug Fix] Repeated key merge fix (#83 )
+* [Bug Fix] The LRem implementation is not consistent with the description (#92 )
+* [Refactor] Improve buildBPTreeRootIdxes file reading (#67)
+* [Docs] Update README && CHANGELOG
