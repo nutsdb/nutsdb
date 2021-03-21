@@ -654,6 +654,8 @@ if err := db.View(
 ```
 ##### LRem 
 
+Note: This feature can be used starting from v0.6.0
+
 Removes the first count occurrences of elements equal to value from the list stored in the bucket at given bucket,key,count.
 The count argument influences the operation in the following ways:
 
@@ -666,7 +668,7 @@ if err := db.Update(
 	func(tx *nutsdb.Tx) error {
 	        bucket := "bucketForList"
 		key := []byte("myList")
-		return tx.LRem(bucket, key, 1)
+		return tx.LRem(bucket, key, 1, []byte("value11))
 	}); err != nil {
 	log.Fatal(err)
 }

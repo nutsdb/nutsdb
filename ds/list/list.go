@@ -192,16 +192,27 @@ func (l *List) LRem(key string, count int, value []byte) (int, error) {
 	size, _ := l.Size(key)
 
 	needRemovedNum, err := l.LRemNum(key, count, value)
-
 	if err != nil {
 		return 0, err
 	}
 
-	var newTempVal [][]byte
-	var realRemovedNum int
+	if needRemovedNum == 0 {
+		return 0, err
+	}
+
+	var (
+		newTempVal     [][]byte
+		realRemovedNum int
+	)
+
 	newTempVal = make([][]byte, size-needRemovedNum)
 	tempVal := l.Items[key]
 	idx := 0
+
+	if count == 0 {
+		count = needRemovedNum
+	}
+
 	if count > 0 {
 		for _, v := range tempVal {
 			if realRemovedNum < count && bytes.Equal(v, value) {
