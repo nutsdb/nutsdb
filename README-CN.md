@@ -697,6 +697,8 @@ if err := db.View(
 ```
 ##### LRem 
 
+注意: 这个方法在 v0.6.0版本开始支持，之前的版本实现和描述有问题。
+
 从指定bucket里面的指定的key的列表里移除前 count 次出现的值为 value 的元素。 这个 count 参数通过下面几种方式影响这个操作：
 
 count > 0: 从头往尾移除值为 value 的元素。
@@ -710,7 +712,7 @@ if err := db.Update(
 	func(tx *nutsdb.Tx) error {
 	        bucket := "bucketForList"
 		key := []byte("myList")
-		return tx.LRem(bucket, key, 1)
+		return tx.LRem(bucket, key, 1, []byte("val11"))
 	}); err != nil {
 	log.Fatal(err)
 }
