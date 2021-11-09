@@ -1,4 +1,4 @@
-module github.com/michaelmukiibi/nutsdb
+module github.com/michaelmukiibi2018/nutsdb
 
 require (
 	github.com/bwmarrin/snowflake v0.3.0
