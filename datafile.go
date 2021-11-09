@@ -158,14 +158,14 @@ func (df *DataFile) Close() (err error) {
 // readMetaData returns MetaData at given buf slice.
 func readMetaData(buf []byte) *MetaData {
 	return &MetaData{
-		timestamp:  binary.LittleEndian.Uint64(buf[4:12]),
+		Timestamp:  binary.LittleEndian.Uint64(buf[4:12]),
 		keySize:    binary.LittleEndian.Uint32(buf[12:16]),
 		valueSize:  binary.LittleEndian.Uint32(buf[16:20]),
 		Flag:       binary.LittleEndian.Uint16(buf[20:22]),
 		TTL:        binary.LittleEndian.Uint32(buf[22:26]),
 		bucketSize: binary.LittleEndian.Uint32(buf[26:30]),
 		status:     binary.LittleEndian.Uint16(buf[30:32]),
-		ds:         binary.LittleEndian.Uint16(buf[32:34]),
-		txID:       binary.LittleEndian.Uint64(buf[34:42]),
+		Ds:         binary.LittleEndian.Uint16(buf[32:34]),
+		TxID:       binary.LittleEndian.Uint64(buf[34:42]),
 	}
 }

@@ -173,7 +173,7 @@ func (tx *Tx) Commit() error {
 			}
 		}
 
-		if entry.Meta.ds == DataStructureBPTree {
+		if entry.Meta.Ds == DataStructureBPTree {
 			tx.db.BPTreeKeyEntryPosMap[string(entry.Meta.bucket)+string(entry.Key)] = tx.db.ActiveFile.writeOff
 		}
 
@@ -202,7 +202,7 @@ func (tx *Tx) Commit() error {
 		}
 
 		if i == lastIndex {
-			txID := entry.Meta.txID
+			txID := entry.Meta.TxID
 			if tx.db.opt.EntryIdxMode == HintBPTSparseIdxMode {
 				if err := tx.buildTxIDRootIdx(txID, countFlag); err != nil {
 					return err
@@ -221,7 +221,7 @@ func (tx *Tx) Commit() error {
 			e = entry
 		}
 
-		if entry.Meta.ds == DataStructureBPTree {
+		if entry.Meta.Ds == DataStructureBPTree {
 			tx.buildBPTreeIdx(bucket, entry, e, off, countFlag)
 		}
 	}
@@ -344,15 +344,15 @@ func (tx *Tx) buildIdxes(writesLen int) {
 
 		bucket := string(entry.Meta.bucket)
 
-		if entry.Meta.ds == DataStructureSet {
+		if entry.Meta.Ds == DataStructureSet {
 			tx.buildSetIdx(bucket, entry)
 		}
 
-		if entry.Meta.ds == DataStructureSortedSet {
+		if entry.Meta.Ds == DataStructureSortedSet {
 			tx.buildSortedSetIdx(bucket, entry)
 		}
 
-		if entry.Meta.ds == DataStructureList {
+		if entry.Meta.Ds == DataStructureList {
 			tx.buildListIdx(bucket, entry)
 		}
 
@@ -600,14 +600,14 @@ func (tx *Tx) put(bucket string, key, value []byte, ttl uint32, flag uint16, tim
 		Meta: &MetaData{
 			keySize:    uint32(len(key)),
 			valueSize:  uint32(len(value)),
-			timestamp:  timestamp,
+			Timestamp:  timestamp,
 			Flag:       flag,
 			TTL:        ttl,
 			bucket:     []byte(bucket),
 			bucketSize: uint32(len(bucket)),
 			status:     UnCommitted,
-			ds:         ds,
-			txID:       tx.id,
+			Ds:         ds,
+			TxID:       tx.id,
 		},
 	})
 

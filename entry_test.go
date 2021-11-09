@@ -25,7 +25,7 @@ func TestEntry_All(t *testing.T) {
 		Meta: &MetaData{
 			keySize:    uint32(len("key_0001")),
 			valueSize:  uint32(len("val_0001")),
-			timestamp:  1547707905,
+			Timestamp:  1547707905,
 			TTL:        Persistent,
 			bucket:     []byte("test_entry"),
 			bucketSize: uint32(len("test_datafile")),

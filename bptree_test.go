@@ -287,7 +287,7 @@ func TestIsExpired(t *testing.T) {
 	record := &Record{
 		H: &Hint{
 			meta: &MetaData{
-				timestamp: 1547707905,
+				Timestamp: 1547707905,
 				TTL:       10,
 			},
 		},

@@ -515,8 +515,8 @@ func (db *DB) parseDataFiles(dataFileIds []int) (unconfirmedRecords []*Record, c
 				}
 
 				if entry.Meta.status == Committed {
-					committedTxIds[entry.Meta.txID] = struct{}{}
-					db.ActiveCommittedTxIdsIdx.Insert([]byte(strconv2.Int64ToStr(int64(entry.Meta.txID))), nil,
+					committedTxIds[entry.Meta.TxID] = struct{}{}
+					db.ActiveCommittedTxIdsIdx.Insert([]byte(strconv2.Int64ToStr(int64(entry.Meta.TxID))), nil,
 						&Hint{meta: &MetaData{Flag: DataSetFlag}}, CountFlagEnabled)
 				}
 
@@ -650,19 +650,19 @@ func (db *DB) buildBucketMetaIdx() error {
 }
 
 func (db *DB) buildOtherIdxes(bucket string, r *Record) error {
-	if r.H.meta.ds == DataStructureSet {
+	if r.H.meta.Ds == DataStructureSet {
 		if err := db.buildSetIdx(bucket, r); err != nil {
 			return err
 		}
 	}
 
-	if r.H.meta.ds == DataStructureSortedSet {
+	if r.H.meta.Ds == DataStructureSortedSet {
 		if err := db.buildSortedSetIdx(bucket, r); err != nil {
 			return err
 		}
 	}
 
-	if r.H.meta.ds == DataStructureList {
+	if r.H.meta.Ds == DataStructureList {
 		if err := db.buildListIdx(bucket, r); err != nil {
 			return err
 		}
@@ -685,10 +685,10 @@ func (db *DB) buildHintIdx(dataFileIds []int) error {
 	}
 
 	for _, r := range unconfirmedRecords {
-		if _, ok := db.committedTxIds[r.H.meta.txID]; ok {
+		if _, ok := db.committedTxIds[r.H.meta.TxID]; ok {
 			bucket := string(r.H.meta.bucket)
 
-			if r.H.meta.ds == DataStructureBPTree {
+			if r.H.meta.Ds == DataStructureBPTree {
 				r.H.meta.status = Committed
 
 				if db.opt.EntryIdxMode == HintBPTSparseIdxMode {
@@ -934,7 +934,7 @@ func (db *DB) getBPTRootTxIDPath(fID int64) string {
 }
 
 func (db *DB) getPendingMergeEntries(entry *Entry, pendingMergeEntries []*Entry) []*Entry {
-	if entry.Meta.ds == DataStructureBPTree {
+	if entry.Meta.Ds == DataStructureBPTree {
 		if r, err := db.BPTreeIdx[string(entry.Meta.bucket)].Find(entry.Key); err == nil {
 			if r.H.meta.Flag == DataSetFlag {
 				pendingMergeEntries = append(pendingMergeEntries, entry)
@@ -942,13 +942,13 @@ func (db *DB) getPendingMergeEntries(entry *Entry, pendingMergeEntries []*Entry)
 		}
 	}
 
-	if entry.Meta.ds == DataStructureSet {
+	if entry.Meta.Ds == DataStructureSet {
 		if db.SetIdx[string(entry.Meta.bucket)].SIsMember(string(entry.Key), entry.Value) {
 			pendingMergeEntries = append(pendingMergeEntries, entry)
 		}
 	}
 
-	if entry.Meta.ds == DataStructureSortedSet {
+	if entry.Meta.Ds == DataStructureSortedSet {
 		keyAndScore := strings.Split(string(entry.Key), SeparatorForZSetKey)
 		if len(keyAndScore) == 2 {
 			key := keyAndScore[0]
@@ -959,7 +959,7 @@ func (db *DB) getPendingMergeEntries(entry *Entry, pendingMergeEntries []*Entry)
 		}
 	}
 
-	if entry.Meta.ds == DataStructureList {
+	if entry.Meta.Ds == DataStructureList {
 		items, _ := db.ListIdx[string(entry.Meta.bucket)].LRange(string(entry.Key), 0, -1)
 		ok := false
 		if entry.Meta.Flag == DataRPushFlag || entry.Meta.Flag == DataLPushFlag {
@@ -997,7 +997,7 @@ func (db *DB) reWriteData(pendingMergeEntries []*Entry) error {
 	db.MaxFileID++
 
 	for _, e := range pendingMergeEntries {
-		err := tx.put(string(e.Meta.bucket), e.Key, e.Value, e.Meta.TTL, e.Meta.Flag, e.Meta.timestamp, e.Meta.ds)
+		err := tx.put(string(e.Meta.bucket), e.Key, e.Value, e.Meta.TTL, e.Meta.Flag, e.Meta.Timestamp, e.Meta.Ds)
 		if err != nil {
 			tx.Rollback()
 			db.isMerging = false
@@ -1013,7 +1013,7 @@ func (db *DB) isFilterEntry(entry *Entry) bool {
 		entry.Meta.Flag == DataLPopFlag || entry.Meta.Flag == DataLRemFlag ||
 		entry.Meta.Flag == DataLTrimFlag || entry.Meta.Flag == DataZRemFlag ||
 		entry.Meta.Flag == DataZRemRangeByRankFlag || entry.Meta.Flag == DataZPopMaxFlag ||
-		entry.Meta.Flag == DataZPopMinFlag || IsExpired(entry.Meta.TTL, entry.Meta.timestamp) {
+		entry.Meta.Flag == DataZPopMinFlag || IsExpired(entry.Meta.TTL, entry.Meta.Timestamp) {
 		return true
 	}
 

@@ -34,7 +34,7 @@ func (tx *Tx) getByHintBPTSparseIdxInMem(bucket string, key []byte) (e *Entry, e
 	// Read in memory.
 	r, err := tx.db.ActiveBPTreeIdx.Find(key)
 	if err == nil && r != nil {
-		if _, err := tx.db.ActiveCommittedTxIdsIdx.Find([]byte(strconv2.Int64ToStr(int64(r.H.meta.txID)))); err == nil {
+		if _, err := tx.db.ActiveCommittedTxIdsIdx.Find([]byte(strconv2.Int64ToStr(int64(r.H.meta.TxID)))); err == nil {
 			path := tx.db.getDataPath(r.H.fileID)
 			df, err := NewDataFile(path, tx.db.opt.SegmentSize, tx.db.opt.RWMode)
 			defer df.rwManager.Close()
@@ -76,15 +76,15 @@ func (tx *Tx) getByHintBPTSparseIdxOnDisk(bucket string, key []byte) (e *Entry, 
 
 			e, err = tx.FindOnDisk(fID, rootOff, key, newKey)
 			if err == nil && e != nil {
-				if e.Meta.Flag == DataDeleteFlag || IsExpired(e.Meta.TTL, e.Meta.timestamp) {
+				if e.Meta.Flag == DataDeleteFlag || IsExpired(e.Meta.TTL, e.Meta.Timestamp) {
 					return nil, ErrNotFoundKey
 				}
 
-				txIDStr := strconv2.Int64ToStr(int64(e.Meta.txID))
+				txIDStr := strconv2.Int64ToStr(int64(e.Meta.TxID))
 				if _, err := tx.db.ActiveCommittedTxIdsIdx.Find([]byte(txIDStr)); err == nil {
 					return e, err
 				}
-				if ok, _ := tx.FindTxIDOnDisk(fID, e.Meta.txID); !ok {
+				if ok, _ := tx.FindTxIDOnDisk(fID, e.Meta.TxID); !ok {
 					return nil, ErrNotFoundKey
 				}
 
@@ -102,7 +102,7 @@ func (tx *Tx) getByHintBPTSparseIdx(bucket string, key []byte) (e *Entry, err er
 
 	entry, err := tx.getByHintBPTSparseIdxInMem(bucket, newKey)
 	if entry != nil && err == nil {
-		if entry.Meta.Flag == DataDeleteFlag || IsExpired(entry.Meta.TTL, entry.Meta.timestamp) {
+		if entry.Meta.Flag == DataDeleteFlag || IsExpired(entry.Meta.TTL, entry.Meta.Timestamp) {
 			return nil, ErrNotFoundKey
 		}
 		return entry, err
@@ -145,7 +145,7 @@ func (tx *Tx) Get(bucket string, key []byte) (e *Entry, err error) {
 				return nil, err
 			}
 
-			if _, ok := tx.db.committedTxIds[r.H.meta.txID]; !ok {
+			if _, ok := tx.db.committedTxIds[r.H.meta.TxID]; !ok {
 				return nil, ErrNotFoundKey
 			}
 
@@ -390,7 +390,7 @@ func processEntriesScanOnDisk(entriesTemp []*Entry) (result []*Entry) {
 
 	keys, es := SortedEntryKeys(entriesMap)
 	for _, key := range keys {
-		if !IsExpired(es[key].Meta.TTL, es[key].Meta.timestamp) && es[key].Meta.Flag != DataDeleteFlag {
+		if !IsExpired(es[key].Meta.TTL, es[key].Meta.Timestamp) && es[key].Meta.Flag != DataDeleteFlag {
 			result = append(result, es[key])
 		}
 	}
