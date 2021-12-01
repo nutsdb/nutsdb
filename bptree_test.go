@@ -31,7 +31,7 @@ func setup(t *testing.T, limit int) {
 	for i := 0; i < 100; i++ {
 		key := []byte("key_" + fmt.Sprintf("%03d", i))
 		val := []byte("val_" + fmt.Sprintf("%03d", i))
-		err := tree.Insert(key, &Entry{Key: key, Value: val}, &Hint{key: key, meta: &MetaData{
+		err := tree.Insert(key, &Entry{Key: key, Value: val}, &Hint{Key: key, Meta: &MetaData{
 			Flag: DataSetFlag,
 		}}, CountFlagEnabled)
 		if err != nil {
@@ -44,7 +44,7 @@ func setup(t *testing.T, limit int) {
 		key := []byte("key_" + fmt.Sprintf("%03d", i))
 		val := []byte("val_" + fmt.Sprintf("%03d", i))
 
-		expected = append(expected, &Record{E: &Entry{Key: key, Value: val}, H: &Hint{key: key, meta: &MetaData{
+		expected = append(expected, &Record{E: &Entry{Key: key, Value: val}, H: &Hint{Key: key, Meta: &MetaData{
 			Flag: DataSetFlag,
 		}}})
 	}
@@ -96,7 +96,7 @@ func TestBPTree_PrefixScan(t *testing.T) {
 	for i := 0; i <= 100; i++ {
 		key := []byte("name_" + fmt.Sprintf("%03d", i))
 		val := []byte("val_" + fmt.Sprintf("%03d", i))
-		err := tree.Insert(key, &Entry{Key: key, Value: val}, &Hint{key: key, meta: &MetaData{
+		err := tree.Insert(key, &Entry{Key: key, Value: val}, &Hint{Key: key, Meta: &MetaData{
 			Flag: DataSetFlag,
 		}}, CountFlagEnabled)
 		if err != nil {
@@ -207,7 +207,7 @@ func TestBPTree_PrefixSearchScan(t *testing.T) {
 	for i := 0; i <= 100; i++ {
 		key := []byte("name_" + fmt.Sprintf("%03d", i))
 		val := []byte("val_" + fmt.Sprintf("%03d", i))
-		err := tree.Insert(key, &Entry{Key: key, Value: val}, &Hint{key: key, meta: &MetaData{
+		err := tree.Insert(key, &Entry{Key: key, Value: val}, &Hint{Key: key, Meta: &MetaData{
 			Flag: DataSetFlag,
 		}}, CountFlagEnabled)
 		if err != nil {
@@ -286,8 +286,8 @@ func TestBPTree_FindLeaf(t *testing.T) {
 func TestIsExpired(t *testing.T) {
 	record := &Record{
 		H: &Hint{
-			meta: &MetaData{
-				timestamp: 1547707905,
+			Meta: &MetaData{
+				Timestamp: 1547707905,
 				TTL:       10,
 			},
 		},
@@ -297,7 +297,7 @@ func TestIsExpired(t *testing.T) {
 		t.Error("err TestIsExpired")
 	}
 
-	record.H.meta.TTL = Persistent
+	record.H.Meta.TTL = Persistent
 	if record.IsExpired() {
 		t.Error("err TestIsExpired")
 	}
@@ -310,7 +310,7 @@ func TestBPTree_Update(t *testing.T) {
 	for i := 0; i <= 100; i++ {
 		key := []byte("key_" + fmt.Sprintf("%03d", i))
 		val := []byte("val_modify" + fmt.Sprintf("%03d", i))
-		err := tree.Insert(key, &Entry{Key: key, Value: val}, &Hint{key: key, meta: &MetaData{
+		err := tree.Insert(key, &Entry{Key: key, Value: val}, &Hint{Key: key, Meta: &MetaData{
 			Flag: DataSetFlag,
 		}}, CountFlagEnabled)
 		if err != nil {
@@ -323,7 +323,7 @@ func TestBPTree_Update(t *testing.T) {
 		key := []byte("key_" + fmt.Sprintf("%03d", i))
 		val := []byte("val_modify" + fmt.Sprintf("%03d", i))
 
-		expected = append(expected, &Record{E: &Entry{Key: key, Value: val}, H: &Hint{key: key, meta: &MetaData{
+		expected = append(expected, &Record{E: &Entry{Key: key, Value: val}, H: &Hint{Key: key, Meta: &MetaData{
 			Flag: DataSetFlag}},
 		})
 	}
@@ -342,7 +342,7 @@ func TestBPTree_Update(t *testing.T) {
 	//delete
 	for i := 1; i <= limit; i++ {
 		key := []byte("key_" + fmt.Sprintf("%03d", i))
-		err := tree.Insert(key, &Entry{Key: key, Value: nil}, &Hint{key: key, meta: &MetaData{
+		err := tree.Insert(key, &Entry{Key: key, Value: nil}, &Hint{Key: key, Meta: &MetaData{
 			Flag: DataDeleteFlag,
 		}}, CountFlagEnabled)
 		if err != nil {
@@ -357,13 +357,13 @@ func TestBPTree_Update(t *testing.T) {
 	}
 
 	for _, v := range rs {
-		if v.H.meta.Flag != DataDeleteFlag {
+		if v.H.Meta.Flag != DataDeleteFlag {
 			t.Error("err TestBPTree_Update")
 		}
 	}
 
 	key := []byte("key_001")
-	err = tree.Insert(key, &Entry{Key: key, Value: nil}, &Hint{key: key, meta: &MetaData{
+	err = tree.Insert(key, &Entry{Key: key, Value: nil}, &Hint{Key: key, Meta: &MetaData{
 		Flag: DataSetFlag,
 	}}, CountFlagEnabled)
 
@@ -376,7 +376,7 @@ func TestBPTree_Update(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if r.H.meta.Flag == DataDeleteFlag {
+	if r.H.Meta.Flag == DataDeleteFlag {
 		t.Error("err TestBPTree_Update")
 	}
 }
