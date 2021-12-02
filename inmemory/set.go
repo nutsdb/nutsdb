@@ -116,7 +116,7 @@ func (db *DB) SDiffByOneBucket(bucket string, key1, key2 string) (list [][]byte,
 
 // SDiffByTwoBuckets returns the members of the set resulting from the difference
 // between the first set and all the successive sets in two buckets.
-func (db *DB) SDiffByTwoBuckets(bucket1 string, key1 []byte, bucket2 string, key2 []byte) (list [][]byte, err error) {
+func (db *DB) SDiffByTwoBuckets(bucket1 string, key1 string, bucket2 string, key2 string) (list [][]byte, err error) {
 	var set1, set2 *set.Set
 
 	err = db.Managed(bucket1, false, func(shardDB *ShardDB) error {
@@ -139,8 +139,8 @@ func (db *DB) SDiffByTwoBuckets(bucket1 string, key1 []byte, bucket2 string, key
 	if err != nil {
 		return nil, err
 	}
-	for item1 := range set1.M[string(key1)] {
-		if _, ok := set2.M[string(key2)][item1]; !ok {
+	for item1 := range set1.M[key1] {
+		if _, ok := set2.M[key2][item1]; !ok {
 			list = append(list, []byte(item1))
 		}
 	}
