@@ -366,13 +366,11 @@ func (db *DB) Merge() error {
 			return err
 		}
 
+		f.rwManager.Close()
 		if err := os.Remove(db.getDataPath(int64(pendingMergeFId))); err != nil {
 			db.isMerging = false
-			f.rwManager.Close()
 			return fmt.Errorf("when merge err: %s", err)
 		}
-
-		f.rwManager.Close()
 	}
 
 	return nil
