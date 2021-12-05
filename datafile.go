@@ -98,17 +98,17 @@ func (df *DataFile) ReadAt(off int) (e *Entry, err error) {
 
 	// read bucket
 	off += DataEntryHeaderSize
-	bucketBuf := make([]byte, meta.bucketSize)
+	bucketBuf := make([]byte, meta.BucketSize)
 	_, err = df.rwManager.ReadAt(bucketBuf, int64(off))
 	if err != nil {
 		return nil, err
 	}
 
-	e.Meta.bucket = bucketBuf
+	e.Meta.Bucket = bucketBuf
 
 	// read key
-	off += int(meta.bucketSize)
-	keyBuf := make([]byte, meta.keySize)
+	off += int(meta.BucketSize)
+	keyBuf := make([]byte, meta.KeySize)
 
 	_, err = df.rwManager.ReadAt(keyBuf, int64(off))
 	if err != nil {
@@ -117,8 +117,8 @@ func (df *DataFile) ReadAt(off int) (e *Entry, err error) {
 	e.Key = keyBuf
 
 	// read value
-	off += int(meta.keySize)
-	valBuf := make([]byte, meta.valueSize)
+	off += int(meta.KeySize)
+	valBuf := make([]byte, meta.ValueSize)
 	_, err = df.rwManager.ReadAt(valBuf, int64(off))
 	if err != nil {
 		return nil, err
@@ -158,14 +158,14 @@ func (df *DataFile) Close() (err error) {
 // readMetaData returns MetaData at given buf slice.
 func readMetaData(buf []byte) *MetaData {
 	return &MetaData{
-		timestamp:  binary.LittleEndian.Uint64(buf[4:12]),
-		keySize:    binary.LittleEndian.Uint32(buf[12:16]),
-		valueSize:  binary.LittleEndian.Uint32(buf[16:20]),
+		Timestamp:  binary.LittleEndian.Uint64(buf[4:12]),
+		KeySize:    binary.LittleEndian.Uint32(buf[12:16]),
+		ValueSize:  binary.LittleEndian.Uint32(buf[16:20]),
 		Flag:       binary.LittleEndian.Uint16(buf[20:22]),
 		TTL:        binary.LittleEndian.Uint32(buf[22:26]),
-		bucketSize: binary.LittleEndian.Uint32(buf[26:30]),
-		status:     binary.LittleEndian.Uint16(buf[30:32]),
-		ds:         binary.LittleEndian.Uint16(buf[32:34]),
-		txID:       binary.LittleEndian.Uint64(buf[34:42]),
+		BucketSize: binary.LittleEndian.Uint32(buf[26:30]),
+		Status:     binary.LittleEndian.Uint16(buf[30:32]),
+		Ds:         binary.LittleEndian.Uint16(buf[32:34]),
+		TxID:       binary.LittleEndian.Uint64(buf[34:42]),
 	}
 }

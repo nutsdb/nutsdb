@@ -24,7 +24,7 @@ type Record struct {
 
 // IsExpired returns the record if expired or not.
 func (r *Record) IsExpired() bool {
-	return IsExpired(r.H.meta.TTL, r.H.meta.timestamp)
+	return IsExpired(r.H.Meta.TTL, r.H.Meta.Timestamp)
 }
 
 // IsExpired checks the ttl if expired or not.
