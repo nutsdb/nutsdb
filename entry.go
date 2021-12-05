@@ -31,30 +31,30 @@ type (
 
 	// Hint represents the index of the key
 	Hint struct {
-		key     []byte
-		fileID  int64
-		meta    *MetaData
-		dataPos uint64
+		Key     []byte
+		FileID  int64
+		Meta    *MetaData
+		DataPos uint64
 	}
 
 	// MetaData represents the meta information of the data item.
 	MetaData struct {
-		keySize    uint32
-		valueSize  uint32
-		timestamp  uint64
+		KeySize    uint32
+		ValueSize  uint32
+		Timestamp  uint64
 		TTL        uint32
 		Flag       uint16 // delete / set
-		bucket     []byte
-		bucketSize uint32
-		txID       uint64
-		status     uint16 // committed / uncommitted
-		ds         uint16 // data structure
+		Bucket     []byte
+		BucketSize uint32
+		TxID       uint64
+		Status     uint16 // committed / uncommitted
+		Ds         uint16 // data structure
 	}
 )
 
 // Size returns the size of the entry.
 func (e *Entry) Size() int64 {
-	return int64(DataEntryHeaderSize + e.Meta.keySize + e.Meta.valueSize + e.Meta.bucketSize)
+	return int64(DataEntryHeaderSize + e.Meta.KeySize + e.Meta.ValueSize + e.Meta.BucketSize)
 }
 
 // Encode returns the slice after the entry be encoded.
@@ -67,15 +67,15 @@ func (e *Entry) Size() int64 {
 //  |----------------------------------------------------------------------------------------------------------------|
 //
 func (e *Entry) Encode() []byte {
-	keySize := e.Meta.keySize
-	valueSize := e.Meta.valueSize
-	bucketSize := e.Meta.bucketSize
+	keySize := e.Meta.KeySize
+	valueSize := e.Meta.ValueSize
+	bucketSize := e.Meta.BucketSize
 
 	//set DataItemHeader buf
 	buf := make([]byte, e.Size())
 	buf = e.setEntryHeaderBuf(buf)
 	//set bucket\key\value
-	copy(buf[DataEntryHeaderSize:(DataEntryHeaderSize+bucketSize)], e.Meta.bucket)
+	copy(buf[DataEntryHeaderSize:(DataEntryHeaderSize+bucketSize)], e.Meta.Bucket)
 	copy(buf[(DataEntryHeaderSize+bucketSize):(DataEntryHeaderSize+bucketSize+keySize)], e.Key)
 	copy(buf[(DataEntryHeaderSize+bucketSize+keySize):(DataEntryHeaderSize+bucketSize+keySize+valueSize)], e.Value)
 
@@ -87,22 +87,22 @@ func (e *Entry) Encode() []byte {
 
 // setEntryHeaderBuf sets the entry header buff.
 func (e *Entry) setEntryHeaderBuf(buf []byte) []byte {
-	binary.LittleEndian.PutUint64(buf[4:12], e.Meta.timestamp)
-	binary.LittleEndian.PutUint32(buf[12:16], e.Meta.keySize)
-	binary.LittleEndian.PutUint32(buf[16:20], e.Meta.valueSize)
+	binary.LittleEndian.PutUint64(buf[4:12], e.Meta.Timestamp)
+	binary.LittleEndian.PutUint32(buf[12:16], e.Meta.KeySize)
+	binary.LittleEndian.PutUint32(buf[16:20], e.Meta.ValueSize)
 	binary.LittleEndian.PutUint16(buf[20:22], e.Meta.Flag)
 	binary.LittleEndian.PutUint32(buf[22:26], e.Meta.TTL)
-	binary.LittleEndian.PutUint32(buf[26:30], e.Meta.bucketSize)
-	binary.LittleEndian.PutUint16(buf[30:32], e.Meta.status)
-	binary.LittleEndian.PutUint16(buf[32:34], e.Meta.ds)
-	binary.LittleEndian.PutUint64(buf[34:42], e.Meta.txID)
+	binary.LittleEndian.PutUint32(buf[26:30], e.Meta.BucketSize)
+	binary.LittleEndian.PutUint16(buf[30:32], e.Meta.Status)
+	binary.LittleEndian.PutUint16(buf[32:34], e.Meta.Ds)
+	binary.LittleEndian.PutUint64(buf[34:42], e.Meta.TxID)
 
 	return buf
 }
 
 // IsZero checks if the entry is zero or not.
 func (e *Entry) IsZero() bool {
-	if e.crc == 0 && e.Meta.keySize == 0 && e.Meta.valueSize == 0 && e.Meta.timestamp == 0 {
+	if e.crc == 0 && e.Meta.KeySize == 0 && e.Meta.ValueSize == 0 && e.Meta.Timestamp == 0 {
 		return true
 	}
 	return false
@@ -111,7 +111,7 @@ func (e *Entry) IsZero() bool {
 // GetCrc returns the crc at given buf slice.
 func (e *Entry) GetCrc(buf []byte) uint32 {
 	crc := crc32.ChecksumIEEE(buf[4:])
-	crc = crc32.Update(crc, crc32.IEEETable, e.Meta.bucket)
+	crc = crc32.Update(crc, crc32.IEEETable, e.Meta.Bucket)
 	crc = crc32.Update(crc, crc32.IEEETable, e.Key)
 	crc = crc32.Update(crc, crc32.IEEETable, e.Value)
 

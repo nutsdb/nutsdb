@@ -1079,8 +1079,8 @@ func Test_getRecordFromKey(t *testing.T) {
 	if err != nil {
 		t.Errorf("wanted nil, got %v", err)
 	}
-	if r.H.dataPos != 58 || r.H.fileID != 4 {
-		t.Errorf("wanted fileID: %d, got: %d\nwanted dataPos: %d, got: %d", 4, r.H.fileID, 58, r.H.dataPos)
+	if r.H.DataPos != 58 || r.H.FileID != 4 {
+		t.Errorf("wanted fileID: %d, got: %d\nwanted dataPos: %d, got: %d", 4, r.H.FileID, 58, r.H.DataPos)
 	}
 	err = db.Close()
 	if err != nil {

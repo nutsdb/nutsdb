@@ -30,12 +30,12 @@ func init() {
 		Key:   []byte("key_0001"),
 		Value: []byte("val_0001"),
 		Meta: &MetaData{
-			keySize:    uint32(len("key_0001")),
-			valueSize:  uint32(len("val_0001")),
-			timestamp:  1547707905,
+			KeySize:    uint32(len("key_0001")),
+			ValueSize:  uint32(len("val_0001")),
+			Timestamp:  1547707905,
 			TTL:        Persistent,
-			bucket:     []byte("test_DataFile"),
-			bucketSize: uint32(len("test_datafile")),
+			Bucket:     []byte("test_DataFile"),
+			BucketSize: uint32(len("test_datafile")),
 			Flag:       DataSetFlag,
 		},
 		position: 0,
@@ -69,7 +69,7 @@ func TestDataFile1(t *testing.T) {
 	}
 
 	e, err = df.ReadAt(0)
-	if err != nil || string(e.Key) != "key_0001" || string(e.Value) != "val_0001" || e.Meta.timestamp != 1547707905 {
+	if err != nil || string(e.Key) != "key_0001" || string(e.Value) != "val_0001" || e.Meta.Timestamp != 1547707905 {
 		t.Error("err TestDataFile_All ReadAt")
 	}
 

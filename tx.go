@@ -165,7 +165,7 @@ func (tx *Tx) Commit() error {
 			return ErrKeyAndValSize
 		}
 
-		bucket := string(entry.Meta.bucket)
+		bucket := string(entry.Meta.Bucket)
 
 		if tx.db.ActiveFile.ActualSize+entrySize > tx.db.opt.SegmentSize {
 			if err := tx.rotateActiveFile(); err != nil {
@@ -173,12 +173,12 @@ func (tx *Tx) Commit() error {
 			}
 		}
 
-		if entry.Meta.ds == DataStructureBPTree {
-			tx.db.BPTreeKeyEntryPosMap[string(entry.Meta.bucket)+string(entry.Key)] = tx.db.ActiveFile.writeOff
+		if entry.Meta.Ds == DataStructureBPTree {
+			tx.db.BPTreeKeyEntryPosMap[string(entry.Meta.Bucket)+string(entry.Key)] = tx.db.ActiveFile.writeOff
 		}
 
 		if i == lastIndex {
-			entry.Meta.status = Committed
+			entry.Meta.Status = Committed
 		}
 
 		off = tx.db.ActiveFile.writeOff
@@ -202,7 +202,7 @@ func (tx *Tx) Commit() error {
 		}
 
 		if i == lastIndex {
-			txID := entry.Meta.txID
+			txID := entry.Meta.TxID
 			if tx.db.opt.EntryIdxMode == HintBPTSparseIdxMode {
 				if err := tx.buildTxIDRootIdx(txID, countFlag); err != nil {
 					return err
@@ -221,7 +221,7 @@ func (tx *Tx) Commit() error {
 			e = entry
 		}
 
-		if entry.Meta.ds == DataStructureBPTree {
+		if entry.Meta.Ds == DataStructureBPTree {
 			tx.buildBPTreeIdx(bucket, entry, e, off, countFlag)
 		}
 	}
@@ -308,12 +308,12 @@ func (tx *Tx) buildBucketMetaIdx(bucket string, key []byte, bucketMetaTemp Bucke
 func (tx *Tx) buildTxIDRootIdx(txID uint64, countFlag bool) error {
 	txIDStr := strconv2.IntToStr(int(txID))
 
-	tx.db.ActiveCommittedTxIdsIdx.Insert([]byte(txIDStr), nil, &Hint{meta: &MetaData{Flag: DataSetFlag}}, countFlag)
+	tx.db.ActiveCommittedTxIdsIdx.Insert([]byte(txIDStr), nil, &Hint{Meta: &MetaData{Flag: DataSetFlag}}, countFlag)
 	if len(tx.ReservedStoreTxIDIdxes) > 0 {
 		for fID, txIDIdx := range tx.ReservedStoreTxIDIdxes {
 			filePath := tx.db.getBPTTxIDPath(fID)
 
-			txIDIdx.Insert([]byte(txIDStr), nil, &Hint{meta: &MetaData{Flag: DataSetFlag}}, countFlag)
+			txIDIdx.Insert([]byte(txIDStr), nil, &Hint{Meta: &MetaData{Flag: DataSetFlag}}, countFlag)
 			txIDIdx.Filepath = filePath
 
 			err := txIDIdx.WriteNodes(tx.db.opt.RWMode, tx.db.opt.SyncEnable, 2)
@@ -325,7 +325,7 @@ func (tx *Tx) buildTxIDRootIdx(txID uint64, countFlag bool) error {
 			txIDRootIdx := NewTree()
 			rootAddress := strconv2.Int64ToStr(txIDIdx.root.Address)
 
-			txIDRootIdx.Insert([]byte(rootAddress), nil, &Hint{meta: &MetaData{Flag: DataSetFlag}}, countFlag)
+			txIDRootIdx.Insert([]byte(rootAddress), nil, &Hint{Meta: &MetaData{Flag: DataSetFlag}}, countFlag)
 			txIDRootIdx.Filepath = filePath
 
 			err = txIDRootIdx.WriteNodes(tx.db.opt.RWMode, tx.db.opt.SyncEnable, 2)
@@ -342,17 +342,17 @@ func (tx *Tx) buildIdxes(writesLen int) {
 	for i := 0; i < writesLen; i++ {
 		entry := tx.pendingWrites[i]
 
-		bucket := string(entry.Meta.bucket)
+		bucket := string(entry.Meta.Bucket)
 
-		if entry.Meta.ds == DataStructureSet {
+		if entry.Meta.Ds == DataStructureSet {
 			tx.buildSetIdx(bucket, entry)
 		}
 
-		if entry.Meta.ds == DataStructureSortedSet {
+		if entry.Meta.Ds == DataStructureSortedSet {
 			tx.buildSortedSetIdx(bucket, entry)
 		}
 
-		if entry.Meta.ds == DataStructureList {
+		if entry.Meta.Ds == DataStructureList {
 			tx.buildListIdx(bucket, entry)
 		}
 
@@ -365,10 +365,10 @@ func (tx *Tx) buildBPTreeIdx(bucket string, entry, e *Entry, off int64, countFla
 		newKey := []byte(bucket)
 		newKey = append(newKey, entry.Key...)
 		tx.db.ActiveBPTreeIdx.Insert(newKey, e, &Hint{
-			fileID:  tx.db.ActiveFile.fileID,
-			key:     newKey,
-			meta:    entry.Meta,
-			dataPos: uint64(off),
+			FileID:  tx.db.ActiveFile.fileID,
+			Key:     newKey,
+			Meta:    entry.Meta,
+			DataPos: uint64(off),
 		}, countFlag)
 	} else {
 		if _, ok := tx.db.BPTreeIdx[bucket]; !ok {
@@ -379,10 +379,10 @@ func (tx *Tx) buildBPTreeIdx(bucket string, entry, e *Entry, off int64, countFla
 			tx.db.BPTreeIdx[bucket] = NewTree()
 		}
 		_ = tx.db.BPTreeIdx[bucket].Insert(entry.Key, e, &Hint{
-			fileID:  tx.db.ActiveFile.fileID,
-			key:     entry.Key,
-			meta:    entry.Meta,
-			dataPos: uint64(off),
+			FileID:  tx.db.ActiveFile.fileID,
+			Key:     entry.Key,
+			Meta:    entry.Meta,
+			DataPos: uint64(off),
 		}, countFlag)
 	}
 }
@@ -598,16 +598,16 @@ func (tx *Tx) put(bucket string, key, value []byte, ttl uint32, flag uint16, tim
 		Key:   key,
 		Value: value,
 		Meta: &MetaData{
-			keySize:    uint32(len(key)),
-			valueSize:  uint32(len(value)),
-			timestamp:  timestamp,
+			KeySize:    uint32(len(key)),
+			ValueSize:  uint32(len(value)),
+			Timestamp:  timestamp,
 			Flag:       flag,
 			TTL:        ttl,
-			bucket:     []byte(bucket),
-			bucketSize: uint32(len(bucket)),
-			status:     UnCommitted,
-			ds:         ds,
-			txID:       tx.id,
+			Bucket:     []byte(bucket),
+			BucketSize: uint32(len(bucket)),
+			Status:     UnCommitted,
+			Ds:         ds,
+			TxID:       tx.id,
 		},
 	})
 

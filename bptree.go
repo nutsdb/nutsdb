@@ -238,7 +238,7 @@ func (t *BPTree) ToBinary(n *Node) (result []byte, err error) {
 	} else {
 		for i = 0; i < n.KeysNum; i++ {
 			if n.pointers[i].(*Record).H != nil {
-				dataPos := n.pointers[i].(*Record).H.dataPos
+				dataPos := n.pointers[i].(*Record).H.DataPos
 				pointers[i] = int64(dataPos)
 			} else {
 				pointers[i] = 0
@@ -431,8 +431,8 @@ func (t *BPTree) getAll() (numFound int, keys [][]byte, pointers []interface{}) 
 	return
 }
 
-// findRange returns numFound,keys and pointers at the given start key and end key.
-func (t *BPTree) findRange(start, end []byte) (numFound int, keys [][]byte, pointers []interface{}) {
+// FindRange returns numFound,keys and pointers at the given start key and end key.
+func (t *BPTree) FindRange(start, end []byte, f func(key, value []byte) bool) (numFound int, keys [][]byte, pointers []interface{}) {
 	var (
 		n        *Node
 		i, j     int
@@ -454,9 +454,15 @@ func (t *BPTree) findRange(start, end []byte) (numFound int, keys [][]byte, poin
 				scanFlag = false
 				break
 			}
-			keys = append(keys, n.Keys[i])
-			pointers = append(pointers, n.pointers[i])
-			numFound++
+			if f != nil {
+				if !f(n.pointers[i].(*Record).E.Key, n.pointers[i].(*Record).E.Value) {
+					break
+				}
+			} else {
+				keys = append(keys, n.Keys[i])
+				pointers = append(pointers, n.pointers[i])
+				numFound++
+			}
 		}
 
 		n, _ = n.pointers[order-1].(*Node)
@@ -478,7 +484,7 @@ func (t *BPTree) Range(start, end []byte) (records Records, err error) {
 		return nil, ErrStartKey
 	}
 
-	return getRecordWrapper(t.findRange(start, end))
+	return getRecordWrapper(t.FindRange(start, end, nil))
 }
 
 // getRecordWrapper returns a wrapper of records when Range or PrefixScan are called.
@@ -683,11 +689,11 @@ func (t *BPTree) Insert(key []byte, e *Entry, h *Hint, countFlag bool) error {
 	t.checkAndSetLastKey(key, h)
 
 	if r, err := t.Find(key); err == nil && r != nil {
-		if countFlag && h.meta.Flag == DataDeleteFlag && r.H.meta.Flag != DataDeleteFlag && t.ValidKeyCount > 0 {
+		if countFlag && h.Meta.Flag == DataDeleteFlag && r.H.Meta.Flag != DataDeleteFlag && t.ValidKeyCount > 0 {
 			t.ValidKeyCount--
 		}
 
-		if countFlag && h.meta.Flag != DataDeleteFlag && r.H.meta.Flag == DataDeleteFlag {
+		if countFlag && h.Meta.Flag != DataDeleteFlag && r.H.Meta.Flag == DataDeleteFlag {
 			t.ValidKeyCount++
 		}
 
