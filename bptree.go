@@ -318,12 +318,11 @@ func (t *BPTree) WriteNodes(rwMode RWMode, syncEnable bool, flag int) error {
 	)
 
 	fd, err := os.OpenFile(t.Filepath, os.O_CREATE|os.O_RDWR, 0644)
-	defer fd.Close()
-
 	if err != nil {
 		return err
 	}
-
+	defer fd.Close()
+	
 	queue = nil
 
 	enqueue(t.root)
@@ -360,14 +359,14 @@ func isValidAddress(addr int64) bool {
 // ReadNode reads a binary node at given Filepath and address.
 func ReadNode(Filepath string, address int64) (bn *BinaryNode, err error) {
 	if !isValidAddress(address) {
-		return nil, fmt.Errorf("Invalid address. Cannot read node at %v ", address)
+		return nil, fmt.Errorf("cannot read node at %v", address)
 	}
 
 	f, err := os.Open(Filepath)
-	defer f.Close()
 	if os.IsNotExist(err) {
 		return nil, err
 	}
+	defer f.Close()
 
 	if err != nil {
 		return nil, err
