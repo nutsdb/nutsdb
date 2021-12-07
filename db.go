@@ -383,7 +383,7 @@ func (db *DB) Backup(dir string) error {
 	})
 }
 
-// Backup copy the database to writer.
+// BackupTarGZ Backup copy the database to writer.
 func (db *DB) BackupTarGZ(w io.Writer) error {
 	return db.View(func(tx *Tx) error {
 		return tarGZCompress(w, db.opt.Dir)
