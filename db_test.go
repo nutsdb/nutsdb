@@ -1037,6 +1037,18 @@ func TestDB_Backup(t *testing.T) {
 	}
 }
 
+func TestDB_BackupTarGZ(t *testing.T) {
+	InitOpt("", false)
+	db, err = Open(opt)
+	path := "/tmp/nutsdbtest_backup.tar.gz"
+	f, _ := os.Create(path)
+	defer f.Close()
+	err = db.BackupTarGZ(f)
+	if err != nil {
+		t.Error("err TestDB_Backup")
+	}
+}
+
 func TestDB_Close(t *testing.T) {
 	InitOpt("", false)
 	db, err = Open(opt)

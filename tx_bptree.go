@@ -379,8 +379,7 @@ func (tx *Tx) prefixSearchScanOnDisk(bucket string, prefix []byte, reg string, o
 }
 
 func processEntriesScanOnDisk(entriesTemp []*Entry) (result []*Entry) {
-	var entriesMap map[string]*Entry
-	entriesMap = make(map[string]*Entry)
+	entriesMap := make(map[string]*Entry)
 
 	for _, entry := range entriesTemp {
 		if _, ok := entriesMap[string(entry.Key)]; !ok {

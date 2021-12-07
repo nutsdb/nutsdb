@@ -72,10 +72,10 @@ func (bm *BucketMeta) Size() int64 {
 func ReadBucketMeta(name string) (bucketMeta *BucketMeta, err error) {
 	var off int64
 	fd, err := os.OpenFile(name, os.O_CREATE|os.O_RDWR, 0644)
-	defer fd.Close()
 	if err != nil {
 		return
 	}
+	defer fd.Close()
 
 	buf := make([]byte, BucketMetaHeaderSize)
 	_, err = fd.ReadAt(buf, off)

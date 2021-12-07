@@ -249,7 +249,7 @@ func (db *DB) checkEntryIdxMode() error {
 		return errors.New("not support HintBPTSparseIdxMode switch to the other EntryIdxMode")
 	}
 
-	if db.opt.EntryIdxMode == HintBPTSparseIdxMode && hasBptDirFlag == false && hasDataFlag == true {
+	if db.opt.EntryIdxMode == HintBPTSparseIdxMode && !hasBptDirFlag && hasDataFlag {
 		return errors.New("not support the other EntryIdxMode switch to HintBPTSparseIdxMode")
 	}
 
@@ -378,14 +378,16 @@ func (db *DB) Merge() error {
 
 // Backup copies the database to file directory at the given dir.
 func (db *DB) Backup(dir string) error {
-	err := db.View(func(tx *Tx) error {
+	return db.View(func(tx *Tx) error {
 		return filesystem.CopyDir(db.opt.Dir, dir)
 	})
-	if err != nil {
-		return err
-	}
+}
 
-	return nil
+// Backup copy the database to writer.
+func (db *DB) BackupTarGZ(w io.Writer) error {
+	return db.View(func(tx *Tx) error {
+		return tarGZCompress(w, db.opt.Dir)
+	})
 }
 
 // Close releases all db resources.

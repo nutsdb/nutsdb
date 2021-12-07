@@ -20,12 +20,12 @@ import (
 )
 
 var (
-	filepath string
+	filePath string
 	entry    Entry
 )
 
 func init() {
-	filepath = "/tmp/foo"
+	filePath = "/tmp/foo"
 	entry = Entry{
 		Key:   []byte("key_0001"),
 		Value: []byte("val_0001"),
@@ -42,8 +42,8 @@ func init() {
 	}
 }
 func TestDataFile_Err(t *testing.T) {
-	_, err := NewDataFile(filepath, -1, FileIO)
-	defer os.Remove(filepath)
+	_, err := NewDataFile(filePath, -1, FileIO)
+	defer os.Remove(filePath)
 
 	if err == nil {
 		t.Error("err invalid argument")
@@ -52,7 +52,7 @@ func TestDataFile_Err(t *testing.T) {
 }
 
 func TestDataFile1(t *testing.T) {
-	df, err := NewDataFile(filepath, 1024, MMap)
+	df, err := NewDataFile(filePath, 1024, MMap)
 	defer df.rwManager.Close()
 	if err != nil {
 		t.Fatal(err)
@@ -80,10 +80,10 @@ func TestDataFile1(t *testing.T) {
 }
 
 func TestDataFile2(t *testing.T) {
-	filepath2 := "/tmp/foo2"
-	df, err := NewDataFile(filepath2, 39, FileIO)
+	filePath2 := "/tmp/foo2"
+	df, err := NewDataFile(filePath2, 39, FileIO)
 	defer df.rwManager.Close()
-	defer os.Remove(filepath2)
+	defer os.Remove(filePath2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,9 +98,9 @@ func TestDataFile2(t *testing.T) {
 		t.Error("err TestDataFile_All ReadAt")
 	}
 
-	filepath3 := "/tmp/foo3"
-	df, err = NewDataFile(filepath3, 41, FileIO)
-	defer os.Remove(filepath3)
+	filePath3 := "/tmp/foo3"
+	df, err = NewDataFile(filePath3, 41, FileIO)
+	defer os.Remove(filePath3)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +117,7 @@ func TestDataFile2(t *testing.T) {
 }
 
 func TestDataFile_ReadAt(t *testing.T) {
-	df, err := NewDataFile(filepath, 1024, FileIO)
+	df, err := NewDataFile(filePath, 1024, FileIO)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,18 +134,18 @@ func TestDataFile_ReadAt(t *testing.T) {
 }
 
 func TestDataFile_Err_Path(t *testing.T) {
-	filepath5 := ":/tmp/foo5"
-	df, err := NewDataFile(filepath5, entry.Size(), FileIO)
+	filePath5 := ":/tmp/foo5"
+	df, err := NewDataFile(filePath5, entry.Size(), FileIO)
 	if err == nil && df != nil {
 		t.Error("err TestDataFile_All open")
 	}
 }
 
 func TestDataFile_Crc_Err(t *testing.T) {
-	filepath4 := "/tmp/foo4"
+	filePath4 := "/tmp/foo4"
 
-	df, err := NewDataFile(filepath4, entry.Size(), FileIO)
-	defer os.Remove(filepath4)
+	df, err := NewDataFile(filePath4, entry.Size(), FileIO)
+	defer os.Remove(filePath4)
 	if err != nil {
 		t.Fatal(err)
 	}
