@@ -16,7 +16,6 @@ package nutsdb
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"regexp"
 	"time"
@@ -176,7 +175,7 @@ func (tx *Tx) Get(bucket string, key []byte) (e *Entry, err error) {
 		}
 	}
 
-	return nil, errors.New("not found bucket:" + bucket + ",key:" + string(key))
+	return nil, ErrBucketAndKey(bucket, key)
 }
 
 //GetAll returns all keys and values of the bucket stored at given bucket.
