@@ -29,7 +29,7 @@ func getNewKey(bucket string, key []byte) []byte {
 	return newKey
 }
 
-func (tx *Tx) getByHintBPTSparseIdxInMem(bucket string, key []byte) (e *Entry, err error) {
+func (tx *Tx) getByHintBPTSparseIdxInMem(key []byte) (e *Entry, err error) {
 	// Read in memory.
 	r, err := tx.db.ActiveBPTreeIdx.Find(key)
 	if err == nil && r != nil {
@@ -99,7 +99,7 @@ func (tx *Tx) getByHintBPTSparseIdxOnDisk(bucket string, key []byte) (e *Entry, 
 func (tx *Tx) getByHintBPTSparseIdx(bucket string, key []byte) (e *Entry, err error) {
 	newKey := getNewKey(bucket, key)
 
-	entry, err := tx.getByHintBPTSparseIdxInMem(bucket, newKey)
+	entry, err := tx.getByHintBPTSparseIdxInMem(newKey)
 	if entry != nil && err == nil {
 		if entry.Meta.Flag == DataDeleteFlag || IsExpired(entry.Meta.TTL, entry.Meta.Timestamp) {
 			return nil, ErrNotFoundKey
