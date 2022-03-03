@@ -47,6 +47,9 @@ var (
 
 	// ErrBucketNotFound is returned when looking for bucket that does not exist
 	ErrBucketNotFound = errors.New("bucket not found")
+
+	// ErrNotSupportHintBPTSparseIdxMode is returned not support mode `HintBPTSparseIdxMode`
+	ErrNotSupportHintBPTSparseIdxMode = errors.New("not support mode `HintBPTSparseIdxMode`")
 )
 
 const (
@@ -294,7 +297,7 @@ func (db *DB) Merge() error {
 	)
 
 	if db.opt.EntryIdxMode == HintBPTSparseIdxMode {
-		return errors.New("not support mode `HintBPTSparseIdxMode`")
+		return ErrNotSupportHintBPTSparseIdxMode
 	}
 
 	db.isMerging = true
