@@ -63,6 +63,8 @@ Badger同样是基于LSM tree，不同的是他把key/value分离。据他官网
     - [只读事务](#只读事务)
     - [手动管理事务](#手动管理事务)
   - [使用buckets](#使用buckets)
+    - [迭代buckets](#迭代buckets)
+    - [删除bucket](#删除bucket)
   - [使用键值对](#使用键值对)
   - [使用TTL](#使用ttl)
   - [对keys的扫描操作](#对keys的扫描操作)
@@ -319,6 +321,45 @@ if err := db.Update(
 
 ```
 这边注意下，这个bucket和你使用数据结构有关，不同数据索引结构，用同一个bucket，也是不同的。比如你定义了一个bucket，命名为`bucket_foo`，比如你要用`list`这个数据结构，使用 `tx.RPush`加数据，必须对应他的数据结构去从这个`bucket_foo`查询或者取出，比如用 `tx.RPop`，`tx.LRange` 等，不能用`tx.Get`（和GetAll、Put、Delete、RangeScan等同一索引类型）去读取这个`bucket_foo`里面的数据，因为索引结构不同。其他数据结构如`Set`、`Sorted Set`同理。
+
+下面说明下迭代buckets 和 删除bucket。它们都用到了`ds`。
+
+ds表示数据结构，支持如下：
+* DataStructureSet
+* DataStructureSortedSet
+* DataStructureBPTree
+* DataStructureList
+
+#### 迭代buckets
+
+IterateBuckets支持迭代指定ds的迭代。
+
+```go
+
+if err := db.View(
+	func(tx *nutsdb.Tx) error {
+		return tx.IterateBuckets(nutsdb.DataStructureBPTree, func(bucket string) {
+			fmt.Println("bucket: ", bucket)
+		})
+	}); err != nil {
+	log.Fatal(err)
+}
+```
+
+#### 删除bucket
+
+DeleteBucket支持删除指定的bucket，需要两个参数`ds`和`bucket`。
+
+```go
+
+if err := db.Update(
+	func(tx *nutsdb.Tx) error {
+		return tx.DeleteBucket(nutsdb.DataStructureBPTree, bucket)
+	}); err != nil {
+	log.Fatal(err)
+}
+```
+
 
 ### 使用键值对
 
