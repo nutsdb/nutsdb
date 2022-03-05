@@ -294,6 +294,14 @@ Also, this bucket is related to the data structure you use. Different data index
 
 #### Iterate buckets
 
+IterateBuckets iterate over all the bucket. IterateBuckets function has two parameters: `ds` (represents the data structure) and function `f`.
+
+The current version of the Iterate Buckets method supports the following EntryId Modes:
+
+* `HintKeyValAndRAMIdxMode`：represents ram index (key and value) mode.
+* `HintKeyAndRAMIdxMode`：represents ram index (only key) mode.
+
+
 ```go
 if err := db.View(
 	func(tx *nutsdb.Tx) error {
@@ -307,6 +315,13 @@ if err := db.View(
 ```
 
 #### Delete bucket
+
+DeleteBucket represents delete bucket. DeleteBucket function has two parameters: `ds`(represents the data structure) and `bucket`.
+
+The current version of the Iterate Buckets method supports the following EntryId Modes:
+
+* `HintKeyValAndRAMIdxMode`：represents ram index (key and value) mode.
+* `HintKeyAndRAMIdxMode`：represents ram index (only key) mode.
 
 ```go
 if err := db.Update(
