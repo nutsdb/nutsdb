@@ -40,6 +40,8 @@ In order to break the limitation, I tried to optimize them. Finally, I did it an
     - [Read-only transactions](#read-only-transactions)
     - [Managing transactions manually](#managing-transactions-manually)
   - [Using buckets](#using-buckets)
+    - [Delete bucket](#delete-bucket)
+    - [Iterate buckets](#iterate-buckets)
   - [Using key/value pairs](#using-keyvalue-pairs)
   - [Using TTL(Time To Live)](#using-ttltime-to-live)
   - [Iterating over keys](#iterating-over-keys)
@@ -289,6 +291,33 @@ if err := db.Update(
 ```
 
 Also, this bucket is related to the data structure you use. Different data index structures that use the same bucket are also different. For example, you define a bucket named `bucket_foo`, so you need to use the `list` data structure, use `tx.RPush` to add data, you must query or retrieve from this bucket_foo data structure, use `tx.RPop`, `tx.LRange`, etc. You cannot use `tx.Get` (same index type as `tx.GetAll`, `tx.Put`, `tx.Delete`, `tx.RangeScan`, etc.) to read the data in this `bucket_foo`, because the index structure is different. Other data structures such as `Set`, `Sorted Set` are the same.
+
+#### Iterate buckets
+
+```go
+if err := db.View(
+	func(tx *nutsdb.Tx) error {
+		return tx.IterateBuckets(nutsdb.DataStructureBPTree, func(bucket string) {
+			fmt.Println("bucket: ", bucket)
+		})
+	}); err != nil {
+	log.Fatal(err)
+}
+	
+```
+
+#### Delete bucket
+
+```go
+if err := db.Update(
+	func(tx *nutsdb.Tx) error {
+		return tx.DeleteBucket(nutsdb.DataStructureBPTree, bucket)
+	}); err != nil {
+	log.Fatal(err)
+}
+	
+```
+
 
 ### Using key/value pairs
 
