@@ -294,13 +294,19 @@ Also, this bucket is related to the data structure you use. Different data index
 
 #### Iterate buckets
 
-IterateBuckets iterate over all the bucket. IterateBuckets function has two parameters: `ds` (represents the data structure) and function `f`.
+IterateBuckets iterate over all the bucket. IterateBuckets function has two parameters: `ds` and function `f`.
 
 The current version of the Iterate Buckets method supports the following EntryId Modes:
 
 * `HintKeyValAndRAMIdxMode`：represents ram index (key and value) mode.
 * `HintKeyAndRAMIdxMode`：represents ram index (only key) mode.
 
+The current version of `ds` (represents the data structure)：
+
+* DataStructureSet
+* DataStructureSortedSet
+* DataStructureBPTree
+* DataStructureList
 
 ```go
 if err := db.View(
@@ -322,6 +328,13 @@ The current version of the Iterate Buckets method supports the following EntryId
 
 * `HintKeyValAndRAMIdxMode`：represents ram index (key and value) mode.
 * `HintKeyAndRAMIdxMode`：represents ram index (only key) mode.
+
+The current version of `ds` (represents the data structure)：
+
+* DataStructureSet
+* DataStructureSortedSet
+* DataStructureBPTree
+* DataStructureList
 
 ```go
 if err := db.Update(
