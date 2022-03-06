@@ -94,6 +94,18 @@ const (
 
 	// DataZPopMinFlag represents the data aZPopMin flag
 	DataZPopMinFlag
+
+	// DataSetBucketDeleteFlag represents the delete Set bucket flag
+	DataSetBucketDeleteFlag
+
+	// DataSortedSetBucketDeleteFlag represents the delete Sorted Set bucket flag
+	DataSortedSetBucketDeleteFlag
+
+	// DataBPTreeBucketDeleteFlag represents the delete BPTree bucket flag
+	DataBPTreeBucketDeleteFlag
+
+	// DataListBucketDeleteFlag represents the delete List bucket flag
+	DataListBucketDeleteFlag
 )
 
 const (
@@ -122,6 +134,9 @@ const (
 
 	// DataStructureList represents the data structure list flag
 	DataStructureList
+
+	// DataStructureNone represents not the data structure
+	DataStructureNone
 )
 
 type (
@@ -709,6 +724,10 @@ func (db *DB) buildHintIdx(dataFileIds []int) error {
 				return err
 			}
 
+			if r.H.Meta.Ds == DataStructureNone {
+				db.buildNotDSIdxes(bucket, r)
+			}
+
 			db.KeyCount++
 		}
 	}
@@ -720,6 +739,36 @@ func (db *DB) buildHintIdx(dataFileIds []int) error {
 	}
 
 	return nil
+}
+
+func (db *DB) buildNotDSIdxes(bucket string, r *Record) {
+	if r.H.Meta.Flag == DataSetBucketDeleteFlag {
+		db.deleteBucket(DataStructureSet, bucket)
+	}
+	if r.H.Meta.Flag == DataSortedSetBucketDeleteFlag {
+		db.deleteBucket(DataStructureSortedSet, bucket)
+	}
+	if r.H.Meta.Flag == DataBPTreeBucketDeleteFlag {
+		db.deleteBucket(DataStructureBPTree, bucket)
+	}
+	if r.H.Meta.Flag == DataListBucketDeleteFlag {
+		db.deleteBucket(DataStructureList, bucket)
+	}
+}
+
+func (db *DB) deleteBucket(ds uint16, bucket string) {
+	if ds == DataStructureSet {
+		delete(db.SetIdx, bucket)
+	}
+	if ds == DataStructureSortedSet {
+		delete(db.SortedSetIdx, bucket)
+	}
+	if ds == DataStructureBPTree {
+		delete(db.BPTreeIdx, bucket)
+	}
+	if ds == DataStructureList {
+		delete(db.ListIdx, bucket)
+	}
 }
 
 // buildSetIdx builds set index when opening the DB.
