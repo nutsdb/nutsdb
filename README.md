@@ -569,6 +569,18 @@ if err != nil {
 }
 ```
 
+NutsDB also provides gzip to compress backups. You can use the `db.BackupTarGZ()` function.
+
+```golang
+f, _ := os.Create(path)
+defer f.Close()
+err = db.BackupTarGZ(f)
+if err != nil {
+   ...
+}
+	
+```
+
 ### Using other data structures
 
 The syntax here is modeled after [Redis commands](https://redis.io/commands)
