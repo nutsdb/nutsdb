@@ -224,6 +224,9 @@ func (tx *Tx) Commit() error {
 		if entry.Meta.Ds == DataStructureBPTree {
 			tx.buildBPTreeIdx(bucket, entry, e, off, countFlag)
 		}
+		if entry.Meta.Ds == DataStructureNone && entry.Meta.Flag == DataBPTreeBucketDeleteFlag {
+			tx.db.deleteBucket(DataStructureBPTree, bucket)
+		}
 	}
 
 	tx.buildIdxes(writesLen)
@@ -354,6 +357,18 @@ func (tx *Tx) buildIdxes(writesLen int) {
 
 		if entry.Meta.Ds == DataStructureList {
 			tx.buildListIdx(bucket, entry)
+		}
+
+		if entry.Meta.Ds == DataStructureNone {
+			if entry.Meta.Flag == DataSetBucketDeleteFlag {
+				tx.db.deleteBucket(DataStructureSet, bucket)
+			}
+			if entry.Meta.Flag == DataSortedSetBucketDeleteFlag {
+				tx.db.deleteBucket(DataStructureSortedSet, bucket)
+			}
+			if entry.Meta.Flag == DataListBucketDeleteFlag {
+				tx.db.deleteBucket(DataStructureList, bucket)
+			}
 		}
 
 		tx.db.KeyCount++

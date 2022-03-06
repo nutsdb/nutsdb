@@ -14,6 +14,8 @@
 
 package nutsdb
 
+import "time"
+
 // IterateBuckets iterate over all the bucket depends on ds (represents the data structure)
 func (tx *Tx) IterateBuckets(ds uint16, f func(bucket string)) error {
 	if err := tx.checkTxIsClosed(); err != nil {
@@ -54,16 +56,16 @@ func (tx *Tx) DeleteBucket(ds uint16, bucket string) error {
 		return ErrNotSupportHintBPTSparseIdxMode
 	}
 	if ds == DataStructureSet {
-		delete(tx.db.SetIdx, bucket)
+		return tx.put(bucket, []byte("0"), nil, Persistent, DataSetBucketDeleteFlag, uint64(time.Now().Unix()), DataStructureNone)
 	}
 	if ds == DataStructureSortedSet {
-		delete(tx.db.SortedSetIdx, bucket)
+		return tx.put(bucket, []byte("1"), nil, Persistent, DataSortedSetBucketDeleteFlag, uint64(time.Now().Unix()), DataStructureNone)
 	}
 	if ds == DataStructureBPTree {
-		delete(tx.db.BPTreeIdx, bucket)
+		return tx.put(bucket, []byte("2"), nil, Persistent, DataBPTreeBucketDeleteFlag, uint64(time.Now().Unix()), DataStructureNone)
 	}
 	if ds == DataStructureList {
-		delete(tx.db.ListIdx, bucket)
+		return tx.put(bucket, []byte("3"), nil, Persistent, DataListBucketDeleteFlag, uint64(time.Now().Unix()), DataStructureNone)
 	}
 	return nil
 }
