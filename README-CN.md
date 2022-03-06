@@ -74,6 +74,7 @@ Badger同样是基于LSM tree，不同的是他把key/value分离。据他官网
     - [获取全部的key和value](#获取全部的key和value)
   - [合并操作](#合并操作)
   - [数据库备份](#数据库备份)
+- [使用内存模式](#使用内存模式)
 - [使用其他数据结构](#使用其他数据结构)
    - [List](#list)
      - [RPush](#rpush)
@@ -614,6 +615,37 @@ if err != nil {
 ```
 
 好了，入门指南已经完结。 散花~，到目前为止都是String类型的数据的crud操作，下面将学习其他更多的数据结构的操作。
+
+### 使用内存模式
+
+NutsDB从0.7.0版本开始支持内存模式，这个模式下，重启数据库，数据会丢失的。
+
+例子：
+
+```go
+
+	opts := inmemory.DefaultOptions
+	db, err := inmemory.Open(opts)
+	if err != nil {
+		panic(err)
+	}
+	bucket := "bucket1"
+	key := []byte("key1")
+	val := []byte("val1")
+	err = db.Put(bucket, key, val, 0)
+	if err != nil {
+		fmt.Println("err", err)
+	}
+
+	entry, err := db.Get(bucket, key)
+	if err != nil {
+		fmt.Println("err", err)
+	}
+
+	fmt.Println("entry.Key", string(entry.Key))     // entry.Key key1
+	fmt.Println("entry.Value", string(entry.Value)) // entry.Value val1
+	
+```
 
 ### 使用其他数据结构
 
