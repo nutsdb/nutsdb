@@ -330,6 +330,11 @@ ds表示数据结构，支持如下：
 * DataStructureBPTree
 * DataStructureList
 
+目前支持的`EntryIdxMode`如下：
+
+* HintKeyValAndRAMIdxMode 
+* HintKeyAndRAMIdxMode 
+
 #### 迭代buckets
 
 IterateBuckets支持迭代指定ds的迭代。
