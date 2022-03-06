@@ -51,6 +51,7 @@ In order to break the limitation, I tried to optimize them. Finally, I did it an
     - [Get all](#get-all)
   - [Merge Operation](#merge-operation)
   - [Database backup](#database-backup)
+- [Using in memory mode](#using-in-memory-mode)
 - [Using Other data structures](#using-other-data-structures)
    - [List](#list)
      - [RPush](#rpush)
@@ -579,6 +580,39 @@ if err != nil {
    ...
 }
 	
+```
+
+### Using in memory mode
+
+In-memory mode is supported since nutsdb 0.7.0.
+
+Run memory mode, after restarting the service, the data will be lost.
+
+
+
+```go
+
+opts := inmemory.DefaultOptions
+db, err := inmemory.Open(opts)
+if err != nil {
+    ...
+}
+bucket := "bucket1"
+key := []byte("key1")
+val := []byte("val1")
+err = db.Put(bucket, key, val, 0)
+if err != nil {
+    ...
+}
+
+entry, err := db.Get(bucket, key)
+if err != nil {
+    ...
+}
+
+fmt.Println("entry.Key", string(entry.Key))     // entry.Key key1
+fmt.Println("entry.Value", string(entry.Value)) // entry.Value val1
+
 ```
 
 ### Using other data structures
