@@ -51,3 +51,11 @@
 * [Bug Fix] The LRem implementation is not consistent with the description (#92 )
 * [Refactor] Improve buildBPTreeRootIdxes file reading (#67)
 * [Docs] Update README && CHANGELOG
+
+## v0.7.0 (2022-03-06)
+* [New Feature] support im memory db (#109)
+* [New Feature] Add backup with tar+gz (#111)
+* [New Feature] Add IterateBuckets() and DeleteBucket()
+* [Refactor] refactor error (#112)
+* [Bug Fix] Windows The process cannot access the file because it is being used by another process. (#110)
+* [Docs] Update README && CHANGELOG
