@@ -601,6 +601,18 @@ if err != nil {
 }
 ```
 
+NutsDB还提供gzip的压缩备份：
+
+```golang
+f, _ := os.Create(path)
+defer f.Close()
+err = db.BackupTarGZ(f)
+if err != nil {
+   ...
+}
+
+```
+
 好了，入门指南已经完结。 散花~，到目前为止都是String类型的数据的crud操作，下面将学习其他更多的数据结构的操作。
 
 ### 使用其他数据结构
