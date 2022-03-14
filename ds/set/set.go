@@ -18,6 +18,14 @@ import (
 	"errors"
 )
 
+var (
+	// ErrKeyNotExist is returned when the key not found.
+	ErrKeyNotFound = errors.New("key not found")
+
+	// ErrKeyNotExist is returned when the key not exist.
+	ErrKeyNotExist = errors.New("key not exist")
+)
+
 // Set represents the Set.
 type Set struct {
 	M map[string]map[string]struct{}
@@ -46,7 +54,7 @@ func (s *Set) SAdd(key string, items ...[]byte) error {
 //SRem removes the specified members from the set stored at key.
 func (s *Set) SRem(key string, items ...[]byte) error {
 	if _, ok := s.M[key]; !ok {
-		return errors.New("key not found")
+		return ErrKeyNotFound
 	}
 
 	if len(items[0]) == 0 {
@@ -152,7 +160,7 @@ func (s *Set) SIsMember(key string, item []byte) bool {
 // For multiple items it returns true only if all of  the items exist.
 func (s *Set) SAreMembers(key string, items ...[]byte) (bool, error) {
 	if _, ok := s.M[key]; !ok {
-		return false, errors.New("key not exits")
+		return false, ErrKeyNotExist
 	}
 
 	for _, item := range items {
