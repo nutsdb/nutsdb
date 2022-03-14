@@ -21,6 +21,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -585,7 +586,7 @@ func (db *DB) buildBPTreeRootIdxes(dataFileIds []int) error {
 	for i := 0; i < len(dataFileIds[0:dataFileIdsSize-1]); i++ {
 		off = 0
 		path := db.getBPTRootPath(int64(dataFileIds[i]))
-		fd, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0644)
+		fd, err := os.OpenFile(filepath.Clean(path), os.O_CREATE|os.O_RDWR, 0644)
 		if err != nil {
 			return err
 		}

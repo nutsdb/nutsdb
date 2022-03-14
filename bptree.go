@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"unsafe"
 
@@ -357,12 +358,12 @@ func isValidAddress(addr int64) bool {
 }
 
 // ReadNode reads a binary node at given Filepath and address.
-func ReadNode(Filepath string, address int64) (bn *BinaryNode, err error) {
+func ReadNode(filePath string, address int64) (bn *BinaryNode, err error) {
 	if !isValidAddress(address) {
 		return nil, fmt.Errorf("cannot read node at %v", address)
 	}
 
-	f, err := os.Open(Filepath)
+	f, err := os.Open(filepath.Clean(filePath))
 	if os.IsNotExist(err) {
 		return nil, err
 	}

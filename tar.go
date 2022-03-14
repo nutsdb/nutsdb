@@ -67,7 +67,7 @@ func tarCompress(dst io.Writer, src string) error {
 				return nil
 			}
 
-			file, err := os.Open(path)
+			file, err := os.Open(filepath.Clean(path))
 			if err != nil {
 				return err
 			}
@@ -99,7 +99,7 @@ func tarDecompress(dst string, src io.Reader) error {
 			continue
 		}
 
-		file, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, info.Mode())
+		file, err := os.OpenFile(filepath.Clean(path), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, info.Mode())
 		if err != nil {
 			return err
 		}
