@@ -616,7 +616,7 @@ func (tx *Tx) findRangeOnDisk(fID, rootOff int64, start, end, newStart, newEnd [
 
 	for curr != nil && scanFlag {
 		for i = j; i < curr.KeysNum; i++ {
-			df, err := NewDataFile(tx.db.getDataPath(int64(fID)), tx.db.opt.SegmentSize, tx.db.opt.RWMode)
+			df, err := NewDataFile(tx.db.getDataPath(fID), tx.db.opt.SegmentSize, tx.db.opt.RWMode)
 			if err != nil {
 				return nil, err
 			}
@@ -887,7 +887,7 @@ func (tx *Tx) FindTxIDOnDisk(fID, txID uint64) (ok bool, err error) {
 		}
 
 		address := curr.Pointers[i]
-		curr, err = ReadNode(filepath, int64(address))
+		curr, err = ReadNode(filepath, address)
 	}
 
 	if curr == nil {
