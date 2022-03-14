@@ -72,9 +72,7 @@ func (l *List) RPeek(key string) (item []byte, size int, err error) {
 
 // RPush inserts all the specified values at the tail of the list stored at key.
 func (l *List) RPush(key string, values ...[]byte) (size int, err error) {
-	for _, value := range values {
-		l.Items[key] = append(l.Items[key], value)
-	}
+	l.Items[key] = append(l.Items[key], values...)
 
 	return l.Size(key)
 }
