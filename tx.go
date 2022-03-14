@@ -288,10 +288,10 @@ func (tx *Tx) buildBucketMetaIdx(bucket string, key []byte, bucketMetaTemp Bucke
 
 	if updateFlag {
 		fd, err := os.OpenFile(tx.db.getBucketMetaFilePath(bucket), os.O_CREATE|os.O_RDWR, 0644)
-		defer fd.Close()
 		if err != nil {
 			return err
 		}
+		defer fd.Close()
 
 		if _, err = fd.WriteAt(bucketMeta.Encode(), 0); err != nil {
 			return err
