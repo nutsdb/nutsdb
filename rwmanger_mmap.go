@@ -38,11 +38,11 @@ var (
 // NewMMapRWManager returns a newly initialized MMapRWManager.
 func NewMMapRWManager(path string, capacity int64) (*MMapRWManager, error) {
 	f, err := os.OpenFile(filepath.Clean(path), os.O_CREATE|os.O_RDWR, 0644)
-	defer f.Close()
-
 	if err != nil {
 		return nil, err
 	}
+	defer f.Close()
+
 
 	err = Truncate(path, capacity, f)
 	if err != nil {
