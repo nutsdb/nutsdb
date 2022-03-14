@@ -231,7 +231,7 @@ func TestTx_LRange(t *testing.T) {
 	}
 
 	for i := 0; i < len(expectResult); i++ {
-		if string(list[i]) != string(expectResult[i]) {
+		if string(list[i]) != expectResult[i] {
 			t.Error("TestTx_LRange err")
 		}
 	}
@@ -485,7 +485,7 @@ func TestTx_LSet(t *testing.T) {
 
 	expectResult := []string{"a1", "b", "c"}
 	for i := 0; i < len(expectResult); i++ {
-		if string(list[i]) != string(expectResult[i]) {
+		if string(list[i]) != expectResult[i] {
 			t.Error("TestTx_LSet err")
 		}
 	}
@@ -563,7 +563,7 @@ func TestTx_LTrim(t *testing.T) {
 
 	expectResult := []string{"a", "b"}
 	for i := 0; i < len(expectResult); i++ {
-		if string(list[i]) != string(expectResult[i]) {
+		if string(list[i]) != expectResult[i] {
 			t.Error("TestTx_LTrim err")
 		}
 	}

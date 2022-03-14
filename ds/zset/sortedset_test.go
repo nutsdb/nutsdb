@@ -355,8 +355,7 @@ func TestSortedSet_Size(t *testing.T) {
 }
 
 func getResultSet(items ...string) map[string]struct{} {
-	var resultSet map[string]struct{}
-	resultSet = make(map[string]struct{}, len(items))
+	resultSet := make(map[string]struct{}, len(items))
 
 	for _, item := range items {
 		resultSet[item] = struct{}{}
