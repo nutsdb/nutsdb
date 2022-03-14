@@ -14,7 +14,10 @@
 
 package nutsdb
 
-import "os"
+import (
+	"os"
+	"path/filepath"
+)
 
 // FileIORWManager represents the RWManager which using standard I/O.
 type FileIORWManager struct {
@@ -23,7 +26,7 @@ type FileIORWManager struct {
 
 // NewFileIORWManager returns a newly initialized FileIORWManager.
 func NewFileIORWManager(path string, capacity int64) (*FileIORWManager, error) {
-	fd, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0644)
+	fd, err := os.OpenFile(filepath.Clean(path), os.O_CREATE|os.O_RDWR, 0644)
 	if err != nil {
 		return nil, err
 	}

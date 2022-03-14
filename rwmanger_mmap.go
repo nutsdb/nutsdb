@@ -17,6 +17,7 @@ package nutsdb
 import (
 	"errors"
 	"os"
+	"path/filepath"
 
 	mmap "github.com/xujiajun/mmap-go"
 )
@@ -36,7 +37,7 @@ var (
 
 // NewMMapRWManager returns a newly initialized MMapRWManager.
 func NewMMapRWManager(path string, capacity int64) (*MMapRWManager, error) {
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0644)
+	f, err := os.OpenFile(filepath.Clean(path), os.O_CREATE|os.O_RDWR, 0644)
 	defer f.Close()
 
 	if err != nil {
