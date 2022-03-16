@@ -68,11 +68,11 @@ func tarCompress(dst io.Writer, src string) error {
 			}
 
 			file, err := os.Open(filepath.Clean(path))
+			defer file.Close()
 			if err != nil {
 				return err
 			}
 
-			defer file.Close()
 			_, err = io.Copy(tarball, file)
 			return err
 		})
@@ -100,10 +100,10 @@ func tarDecompress(dst string, src io.Reader) error {
 		}
 
 		file, err := os.OpenFile(filepath.Clean(path), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, info.Mode())
+		defer file.Close()
 		if err != nil {
 			return err
 		}
-		defer file.Close()
 		_, err = io.Copy(file, tarReader)
 		if err != nil {
 			return err
