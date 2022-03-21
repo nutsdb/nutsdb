@@ -241,7 +241,6 @@ func (l *List) LRem(key string, count int, value []byte) (int, error) {
 	}
 
 	l.Items[key] = newTempVal
-	tempVal = nil
 
 	return realRemovedNum, nil
 }
