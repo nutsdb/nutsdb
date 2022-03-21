@@ -13,7 +13,7 @@ We love your input! We want to make contributing to this project as easy and tra
 
 By contributing to NutsDB, you agree to abide by the [code of conduct](https://github.com/xujiajun/nutsdb/blob/master/CODE_OF_CONDUCT.md).
  
-## Geting Started
+## Getting Started
 If you are looking to contribute to the NutsDB, the best place to start is the [GitHub "issues"](https://github.com/xujiajun/nutsdb/issues) tab. This is also a great place for filing bug reports and making suggestions for ways in which we can improve the code and documentation.
 
 ## Reporting bugs

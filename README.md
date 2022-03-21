@@ -164,7 +164,7 @@ FileIO represents the read and write mode using standard I/O. And MMap represent
 * SegmentSize          int64 
 
 NutsDB will truncate data file if the active file is larger than `SegmentSize`.
-Current verison default `SegmentSize` is 8MB,but you can custom it.
+Current version default `SegmentSize` is 8MB,but you can custom it.
 Once set, it cannot be changed. see [caveats--limitations](https://github.com/xujiajun/nutsdb#caveats--limitations) for detail.
 
 * NodeNum              int64
@@ -434,7 +434,7 @@ if err := db.Update(
 	val := []byte("val1")
 	bucket := "bucket1"
 	
-	// If set ttl = 0 or Persistent, this key will nerver expired.
+	// If set ttl = 0 or Persistent, this key will never expired.
 	// Set ttl = 60 , after 60 seconds, this key will expired.
 	if err := tx.Put(bucket, key, val, 60); err != nil {
 		return err
@@ -1940,7 +1940,7 @@ From the version v0.3.0, NutsDB supports two modes about entry index: `HintKeyVa
 The default mode use `HintKeyValAndRAMIdxMode`, entries are indexed base on RAM, so its read/write performance is fast. but can’t handle databases much larger than the available physical RAM. If you set the `HintKeyAndRAMIdxMode` mode, HintIndex will not cache the value of the entry. Its write performance is also fast. To retrieve a key by seeking to offset relative to the start of the data file, so its read performance more slowly that RAM way, but it can save memory. The mode `HintBPTSparseIdxMode` is based b+ tree sparse index, this mode saves memory very much (1 billion data only uses about 80MB of memory). And other data structures such as ***list, set, sorted set only supported with mode HintKeyValAndRAMIdxMode***.
 ***It cannot switch back and forth between modes because the index structure is different***.
 
-NutsDB will truncate data file if the active file is larger than  `SegmentSize`, so the size of an entry can not be set larger than `SegmentSize` , defalut `SegmentSize` is 8MB, you can set it(opt.SegmentSize) as option before DB opening. ***Once set, it cannot be changed***.
+NutsDB will truncate data file if the active file is larger than  `SegmentSize`, so the size of an entry can not be set larger than `SegmentSize` , default `SegmentSize` is 8MB, you can set it(opt.SegmentSize) as option before DB opening. ***Once set, it cannot be changed***.
 
 #### Support OS
 
