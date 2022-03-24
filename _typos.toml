@@ -1,0 +1,7 @@
+# Typo check: https://github.com/crate-ci/typos
+
+[files]
+extend-exclude = ["*.json", "*.js", "static/*", "layouts/*", "assets/*", "i18n/*", "go.*"]
+
+[default.extend-words]
+datas = "datas"
