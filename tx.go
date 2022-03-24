@@ -15,9 +15,11 @@
 package nutsdb
 
 import (
+	"bytes"
 	"errors"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/bwmarrin/snowflake"
@@ -57,6 +59,12 @@ var (
 	// ErrNotFoundKey is returned when key not found int the bucket on an view function.
 	ErrNotFoundKey = errors.New("key not found in the bucket")
 )
+
+var cachePool = sync.Pool{
+	New: func() interface{} {
+		return new(bytes.Buffer)
+	},
+}
 
 // Tx represents a transaction.
 type Tx struct {
@@ -135,7 +143,6 @@ func (tx *Tx) getTxID() (id uint64, err error) {
 // 5. Unlock the database and clear the db field.
 func (tx *Tx) Commit() error {
 	var (
-		off            int64
 		e              *Entry
 		bucketMetaTemp BucketMeta
 	)
@@ -158,6 +165,12 @@ func (tx *Tx) Commit() error {
 		countFlag = CountFlagDisabled
 	}
 
+	buff := cachePool.Get().(*bytes.Buffer)
+	defer func() {
+		buff.Reset()
+		cachePool.Put(buff)
+	}()
+
 	for i := 0; i < writesLen; i++ {
 		entry := tx.pendingWrites[i]
 		entrySize := entry.Size()
@@ -167,35 +180,34 @@ func (tx *Tx) Commit() error {
 
 		bucket := string(entry.Meta.Bucket)
 
-		if tx.db.ActiveFile.ActualSize+entrySize > tx.db.opt.SegmentSize {
+		if tx.db.ActiveFile.ActualSize+int64(buff.Len())+entrySize > tx.db.opt.SegmentSize {
+			if _, err := tx.writeData(buff.Bytes()); err != nil {
+				return err
+			}
+			buff.Reset()
+
 			if err := tx.rotateActiveFile(); err != nil {
 				return err
 			}
 		}
 
+		offset := tx.db.ActiveFile.writeOff + int64(buff.Len())
+
 		if entry.Meta.Ds == DataStructureBPTree {
-			tx.db.BPTreeKeyEntryPosMap[string(entry.Meta.Bucket)+string(entry.Key)] = tx.db.ActiveFile.writeOff
+			tx.db.BPTreeKeyEntryPosMap[string(entry.Meta.Bucket)+string(entry.Key)] = offset
+		}
+
+		if _, err := buff.Write(entry.Encode()); err != nil {
+			return err
 		}
 
 		if i == lastIndex {
 			entry.Meta.Status = Committed
-		}
 
-		off = tx.db.ActiveFile.writeOff
-
-		if _, err := tx.db.ActiveFile.WriteAt(entry.Encode(), tx.db.ActiveFile.writeOff); err != nil {
-			return err
-		}
-
-		if tx.db.opt.SyncEnable {
-			if err := tx.db.ActiveFile.rwManager.Sync(); err != nil {
+			if _, err := tx.writeData(buff.Bytes()); err != nil {
 				return err
 			}
 		}
-
-		tx.db.ActiveFile.ActualSize += entrySize
-
-		tx.db.ActiveFile.writeOff += entrySize
 
 		if tx.db.opt.EntryIdxMode == HintBPTSparseIdxMode {
 			bucketMetaTemp = tx.buildTempBucketMetaIdx(bucket, entry.Key, bucketMetaTemp)
@@ -222,7 +234,7 @@ func (tx *Tx) Commit() error {
 		}
 
 		if entry.Meta.Ds == DataStructureBPTree {
-			tx.buildBPTreeIdx(bucket, entry, e, off, countFlag)
+			tx.buildBPTreeIdx(bucket, entry, e, offset, countFlag)
 		}
 		if entry.Meta.Ds == DataStructureNone && entry.Meta.Flag == DataBPTreeBucketDeleteFlag {
 			tx.db.deleteBucket(DataStructureBPTree, bucket)
@@ -375,15 +387,15 @@ func (tx *Tx) buildIdxes(writesLen int) {
 	}
 }
 
-func (tx *Tx) buildBPTreeIdx(bucket string, entry, e *Entry, off int64, countFlag bool) {
+func (tx *Tx) buildBPTreeIdx(bucket string, entry, e *Entry, offset int64, countFlag bool) {
 	if tx.db.opt.EntryIdxMode == HintBPTSparseIdxMode {
 		newKey := []byte(bucket)
 		newKey = append(newKey, entry.Key...)
-		tx.db.ActiveBPTreeIdx.Insert(newKey, e, &Hint{
+		_ = tx.db.ActiveBPTreeIdx.Insert(newKey, e, &Hint{
 			FileID:  tx.db.ActiveFile.fileID,
 			Key:     newKey,
 			Meta:    entry.Meta,
-			DataPos: uint64(off),
+			DataPos: uint64(offset),
 		}, countFlag)
 	} else {
 		if _, ok := tx.db.BPTreeIdx[bucket]; !ok {
@@ -397,7 +409,7 @@ func (tx *Tx) buildBPTreeIdx(bucket string, entry, e *Entry, off int64, countFla
 			FileID:  tx.db.ActiveFile.fileID,
 			Key:     entry.Key,
 			Meta:    entry.Meta,
-			DataPos: uint64(off),
+			DataPos: uint64(offset),
 		}, countFlag)
 	}
 }
@@ -543,6 +555,34 @@ func (tx *Tx) rotateActiveFile() error {
 
 	tx.db.ActiveFile.fileID = tx.db.MaxFileID
 	return nil
+}
+
+func (tx *Tx) writeData(data []byte) (n int, err error) {
+	if len(data) == 0 {
+		return
+	}
+
+	writeOffset := tx.db.ActiveFile.ActualSize
+
+	l := len(data)
+	if writeOffset+int64(l) > tx.db.opt.SegmentSize {
+		return 0, errors.New("not enough file space")
+	}
+
+	if n, err = tx.db.ActiveFile.WriteAt(data, writeOffset); err != nil {
+		return
+	}
+
+	tx.db.ActiveFile.writeOff += int64(l)
+	tx.db.ActiveFile.ActualSize += int64(l)
+
+	if tx.db.opt.SyncEnable {
+		if err := tx.db.ActiveFile.rwManager.Sync(); err != nil {
+			return 0, err
+		}
+	}
+
+	return
 }
 
 // Rollback closes the transaction.
