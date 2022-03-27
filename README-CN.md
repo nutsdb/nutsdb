@@ -216,6 +216,9 @@ MB，这个可以自己配置。但是一旦被设置，下次启动数据库也
 
 推荐使用默认选项的方式。兼顾了持久化+快速的启动数据库。当然具体还要看你场景的要求。
 
+> 以下配置是比较保守的方式。
+> 如果你对写性能要求比较高，可以设置SyncEnable等于false，RWMode改成MMap，写性能会得到极大提升，缺点是可能会丢数据（例如遇到断电或者系统奔溃）
+
 ```
 var DefaultOptions = Options{
 	EntryIdxMode:         HintKeyValAndRAMIdxMode,
