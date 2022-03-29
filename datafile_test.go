@@ -53,10 +53,11 @@ func TestDataFile_Err(t *testing.T) {
 
 func TestDataFile1(t *testing.T) {
 	df, err := NewDataFile(filePath, 1024, MMap)
-	defer df.rwManager.Close()
+	defer os.Remove(filePath)
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer df.rwManager.Close()
 
 	n, err := df.WriteAt(entry.Encode(), 0)
 	if err != nil {
@@ -82,11 +83,12 @@ func TestDataFile1(t *testing.T) {
 func TestDataFile2(t *testing.T) {
 	filePath2 := "/tmp/foo2"
 	df, err := NewDataFile(filePath2, 39, FileIO)
-	defer df.rwManager.Close()
 	defer os.Remove(filePath2)
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer df.rwManager.Close()
+
 	content := entry.Encode()[0 : DataEntryHeaderSize-1]
 	_, err = df.WriteAt(content, 0)
 	if err != nil {
@@ -104,6 +106,8 @@ func TestDataFile2(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer df.Close()
+
 	content = entry.Encode()[0 : DataEntryHeaderSize+1]
 	_, err = df.WriteAt(content, 0)
 	if err != nil {
@@ -118,9 +122,11 @@ func TestDataFile2(t *testing.T) {
 
 func TestDataFile_ReadAt(t *testing.T) {
 	df, err := NewDataFile(filePath, 1024, FileIO)
+	defer os.Remove(filePath)
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer df.Close()
 
 	e, err := df.ReadAt(0)
 	if err != nil && e != nil {
@@ -149,6 +155,8 @@ func TestDataFile_Crc_Err(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer df.Close()
+
 	var errContent []byte
 	errContent = append(errContent, entry.Encode()[0:4]...)
 	errContent = append(errContent, entry.Encode()[4:entry.Size()-1]...)
