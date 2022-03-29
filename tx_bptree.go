@@ -36,10 +36,10 @@ func (tx *Tx) getByHintBPTSparseIdxInMem(key []byte) (e *Entry, err error) {
 		if _, err := tx.db.ActiveCommittedTxIdsIdx.Find([]byte(strconv2.Int64ToStr(int64(r.H.Meta.TxID)))); err == nil {
 			path := tx.db.getDataPath(r.H.FileID)
 			df, err := NewDataFile(path, tx.db.opt.SegmentSize, tx.db.opt.RWMode)
-			defer df.rwManager.Close()
 			if err != nil {
 				return nil, err
 			}
+			defer df.rwManager.Close()
 
 			return df.ReadAt(int(r.H.DataPos))
 		}
@@ -159,11 +159,10 @@ func (tx *Tx) Get(bucket string, key []byte) (e *Entry, err error) {
 			if idxMode == HintKeyAndRAMIdxMode {
 				path := tx.db.getDataPath(r.H.FileID)
 				df, err := NewDataFile(path, tx.db.opt.SegmentSize, tx.db.opt.RWMode)
-				defer df.rwManager.Close()
-
 				if err != nil {
 					return nil, err
 				}
+				defer df.rwManager.Close()
 
 				item, err := df.ReadAt(int(r.H.DataPos))
 				if err != nil {
