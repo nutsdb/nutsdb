@@ -159,7 +159,7 @@ func TestTx_Close(t *testing.T) {
 
 func TestTx_CommittedStatus(t *testing.T) {
 
-	tmpdir, _ := ioutil.TempDir("", "nutsdbtesttx_commited")
+	tmpdir, _ := ioutil.TempDir("", "nutsdbtesttx_committed")
 	opt := DefaultOptions
 	opt.Dir = tmpdir
 	opt.EntryIdxMode = HintKeyAndRAMIdxMode
@@ -203,7 +203,7 @@ func TestTx_CommittedStatus(t *testing.T) {
 			t.Errorf("get entry error: %v", err)
 		}
 		if entry1.Meta.Status != UnCommitted {
-			t.Error("not the last entry should be uncommited")
+			t.Error("not the last entry should be uncommitted")
 		}
 
 		entry2, err := tx.Get(bucket, []byte("key2"))
@@ -211,7 +211,7 @@ func TestTx_CommittedStatus(t *testing.T) {
 			t.Errorf("get entry error: %v", err)
 		}
 		if entry2.Meta.Status != Committed {
-			t.Error("the last entry should be commited")
+			t.Error("the last entry should be committed")
 		}
 
 		// check committedTxIds
