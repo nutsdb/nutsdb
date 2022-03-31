@@ -197,13 +197,15 @@ func (tx *Tx) Commit() error {
 			tx.db.BPTreeKeyEntryPosMap[string(entry.Meta.Bucket)+string(entry.Key)] = offset
 		}
 
+		if i == lastIndex {
+			entry.Meta.Status = Committed
+		}
+
 		if _, err := buff.Write(entry.Encode()); err != nil {
 			return err
 		}
 
 		if i == lastIndex {
-			entry.Meta.Status = Committed
-
 			if _, err := tx.writeData(buff.Bytes()); err != nil {
 				return err
 			}

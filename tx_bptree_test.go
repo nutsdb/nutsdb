@@ -39,7 +39,6 @@ func Init() {
 	opt = DefaultOptions
 	opt.Dir = fileDir
 	opt.SegmentSize = 8 * 1024
-	return
 }
 
 func InitForBPTSparseIdxMode() {

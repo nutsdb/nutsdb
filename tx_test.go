@@ -156,3 +156,74 @@ func TestTx_Close(t *testing.T) {
 	}
 
 }
+
+func TestTx_CommittedStatus(t *testing.T) {
+
+	tmpdir, _ := ioutil.TempDir("", "nutsdbtesttx_committed")
+	opt := DefaultOptions
+	opt.Dir = tmpdir
+	opt.EntryIdxMode = HintKeyAndRAMIdxMode
+
+	db, err := Open(opt)
+	if err != nil {
+		t.Fatalf("open db error: %v", err)
+	}
+	defer func() {
+		os.RemoveAll(tmpdir)
+		db.Close()
+	}()
+
+	bucket := "bucket_committed_status"
+
+	{ // setup data
+
+		tx, err := db.Begin(true)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err = tx.Put(bucket, []byte("key1"), []byte("value1"), 0); err != nil {
+			t.Errorf("put key error: %v", err)
+		}
+		if err = tx.Put(bucket, []byte("key2"), []byte("value2"), 0); err != nil {
+			t.Errorf("put key error: %v", err)
+		}
+
+		if err = tx.Commit(); err != nil {
+			t.Errorf("commit error: %v", err)
+		}
+	}
+
+	{ // check data
+
+		tx, _ := db.Begin(false)
+
+		entry1, err := tx.Get(bucket, []byte("key1"))
+		if err != nil {
+			t.Errorf("get entry error: %v", err)
+		}
+		if entry1.Meta.Status != UnCommitted {
+			t.Error("not the last entry should be uncommitted")
+		}
+
+		entry2, err := tx.Get(bucket, []byte("key2"))
+		if err != nil {
+			t.Errorf("get entry error: %v", err)
+		}
+		if entry2.Meta.Status != Committed {
+			t.Error("the last entry should be committed")
+		}
+
+		// check committedTxIds
+		txID := entry1.Meta.TxID
+		if _, ok := tx.db.committedTxIds[txID]; !ok {
+			t.Error("should be committed tx")
+		}
+
+		if err = tx.Commit(); err != nil {
+			t.Errorf("commit error: %v", err)
+		}
+
+	}
+
+}
