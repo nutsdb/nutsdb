@@ -375,6 +375,9 @@ func (db *DB) Merge() error {
 				if err == io.EOF {
 					break
 				}
+				if err == ErrIndexOutOfBound {
+					break
+				}
 				f.rwManager.Close()
 				return fmt.Errorf("when merge operation build hintIndex readAt err: %s", err)
 			}
@@ -490,6 +493,9 @@ func (db *DB) getActiveFileWriteOff() (off int64, err error) {
 			if err == io.EOF {
 				break
 			}
+			if err == ErrIndexOutOfBound {
+				break
+			}
 
 			return -1, fmt.Errorf("when build activeDataIndex readAt err: %s", err)
 		}
@@ -559,7 +565,9 @@ func (db *DB) parseDataFiles(dataFileIds []int) (unconfirmedRecords []*Record, c
 				if err == io.EOF {
 					break
 				}
-
+				if err == ErrIndexOutOfBound {
+					break
+				}
 				if off >= db.opt.SegmentSize {
 					break
 				}
