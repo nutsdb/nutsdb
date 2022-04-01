@@ -61,4 +61,18 @@
 * [Docs] Update README && CHANGELOG
 
 ## v0.7.1 (2022-03-06)
-[Bug Fix] Delete buckets without persistence.(#115)
+* [Bug Fix] Delete buckets without persistence.(#115)
+
+## v0.8.0 (2022-04-01)
+* [Perf] optimize tx commit for batch write (#132)
+* [Bug Fix] fix: open file by variable (#118)
+* [Bug Fix] fix close file before error check（#122）
+* [Bug Fix] fix rwManager.Close order（#133）
+* [Bug Fix] fix last entry status error （#134）
+* [Bug Fix] fix: read ErrIndexOutOfBound err
+* [CI] add unit-test action （#120）
+* [Chore] add constant ErrKeyNotFound and ErrKeyNotExist (#125)
+* [Chore] chore: remove unnecessary conversion  (#126)
+* [Chore] chore(ds/list): replace for-loop with append  (#127)
+* [Chore] add push check for lint, typo  (#131)
+* [Style] style: fix typo and ineffectual assignment  (#130)
