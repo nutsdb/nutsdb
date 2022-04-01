@@ -59,3 +59,6 @@
 * [Refactor] refactor error (#112)
 * [Bug Fix] Windows The process cannot access the file because it is being used by another process. (#110)
 * [Docs] Update README && CHANGELOG
+
+## v0.7.1 (2022-03-06)
+[Bug Fix] Delete buckets without persistence.(#115)
