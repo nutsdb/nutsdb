@@ -930,29 +930,30 @@ func (db *DB) buildIndexes() (err error) {
 }
 
 // managed calls a block of code that is fully contained in a transaction.
-func (db *DB) managed(writable bool, fn func(tx *Tx) error) error {
+func (db *DB) managed(writable bool, fn func(tx *Tx) error) (err error) {
 	var tx *Tx
 
-	tx, err := db.Begin(writable)
+	tx, err = db.Begin(writable)
 	if err != nil {
 		return err
 	}
-
-	if err = fn(tx); err != nil {
-		if errRollback := tx.Rollback(); errRollback != nil {
-			return errRollback
+	defer func() {
+		var panicked bool
+		if r := recover(); r != nil {
+			// resume normal execution
+			panicked = true
 		}
-		return err
-	}
-
-	if err = tx.Commit(); err != nil {
-		if errRollback := tx.Rollback(); errRollback != nil {
-			return errRollback
+		if panicked || err != nil {
+			if errRollback := tx.Rollback(); errRollback != nil {
+				err = errRollback
+			}
 		}
-		return err
-	}
+	}()
 
-	return nil
+	if err = fn(tx); err == nil {
+		err = tx.Commit()
+	}
+	return err
 }
 
 const bptDir = "bpt"
