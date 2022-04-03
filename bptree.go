@@ -323,7 +323,7 @@ func (t *BPTree) WriteNodes(rwMode RWMode, syncEnable bool, flag int) error {
 		return err
 	}
 	defer fd.Close()
-	
+
 	queue = nil
 
 	enqueue(t.root)
@@ -364,14 +364,10 @@ func ReadNode(filePath string, address int64) (bn *BinaryNode, err error) {
 	}
 
 	f, err := os.Open(filepath.Clean(filePath))
-	if os.IsNotExist(err) {
-		return nil, err
-	}
-	defer f.Close()
-
 	if err != nil {
 		return nil, err
 	}
+	defer f.Close()
 
 	size := int64(unsafe.Sizeof(BinaryNode{}))
 
