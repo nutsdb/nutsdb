@@ -19,6 +19,9 @@ import (
 	"io/ioutil"
 	"os"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestTx_Rollback(t *testing.T) {
@@ -165,9 +168,7 @@ func TestTx_CommittedStatus(t *testing.T) {
 	opt.EntryIdxMode = HintKeyAndRAMIdxMode
 
 	db, err := Open(opt)
-	if err != nil {
-		t.Fatalf("open db error: %v", err)
-	}
+	require.NoError(t, err)
 	defer func() {
 		os.RemoveAll(tmpdir)
 		db.Close()
@@ -176,54 +177,39 @@ func TestTx_CommittedStatus(t *testing.T) {
 	bucket := "bucket_committed_status"
 
 	{ // setup data
-
 		tx, err := db.Begin(true)
-		if err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(t, err)
 
-		if err = tx.Put(bucket, []byte("key1"), []byte("value1"), 0); err != nil {
-			t.Errorf("put key error: %v", err)
-		}
-		if err = tx.Put(bucket, []byte("key2"), []byte("value2"), 0); err != nil {
-			t.Errorf("put key error: %v", err)
-		}
+		err = tx.Put(bucket, []byte("key1"), []byte("value1"), 0)
+		assert.NoError(t, err)
 
-		if err = tx.Commit(); err != nil {
-			t.Errorf("commit error: %v", err)
-		}
+		err = tx.Put(bucket, []byte("key2"), []byte("value2"), 0)
+		assert.NoError(t, err)
+
+		err = tx.Commit()
+		assert.NoError(t, err)
 	}
 
 	{ // check data
 
-		tx, _ := db.Begin(false)
+		tx, err := db.Begin(false)
+		assert.NoError(t, err)
 
 		entry1, err := tx.Get(bucket, []byte("key1"))
-		if err != nil {
-			t.Errorf("get entry error: %v", err)
-		}
-		if entry1.Meta.Status != UnCommitted {
-			t.Error("not the last entry should be uncommitted")
-		}
+		assert.NoError(t, err)
+		assert.Equalf(t, UnCommitted, entry1.Meta.Status, "not the last entry should be uncommitted")
 
 		entry2, err := tx.Get(bucket, []byte("key2"))
-		if err != nil {
-			t.Errorf("get entry error: %v", err)
-		}
-		if entry2.Meta.Status != Committed {
-			t.Error("the last entry should be committed")
-		}
+		assert.NoError(t, err)
+		assert.Equalf(t, Committed, entry2.Meta.Status, "the last entry should be committed")
 
 		// check committedTxIds
 		txID := entry1.Meta.TxID
-		if _, ok := tx.db.committedTxIds[txID]; !ok {
-			t.Error("should be committed tx")
-		}
+		_, ok := tx.db.committedTxIds[txID]
+		assert.True(t, ok)
 
-		if err = tx.Commit(); err != nil {
-			t.Errorf("commit error: %v", err)
-		}
-
+		err = tx.Commit()
+		assert.NoError(t, err)
 	}
 
 }
