@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"github.com/xujiajun/utils/strconv2"
 )
 
@@ -1098,4 +1099,35 @@ func Test_getRecordFromKey(t *testing.T) {
 	if err != nil {
 		t.Errorf("wanted nil, got %v", err)
 	}
+}
+
+func withDBOption(t *testing.T, opt Options, fn func(t *testing.T, db *DB)) {
+	db, err := Open(opt)
+	require.NoError(t, err)
+
+	defer func() {
+		os.RemoveAll(db.opt.Dir)
+		db.Close()
+	}()
+
+	fn(t, db)
+}
+
+func withDefaultDB(t *testing.T, fn func(t *testing.T, db *DB)) {
+
+	tmpdir, _ := ioutil.TempDir("", "nutsdb")
+	opt := DefaultOptions
+	opt.Dir = tmpdir
+	opt.SegmentSize = 8 * 1024
+
+	withDBOption(t, opt, fn)
+}
+
+func withRAMIdxDB(t *testing.T, fn func(t *testing.T, db *DB)) {
+	tmpdir, _ := ioutil.TempDir("", "nutsdb")
+	opt := DefaultOptions
+	opt.Dir = tmpdir
+	opt.EntryIdxMode = HintKeyAndRAMIdxMode
+
+	withDBOption(t, opt, fn)
 }
