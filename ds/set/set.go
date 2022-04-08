@@ -19,7 +19,7 @@ import (
 )
 
 var (
-	// ErrKeyNotExist is returned when the key not found.
+	// ErrKeyNotFound is returned when the key not found.
 	ErrKeyNotFound = errors.New("key not found")
 
 	// ErrKeyNotExist is returned when the key not exist.
@@ -51,7 +51,7 @@ func (s *Set) SAdd(key string, items ...[]byte) error {
 	return nil
 }
 
-//SRem removes the specified members from the set stored at key.
+// SRem removes the specified members from the set stored at key.
 func (s *Set) SRem(key string, items ...[]byte) error {
 	if _, ok := s.M[key]; !ok {
 		return ErrKeyNotFound
@@ -91,7 +91,7 @@ func (s *Set) SPop(key string) []byte {
 	return nil
 }
 
-//SCard Returns the set cardinality (number of elements) of the set stored at key.
+// SCard Returns the set cardinality (number of elements) of the set stored at key.
 func (s *Set) SCard(key string) int {
 	if !s.SHasKey(key) {
 		return 0
@@ -100,7 +100,7 @@ func (s *Set) SCard(key string) int {
 	return len(s.M[key])
 }
 
-//SDiff Returns the members of the set resulting from the difference between the first set and all the successive sets.
+// SDiff Returns the members of the set resulting from the difference between the first set and all the successive sets.
 func (s *Set) SDiff(key1, key2 string) (list [][]byte, err error) {
 	if _, err = s.checkKey1AndKey2(key1, key2); err != nil {
 		return
@@ -115,7 +115,7 @@ func (s *Set) SDiff(key1, key2 string) (list [][]byte, err error) {
 	return
 }
 
-//SInter Returns the members of the set resulting from the intersection of all the given sets.
+// SInter Returns the members of the set resulting from the intersection of all the given sets.
 func (s *Set) SInter(key1, key2 string) (list [][]byte, err error) {
 	if _, err = s.checkKey1AndKey2(key1, key2); err != nil {
 		return
@@ -143,7 +143,7 @@ func (s *Set) checkKey1AndKey2(key1, key2 string) (list [][]byte, err error) {
 	return nil, nil
 }
 
-//SIsMember Returns if member is a member of the set stored at key.
+// SIsMember Returns if member is a member of the set stored at key.
 func (s *Set) SIsMember(key string, item []byte) bool {
 	if _, ok := s.M[key]; !ok {
 		return false
@@ -204,7 +204,7 @@ func (s *Set) SMove(key1, key2 string, item []byte) (bool, error) {
 	return true, nil
 }
 
-//SUnion returns the members of the set resulting from the union of all the given sets.
+// SUnion returns the members of the set resulting from the union of all the given sets.
 func (s *Set) SUnion(key1, key2 string) (list [][]byte, err error) {
 	if _, err = s.checkKey1AndKey2(key1, key2); err != nil {
 		return

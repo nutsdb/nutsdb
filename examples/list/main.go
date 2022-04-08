@@ -140,7 +140,7 @@ func testLPop() {
 			if err != nil {
 				return err
 			}
-			fmt.Println("LPop item:", string(item)) //val1
+			fmt.Println("LPop item:", string(item)) // val1
 			return nil
 		}); err != nil {
 		log.Fatal(err)
@@ -154,7 +154,7 @@ func testRPop() {
 			if err != nil {
 				return err
 			}
-			fmt.Println("RPop item:", string(item)) //val2
+			fmt.Println("RPop item:", string(item)) // val2
 			return nil
 		}); err != nil {
 		log.Fatal(err)
@@ -201,7 +201,7 @@ func testRPushItems() {
 func testLRem() {
 	value := []byte("val2")
 	count := -1
-	//count := 1
+	// count := 1
 	if err := db.Update(
 		func(tx *nutsdb.Tx) error {
 			key := []byte("myList")
@@ -241,7 +241,7 @@ func testLPeek() {
 				return err
 			}
 
-			fmt.Println("LPeek item:", string(item)) //val11
+			fmt.Println("LPeek item:", string(item)) // val11
 			return nil
 		}); err != nil {
 		log.Fatal(err)
@@ -258,7 +258,7 @@ func testRPeek() {
 				return err
 			}
 
-			fmt.Println("RPeek item:", string(item)) //val2
+			fmt.Println("RPeek item:", string(item)) // val2
 			return nil
 		}); err != nil {
 		log.Fatal(err)

@@ -35,7 +35,7 @@ func TestSortedSet_Put(t *testing.T) {
 		t.Error("TestSortedSet_Put err")
 	}
 
-	//update
+	// update
 	ss.Put("key5", 100, []byte("b2"))
 	n := ss.GetByKey("key5")
 	if string(n.Value) != "b2" {
@@ -79,7 +79,7 @@ func TestSortedSet_GetByRank(t *testing.T) {
 		t.Error("TestSortedSet_GetByRank err")
 	}
 
-	//remove
+	// remove
 	n = ss.GetByRank(5, true)
 	if string(n.Value) != "b1" {
 		t.Error("TestSortedSet_GetByRank err")

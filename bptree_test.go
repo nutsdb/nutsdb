@@ -339,7 +339,7 @@ func TestBPTree_Update(t *testing.T) {
 		}
 	}
 
-	//delete
+	// delete
 	for i := 1; i <= limit; i++ {
 		key := []byte("key_" + fmt.Sprintf("%03d", i))
 		err := tree.Insert(key, &Entry{Key: key, Value: nil}, &Hint{Key: key, Meta: &MetaData{

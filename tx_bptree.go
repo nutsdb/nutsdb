@@ -177,7 +177,7 @@ func (tx *Tx) Get(bucket string, key []byte) (e *Entry, err error) {
 	return nil, ErrBucketAndKey(bucket, key)
 }
 
-//GetAll returns all keys and values of the bucket stored at given bucket.
+// GetAll returns all keys and values of the bucket stored at given bucket.
 func (tx *Tx) GetAll(bucket string) (entries Entries, err error) {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return nil, err

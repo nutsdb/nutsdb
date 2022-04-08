@@ -52,7 +52,7 @@ func TestTx_DeleteBucket(t *testing.T) {
 
 	deleteBucketNum := 3
 	expectedDeleteBucketNum := "bucket" + fmt.Sprintf("%07d", deleteBucketNum)
-	//write tx begin
+	// write tx begin
 	for i := 1; i <= 10; i++ {
 		tx, err := db.Begin(true)
 		if err != nil {
@@ -64,11 +64,11 @@ func TestTx_DeleteBucket(t *testing.T) {
 		key := []byte("key" + numStr)
 		val := []byte("val" + numStr)
 		if err = tx.Put(bucket, key, val, Persistent); err != nil {
-			//tx rollback
+			// tx rollback
 			err = tx.Rollback()
 			t.Fatal(err)
 		} else {
-			//tx commit
+			// tx commit
 			tx.Commit()
 		}
 
@@ -77,7 +77,7 @@ func TestTx_DeleteBucket(t *testing.T) {
 		}
 	}
 
-	//write tx begin
+	// write tx begin
 	tx, err = db.Begin(true)
 	if err != nil {
 		t.Fatal(err)
@@ -85,16 +85,16 @@ func TestTx_DeleteBucket(t *testing.T) {
 
 	err = tx.DeleteBucket(DataStructureBPTree, expectedDeleteBucketNum)
 	if err != nil {
-		//tx rollback
+		// tx rollback
 		tx.Rollback()
 		t.Fatal(err)
 
 	} else {
-		//tx commit
+		// tx commit
 		tx.Commit()
 	}
 
-	//read tx begin
+	// read tx begin
 	tx, err = db.Begin(false)
 	if err != nil {
 		t.Fatal(err)
@@ -104,11 +104,11 @@ func TestTx_DeleteBucket(t *testing.T) {
 		buckets = append(buckets, bucket)
 	})
 	if err != nil {
-		//tx rollback
+		// tx rollback
 		err = tx.Rollback()
 		t.Fatal(err)
 	} else {
-		//tx commit
+		// tx commit
 		tx.Commit()
 	}
 
@@ -122,7 +122,7 @@ func TestTx_IterateBuckets(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	//write tx begin
+	// write tx begin
 	var expectedBuckets []string
 	for i := 1; i <= 10; i++ {
 		tx, err := db.Begin(true)
@@ -135,18 +135,18 @@ func TestTx_IterateBuckets(t *testing.T) {
 		key := []byte("key" + numStr)
 		val := []byte("val" + numStr)
 		if err = tx.Put(bucket, key, val, Persistent); err != nil {
-			//tx rollback
+			// tx rollback
 			err = tx.Rollback()
 			t.Fatal(err)
 		} else {
-			//tx commit
+			// tx commit
 			tx.Commit()
 		}
 
 		expectedBuckets = append(expectedBuckets, "bucket"+numStr)
 	}
 
-	//read tx begin
+	// read tx begin
 	tx, err = db.Begin(false)
 	if err != nil {
 		t.Fatal(err)
@@ -156,11 +156,11 @@ func TestTx_IterateBuckets(t *testing.T) {
 		buckets = append(buckets, bucket)
 	})
 	if err != nil {
-		//tx rollback
+		// tx rollback
 		err = tx.Rollback()
 		t.Fatal(err)
 	} else {
-		//tx commit
+		// tx commit
 		tx.Commit()
 	}
 

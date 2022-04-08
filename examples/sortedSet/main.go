@@ -186,7 +186,7 @@ func testZPeekMax() {
 			if err != nil {
 				return err
 			}
-			fmt.Println("ZPeekMax:", string(node.Value)) //val3
+			fmt.Println("ZPeekMax:", string(node.Value)) // val3
 			return nil
 		}); err != nil {
 		log.Fatal(err)
@@ -201,7 +201,7 @@ func testZPeekMin() {
 			if err != nil {
 				return err
 			}
-			fmt.Println("ZPeekMin:", string(node.Value)) //val1
+			fmt.Println("ZPeekMin:", string(node.Value)) // val1
 			return nil
 		}); err != nil {
 		log.Fatal(err)
@@ -216,7 +216,7 @@ func testZPopMax() {
 			if err != nil {
 				return err
 			}
-			fmt.Println("ZPopMax:", string(node.Value)) //val3
+			fmt.Println("ZPopMax:", string(node.Value)) // val3
 			return nil
 		}); err != nil {
 		log.Fatal(err)
@@ -231,7 +231,7 @@ func testZPopMin() {
 			if err != nil {
 				return err
 			}
-			fmt.Println("ZPopMin:", string(node.Value)) //val1
+			fmt.Println("ZPopMin:", string(node.Value)) // val1
 			return nil
 		}); err != nil {
 		log.Fatal(err)
@@ -586,7 +586,7 @@ func testZRevRank() {
 			if err != nil {
 				return err
 			}
-			fmt.Println("ZRevRank key1 rank:", rank) //ZRevRank key1 rank: 3
+			fmt.Println("ZRevRank key1 rank:", rank) // ZRevRank key1 rank: 3
 			return nil
 		}); err != nil {
 		log.Fatal(err)
@@ -598,7 +598,7 @@ func testZRevRank() {
 			if err != nil {
 				return err
 			}
-			fmt.Println("ZRevRank key2 rank:", rank) //ZRevRank key2 rank: 2
+			fmt.Println("ZRevRank key2 rank:", rank) // ZRevRank key2 rank: 2
 			return nil
 		}); err != nil {
 		log.Fatal(err)
@@ -610,7 +610,7 @@ func testZRevRank() {
 			if err != nil {
 				return err
 			}
-			fmt.Println("ZRevRank key3 rank:", rank) //ZRevRank key3 rank: 1
+			fmt.Println("ZRevRank key3 rank:", rank) // ZRevRank key3 rank: 1
 			return nil
 		}); err != nil {
 		log.Fatal(err)

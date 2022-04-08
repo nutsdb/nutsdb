@@ -43,7 +43,6 @@ func NewMMapRWManager(path string, capacity int64) (*MMapRWManager, error) {
 	}
 	defer f.Close()
 
-
 	err = Truncate(path, capacity, f)
 	if err != nil {
 		return nil, err
@@ -86,7 +85,7 @@ func (mm *MMapRWManager) Sync() (err error) {
 	return mm.m.Flush()
 }
 
-//Close deletes the memory mapped region, flushes any remaining changes
+// Close deletes the memory mapped region, flushes any remaining changes
 func (mm *MMapRWManager) Close() (err error) {
 	return mm.m.Unmap()
 }

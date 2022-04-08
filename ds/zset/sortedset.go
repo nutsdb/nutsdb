@@ -119,7 +119,7 @@ func (ss *SortedSet) insertNode(score SCORE, key string, value []byte) *SortedSe
 		update[i].level[i].span = (rank[0] - rank[i]) + 1
 	}
 
-	//increment span for untouched levels
+	// increment span for untouched levels
 	for i := level; i < ss.level; i++ {
 		update[i].level[i].span++
 	}
@@ -303,7 +303,7 @@ func (ss *SortedSet) GetByScoreRange(start SCORE, end SCORE, options *GetByScore
 
 	var nodes []*SortedSetNode
 
-	//determine if out of range
+	// determine if out of range
 	if ss.length == 0 {
 		return nodes
 	}
