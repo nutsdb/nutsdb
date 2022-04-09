@@ -68,7 +68,7 @@ func TestTx_PutAndGet(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	//write tx begin
+	// write tx begin
 	tx, err := db.Begin(true)
 	if err != nil {
 		t.Fatal(err)
@@ -79,25 +79,25 @@ func TestTx_PutAndGet(t *testing.T) {
 	val := []byte("val1")
 
 	if err = tx.Put(bucket, key, val, Persistent); err != nil {
-		//tx rollback
+		// tx rollback
 		err = tx.Rollback()
 		t.Fatal(err)
 	} else {
-		//tx commit
+		// tx commit
 		tx.Commit()
 	}
 
-	//read tx begin
+	// read tx begin
 	tx, err = db.Begin(false)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	if e, err := tx.Get(bucket, key); err != nil {
-		//tx rollback
+		// tx rollback
 		tx.Rollback()
 	} else {
-		//tx commit
+		// tx commit
 		tx.Commit()
 
 		if string(e.Value) != string(val) {
@@ -111,7 +111,7 @@ func TestTx_PutAndGet(t *testing.T) {
 
 	}
 
-	//test db close
+	// test db close
 	db.Close()
 
 	if err = tx.Put(bucket, key, val, Persistent); err != nil {
@@ -198,11 +198,11 @@ func TestTx_RangeScan_Err(t *testing.T) {
 	key := []byte("key_" + fmt.Sprintf("%07d", 0))
 	val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 0))
 	if err = tx.Put(bucket, key, val, Persistent); err != nil {
-		//tx rollback
+		// tx rollback
 		err = tx.Rollback()
 		t.Fatal(err)
 	}
-	//tx commit
+	// tx commit
 	tx.Commit()
 
 	tx, err = db.Begin(true)
@@ -212,11 +212,11 @@ func TestTx_RangeScan_Err(t *testing.T) {
 	key = []byte("key_" + fmt.Sprintf("%07d", 1))
 	val = []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 1))
 	if err = tx.Put(bucket, key, val, Persistent); err != nil {
-		//tx rollback
+		// tx rollback
 		err = tx.Rollback()
 		t.Fatal(err)
 	}
-	//tx commit
+	// tx commit
 	tx.Commit()
 
 	tx, err = db.Begin(false)
@@ -227,7 +227,7 @@ func TestTx_RangeScan_Err(t *testing.T) {
 	start := []byte("key_0010001")
 	end := []byte("key_0010010")
 	if _, err := tx.RangeScan(bucket, start, end); err != nil {
-		//tx rollback
+		// tx rollback
 		tx.Rollback()
 	} else {
 		t.Error("err range scan")
@@ -251,11 +251,11 @@ func TestTx_RangeScan(t *testing.T) {
 	key := []byte("key_" + fmt.Sprintf("%07d", 0))
 	val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 0))
 	if err = tx.Put(bucket, key, val, Persistent); err != nil {
-		//tx rollback
+		// tx rollback
 		err = tx.Rollback()
 		t.Fatal(err)
 	}
-	//tx commit
+	// tx commit
 	tx.Commit()
 
 	tx, err = db.Begin(true)
@@ -265,11 +265,11 @@ func TestTx_RangeScan(t *testing.T) {
 	key = []byte("key_" + fmt.Sprintf("%07d", 1))
 	val = []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 1))
 	if err = tx.Put(bucket, key, val, Persistent); err != nil {
-		//tx rollback
+		// tx rollback
 		err = tx.Rollback()
 		t.Fatal(err)
 	}
-	//tx commit
+	// tx commit
 	tx.Commit()
 
 	tx, err = db.Begin(true)
@@ -279,11 +279,11 @@ func TestTx_RangeScan(t *testing.T) {
 	key = []byte("key_" + fmt.Sprintf("%07d", 2))
 	val = []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 2))
 	if err = tx.Put(bucket, key, val, Persistent); err != nil {
-		//tx rollback
+		// tx rollback
 		err = tx.Rollback()
 		t.Fatal(err)
 	}
-	//tx commit
+	// tx commit
 	tx.Commit()
 
 	tx, err = db.Begin(false)
@@ -294,7 +294,7 @@ func TestTx_RangeScan(t *testing.T) {
 	start := []byte("key_0000001")
 	end := []byte("key_000002")
 	if entries, err := tx.RangeScan(bucket, start, end); err != nil {
-		//tx rollback
+		// tx rollback
 		tx.Rollback()
 	} else {
 		j := 0
@@ -307,7 +307,7 @@ func TestTx_RangeScan(t *testing.T) {
 		}
 	}
 
-	//tx commit
+	// tx commit
 	tx.Commit()
 
 	entries, err := tx.RangeScan(bucket, start, end)
@@ -333,11 +333,11 @@ func TestTx_PrefixScan(t *testing.T) {
 	key := []byte("key_" + fmt.Sprintf("%07d", 0))
 	val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 0))
 	if err = tx.Put(bucket, key, val, Persistent); err != nil {
-		//tx rollback
+		// tx rollback
 		err = tx.Rollback()
 		t.Fatal(err)
 	}
-	//tx commit
+	// tx commit
 	tx.Commit()
 
 	tx, err = db.Begin(true)
@@ -347,11 +347,11 @@ func TestTx_PrefixScan(t *testing.T) {
 	key = []byte("key_" + fmt.Sprintf("%07d", 1))
 	val = []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 1))
 	if err = tx.Put(bucket, key, val, Persistent); err != nil {
-		//tx rollback
+		// tx rollback
 		err = tx.Rollback()
 		t.Fatal(err)
 	}
-	//tx commit
+	// tx commit
 	tx.Commit()
 
 	tx, err = db.Begin(false)
@@ -361,7 +361,7 @@ func TestTx_PrefixScan(t *testing.T) {
 
 	prefix := []byte("key_")
 	if entries, _, err := tx.PrefixScan(bucket, prefix, 0, 2); err != nil {
-		//tx rollback
+		// tx rollback
 		tx.Rollback()
 	} else {
 		j := 0
@@ -373,7 +373,7 @@ func TestTx_PrefixScan(t *testing.T) {
 			j++
 		}
 	}
-	//tx commit
+	// tx commit
 	tx.Commit()
 }
 
@@ -396,11 +396,11 @@ func TestTx_PrefixSearchScan(t *testing.T) {
 	key := []byte("key_" + fmt.Sprintf("%07d", 0))
 	val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 0))
 	if err = tx.Put(bucket, key, val, Persistent); err != nil {
-		//tx rollback
+		// tx rollback
 		err = tx.Rollback()
 		t.Fatal(err)
 	}
-	//tx commit
+	// tx commit
 	tx.Commit()
 
 	tx, err = db.Begin(true)
@@ -410,11 +410,11 @@ func TestTx_PrefixSearchScan(t *testing.T) {
 	key = []byte("key_" + fmt.Sprintf("%07d", 1))
 	val = []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 1))
 	if err = tx.Put(bucket, key, val, Persistent); err != nil {
-		//tx rollback
+		// tx rollback
 		err = tx.Rollback()
 		t.Fatal(err)
 	}
-	//tx commit
+	// tx commit
 	tx.Commit()
 
 	tx, err = db.Begin(false)
@@ -424,7 +424,7 @@ func TestTx_PrefixSearchScan(t *testing.T) {
 
 	prefix := []byte("key_")
 	if entries, _, err := tx.PrefixSearchScan(bucket, prefix, regs, 0, 1); err != nil {
-		//tx rollback
+		// tx rollback
 		tx.Rollback()
 	} else {
 		c := 0
@@ -441,7 +441,7 @@ func TestTx_PrefixSearchScan(t *testing.T) {
 		}
 
 	}
-	//tx commit
+	// tx commit
 	tx.Commit()
 }
 
@@ -465,12 +465,12 @@ func TestTx_DeleteAndGet(t *testing.T) {
 		key := []byte("key_" + fmt.Sprintf("%07d", i))
 		val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", i))
 		if err = tx.Put(bucket, key, val, Persistent); err != nil {
-			//tx rollback
+			// tx rollback
 			err = tx.Rollback()
 			t.Fatal(err)
 		}
 	}
-	//tx commit
+	// tx commit
 	tx.Commit()
 
 	tx, err = db.Begin(true)
@@ -480,13 +480,13 @@ func TestTx_DeleteAndGet(t *testing.T) {
 	for i := 0; i <= 5; i++ {
 		key := []byte("key_" + fmt.Sprintf("%07d", i))
 		if err = tx.Delete(bucket, key); err != nil {
-			//tx rollback
+			// tx rollback
 			err = tx.Rollback()
 			t.Fatal(err)
 		}
 	}
 
-	//tx commit
+	// tx commit
 	tx.Commit()
 
 	err = tx.Delete(bucket, []byte("key_"+fmt.Sprintf("%07d", 1)))
@@ -501,7 +501,7 @@ func TestTx_DeleteAndGet(t *testing.T) {
 		}
 		key := []byte("key_" + fmt.Sprintf("%07d", i))
 		if _, err := tx.Get(bucket, key); err != nil {
-			//tx rollback
+			// tx rollback
 			tx.Rollback()
 		} else {
 			t.Error("err read tx ")
@@ -518,7 +518,7 @@ func TestTx_GetAndScansFromHintKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	//write tx begin
+	// write tx begin
 	tx, err := db.Begin(true)
 	if err != nil {
 		t.Fatal(err)
@@ -530,12 +530,12 @@ func TestTx_GetAndScansFromHintKey(t *testing.T) {
 		key := []byte("key_" + fmt.Sprintf("%07d", i))
 		val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", i))
 		if err = tx.Put(bucket, key, val, Persistent); err != nil {
-			//tx rollback
+			// tx rollback
 			err = tx.Rollback()
 			t.Fatal(err)
 		}
 	}
-	//tx commit
+	// tx commit
 	tx.Commit()
 
 	for i := 0; i <= 10; i++ {
@@ -545,7 +545,7 @@ func TestTx_GetAndScansFromHintKey(t *testing.T) {
 		}
 		key := []byte("key_" + fmt.Sprintf("%07d", i))
 		if entry, err := tx.Get(bucket, key); err != nil {
-			//tx rollback
+			// tx rollback
 			tx.Rollback()
 		} else {
 			val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", i))
@@ -553,7 +553,7 @@ func TestTx_GetAndScansFromHintKey(t *testing.T) {
 				t.Error("err read tx ")
 			}
 		}
-		//tx commit
+		// tx commit
 		tx.Commit()
 	}
 
@@ -565,7 +565,7 @@ func TestTx_GetAndScansFromHintKey(t *testing.T) {
 	start := []byte("key_0000001")
 	end := []byte("key_0000010")
 	if entries, err := tx.RangeScan(bucket, start, end); err != nil {
-		//tx rollback
+		// tx rollback
 		tx.Rollback()
 	} else {
 		j := 0
@@ -577,7 +577,7 @@ func TestTx_GetAndScansFromHintKey(t *testing.T) {
 			j++
 		}
 	}
-	//tx commit
+	// tx commit
 	tx.Commit()
 }
 
@@ -589,8 +589,8 @@ func TestTx_Put_Err(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	//write tx begin err setting here
-	tx, err := db.Begin(false) //tx not writable
+	// write tx begin err setting here
+	tx, err := db.Begin(false) // tx not writable
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -600,7 +600,7 @@ func TestTx_Put_Err(t *testing.T) {
 	key := []byte("key_" + fmt.Sprintf("%07d", 0))
 	val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 0))
 	if err = tx.Put(bucket, key, val, Persistent); err != nil {
-		//tx rollback
+		// tx rollback
 		tx.Rollback()
 	} else {
 		t.Fatal("err TestTx_Put_Err")
@@ -613,16 +613,16 @@ func TestTx_Put_Err(t *testing.T) {
 
 	bucket = "bucket_get_test2"
 
-	key = []byte("") //key cannot be empty
+	key = []byte("") // key cannot be empty
 	val = []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 0))
 	if err = tx.Put(bucket, key, val, Persistent); err != nil {
-		//tx rollback
+		// tx rollback
 		tx.Rollback()
 	} else {
 		t.Fatal("err TestTx_Put_Err")
 	}
 
-	//too big size
+	// too big size
 	tx, err = db.Begin(true)
 	if err != nil {
 		t.Fatal(err)
@@ -655,7 +655,7 @@ func TestTx_PrefixScan_NotFound(t *testing.T) {
 
 	prefix := []byte("key_")
 	if entries, _, err := tx.PrefixScan("foobucket", prefix, 0, 10); err != nil {
-		//tx rollback
+		// tx rollback
 		if entries != nil {
 			t.Error("err TestTx_PrefixScan_NotFound")
 		}
@@ -663,10 +663,10 @@ func TestTx_PrefixScan_NotFound(t *testing.T) {
 	} else {
 		t.Error("err TestTx_PrefixScan_NotFound")
 	}
-	//tx commit
+	// tx commit
 	tx.Commit()
 
-	//write tx begin
+	// write tx begin
 	tx, err = db.Begin(true)
 	if err != nil {
 		t.Fatal(err)
@@ -678,12 +678,12 @@ func TestTx_PrefixScan_NotFound(t *testing.T) {
 		key := []byte("key_" + fmt.Sprintf("%07d", i))
 		val := []byte("val" + fmt.Sprintf("%07d", i))
 		if err = tx.Put(bucket, key, val, Persistent); err != nil {
-			//tx rollback
+			// tx rollback
 			err = tx.Rollback()
 			t.Fatal(err)
 		}
 	}
-	//tx commit
+	// tx commit
 	tx.Commit()
 
 	tx, err = db.Begin(false)
@@ -693,7 +693,7 @@ func TestTx_PrefixScan_NotFound(t *testing.T) {
 
 	prefix = []byte("key_foo")
 	if entries, _, err := tx.PrefixScan(bucket, prefix, 0, 10); err != nil {
-		//tx rollback
+		// tx rollback
 		if entries != nil {
 			t.Error("err TestTx_PrefixScan_NotFound")
 		}
@@ -733,7 +733,7 @@ func TestTx_PrefixSearchScan_NotFound(t *testing.T) {
 
 	prefix := []byte("key_")
 	if entries, _, err := tx.PrefixSearchScan("foobucket", prefix, regs, 0, 10); err != nil {
-		//tx rollback
+		// tx rollback
 		if entries != nil {
 			t.Error("err TestTx_PrefixSearchScan_NotFound")
 		}
@@ -741,10 +741,10 @@ func TestTx_PrefixSearchScan_NotFound(t *testing.T) {
 	} else {
 		t.Error("err TestTx_PrefixSearchScan_NotFound")
 	}
-	//tx commit
+	// tx commit
 	tx.Commit()
 
-	//write tx begin
+	// write tx begin
 	tx, err = db.Begin(true)
 	if err != nil {
 		t.Fatal(err)
@@ -756,12 +756,12 @@ func TestTx_PrefixSearchScan_NotFound(t *testing.T) {
 		key := []byte("key_" + fmt.Sprintf("%07d", i))
 		val := []byte("val" + fmt.Sprintf("%07d", i))
 		if err = tx.Put(bucket, key, val, Persistent); err != nil {
-			//tx rollback
+			// tx rollback
 			err = tx.Rollback()
 			t.Fatal(err)
 		}
 	}
-	//tx commit
+	// tx commit
 	tx.Commit()
 
 	tx, err = db.Begin(false)
@@ -771,7 +771,7 @@ func TestTx_PrefixSearchScan_NotFound(t *testing.T) {
 
 	prefix = []byte("key_foo")
 	if entries, _, err := tx.PrefixSearchScan(bucket, prefix, regs, 0, 10); err != nil {
-		//tx rollback
+		// tx rollback
 		if entries != nil {
 			t.Error("err TestTx_PrefixSearchScan_NotFound")
 		}
@@ -803,7 +803,7 @@ func TestTx_RangeScan_NotFound(t *testing.T) {
 	db, err = Open(opt)
 	defer db.Close()
 
-	//write tx begin
+	// write tx begin
 	tx, err := db.Begin(true)
 	if err != nil {
 		t.Fatal(err)
@@ -815,12 +815,12 @@ func TestTx_RangeScan_NotFound(t *testing.T) {
 		key := []byte("key_" + fmt.Sprintf("%03d", i))
 		val := []byte("val" + fmt.Sprintf("%03d", i))
 		if err = tx.Put(bucket, key, val, Persistent); err != nil {
-			//tx rollback
+			// tx rollback
 			err = tx.Rollback()
 			t.Fatal(err)
 		}
 	}
-	//tx commit
+	// tx commit
 	tx.Commit()
 
 	tx, err = db.Begin(false)

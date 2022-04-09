@@ -71,10 +71,10 @@ func (e *Entry) Encode() []byte {
 	valueSize := e.Meta.ValueSize
 	bucketSize := e.Meta.BucketSize
 
-	//set DataItemHeader buf
+	// set DataItemHeader buf
 	buf := make([]byte, e.Size())
 	buf = e.setEntryHeaderBuf(buf)
-	//set bucket\key\value
+	// set bucket\key\value
 	copy(buf[DataEntryHeaderSize:(DataEntryHeaderSize+bucketSize)], e.Meta.Bucket)
 	copy(buf[(DataEntryHeaderSize+bucketSize):(DataEntryHeaderSize+bucketSize+keySize)], e.Key)
 	copy(buf[(DataEntryHeaderSize+bucketSize+keySize):(DataEntryHeaderSize+bucketSize+keySize+valueSize)], e.Value)

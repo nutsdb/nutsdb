@@ -18,8 +18,8 @@ func init() {
 	time2.Start()
 	opt := nutsdb.DefaultOptions
 	opt.StartFileLoadingMode = nutsdb.MMap
-	//opt.RWMode = nutsdb.MMap
-	//opt.SyncEnable = false
+	// opt.RWMode = nutsdb.MMap
+	// opt.SyncEnable = false
 	opt.Dir = "/tmp/nutsdbexample/example_batch"
 	db, _ = nutsdb.Open(opt)
 	bucket = "bucket1"

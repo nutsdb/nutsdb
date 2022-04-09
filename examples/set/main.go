@@ -136,8 +136,8 @@ func testSDiffByOneBucket() {
 			for _, item := range items {
 				fmt.Println("item", string(item))
 			}
-			//item a
-			//item b
+			// item a
+			// item b
 			return nil
 		}); err != nil {
 		log.Fatal(err)

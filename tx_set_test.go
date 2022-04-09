@@ -46,7 +46,7 @@ func TestTx_SAdd(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	//write tx begin
+	// write tx begin
 	tx, err := db.Begin(true)
 	if err != nil {
 		t.Fatal(err)
@@ -69,7 +69,7 @@ func TestTx_SAdd(t *testing.T) {
 		tx.Commit()
 	}
 
-	//read tx
+	// read tx
 	tx, err = db.Begin(false)
 	if err != nil {
 		t.Fatal(err)
@@ -91,7 +91,7 @@ func TestTx_SRem(t *testing.T) {
 	InitForSet()
 	db, err = Open(opt)
 
-	//write tx begin
+	// write tx begin
 	tx, err := db.Begin(true)
 	if err != nil {
 		t.Fatal(err)
@@ -110,7 +110,7 @@ func TestTx_SRem(t *testing.T) {
 		tx.Commit()
 	}
 
-	//write tx begin
+	// write tx begin
 	tx, err = db.Begin(true)
 	if err != nil {
 		t.Fatal(err)
@@ -123,7 +123,7 @@ func TestTx_SRem(t *testing.T) {
 		tx.Commit()
 	}
 
-	//read tx
+	// read tx
 	tx, err = db.Begin(false)
 	if err != nil {
 		t.Fatal(err)
@@ -155,7 +155,7 @@ func TestTx_SMembers(t *testing.T) {
 	InitForSet()
 	db, err = Open(opt)
 
-	//write tx begin
+	// write tx begin
 	tx, err := db.Begin(true)
 	if err != nil {
 		t.Fatal(err)
@@ -173,7 +173,7 @@ func TestTx_SMembers(t *testing.T) {
 		tx.Commit()
 	}
 
-	//read tx
+	// read tx
 	tx, err = db.Begin(false)
 	if err != nil {
 		t.Fatal(err)
@@ -212,7 +212,7 @@ func TestTx_SCard(t *testing.T) {
 	InitForSet()
 	db, err = Open(opt)
 
-	//write tx begin
+	// write tx begin
 	tx, err := db.Begin(true)
 	if err != nil {
 		t.Fatal(err)

@@ -36,24 +36,24 @@ func init() {
 }
 
 func main() {
-	//insert
+	// insert
 	put()
-	//read
+	// read
 	read()
 
-	//delete
+	// delete
 	delete()
-	//read
+	// read
 	read()
 
-	//insert
+	// insert
 	put()
-	//read
+	// read
 	read()
 
-	//update
+	// update
 	put2()
-	//read
+	// read
 	read()
 }
 

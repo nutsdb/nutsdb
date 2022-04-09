@@ -486,7 +486,7 @@ func (db *DB) getActiveFileWriteOff() (off int64, err error) {
 			}
 
 			off += item.Size()
-			//set ActiveFileActualSize
+			// set ActiveFileActualSize
 			db.ActiveFile.ActualSize = off
 
 		} else {
@@ -840,7 +840,7 @@ func (db *DB) buildSortedSetIdx(bucket string, r *Record) error {
 	return nil
 }
 
-//buildListIdx builds List index when opening the DB.
+// buildListIdx builds List index when opening the DB.
 func (db *DB) buildListIdx(bucket string, r *Record) error {
 	if _, ok := db.ListIdx[bucket]; !ok {
 		db.ListIdx[bucket] = list.New()
@@ -905,10 +905,10 @@ func (db *DB) buildIndexes() (err error) {
 
 	maxFileID, dataFileIds = db.getMaxFileIDAndFileIDs()
 
-	//init db.ActiveFile
+	// init db.ActiveFile
 	db.MaxFileID = maxFileID
 
-	//set ActiveFile
+	// set ActiveFile
 	if err = db.setActiveFile(); err != nil {
 		return
 	}

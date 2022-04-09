@@ -24,7 +24,7 @@ var (
 	ErrCrcZero = errors.New("error crc is 0")
 
 	// ErrCrc is returned when crc is error
-	ErrCrc = errors.New(" crc error")
+	ErrCrc = errors.New("crc error")
 
 	// ErrCapacity is returned when capacity is error.
 	ErrCapacity = errors.New("capacity error")

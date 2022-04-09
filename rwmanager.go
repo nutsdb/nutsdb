@@ -18,10 +18,10 @@ package nutsdb
 type RWMode int
 
 const (
-	//FileIO represents the read and write mode using standard I/O.
+	// FileIO represents the read and write mode using standard I/O.
 	FileIO RWMode = iota
 
-	//MMap represents the read and write mode using mmap.
+	// MMap represents the read and write mode using mmap.
 	MMap
 )
 
