@@ -2071,6 +2071,25 @@ nutsDB不会出现“不可重复读”这种情况，当高并发的时候，�
 * 提pull requests
 * 优化修改README文档
 
+#### 代码风格指南参考
+
+https://github.com/golang/go/wiki/CodeReviewComments
+
+#### git commit 规范参考
+ 
+ commit message格式
+ 
+ ```
+ <type>(<scope>): <subject>
+ ```
+
+ 
+####  type的参考
+
+![image](https://user-images.githubusercontent.com/6065007/162549766-58f164df-3794-4a5a-ab25-dd47962de74e.png)
+ 
+ 
+
 详情参考英文版的 [CONTRIBUTING](https://github.com/xujiajun/nutsdb/blob/master/CONTRIBUTING.md) 。
 
 ### 致谢
