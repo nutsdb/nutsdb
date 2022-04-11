@@ -548,7 +548,7 @@ if err := db.View(
 ```
 ### Merge Operation
 
-NutsDB supports merge operation. you can use `db.Merge()` function removes dirty data and reduce data redundancy. Call this function from a read-write transaction. It will effect other write request. So you can execute it at the appropriate time.
+NutsDB supports merge operation. you can use `db.Merge()` function removes dirty data and reduce data redundancy. Call this function from a read-write transaction. It will block other write request. So you can execute it at the appropriate time.
 
 ```golang
 err := db.Merge()
