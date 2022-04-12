@@ -111,7 +111,6 @@ func (s *Set) SDiff(key1, key2 string) (list [][]byte, err error) {
 			list = append(list, []byte(item1))
 		}
 	}
-
 	return
 }
 

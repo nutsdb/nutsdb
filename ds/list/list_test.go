@@ -15,6 +15,8 @@
 package list
 
 import (
+	"github.com/stretchr/testify/assert"
+	"reflect"
 	"testing"
 )
 
@@ -50,8 +52,9 @@ func TestList_LPush(t *testing.T) {
 	list.LPush(key, []byte("b"))
 	list.LPush(key, []byte("c"))
 	list.LPush(key, []byte("d"), []byte("e"), []byte("f"))
+	list.LPush(key, [][]byte{[]byte("d"), []byte("e"), []byte("f")}...)
 
-	expectResult := []string{"f", "e", "d", "c", "b", "a"}
+	expectResult := []string{"f", "e", "d", "f", "e", "d", "c", "b", "a"}
 	for i := 0; i < len(expectResult); i++ {
 		item, err := list.LPop(key)
 		if err == nil && string(item) != expectResult[i] {
@@ -80,54 +83,45 @@ func TestList_LPop(t *testing.T) {
 
 	item, err := list.LPop(key)
 
-	if err != nil || string(item) != "a" {
-		t.Error("TestList_LPop err")
-	}
+	assert.Nil(t, err, "TestList_LPop err")
+	assert.Equal(t, "a", string(item), "TestList_LPop wrong value")
 
 	item, err = list.LPop("key_fake")
-	if err == nil || item != nil {
-		t.Error("TestList_LPop err")
-	}
+	assert.NotNil(t, err, "TestList_LPop err")
+	assert.Nil(t, item, "TestList_LPop err")
 
 	item, err = list.LPop(key)
-	if err != nil || item == nil {
-		t.Error("TestList_LPop err")
-	}
+	assert.Nil(t, err, "TestList_LPop err")
+	assert.Equal(t, "b", string(item), "TestList_LPop wrong value")
 
 	item, err = list.LPop(key)
-	if err != nil || item == nil {
-		t.Error("TestList_LPop err")
-	}
+	assert.Nil(t, err, "TestList_LPop err")
+	assert.Equal(t, "c", string(item), "TestList_LPop wrong value")
 
 	item, err = list.LPop(key)
-	if err != nil || item == nil {
-		t.Error("TestList_LPop err")
-	}
+	assert.Nil(t, err, "TestList_LPop err")
+	assert.Equal(t, "d", string(item), "TestList_LPop wrong value")
 
 	item, err = list.LPop(key)
-	if err == nil || item != nil {
-		t.Error("TestList_LPop err")
-	}
+	assert.NotNilf(t, err, "TestList_LPop err")
+	assert.Nil(t, item, "TestList_LPop err")
 }
 
 func TestList_RPop(t *testing.T) {
 	list, key := InitListData()
-	if size, err := list.Size(key); err != nil && size != 4 {
-		t.Error("TestList_RPop err")
-	}
+	size, err := list.Size(key)
+	assert.Nil(t, err, "TestList_RPop err")
+	assert.Equalf(t, 4, size, "TestList_RPop wrong size")
 
 	item, err := list.RPop(key)
-	if size, err := list.Size(key); err != nil && size != 3 {
-		t.Error("TestList_RPop err")
-	}
-	if err != nil || string(item) != "d" {
-		t.Error("TestList_RPop err")
-	}
+	size, err = list.Size(key)
+	assert.Nil(t, err, "TestList_RPop err")
+	assert.Equal(t, 3, size, "TestList_RPop wrong size")
+	assert.Equal(t, "d", string(item), "TestList_RPop wrong value")
 
 	item, err = list.RPop("key_fake")
-	if err == nil || item != nil {
-		t.Error("TestList_RPop err")
-	}
+	assert.NotNil(t, err, "TestList_RPop err")
+	assert.Nil(t, item, "TestList_RPop err")
 }
 
 func TestList_LRange(t *testing.T) {
@@ -135,80 +129,95 @@ func TestList_LRange(t *testing.T) {
 	list.RPush(key, []byte("e"))
 	list.RPush(key, []byte("f"))
 
-	items, err := list.LRange(key, 0, 2)
-	if err != nil {
-		t.Error("TestList_LRange err")
+	type args struct {
+		key   string
+		start int
+		end   int
 	}
 
-	expectResult := getExpectResult("a", "b", "c")
-	for _, item := range items {
-		if _, ok := expectResult[string(item)]; !ok {
-			t.Error("TestList_LRange err")
-		}
+	tests := []struct {
+		name    string
+		list    *List
+		args    args
+		want    [][]byte
+		wantErr bool
+	}{
+		{
+			"normal-1",
+			list,
+			args{key, 0, 2},
+			[][]byte{[]byte("a"), []byte("b"), []byte("c")},
+			false,
+		},
+		{
+			"normal-1",
+			list,
+			args{key, 4, 8},
+			[][]byte{[]byte("e"), []byte("f")},
+			false,
+		},
+		{
+			"start + size > end",
+			list,
+			args{key, -1, 2},
+			nil,
+			true,
+		},
+		{
+			"wrong start index ",
+			list,
+			args{key, -3, -1},
+			[][]byte{[]byte("d"), []byte("e"), []byte("f")},
+			false,
+		},
+		{
+			"start > end",
+			list,
+			args{key, -1, -2},
+			nil,
+			true,
+		},
+		{
+			"fake key",
+			list,
+			args{"key_fake", -2, -1},
+			nil,
+			true,
+		},
+		{
+			"start == end",
+			list,
+			args{key, 0, 0},
+			[][]byte{[]byte("a")},
+			false,
+		},
+		{
+			"all values",
+			list,
+			args{key, 0, -1},
+			[][]byte{[]byte("a"), []byte("b"), []byte("c"), []byte("d"), []byte("e"), []byte("f")},
+			false,
+		},
 	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := tt.list.LRange(tt.args.key, tt.args.start, tt.args.end)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Get() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Get() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
+
 }
 
-func TestList_LRange2(t *testing.T) {
-	list, key := InitListData()
-	list.RPush(key, []byte("e"))
-	list.RPush(key, []byte("f"))
+func TestList_LRem_D(t *testing.T) {
+	//list, key := InitListData()
 
-	items, err := list.LRange(key, 4, 8)
-	if err != nil {
-		t.Error("TestList_LRange err")
-	}
-
-	expectResult := getExpectResult("e", "f")
-	for _, item := range items {
-		if _, ok := expectResult[string(item)]; !ok {
-			t.Error("TestList_LRange err")
-		}
-	}
-
-	items, err = list.LRange(key, -1, 2)
-	if err == nil || items != nil {
-		t.Error("TestList_LRange err")
-	}
-}
-
-func TestList_LRange3(t *testing.T) {
-	list, key := InitListData()
-	list.RPush(key, []byte("e"))
-	items, err := list.LRange(key, -3, -1)
-	if err != nil {
-		t.Error("TestList_LRange err")
-	}
-
-	expectResult := getExpectResult("c", "d", "e")
-	for _, item := range items {
-		if _, ok := expectResult[string(item)]; !ok {
-			t.Error("TestList_LRange err")
-		}
-	}
-
-	items, err = list.LRange(key, -1, -2)
-	if err == nil || items != nil {
-		t.Error("TestList_LRange err")
-	}
-}
-
-func TestList_LRange4(t *testing.T) {
-	list, key := InitListData()
-
-	items, err := list.LRange("key_fake", -2, -1)
-	if err == nil || items != nil {
-		t.Error("TestList_LRange err")
-	}
-
-	items, err = list.LRange(key, 0, 0)
-	if string(items[0]) != "a" || err != nil {
-		t.Error("TestList_LRange err")
-	}
-
-	items, err = list.LRange(key, 0, -1)
-	if len(items) != 4 || err != nil {
-		t.Error("TestList_LRange err")
-	}
 }
 
 func TestList_LRem(t *testing.T) {
