@@ -1090,7 +1090,7 @@ bucket3 := "bucket3"
 
 if err := db.Update(
 	func(tx *nutsdb.Tx) error {
-		return SAdd(bucket3, []byte("mySet1"), []byte("a"), []byte("b"), []byte("c"))
+		return tx.SAdd(bucket3, []byte("mySet1"), []byte("a"), []byte("b"), []byte("c"))
 	}); err != nil {
 	log.Fatal(err)
 }
