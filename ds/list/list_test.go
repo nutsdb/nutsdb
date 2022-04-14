@@ -110,12 +110,12 @@ func TestList_LPop(t *testing.T) {
 func TestList_RPop(t *testing.T) {
 	list, key := InitListData()
 	size, err := list.Size(key)
-	assert.Nil(t, err, "TestList_RPop err")
+	assert.NoError(t, err, "TestList_RPop err")
 	assert.Equalf(t, 4, size, "TestList_RPop wrong size")
 
 	item, err := list.RPop(key)
 	size, err = list.Size(key)
-	assert.Nil(t, err, "TestList_RPop err")
+	assert.NoError(t, err, "TestList_RPop err")
 	assert.Equal(t, 3, size, "TestList_RPop wrong size")
 	assert.Equal(t, "d", string(item), "TestList_RPop wrong value")
 
@@ -215,98 +215,71 @@ func TestList_LRange(t *testing.T) {
 
 }
 
-func TestList_LRem_D(t *testing.T) {
-	//list, key := InitListData()
-
-}
-
 func TestList_LRem(t *testing.T) {
 	list, key := InitListData()
 
-	if num, err := list.LRem("key_fake", 1, []byte("a")); err == nil || num != 0 {
-		t.Error("TestList_LRem err")
-	}
+	num, err := list.LRem("key_fake", 1, []byte("a"))
+	assert.Error(t, err, "TestList_LRem err")
+	assert.Zero(t, num, "TestList_LRem err")
 
-	if num, err := list.LRem(key, 1, []byte("a")); err != nil && num != 1 {
-		t.Error("TestList_LRem err")
-	}
+	num, err = list.LRem(key, 1, []byte("a"))
+	assert.NoError(t, err, "TestList_LRem err")
+	assert.Equal(t, 1, num, "TestList_LRem err")
 
-	expectResult := getExpectResult("b", "c", "d")
+	expectResult := [][]byte{[]byte("b"), []byte("c"), []byte("d")}
+	items, err := list.LRange(key, 0, -1)
+	assert.NoError(t, err, "TestList_LRem err")
+	assert.Equal(t, expectResult, items, "")
 
-	if items, err := list.LRange(key, 0, -1); err != nil {
-		t.Error("TestList_LRem err")
-	} else {
-		for _, item := range items {
-			if _, ok := expectResult[string(item)]; !ok {
-				t.Error("TestList_LRem err")
-			}
-		}
-	}
 }
 
 func TestList_LRem2(t *testing.T) {
 	list, key := InitListData()
 
-	if num, err := list.LRem(key, -1, []byte("d")); err != nil || num == 0 {
-		t.Error("TestList_LRem err")
-	}
+	num, err := list.LRem(key, -1, []byte("d"))
+	assert.NoError(t, err, "TestList_LRem err")
+	assert.Equal(t, 1, num, "TestList_LRem err")
 
-	expectResult := getExpectResult("a", "b", "c")
-
-	if items, err := list.LRange(key, 0, -1); err != nil || items == nil {
-		t.Error("TestList_LRem err")
-	} else {
-		for _, item := range items {
-			if _, ok := expectResult[string(item)]; !ok {
-				t.Error("TestList_LRem err")
-			}
-		}
-	}
+	expectResult := [][]byte{[]byte("a"), []byte("b"), []byte("c")}
+	items, err := list.LRange(key, 0, -1)
+	assert.NoError(t, err, "TestList_LRem err")
+	assert.Equal(t, expectResult, items, "TestList_LRem err")
 }
 
 func TestList_LRem3(t *testing.T) {
 	list, key := InitListData()
 	list.RPush(key, []byte("b"))
-	if num, err := list.LRem(key, -2, []byte("b")); num != 2 || err != nil {
-		t.Error("TestList_LRem err")
-	}
+	num, err := list.LRem(key, -2, []byte("b"))
+	assert.NoError(t, err, "TestList_LRem err")
+	assert.Equal(t, 2, num, "TestList_LRem err")
 
-	if items, err := list.LRange(key, 0, -1); err != nil {
-		t.Error("TestList_LRem err")
-	} else {
-		expectResult := getExpectResult("a", "c", "d")
-		for _, item := range items {
-			if _, ok := expectResult[string(item)]; !ok {
-				t.Error("TestList_LRem err")
-			}
-		}
-	}
+	expectResult := [][]byte{[]byte("a"), []byte("c"), []byte("d")}
+	items, err := list.LRange(key, 0, -1)
+	assert.NoError(t, err, "TestList_LRem err")
+	assert.Equal(t, expectResult, items, "TestList_LRem err")
 }
 
 func TestList_LRem4(t *testing.T) {
 	{
 		list, key := InitListData()
 		num, err := list.LRem(key, -10, []byte("b"))
-		if err != nil || num != 1 {
-			t.Error("TestList_LRem err")
-		}
+		assert.NoError(t, err, "TestList_LRem err")
+		assert.Equal(t, 1, num, "TestList_LRem err")
 	}
 	{
 		list, key := InitListData()
 		list.RPush(key, []byte("b"))
 		num, err := list.LRem(key, 4, []byte("b"))
-		if err != nil || num != 2 {
-			t.Error("TestList_LRem err")
-		}
+		assert.NoError(t, err, "TestList_LRem err")
+		assert.Equal(t, 2, num, "TestList_LRem err")
 	}
 
 	{
 		list, key := InitListData()
 		list.RPush(key, []byte("b"))
 		num, err := list.LRem(key, 2, []byte("b"))
-		if err != nil || num != 2 {
-			t.Error(err)
-		}
+		assert.NoError(t, err, "TestList_LRem err")
+		assert.Equal(t, 2, num, "TestList_LRem err")
 	}
 }
 
@@ -315,14 +288,12 @@ func TestList_LRem5(t *testing.T) {
 	list.RPush(key, []byte("b"))
 	list.RPush(key, []byte("b"))
 	num, err := list.LRem(key, 0, []byte("b"))
+	assert.NoError(t, err, "TestList_LRem err")
+	assert.Equal(t, 3, num, "TestList_LRem err")
 
-	if err != nil && num != 3 {
-		t.Error("TestList_LRem err")
-	}
 	size, err := list.Size(key)
-	if err != nil || size != 3 {
-		t.Error("TestList_LRem err")
-	}
+	assert.NoError(t, err, "TestList_LRem err")
+	assert.Equal(t, 3, size, "TestList_LRem err")
 }
 
 func TestList_LRem6(t *testing.T) {
@@ -330,15 +301,12 @@ func TestList_LRem6(t *testing.T) {
 	list.RPush(key, []byte("b"))
 	list.RPush(key, []byte("b"))
 	num, err := list.LRem(key, -3, []byte("b"))
-
-	if err != nil && num != 3 {
-		t.Error("TestList_LRem err")
-	}
+	assert.NoError(t, err, "TestList_LRem err")
+	assert.Equal(t, 3, num, "TestList_LRem err")
 
 	size, err := list.Size(key)
-	if err != nil || size != 3 {
-		t.Error("TestList_LRem err")
-	}
+	assert.NoError(t, err, "TestList_LRem err")
+	assert.Equal(t, 3, size, "TestList_LRem err")
 }
 
 func TestList_LRem7(t *testing.T) {
@@ -346,82 +314,46 @@ func TestList_LRem7(t *testing.T) {
 	list.RPush(key, []byte("b"))
 	list.RPush(key, []byte("b"))
 	num, err := list.LRem(key, 0, []byte("b"))
-
-	if err != nil && num != 3 {
-		t.Error("TestList_LRem err")
-	}
+	assert.NoError(t, err, "TestList_LRem err")
+	assert.Equal(t, 3, num, "TestList_LRem err")
 
 	size, err := list.Size(key)
-	if err != nil || size != 3 {
-		t.Error("TestList_LRem err")
-	}
+	assert.NoError(t, err, "TestList_LRem err")
+	assert.Equal(t, 3, size, "TestList_LRem err")
 }
 
 func TestList_LSet(t *testing.T) {
 	list, key := InitListData()
-
-	if string(list.Items[key][0]) != "a" {
-		t.Error("TestList_LSet err")
-	}
+	assert.Equal(t, "a", string(list.Items[key][0]), "TestList_LSet err")
 
 	list.LSet(key, 0, []byte("a1"))
-
-	if string(list.Items[key][0]) != "a1" {
-		t.Error("TestList_LSet err")
-	}
+	assert.Equal(t, "a1", string(list.Items[key][0]), "TestList_LSet err")
 
 	err := list.LSet("key_fake", 0, []byte("a1"))
-	if err == nil {
-		t.Error("TestList_LSet err")
-	}
+	assert.Error(t, err, "TestList_LSet err")
 
 	err = list.LSet(key, 4, []byte("a1"))
-	if err == nil {
-		t.Error("TestList_LSet err")
-	}
+	assert.Error(t, err, "TestList_LSet err")
 
 	err = list.LSet(key, -1, []byte("a1"))
-	if err == nil {
-		t.Error("TestList_LSet err")
-	}
+	assert.Error(t, err, "TestList_LSet err")
 }
 
 func TestList_Ltrim(t *testing.T) {
 	list, key := InitListData()
 
-	expectResult := getExpectResult("a", "b", "c", "d")
+	expectResult := [][]byte{[]byte("a"), []byte("b"), []byte("c"), []byte("d")}
+	assert.ElementsMatchf(t, expectResult, list.Items[key], "TestList_Ltrim err")
 
-	for _, item := range list.Items[key] {
-		if _, ok := expectResult[string(item)]; !ok {
-			t.Error("TestList_Ltrim err")
-		}
-	}
+	err := list.Ltrim(key, 0, 2)
+	expectResult = [][]byte{[]byte("a"), []byte("b"), []byte("c")}
 
-	if err := list.Ltrim(key, 0, 2); err != nil {
-		t.Error("TestList_Ltrim err")
-	}
+	assert.Nil(t, err, "TestList_Ltrim err")
+	assert.ElementsMatchf(t, expectResult, list.Items[key], "TestList_Ltrim err")
 
-	expectResult = getExpectResult("a", "b", "c")
-	for _, item := range list.Items[key] {
-		if _, ok := expectResult[string(item)]; !ok {
-			t.Error("TestList_Ltrim err")
-		}
-	}
+	err = list.Ltrim("key_fake", 0, 2)
+	assert.Error(t, err, "TestList_Ltrim err")
 
-	if err := list.Ltrim("key_fake", 0, 2); err == nil {
-		t.Error("TestList_Ltrim err")
-	}
-
-	if err := list.Ltrim(key, -1, -2); err == nil {
-		t.Error("TestList_Ltrim err")
-	}
-}
-
-func getExpectResult(items ...string) map[string]struct{} {
-	expectResult := make(map[string]struct{}, len(items))
-	for _, item := range items {
-		expectResult[item] = struct{}{}
-	}
-
-	return expectResult
+	err = list.Ltrim(key, -1, -2)
+	assert.Error(t, err, "TestList_Ltrim err")
 }
