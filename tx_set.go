@@ -22,10 +22,39 @@ import (
 )
 
 func (tx *Tx) sPut(bucket string, key []byte, dataFlag uint16, items ...[]byte) error {
-	for _, item := range items {
-		err := tx.put(bucket, key, item, Persistent, dataFlag, uint64(time.Now().Unix()), DataStructureSet)
-		if err != nil {
-			return err
+
+	if dataFlag == DataSetFlag {
+
+		filter := make(map[string]struct{})
+
+		if set, ok := tx.db.SetIdx[bucket]; ok {
+
+			if _, ok := set.M[string(key)]; ok {
+				for item := range set.M[string(key)] {
+					filter[item] = struct{}{}
+				}
+			}
+
+		}
+
+		for _, item := range items {
+			if _, ok := filter[string(item)]; !ok {
+				filter[string(item)] = struct{}{}
+				err := tx.put(bucket, key, item, Persistent, dataFlag, uint64(time.Now().Unix()), DataStructureSet)
+				if err != nil {
+					return err
+				}
+			}
+		}
+
+	} else {
+		for _, item := range items {
+
+			err := tx.put(bucket, key, item, Persistent, dataFlag, uint64(time.Now().Unix()), DataStructureSet)
+			if err != nil {
+				return err
+			}
+
 		}
 	}
 
