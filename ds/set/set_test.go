@@ -21,11 +21,12 @@ import (
 
 func TestSet_SAdd(t *testing.T) {
 	mySet := New()
+	assertions := assert.New(t)
 	key := "mySet0"
 
-	mySet.SAdd(key, []byte("Hello"))
-	mySet.SAdd(key, []byte("World"))
-	mySet.SAdd(key, []byte("hello1"), []byte("hello2"))
+	assertions.NoError(mySet.SAdd(key, []byte("Hello")))
+	assertions.NoError(mySet.SAdd(key, []byte("World")))
+	assertions.NoError(mySet.SAdd(key, []byte("hello1"), []byte("hello2")))
 
 	if ok, _ := mySet.SAreMembers(key, []byte("Hello"), []byte("World"), []byte("hello1"), []byte("hello2")); !ok {
 		t.Error("TestSet_SAdd err")
@@ -40,27 +41,33 @@ func TestSet_SDiff(t *testing.T) {
 	key4 := "mySet4"
 	key5 := "mySet5"
 
-	mySet.SAdd(key1, []byte("a"))
-	mySet.SAdd(key1, []byte("b"))
-	mySet.SAdd(key1, []byte("c"))
+	assertions := assert.New(t)
 
-	mySet.SAdd(key2, []byte("d"))
-	mySet.SAdd(key2, []byte("c"))
-	mySet.SAdd(key2, []byte("e"))
+	assertions.NoError(mySet.SAdd(key1, []byte("a")))
 
-	mySet.SAdd(key3, []byte("a"))
-	mySet.SAdd(key3, []byte("b"))
-	mySet.SAdd(key3, []byte("c"))
+	assertions.NoError(mySet.SAdd(key1, []byte("b")))
 
-	mySet.SAdd(key4, []byte("a"))
-	mySet.SAdd(key4, []byte("b"))
-	mySet.SAdd(key4, []byte("c"))
+	assertions.NoError(mySet.SAdd(key1, []byte("c")))
 
-	mySet.SAdd(key4, []byte("d"))
-	mySet.SAdd(key4, []byte("e"))
-	mySet.SAdd(key4, []byte("f"))
+	assertions.NoError(mySet.SAdd(key2, []byte("d")))
 
-	mySet.SAdd(key5, []byte("b"))
+	assertions.NoError(mySet.SAdd(key2, []byte("c")))
+	assertions.NoError(mySet.SAdd(key2, []byte("e")))
+
+	assertions.NoError(mySet.SAdd(key3, []byte("a")))
+
+	assertions.NoError(mySet.SAdd(key3, []byte("b")))
+	assertions.NoError(mySet.SAdd(key3, []byte("c")))
+
+	assertions.NoError(mySet.SAdd(key4, []byte("a")))
+	assertions.NoError(mySet.SAdd(key4, []byte("b")))
+	assertions.NoError(mySet.SAdd(key4, []byte("c")))
+
+	assertions.NoError(mySet.SAdd(key4, []byte("d")))
+	assertions.NoError(mySet.SAdd(key4, []byte("e")))
+	assertions.NoError(mySet.SAdd(key4, []byte("f")))
+
+	assertions.NoError(mySet.SAdd(key5, []byte("b")))
 
 	type args struct {
 		key1 string
@@ -125,7 +132,7 @@ func TestSet_SDiff(t *testing.T) {
 				t.Errorf("Get() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			assert.ElementsMatchf(t, got, tt.want, "Get() got = %v, want %v", got, tt.want)
+			assertions.ElementsMatchf(got, tt.want, "Get() got = %v, want %v", got, tt.want)
 		})
 	}
 
@@ -136,20 +143,20 @@ func TestSet_SCard(t *testing.T) {
 	key1 := "mySet1"
 	key2 := "mySet2"
 	key3 := "mySet3"
+	assertions := assert.New(t)
+	assertions.NoError(mySet.SAdd(key1, []byte("1")))
+	assertions.NoError(mySet.SAdd(key1, []byte("2")))
+	assertions.NoError(mySet.SAdd(key1, []byte("3")))
 
-	mySet.SAdd(key1, []byte("1"))
-	mySet.SAdd(key1, []byte("2"))
-	mySet.SAdd(key1, []byte("3"))
+	assertions.NoError(mySet.SAdd(key2, []byte("1")))
+	assertions.NoError(mySet.SAdd(key2, []byte("2")))
+	assertions.NoError(mySet.SAdd(key2, []byte("3")))
 
-	mySet.SAdd(key2, []byte("1"))
-	mySet.SAdd(key2, []byte("2"))
-	mySet.SAdd(key2, []byte("3"))
+	assertions.NoError(mySet.SAdd(key2, []byte("4")))
+	assertions.NoError(mySet.SAdd(key2, []byte("5")))
+	assertions.NoError(mySet.SAdd(key2, []byte("6")))
 
-	mySet.SAdd(key2, []byte("4"))
-	mySet.SAdd(key2, []byte("5"))
-	mySet.SAdd(key2, []byte("6"))
-
-	mySet.SAdd(key3, []byte("1"))
+	assertions.NoError(mySet.SAdd(key3, []byte("1")))
 
 	tests := []struct {
 		name string
@@ -166,7 +173,7 @@ func TestSet_SCard(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := tt.set.SCard(tt.key)
-			assert.Equalf(t, tt.want, got, "TestSet_SCard err")
+			assertions.Equalf(tt.want, got, "TestSet_SCard err")
 		})
 	}
 
@@ -177,13 +184,16 @@ func TestSet_SInter(t *testing.T) {
 
 	key1 := "mySet5"
 	key2 := "mySet6"
-	mySet.SAdd(key1, []byte("a"))
-	mySet.SAdd(key1, []byte("b"))
-	mySet.SAdd(key1, []byte("c"))
 
-	mySet.SAdd(key2, []byte("d"))
-	mySet.SAdd(key2, []byte("c"))
-	mySet.SAdd(key2, []byte("e"))
+	assertions := assert.New(t)
+
+	assertions.NoError(mySet.SAdd(key1, []byte("a")))
+	assertions.NoError(mySet.SAdd(key1, []byte("b")))
+	assertions.NoError(mySet.SAdd(key1, []byte("c")))
+
+	assertions.NoError(mySet.SAdd(key2, []byte("d")))
+	assertions.NoError(mySet.SAdd(key2, []byte("c")))
+	assertions.NoError(mySet.SAdd(key2, []byte("e")))
 
 	type args struct {
 		key1 string
@@ -234,7 +244,7 @@ func TestSet_SInter(t *testing.T) {
 				t.Errorf("SInter() err = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			assert.ElementsMatchf(t, tt.want, got, "SInter() want = %, got = %v", tt.want, got)
+			assertions.ElementsMatchf(tt.want, got, "SInter() want = %, got = %v", tt.want, got)
 		})
 	}
 }
@@ -244,9 +254,9 @@ func TestSet_SMembers(t *testing.T) {
 	mySet := New()
 
 	key := "mySet8"
-
-	mySet.SAdd(key, []byte("v-1"))
-	mySet.SAdd(key, []byte("v-2"))
+	assertions := assert.New(t)
+	assertions.NoError(mySet.SAdd(key, []byte("v-1")))
+	assertions.NoError(mySet.SAdd(key, []byte("v-2")))
 
 	tests := []struct {
 		name    string
@@ -256,21 +266,21 @@ func TestSet_SMembers(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			"normal SMemebers",
+			"normal SMembers",
 			key,
 			mySet,
 			[][]byte{[]byte("v-2")},
 			false,
 		},
 		{
-			"normal SMemebers",
+			"normal SMembers",
 			key,
 			mySet,
 			[][]byte{[]byte("v-2")},
 			false,
 		},
 		{
-			"normal SMemebers",
+			"normal SMembers",
 			key,
 			mySet,
 			[][]byte{[]byte("v-2"), []byte("v-2")},
@@ -292,7 +302,7 @@ func TestSet_SMembers(t *testing.T) {
 				t.Errorf("SInter() err = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			assert.Subsetf(t, got, tt.want, "SInter() got = %v, want = %v", got, tt.want)
+			assertions.Subsetf(got, tt.want, "SInter() got = %v, want = %v", got, tt.want)
 		})
 	}
 }
@@ -302,12 +312,12 @@ func TestSet_SMove(t *testing.T) {
 	mySet := New()
 
 	key1 := "mySet9"
-
-	mySet.SAdd(key1, []byte("a"))
-	mySet.SAdd(key1, []byte("b"))
+	assertions := assert.New(t)
+	assertions.NoError(mySet.SAdd(key1, []byte("a")))
+	assertions.NoError(mySet.SAdd(key1, []byte("b")))
 
 	key2 := "mySet10"
-	mySet.SAdd(key2, []byte("c"))
+	assertions.NoError(mySet.SAdd(key2, []byte("c")))
 
 	type args struct {
 		key1 string
@@ -325,7 +335,7 @@ func TestSet_SMove(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			"noraml SMove",
+			"normal SMove",
 			args{key1, key2, []byte("b")},
 			mySet,
 			true,
@@ -363,8 +373,8 @@ func TestSet_SMove(t *testing.T) {
 			if got == tt.want {
 				got1, _ := tt.set.SMembers(tt.args.key1)
 				got2, _ := tt.set.SMembers(tt.args.key2)
-				assert.ElementsMatchf(t, got1, tt.want1, "SMove() got = %v, want = %v", got1, tt.want1)
-				assert.ElementsMatchf(t, got2, tt.want2, "SMove() got = %v, want = %v", got2, tt.want2)
+				assertions.ElementsMatchf(got1, tt.want1, "SMove() got = %v, want = %v", got1, tt.want1)
+				assertions.ElementsMatchf(got2, tt.want2, "SMove() got = %v, want = %v", got2, tt.want2)
 			} else {
 				t.Errorf("SMove() got = %v, want = %v", tt.want, got)
 			}
@@ -375,12 +385,13 @@ func TestSet_SMove(t *testing.T) {
 func TestSet_SPop(t *testing.T) {
 
 	mySet := New()
+	assertions := assert.New(t)
 
 	key := "mySet10"
 
-	mySet.SAdd(key, []byte("a"))
-	mySet.SAdd(key, []byte("b"))
-	mySet.SAdd(key, []byte("c"))
+	assertions.NoError(mySet.SAdd(key, []byte("a")))
+	assertions.NoError(mySet.SAdd(key, []byte("b")))
+	assertions.NoError(mySet.SAdd(key, []byte("c")))
 
 	members, _ := mySet.SMembers(key)
 
@@ -396,13 +407,13 @@ func TestSet_SPop(t *testing.T) {
 		members [][]byte
 	}{
 		{
-			"noraml pop",
+			"normal pop",
 			args{key, 1},
 			mySet,
 			members,
 		},
 		{
-			"noraml pop",
+			"normal pop",
 			args{key, 1},
 			mySet,
 			members,
@@ -419,7 +430,7 @@ func TestSet_SPop(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got := tt.set.SPop(tt.args.key)
 			if got != nil {
-				assert.Containsf(t, members, got, "SPop() got = %v, not in = %v", got, tt.members)
+				assertions.Containsf(members, got, "SPop() got = %v, not in = %v", got, tt.members)
 			}
 		})
 	}
@@ -429,34 +440,36 @@ func TestSet_SRem(t *testing.T) {
 
 	mySet := New()
 	key := "mySet11"
+	assertions := assert.New(t)
 
-	mySet.SAdd(key, []byte("a"))
-	mySet.SAdd(key, []byte("b"))
-	mySet.SAdd(key, []byte("c"))
+	assertions.NoError(mySet.SAdd(key, []byte("a")))
+	assertions.NoError(mySet.SAdd(key, []byte("b")))
+	assertions.NoError(mySet.SAdd(key, []byte("c")))
 
-	mySet.SRem(key, []byte("a"))
-	mySet.SRem(key, []byte("b"))
+	assertions.NoError(mySet.SRem(key, []byte("a")))
+	assertions.NoError(mySet.SRem(key, []byte("b")))
 
-	assert.False(t, mySet.SIsMember(key, []byte("a")), "TestSet_SRem err")
+	assertions.False(mySet.SIsMember(key, []byte("a")), "TestSet_SRem err")
 
-	assert.False(t, mySet.SIsMember(key, []byte("b")), "TestSet_SRem err")
+	assertions.False(mySet.SIsMember(key, []byte("b")), "TestSet_SRem err")
 
-	assert.Error(t, mySet.SRem("key_fake", []byte("b")), "TestSet_SRem err")
+	assertions.Error(mySet.SRem("key_fake", []byte("b")), "TestSet_SRem err")
 
-	assert.Error(t, mySet.SRem(key, []byte("")), "TestSet_SRem err")
+	assertions.Error(mySet.SRem(key, []byte("")), "TestSet_SRem err")
 }
 
 func TestSet_SUnion(t *testing.T) {
 	mySet := New()
 	key1 := "mySet12"
-	mySet.SAdd(key1, []byte("a"))
-	mySet.SAdd(key1, []byte("b"))
-	mySet.SAdd(key1, []byte("c"))
+	assertions := assert.New(t)
+	assertions.NoError(mySet.SAdd(key1, []byte("a")))
+	assertions.NoError(mySet.SAdd(key1, []byte("b")))
+	assertions.NoError(mySet.SAdd(key1, []byte("c")))
 
 	key2 := "mySet12"
-	mySet.SAdd(key2, []byte("c"))
-	mySet.SAdd(key2, []byte("d"))
-	mySet.SAdd(key2, []byte("e"))
+	assertions.NoError(mySet.SAdd(key2, []byte("c")))
+	assertions.NoError(mySet.SAdd(key2, []byte("d")))
+	assertions.NoError(mySet.SAdd(key2, []byte("e")))
 
 	type args struct {
 		key1 string
@@ -493,7 +506,7 @@ func TestSet_SUnion(t *testing.T) {
 				t.Errorf("SUnion() err = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			assert.ElementsMatchf(t, got, tt.want, "SUnion() got = %v, want = %v", got, tt.want)
+			assertions.ElementsMatchf(got, tt.want, "SUnion() got = %v, want = %v", got, tt.want)
 		})
 	}
 }
