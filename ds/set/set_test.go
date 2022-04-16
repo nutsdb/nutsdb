@@ -15,8 +15,9 @@
 package set
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestSet_SAdd(t *testing.T) {
