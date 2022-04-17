@@ -10,49 +10,18 @@ NutsDB是纯Go语言编写一个简单、高性能、内嵌型、持久化的key
 
 NutsDB支持事务，从v0.2.0之后的版本开始支持ACID的特性，建议使用最新的release版本。v0.2.0之前的版本，保持高性能，没有作sync，但是具备高性能的写（本地测试，百万数据写入达40~50W+/s）。所有的操作都在事务中执行。NutsDB从v0.2.0版本开始支持多种数据结构，如列表(list)、集合(set)、有序集合(sorted set)。从0.4.0版本开始增加自定义配置读写方式、启动时候的文件载入方式、sync是否开启等，详情见[选项配置](https://github.com/xujiajun/nutsdb/blob/master/README-CN.md#%E9%80%89%E9%A1%B9%E9%85%8D%E7%BD%AE)
 
-> 欢迎对NutsDB感兴趣的加群、一起开发，具体看这个issue：https://github.com/nutsdb/nutsdb/issues/116
+
+### 加群
+欢迎对NutsDB感兴趣的加群、一起开发，具体看这个issue：https://github.com/nutsdb/nutsdb/issues/116
+
+### 公告
+v0.8.0 release，详情见：https://github.com/nutsdb/nutsdb/issues/135
+
+## 架构设计
+![image](https://user-images.githubusercontent.com/6065007/163700148-3f176acf-c9c5-4248-a999-684acb92849a.png)
 
 
-## 为什么有NutsDB
 
-### 对于现状或多或少的不满
-
-我想找一个用纯go编写，尽量简单（方便二次开发、研究）、高性能（读写都能快一点）、内嵌型的（减少网络开销）数据库，最好支持事务。因为我觉得对于数据库而言，数据完整性很重要。如果能像Redis一样支持多种数据结构就更好了。
-而像Redis一般用作缓存，对于事务支持也很弱。
-
-找到几个备选项：
-
-* BoltDB
-
-BoltDB是一个基于B+ tree，有着非常好的读性能，还支持很实用的特性：范围扫描和按照前缀进行扫描。有很多项目采用了他。虽然现在官方不维护，由etcd团队在维护
-他也支持ACID事务，但是他的写性能不是很好。如果对写性能要求不高也值得尝试。
-
-* GoLevelDB
-
-GoLevelDB是google开源的[leveldb](https://github.com/google/leveldb)的go语言版本的实现。他的性能很高，特别是写性能，他基于LSM tree实现。~~可惜他不支持事务~~(他的README没有提到，其实doc有api的)。
-
-* Badger
-
-Badger同样是基于LSM tree，不同的是他把key/value分离。据他官网描述是基于为SSD优化。同是他也支持事务。但是我自己测试发现他的写性能没我想象中高，具体见我的benchmark。
-
-此外，以上DB都不支持多种数据结构例如list、set等。
-
-### 好奇心的驱使
-
-对于如何实现kv数据库的好奇心吧。数据库可以说是系统的核心，了解数据库的内核或者自己有实现，对更好的用轮子或者下次根据业务定制轮子都很有帮助。
-
-基于以上两点，我决定尝试开发一个简单的kv数据库，性能要好，功能也要强大（至少他们好的功能特性都要继承）。
-
-如上面的选项，我发现大致基于存储引擎的模型分：B+ tree和LSM tree。基于B+ tree的模型相对后者成熟。一般使用覆盖页的方式和WAL（预写日志）来作崩溃恢复。而LSM tree的模型他是先写log文件，然后在写入MemTable内存中，当一定的时候写回SSTable，文件会越来越多，于是他一般作法是在后台进行合并和压缩操作。
-一般来说，基于B+ tree的模型写性能不如LSM tree的模型。而在读性能上比LSM tree的模型要来得好。当然LSM tree的模型也可以优化，比如引入BloomFilter。
-但是这些模型还是太复杂了。我喜欢简单，简单意味着好实现，好维护，相对不容易出错。
-
-直到我找到bitcask这种模型，他其实本质上也算LSM tree的范畴吧。
-他模型非常简单很好理解和实现，很快我就实现了一个版本。但是他的缺点是不支持范围扫描。我尝试去优化他，又开发一个版本，基于B+ tree作为索引，满足了范围扫描的问题。现在这个版本基本上都实现上面提到的数据库的一些有用的特性，包括支持范围扫描和前缀扫描、包括支持bucket、事务等，还支持了更多的数据结构（list、set、sorted set）。
- 
-天下没有银弹，NutsDB也有他的局限，比如随着数据量的增大，索引变大，启动会慢,只想说NutsDB还有很多优化和提高的空间，由于本人精力以及能力有限。所以把这个项目开源出来。更重要的是我认为一个项目需要有人去使用，有人提意见才会成长。
-
-> 希望看到这个文档的童鞋有兴趣的，一起来参与贡献，欢迎Star、提issues、提交PR ！ [参与贡献](https://github.com/xujiajun/nutsdb/blob/master/README-CN.md#%E5%8F%82%E4%B8%8E%E8%B4%A1%E7%8C%AE)
 
 ## 目录
 
@@ -280,7 +249,7 @@ key := []byte("foo")
 val := []byte("bar")
 
 // 使用事务
-if err = tx.Put(bucket, key, val, Persistent); err != nil {
+if err = tx.Put(bucket, key, val, nutsdb.Persistent); err != nil {
 	// 回滚事务
 	tx.Rollback()
 } else {
