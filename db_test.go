@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/assert"
 	"github.com/xujiajun/utils/strconv2"
 )
 
@@ -58,80 +59,64 @@ func TestDB_Basic(t *testing.T) {
 	db, err = Open(opt)
 	defer db.Close()
 
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	bucket := "bucket1"
 	key := []byte("key1")
 	val := []byte("val1")
 
 	//put
-	if err := db.Update(
+	err = db.Update(
 		func(tx *Tx) error {
 			return tx.Put(bucket, key, val, Persistent)
-		}); err != nil {
-		t.Fatal(err)
-	}
+		})
+	require.NoError(t, err)
 
 	//get
-	if err := db.View(
+	err = db.View(
 		func(tx *Tx) error {
 			e, err := tx.Get(bucket, key)
-			if err == nil {
-				if string(e.Value) != string(val) {
-					t.Errorf("err Tx Get. got %s want %s", string(e.Value), string(val))
-				}
+			if assert.NoError(t, err) {
+				assert.EqualValuesf(t, val, e.Value, "err Tx Get. got %s want %s", string(e.Value), string(val))
 			}
 			return nil
-		}); err != nil {
-		t.Fatal(err)
-	}
+		})
+	require.NoError(t, err)
 
 	// delete
-	if err := db.Update(
+	err = db.Update(
 		func(tx *Tx) error {
 			err := tx.Delete(bucket, key)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			return nil
-		}); err != nil {
-		t.Fatal(err)
-	}
+		})
+	require.NoError(t, err)
 
-	if err := db.View(
+	err = db.View(
 		func(tx *Tx) error {
 			_, err := tx.Get(bucket, key)
-			if err == nil {
-				t.Errorf("err Tx Get.")
-			}
+			assert.Error(t, err, "err Tx Get.")
 			return nil
-		}); err != nil {
-		t.Fatal(err)
-	}
+		})
+	require.NoError(t, err)
 
 	//update
 	val = []byte("val001")
-	if err := db.Update(
+	err = db.Update(
 		func(tx *Tx) error {
 			return tx.Put(bucket, key, val, Persistent)
-		}); err != nil {
-		t.Fatal(err)
-	}
+		})
+	require.NoError(t, err)
 
-	if err := db.View(
+	err := db.View(
 		func(tx *Tx) error {
 			e, err := tx.Get(bucket, key)
-			if err == nil {
-				if string(e.Value) != string(val) {
-					t.Errorf("err Tx Get. got %s want %s", string(e.Value), string(val))
-				}
+			if assert.NoError(t, err) {
+				assert.EqualValuesf(t, val, e.Value, "err Tx Get. got %s want %s", string(e.Value), string(val))
 			}
 			return nil
-		}); err != nil {
-		t.Fatal(err)
-	}
+		})
+	require.NoError(t, err)
 }
 
 func TestDB_Merge_For_string(t *testing.T) {
@@ -154,56 +139,46 @@ func TestDB_Merge_For_string(t *testing.T) {
 
 	db2, err := Open(opt)
 
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	bucketForString := "test_merge"
 
 	key1 := []byte("key_" + fmt.Sprintf("%07d", 1))
 	value1 := []byte("value1value1value1value1value1")
-	if err := db2.Update(
+	err = db2.Update(
 		func(tx *Tx) error {
 			return tx.Put(bucketForString, key1, value1, Persistent)
-		}); err != nil {
-		t.Error("initStringDataAndDel,err batch put", err)
-	}
+		})
+	assert.NoError(t, err, "initStringDataAndDel,err batch put")
 
 	key2 := []byte("key_" + fmt.Sprintf("%07d", 2))
 	value2 := []byte("value2value2value2value2value2")
-	if err := db2.Update(
+	err = db2.Update(
 		func(tx *Tx) error {
 			return tx.Put(bucketForString, key2, value2, Persistent)
-		}); err != nil {
-		t.Error("initStringDataAndDel,err batch put", err)
-	}
+		})
+	assert.NoError(t, err, "initStringDataAndDel,err batch put")
 
-	if err := db2.Update(
+	err = db2.Update(
 		func(tx *Tx) error {
 			return tx.Delete(bucketForString, key2)
-		}); err != nil {
-		t.Error(err)
-	}
+		})
+	assert.NoError(t, err)
 
-	if err := db2.View(
+	err = db2.View(
 		func(tx *Tx) error {
-			if _, err := tx.Get(bucketForString, key2); err == nil {
-				t.Error("err read data ", err)
-			}
+			_, err := tx.Get(bucketForString, key2)
+			assert.Error(t, err, "err read data")
 			return nil
-		}); err != nil {
-		t.Fatal(err)
-	}
+		})
+	require.NoError(t, err)
 
 	//GetValidKeyCount
 	validKeyNum := db2.BPTreeIdx[bucketForString].ValidKeyCount
-	if validKeyNum != 1 {
-		t.Errorf("err GetValidKeyCount. got %d want %d", validKeyNum, 1)
-	}
+	assert.EqualValuesf(t, 1, validKeyNum, "err GetValidKeyCount. got %d want %d", validKeyNum, 1)
 
-	if err = db2.Merge(); err != nil {
-		t.Error("err merge", err)
-	}
+	err = db2.Merge()
+	assert.NoError(t, err, "err merge")
 }
 
 func Test_MergeRepeated(t *testing.T) {
