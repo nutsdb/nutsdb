@@ -57,9 +57,9 @@ v0.8.0 release，详情见：https://github.com/nutsdb/nutsdb/issues/135
      - [RPeek](#rpeek)
      - [LRange](#lrange)
      - [LRem](#lrem)
-     - [LSet](#lset)	
+     - [LSet](#lset)    
      - [Ltrim](#ltrim)
-     - [LSize](#lsize)  	
+     - [LSize](#lsize)      
    - [Set](#set)
      - [SAdd](#sadd)
      - [SAreMembers](#saremembers)
@@ -123,21 +123,21 @@ go get -u github.com/xujiajun/nutsdb
 package main
 
 import (
-	"log"
+    "log"
 
-	"github.com/xujiajun/nutsdb"
+    "github.com/xujiajun/nutsdb"
 )
 
 func main() {
-	opt := nutsdb.DefaultOptions
-	opt.Dir = "/tmp/nutsdb" //这边数据库会自动创建这个目录文件
-	db, err := nutsdb.Open(opt)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
+    opt := nutsdb.DefaultOptions
+    opt.Dir = "/tmp/nutsdb" //这边数据库会自动创建这个目录文件
+    db, err := nutsdb.Open(opt)
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer db.Close()
 
-	...
+    ...
 }
 ```
 
@@ -179,8 +179,8 @@ MB，这个可以自己配置。但是一旦被设置，下次启动数据库也
 * StartFileLoadingMode RWMode
 
 `StartFileLoadingMode` 代表启动数据库的载入文件的方式。参数选项同`RWMode`。
-	
-	
+    
+    
 #### 默认选项
 
 推荐使用默认选项的方式。兼顾了持久化+快速的启动数据库。当然具体还要看你场景的要求。
@@ -190,12 +190,12 @@ MB，这个可以自己配置。但是一旦被设置，下次启动数据库也
 
 ```
 var DefaultOptions = Options{
-	EntryIdxMode:         HintKeyValAndRAMIdxMode,
-	SegmentSize:          defaultSegmentSize,
-	NodeNum:              1,
-	RWMode:               FileIO,
-	SyncEnable:           true,
-	StartFileLoadingMode: MMap,
+    EntryIdxMode:         HintKeyValAndRAMIdxMode,
+    SegmentSize:          defaultSegmentSize,
+    NodeNum:              1,
+    RWMode:               FileIO,
+    SyncEnable:           true,
+    StartFileLoadingMode: MMap,
 }
 ```
 
@@ -209,9 +209,9 @@ NutsDB为了保证隔离性，防止并发读写事务时候数据的不一致�
 
 ```golang
 err := db.Update(
-	func(tx *nutsdb.Tx) error {
-	...
-	return nil
+    func(tx *nutsdb.Tx) error {
+    ...
+    return nil
 })
 
 ```
@@ -220,9 +220,9 @@ err := db.Update(
 
 ```golang
 err := db.View(
-	func(tx *nutsdb.Tx) error {
-	...
-	return nil
+    func(tx *nutsdb.Tx) error {
+    ...
+    return nil
 })
 
 ```
@@ -250,14 +250,14 @@ val := []byte("bar")
 
 // 使用事务
 if err = tx.Put(bucket, key, val, nutsdb.Persistent); err != nil {
-	// 回滚事务
-	tx.Rollback()
+    // 回滚事务
+    tx.Rollback()
 } else {
-	// 提交事务
-	if err = tx.Commit(); err != nil {
-		tx.Rollback()
-		return err
-	}
+    // 提交事务
+    if err = tx.Commit(); err != nil {
+        tx.Rollback()
+        return err
+    }
 }
 ```
 
@@ -275,24 +275,24 @@ val := []byte("val001")
 
 bucket001 := "bucket001"
 if err := db.Update(
-	func(tx *nutsdb.Tx) error {
-		if err := tx.Put(bucket001, key, val, 0); err != nil {
-			return err
-		}
-		return nil
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        if err := tx.Put(bucket001, key, val, 0); err != nil {
+            return err
+        }
+        return nil
+    }); err != nil {
+    log.Fatal(err)
 }
 
 bucket002 := "bucket002"
 if err := db.Update(
-	func(tx *nutsdb.Tx) error {
-		if err := tx.Put(bucket002, key, val, 0); err != nil {
-			return err
-		}
-		return nil
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        if err := tx.Put(bucket002, key, val, 0); err != nil {
+            return err
+        }
+        return nil
+    }); err != nil {
+    log.Fatal(err)
 }
 
 ```
@@ -318,12 +318,12 @@ IterateBuckets支持迭代指定ds的迭代。
 ```go
 
 if err := db.View(
-	func(tx *nutsdb.Tx) error {
-		return tx.IterateBuckets(nutsdb.DataStructureBPTree, func(bucket string) {
-			fmt.Println("bucket: ", bucket)
-		})
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        return tx.IterateBuckets(nutsdb.DataStructureBPTree, func(bucket string) {
+            fmt.Println("bucket: ", bucket)
+        })
+    }); err != nil {
+    log.Fatal(err)
 }
 ```
 
@@ -334,10 +334,10 @@ DeleteBucket支持删除指定的bucket，需要两个参数`ds`和`bucket`。
 ```go
 
 if err := db.Update(
-	func(tx *nutsdb.Tx) error {
-		return tx.DeleteBucket(nutsdb.DataStructureBPTree, bucket)
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        return tx.DeleteBucket(nutsdb.DataStructureBPTree, bucket)
+    }); err != nil {
+    log.Fatal(err)
 }
 ```
 
@@ -351,16 +351,16 @@ if err := db.Update(
 ```golang
 
 if err := db.Update(
-	func(tx *nutsdb.Tx) error {
-	key := []byte("name1")
-	val := []byte("val1")
-	bucket := "bucket1"
-	if err := tx.Put(bucket, key, val, 0); err != nil {
-		return err
-	}
-	return nil
+    func(tx *nutsdb.Tx) error {
+    key := []byte("name1")
+    val := []byte("val1")
+    bucket := "bucket1"
+    if err := tx.Put(bucket, key, val, 0); err != nil {
+        return err
+    }
+    return nil
 }); err != nil {
-	log.Fatal(err)
+    log.Fatal(err)
 }
 
 ```
@@ -373,16 +373,16 @@ if err := db.Update(
 
 ```golang
 if err := db.Update(
-	func(tx *nutsdb.Tx) error {
-	key := []byte("name1")
-	val := []byte("val1-modify") // 更新值
-	bucket := "bucket1"
-	if err := tx.Put(bucket, key, val, 0); err != nil {
-		return err
-	}
-	return nil
+    func(tx *nutsdb.Tx) error {
+    key := []byte("name1")
+    val := []byte("val1-modify") // 更新值
+    bucket := "bucket1"
+    if err := tx.Put(bucket, key, val, 0); err != nil {
+        return err
+    }
+    return nil
 }); err != nil {
-	log.Fatal(err)
+    log.Fatal(err)
 }
 
 ```
@@ -394,16 +394,16 @@ if err := db.Update(
 ```golang
 if err := db.View(
 func(tx *nutsdb.Tx) error {
-	key := []byte("name1")
-	bucket := "bucket1"
-	if e, err := tx.Get(bucket, key); err != nil {
-		return err
-	} else {
-		fmt.Println(string(e.Value)) // "val1-modify"
-	}
-	return nil
+    key := []byte("name1")
+    bucket := "bucket1"
+    if e, err := tx.Get(bucket, key); err != nil {
+        return err
+    } else {
+        fmt.Println(string(e.Value)) // "val1-modify"
+    }
+    return nil
 }); err != nil {
-	log.Println(err)
+    log.Println(err)
 }
 ```
 
@@ -413,15 +413,15 @@ func(tx *nutsdb.Tx) error {
 
 ```golang
 if err := db.Update(
-	func(tx *nutsdb.Tx) error {
-	key := []byte("name1")
-	bucket := "bucket1"
-	if err := tx.Delete(bucket, key); err != nil {
-		return err
-	}
-	return nil
+    func(tx *nutsdb.Tx) error {
+    key := []byte("name1")
+    bucket := "bucket1"
+    if err := tx.Delete(bucket, key); err != nil {
+        return err
+    }
+    return nil
 }); err != nil {
-	log.Fatal(err)
+    log.Fatal(err)
 }
 ```
 
@@ -432,19 +432,19 @@ NusDB支持TTL(存活时间)的功能，可以对指定的bucket里的key过期�
 
 ```golang
 if err := db.Update(
-	func(tx *nutsdb.Tx) error {
-	key := []byte("name1")
-	val := []byte("val1")
-	bucket := "bucket1"
-	
-	// 如果设置 ttl = 0 or Persistent, 这个key就会永久不删除
-	// 这边 ttl = 60 , 60s之后就会过期。
-	if err := tx.Put(bucket, key, val, 60); err != nil {
-		return err
-	}
-	return nil
+    func(tx *nutsdb.Tx) error {
+    key := []byte("name1")
+    val := []byte("val1")
+    bucket := "bucket1"
+    
+    // 如果设置 ttl = 0 or Persistent, 这个key就会永久不删除
+    // 这边 ttl = 60 , 60s之后就会过期。
+    if err := tx.Put(bucket, key, val, 60); err != nil {
+        return err
+    }
+    return nil
 }); err != nil {
-	log.Fatal(err)
+    log.Fatal(err)
 }
 ```
 ### 对keys的扫描操作
@@ -459,20 +459,20 @@ key在一个bucket里面按照byte-sorted有序排序的，所以对于keys的�
 ```golang
 
 if err := db.View(
-	func(tx *nutsdb.Tx) error {
-		prefix := []byte("user_")
-		bucket := "user_list"
-		// 从offset=0开始 ，限制 100 entries 返回 
-		if entries, err := tx.PrefixScan(bucket, prefix, 0, 100); err != nil {
-			return err
-		} else {
-			for _, entry := range entries {
-				fmt.Println(string(entry.Key), string(entry.Value))
-			}
-		}
-		return nil
-	}); err != nil {
-		log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        prefix := []byte("user_")
+        bucket := "user_list"
+        // 从offset=0开始 ，限制 100 entries 返回 
+        if entries, err := tx.PrefixScan(bucket, prefix, 0, 100); err != nil {
+            return err
+        } else {
+            for _, entry := range entries {
+                fmt.Println(string(entry.Key), string(entry.Value))
+            }
+        }
+        return nil
+    }); err != nil {
+        log.Fatal(err)
 }
 
 ```
@@ -484,21 +484,21 @@ if err := db.View(
 ```go
 
 if err := db.View(
-	func(tx *nutsdb.Tx) error {
-		prefix := []byte("user_") // 定义前缀
-		reg := "99"  // 定义正则表达式
-		bucket := "user_list"
-		// 从offset=25开始，限制 100 entries 返回 
-		if entries, _, err := tx.PrefixSearchScan(bucket, prefix, reg, 25, 100); err != nil {
-			return err
-		} else {
-			for _, entry := range entries {
-				fmt.Println(string(entry.Key), string(entry.Value))
-			}
-		}
-		return nil
-	}); err != nil {
-		log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        prefix := []byte("user_") // 定义前缀
+        reg := "99"  // 定义正则表达式
+        bucket := "user_list"
+        // 从offset=25开始，限制 100 entries 返回 
+        if entries, _, err := tx.PrefixSearchScan(bucket, prefix, reg, 25, 100); err != nil {
+            return err
+        } else {
+            for _, entry := range entries {
+                fmt.Println(string(entry.Key), string(entry.Value))
+            }
+        }
+        return nil
+    }); err != nil {
+        log.Fatal(err)
 }
 ```
 
@@ -510,22 +510,22 @@ if err := db.View(
 
 ```golang
 if err := db.View(
-	func(tx *nutsdb.Tx) error {
-		// 假设用户key从 user_0000000 to user_9999999.
-		// 执行区间扫描类似这样一个start和end作为主要参数.
-		start := []byte("user_0010001")
-		end := []byte("user_0010010")
-		bucket := "user_list"
-		if entries, err := tx.RangeScan(bucket, start, end); err != nil {
-			return err
-		} else {
-			for _, entry := range entries {
-				fmt.Println(string(entry.Key), string(entry.Value))
-			}
-		}
-		return nil
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        // 假设用户key从 user_0000000 to user_9999999.
+        // 执行区间扫描类似这样一个start和end作为主要参数.
+        start := []byte("user_0010001")
+        end := []byte("user_0010010")
+        bucket := "user_list"
+        if entries, err := tx.RangeScan(bucket, start, end); err != nil {
+            return err
+        } else {
+            for _, entry := range entries {
+                fmt.Println(string(entry.Key), string(entry.Value))
+            }
+        }
+        return nil
+    }); err != nil {
+    log.Fatal(err)
 }
 ```
 ### 获取全部的key和value
@@ -536,26 +536,28 @@ if err := db.View(
 
 ```go
 if err := db.View(
-	func(tx *nutsdb.Tx) error {
-		bucket := "user_list"
-		entries, err := tx.GetAll(bucket)
-		if err != nil {
-			return err
-		}
+    func(tx *nutsdb.Tx) error {
+        bucket := "user_list"
+        entries, err := tx.GetAll(bucket)
+        if err != nil {
+            return err
+        }
 
-		for _, entry := range entries {
-			fmt.Println(string(entry.Key),string(entry.Value))
-		}
+        for _, entry := range entries {
+            fmt.Println(string(entry.Key),string(entry.Value))
+        }
 
-		return nil
-	}); err != nil {
-	log.Println(err)
+        return nil
+    }); err != nil {
+    log.Println(err)
 }
 ```
 ### 合并操作
 
-随着数据越来越多，特别是一些删除或者过期的数据占据着磁盘，清理这些NutsDB提供了`db.Merge()`方法，这个方法需要自己根据实际情况编写合并策略。
-一旦执行会影响到正常的写请求，所以最好避开高峰期，比如半夜定时执行等。
+nutsdb为了保持高性能写，同一个key会写多份，如果你的服务，有对同一个key多次的更新或者删除，你希望对同一个key做合并，可以使用NutsDB提供了`db.Merge()`方法。
+这个方法需要自己根据实际情况编写合并策略。一旦执行会影响到正常的写请求，所以最好避开高峰期，比如半夜定时执行等。
+
+当然，如果你没有对同一个key有太多的更新或者删除，可以不用Merge()函数。
 
 ```golang
 err := db.Merge()
@@ -599,27 +601,27 @@ NutsDB从0.7.0版本开始支持内存模式，这个模式下，重启数据库
 
 ```go
 
-	opts := inmemory.DefaultOptions
-	db, err := inmemory.Open(opts)
-	if err != nil {
-		panic(err)
-	}
-	bucket := "bucket1"
-	key := []byte("key1")
-	val := []byte("val1")
-	err = db.Put(bucket, key, val, 0)
-	if err != nil {
-		fmt.Println("err", err)
-	}
+    opts := inmemory.DefaultOptions
+    db, err := inmemory.Open(opts)
+    if err != nil {
+        panic(err)
+    }
+    bucket := "bucket1"
+    key := []byte("key1")
+    val := []byte("val1")
+    err = db.Put(bucket, key, val, 0)
+    if err != nil {
+        fmt.Println("err", err)
+    }
 
-	entry, err := db.Get(bucket, key)
-	if err != nil {
-		fmt.Println("err", err)
-	}
+    entry, err := db.Get(bucket, key)
+    if err != nil {
+        fmt.Println("err", err)
+    }
 
-	fmt.Println("entry.Key", string(entry.Key))     // entry.Key key1
-	fmt.Println("entry.Value", string(entry.Value)) // entry.Value val1
-	
+    fmt.Println("entry.Key", string(entry.Key))     // entry.Key key1
+    fmt.Println("entry.Value", string(entry.Value)) // entry.Value val1
+    
 ```
 
 ### 使用其他数据结构
@@ -635,13 +637,13 @@ NutsDB从0.7.0版本开始支持内存模式，这个模式下，重启数据库
 
 ```golang
 if err := db.Update(
-	func(tx *nutsdb.Tx) error {
-		bucket := "bucketForList"
-		key := []byte("myList")
-		val := []byte("val1")
-		return tx.RPush(bucket, key, val)
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        bucket := "bucketForList"
+        key := []byte("myList")
+        val := []byte("val1")
+        return tx.RPush(bucket, key, val)
+    }); err != nil {
+    log.Fatal(err)
 }
 ```
 
@@ -651,13 +653,13 @@ if err := db.Update(
 
 ```golang
 if err := db.Update(
-	func(tx *nutsdb.Tx) error {
-	        bucket := "bucketForList"
-		key := []byte("myList")
-		val := []byte("val2")
-		return tx.LPush(bucket, key, val)
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+            bucket := "bucketForList"
+        key := []byte("myList")
+        val := []byte("val2")
+        return tx.LPush(bucket, key, val)
+    }); err != nil {
+    log.Fatal(err)
 }
 ```
 
@@ -667,17 +669,17 @@ if err := db.Update(
 
 ```golang
 if err := db.Update(
-	func(tx *nutsdb.Tx) error {
-	        bucket := "bucketForList"
-		key := []byte("myList")
-		if item, err := tx.LPop(bucket, key); err != nil {
-			return err
-		} else {
-			fmt.Println("LPop item:", string(item))
-		}
-		return nil
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+            bucket := "bucketForList"
+        key := []byte("myList")
+        if item, err := tx.LPop(bucket, key); err != nil {
+            return err
+        } else {
+            fmt.Println("LPop item:", string(item))
+        }
+        return nil
+    }); err != nil {
+    log.Fatal(err)
 }
 ```
 
@@ -687,17 +689,17 @@ if err := db.Update(
 
 ```golang
 if err := db.View(
-	func(tx *nutsdb.Tx) error {
-	        bucket := "bucketForList"
-		key := []byte("myList")
-		if item, err := tx.LPeek(bucket, key); err != nil {
-			return err
-		} else {
-			fmt.Println("LPeek item:", string(item)) //val11
-		}
-		return nil
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+            bucket := "bucketForList"
+        key := []byte("myList")
+        if item, err := tx.LPeek(bucket, key); err != nil {
+            return err
+        } else {
+            fmt.Println("LPeek item:", string(item)) //val11
+        }
+        return nil
+    }); err != nil {
+    log.Fatal(err)
 }
 ```
 
@@ -707,17 +709,17 @@ if err := db.View(
 
 ```golang
 if err := db.Update(
-	func(tx *nutsdb.Tx) error {
-	        bucket := "bucketForList"
-		key := []byte("myList")
-		if item, err := tx.RPop(bucket, key); err != nil {
-			return err
-		} else {
-			fmt.Println("RPop item:", string(item))
-		}
-		return nil
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+            bucket := "bucketForList"
+        key := []byte("myList")
+        if item, err := tx.RPop(bucket, key); err != nil {
+            return err
+        } else {
+            fmt.Println("RPop item:", string(item))
+        }
+        return nil
+    }); err != nil {
+    log.Fatal(err)
 }
 ```
 
@@ -727,17 +729,17 @@ if err := db.Update(
 
 ```golang
 if err := db.View(
-	func(tx *nutsdb.Tx) error {
-	        bucket := "bucketForList"
-		key := []byte("myList")
-		if item, err := tx.RPeek(bucket, key); err != nil {
-			return err
-		} else {
-			fmt.Println("RPeek item:", string(item))
-		}
-		return nil
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+            bucket := "bucketForList"
+        key := []byte("myList")
+        if item, err := tx.RPeek(bucket, key); err != nil {
+            return err
+        } else {
+            fmt.Println("RPeek item:", string(item))
+        }
+        return nil
+    }); err != nil {
+    log.Fatal(err)
 }
 ```
 
@@ -748,20 +750,20 @@ if err := db.View(
 
 ```golang
 if err := db.View(
-	func(tx *nutsdb.Tx) error {
-	        bucket := "bucketForList"
-		key := []byte("myList")
-		if items, err := tx.LRange(bucket, key, 0, -1); err != nil {
-			return err
-		} else {
-			//fmt.Println(items)
-			for _, item := range items {
-				fmt.Println(string(item))
-			}
-		}
-		return nil
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+            bucket := "bucketForList"
+        key := []byte("myList")
+        if items, err := tx.LRange(bucket, key, 0, -1); err != nil {
+            return err
+        } else {
+            //fmt.Println(items)
+            for _, item := range items {
+                fmt.Println(string(item))
+            }
+        }
+        return nil
+    }); err != nil {
+    log.Fatal(err)
 }
 ```
 ##### LRem 
@@ -778,12 +780,12 @@ count = 0: 移除所有值为 value 的元素。
 
 ```golang
 if err := db.Update(
-	func(tx *nutsdb.Tx) error {
-	        bucket := "bucketForList"
-		key := []byte("myList")
-		return tx.LRem(bucket, key, 1, []byte("val11"))
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+            bucket := "bucketForList"
+        key := []byte("myList")
+        return tx.LRem(bucket, key, 1, []byte("val11"))
+    }); err != nil {
+    log.Fatal(err)
 }
 ```
 
@@ -793,17 +795,17 @@ if err := db.Update(
 
 ```golang
 if err := db.Update(
-	func(tx *nutsdb.Tx) error {
-	        bucket := "bucketForList"
-		key := []byte("myList")
-		if err := tx.LSet(bucket, key, 0, []byte("val11")); err != nil {
-			return err
-		} else {
-			fmt.Println("LSet ok, index 0 item value => val11")
-		}
-		return nil
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+            bucket := "bucketForList"
+        key := []byte("myList")
+        if err := tx.LSet(bucket, key, 0, []byte("val11")); err != nil {
+            return err
+        } else {
+            fmt.Println("LSet ok, index 0 item value => val11")
+        }
+        return nil
+    }); err != nil {
+    log.Fatal(err)
 }
 ```
 
@@ -817,12 +819,12 @@ start 和 end 也可以用负数来表示与表尾的偏移量，比如 -1 表�
 
 ```golang
 if err := db.Update(
-	func(tx *nutsdb.Tx) error {
-	        bucket := "bucketForList"
-		key := []byte("myList")
-		return tx.LTrim(bucket, key, 0, 1)
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+            bucket := "bucketForList"
+        key := []byte("myList")
+        return tx.LTrim(bucket, key, 0, 1)
+    }); err != nil {
+    log.Fatal(err)
 }
 ```
 
@@ -832,17 +834,17 @@ if err := db.Update(
 
 ```golang
 if err := db.Update(
-	func(tx *nutsdb.Tx) error {
-	        bucket := "bucketForList"
-		key := []byte("myList")
-		if size,err := tx.LSize(bucket, key); err != nil {
-			return err
-		} else {
-			fmt.Println("myList size is ",size)
-		}
-		return nil
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+            bucket := "bucketForList"
+        key := []byte("myList")
+        if size,err := tx.LSize(bucket, key); err != nil {
+            return err
+        } else {
+            fmt.Println("myList size is ",size)
+        }
+        return nil
+    }); err != nil {
+    log.Fatal(err)
 }
 ```
 
@@ -854,12 +856,12 @@ if err := db.Update(
 
 ```go
 if err := db.Update(
-	func(tx *nutsdb.Tx) error {
-	        bucket := "bucketForSet"
-		key := []byte("mySet")
-		return tx.SAdd(bucket, key, []byte("a"), []byte("b"), []byte("c"))
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+            bucket := "bucketForSet"
+        key := []byte("mySet")
+        return tx.SAdd(bucket, key, []byte("a"), []byte("b"), []byte("c"))
+    }); err != nil {
+    log.Fatal(err)
 }
 ```
 
@@ -869,17 +871,17 @@ if err := db.Update(
 
 ```go
 if err := db.View(
-	func(tx *nutsdb.Tx) error {
-		bucket := "bucketForSet"
-		key := []byte("mySet")
-		if ok, err := tx.SAreMembers(bucket, key, []byte("a"), []byte("b"), []byte("c")); err != nil {
-			return err
-		} else {
-			fmt.Println("SAreMembers:", ok)
-		}
-		return nil
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        bucket := "bucketForSet"
+        key := []byte("mySet")
+        if ok, err := tx.SAreMembers(bucket, key, []byte("a"), []byte("b"), []byte("c")); err != nil {
+            return err
+        } else {
+            fmt.Println("SAreMembers:", ok)
+        }
+        return nil
+    }); err != nil {
+    log.Fatal(err)
 }
 ```
 
@@ -890,17 +892,17 @@ if err := db.View(
 ```go
 
 if err := db.View(
-	func(tx *nutsdb.Tx) error {
-		bucket := "bucketForSet"
-		key := []byte("mySet")
-		if num, err := tx.SCard(bucket, key); err != nil {
-			return err
-		} else {
-			fmt.Println("SCard:", num)
-		}
-		return nil
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        bucket := "bucketForSet"
+        key := []byte("mySet")
+        if num, err := tx.SCard(bucket, key); err != nil {
+            return err
+        } else {
+            fmt.Println("SCard:", num)
+        }
+        return nil
+    }); err != nil {
+    log.Fatal(err)
 }
 
 ```
@@ -915,34 +917,34 @@ key2 := []byte("mySet2") // 集合2
 bucket := "bucketForSet"
 
 if err := db.Update(
-	func(tx *nutsdb.Tx) error {
-		return tx.SAdd(bucket, key1, []byte("a"), []byte("b"), []byte("c"))
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        return tx.SAdd(bucket, key1, []byte("a"), []byte("b"), []byte("c"))
+    }); err != nil {
+    log.Fatal(err)
 }
 
 if err := db.Update(
-	func(tx *nutsdb.Tx) error {
-		return tx.SAdd(bucket, key2, []byte("c"), []byte("d"))
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        return tx.SAdd(bucket, key2, []byte("c"), []byte("d"))
+    }); err != nil {
+    log.Fatal(err)
 }
 
 if err := db.View(
-	func(tx *nutsdb.Tx) error {
-		if items, err := tx.SDiffByOneBucket(bucket, key1, key2); err != nil {
-			return err
-		} else {
-			fmt.Println("SDiffByOneBucket:", items)
-			for _, item := range items {
-				fmt.Println("item", string(item))
-			}
-			//item a
-			//item b
-		}
-		return nil
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        if items, err := tx.SDiffByOneBucket(bucket, key1, key2); err != nil {
+            return err
+        } else {
+            fmt.Println("SDiffByOneBucket:", items)
+            for _, item := range items {
+                fmt.Println("item", string(item))
+            }
+            //item a
+            //item b
+        }
+        return nil
+    }); err != nil {
+    log.Fatal(err)
 }
 
 ```
@@ -959,32 +961,32 @@ bucket2 := "bucket2"
 key2 := []byte("mySet2")
 
 if err := db.Update(
-	func(tx *nutsdb.Tx) error {
-		return tx.SAdd(bucket1, key1, []byte("a"), []byte("b"), []byte("c"))
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        return tx.SAdd(bucket1, key1, []byte("a"), []byte("b"), []byte("c"))
+    }); err != nil {
+    log.Fatal(err)
 }
 
 if err := db.Update(
-	func(tx *nutsdb.Tx) error {
-		return tx.SAdd(bucket2, key2, []byte("c"), []byte("d"))
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        return tx.SAdd(bucket2, key2, []byte("c"), []byte("d"))
+    }); err != nil {
+    log.Fatal(err)
 }
 
 if err := db.View(
-	func(tx *nutsdb.Tx) error {
-		if items, err := tx.SDiffByTwoBuckets(bucket1, key1, bucket2, key2); err != nil {
-			return err
-		} else {
-			fmt.Println("SDiffByTwoBuckets:", items)
-			for _, item := range items {
-				fmt.Println("item", string(item))
-			}
-		}
-		return nil
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        if items, err := tx.SDiffByTwoBuckets(bucket1, key1, bucket2, key2); err != nil {
+            return err
+        } else {
+            fmt.Println("SDiffByTwoBuckets:", items)
+            for _, item := range items {
+                fmt.Println("item", string(item))
+            }
+        }
+        return nil
+    }); err != nil {
+    log.Fatal(err)
 }
 
 ```
@@ -997,15 +999,15 @@ if err := db.View(
 bucket := "bucketForSet"
 
 if err := db.View(
-	func(tx *nutsdb.Tx) error {
-		if ok, err := tx.SHasKey(bucket, []byte("mySet")); err != nil {
-			return err
-		} else {
-			fmt.Println("SHasKey", ok)
-		}
-		return nil
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        if ok, err := tx.SHasKey(bucket, []byte("mySet")); err != nil {
+            return err
+        } else {
+            fmt.Println("SHasKey", ok)
+        }
+        return nil
+    }); err != nil {
+    log.Fatal(err)
 }
 
 ```
@@ -1017,15 +1019,15 @@ if err := db.View(
 bucket := "bucketForSet"
 
 if err := db.View(
-	func(tx *nutsdb.Tx) error {
-		if ok, err := tx.SIsMember(bucket, []byte("mySet"), []byte("a")); err != nil {
-			return err
-		} else {
-			fmt.Println("SIsMember", ok)
-		}
-		return nil
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        if ok, err := tx.SIsMember(bucket, []byte("mySet"), []byte("a")); err != nil {
+            return err
+        } else {
+            fmt.Println("SIsMember", ok)
+        }
+        return nil
+    }); err != nil {
+    log.Fatal(err)
 }
 ```
 ##### SMembers 
@@ -1036,18 +1038,18 @@ if err := db.View(
 bucket := "bucketForSet"
 
 if err := db.View(
-	func(tx *nutsdb.Tx) error {
-		if items, err := tx.SMembers(bucket, []byte("mySet")); err != nil {
-			return err
-		} else {
-			fmt.Println("SMembers", items)
-			for _, item := range items {
-				fmt.Println("item", string(item))
-			}
-		}
-		return nil
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        if items, err := tx.SMembers(bucket, []byte("mySet")); err != nil {
+            return err
+        } else {
+            fmt.Println("SMembers", items)
+            for _, item := range items {
+                fmt.Println("item", string(item))
+            }
+        }
+        return nil
+    }); err != nil {
+    log.Fatal(err)
 }
 ```
 ##### SMoveByOneBucket 
@@ -1058,58 +1060,58 @@ if err := db.View(
 bucket3 := "bucket3"
 
 if err := db.Update(
-	func(tx *nutsdb.Tx) error {
-		return tx.SAdd(bucket3, []byte("mySet1"), []byte("a"), []byte("b"), []byte("c"))
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        return tx.SAdd(bucket3, []byte("mySet1"), []byte("a"), []byte("b"), []byte("c"))
+    }); err != nil {
+    log.Fatal(err)
 }
 if err := db.Update(
-	func(tx *nutsdb.Tx) error {
-		return tx.SAdd(bucket3, []byte("mySet2"), []byte("c"), []byte("d"), []byte("e"))
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        return tx.SAdd(bucket3, []byte("mySet2"), []byte("c"), []byte("d"), []byte("e"))
+    }); err != nil {
+    log.Fatal(err)
 }
 
 if err := db.Update(
-	func(tx *nutsdb.Tx) error {
-		if ok, err := tx.SMoveByOneBucket(bucket3, []byte("mySet1"), []byte("mySet2"), []byte("a")); err != nil {
-			return err
-		} else {
-			fmt.Println("SMoveByOneBucket", ok)
-		}
-		return nil
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        if ok, err := tx.SMoveByOneBucket(bucket3, []byte("mySet1"), []byte("mySet2"), []byte("a")); err != nil {
+            return err
+        } else {
+            fmt.Println("SMoveByOneBucket", ok)
+        }
+        return nil
+    }); err != nil {
+    log.Fatal(err)
 }
 
 if err := db.View(
-	func(tx *nutsdb.Tx) error {
-		if items, err := tx.SMembers(bucket3, []byte("mySet1")); err != nil {
-			return err
-		} else {
-			fmt.Println("after SMoveByOneBucket bucket3 mySet1 SMembers", items)
-			for _, item := range items {
-				fmt.Println("item", string(item))
-			}
-		}
-		return nil
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        if items, err := tx.SMembers(bucket3, []byte("mySet1")); err != nil {
+            return err
+        } else {
+            fmt.Println("after SMoveByOneBucket bucket3 mySet1 SMembers", items)
+            for _, item := range items {
+                fmt.Println("item", string(item))
+            }
+        }
+        return nil
+    }); err != nil {
+    log.Fatal(err)
 }
 
 if err := db.View(
-	func(tx *nutsdb.Tx) error {
-		if items, err := tx.SMembers(bucket3, []byte("mySet2")); err != nil {
-			return err
-		} else {
-			fmt.Println("after SMoveByOneBucket bucket3 mySet2 SMembers", items)
-			for _, item := range items {
-				fmt.Println("item", string(item))
-			}
-		}
-		return nil
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        if items, err := tx.SMembers(bucket3, []byte("mySet2")); err != nil {
+            return err
+        } else {
+            fmt.Println("after SMoveByOneBucket bucket3 mySet2 SMembers", items)
+            for _, item := range items {
+                fmt.Println("item", string(item))
+            }
+        }
+        return nil
+    }); err != nil {
+    log.Fatal(err)
 }
 ```
 ##### SMoveByTwoBuckets 
@@ -1120,58 +1122,58 @@ if err := db.View(
 bucket4 := "bucket4"
 bucket5 := "bucket5"
 if err := db.Update(
-	func(tx *nutsdb.Tx) error {
-		return tx.SAdd(bucket4, []byte("mySet1"), []byte("a"), []byte("b"), []byte("c"))
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        return tx.SAdd(bucket4, []byte("mySet1"), []byte("a"), []byte("b"), []byte("c"))
+    }); err != nil {
+    log.Fatal(err)
 }
 if err := db.Update(
-	func(tx *nutsdb.Tx) error {
-		return tx.SAdd(bucket5, []byte("mySet2"), []byte("c"), []byte("d"), []byte("e"))
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        return tx.SAdd(bucket5, []byte("mySet2"), []byte("c"), []byte("d"), []byte("e"))
+    }); err != nil {
+    log.Fatal(err)
 }
 
 if err := db.Update(
-	func(tx *nutsdb.Tx) error {
-		if ok, err := tx.SMoveByTwoBuckets(bucket4, []byte("mySet1"), bucket5, []byte("mySet2"), []byte("a")); err != nil {
-			return err
-		} else {
-			fmt.Println("SMoveByTwoBuckets", ok)
-		}
-		return nil
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        if ok, err := tx.SMoveByTwoBuckets(bucket4, []byte("mySet1"), bucket5, []byte("mySet2"), []byte("a")); err != nil {
+            return err
+        } else {
+            fmt.Println("SMoveByTwoBuckets", ok)
+        }
+        return nil
+    }); err != nil {
+    log.Fatal(err)
 }
 
 if err := db.View(
-	func(tx *nutsdb.Tx) error {
-		if items, err := tx.SMembers(bucket4, []byte("mySet1")); err != nil {
-			return err
-		} else {
-			fmt.Println("after SMoveByTwoBuckets bucket4 mySet1 SMembers", items)
-			for _, item := range items {
-				fmt.Println("item", string(item))
-			}
-		}
-		return nil
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        if items, err := tx.SMembers(bucket4, []byte("mySet1")); err != nil {
+            return err
+        } else {
+            fmt.Println("after SMoveByTwoBuckets bucket4 mySet1 SMembers", items)
+            for _, item := range items {
+                fmt.Println("item", string(item))
+            }
+        }
+        return nil
+    }); err != nil {
+    log.Fatal(err)
 }
 
 if err := db.View(
-	func(tx *nutsdb.Tx) error {
-		if items, err := tx.SMembers(bucket5, []byte("mySet2")); err != nil {
-			return err
-		} else {
-			fmt.Println("after SMoveByTwoBuckets bucket5 mySet2 SMembers", items)
-			for _, item := range items {
-				fmt.Println("item", string(item))
-			}
-		}
-		return nil
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        if items, err := tx.SMembers(bucket5, []byte("mySet2")); err != nil {
+            return err
+        } else {
+            fmt.Println("after SMoveByTwoBuckets bucket5 mySet2 SMembers", items)
+            for _, item := range items {
+                fmt.Println("item", string(item))
+            }
+        }
+        return nil
+    }); err != nil {
+    log.Fatal(err)
 }
 ```
 ##### SPop 
@@ -1180,16 +1182,16 @@ if err := db.View(
 
 ```go
 if err := db.Update(
-	func(tx *nutsdb.Tx) error {
-		key := []byte("mySet")
-		if item, err := tx.SPop(bucket, key); err != nil {
-			return err
-		} else {
-			fmt.Println("SPop item from mySet:", string(item))
-		}
-		return nil
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        key := []byte("mySet")
+        if item, err := tx.SPop(bucket, key); err != nil {
+            return err
+        } else {
+            fmt.Println("SPop item from mySet:", string(item))
+        }
+        return nil
+    }); err != nil {
+    log.Fatal(err)
 }
 ```
 ##### SRem 
@@ -1199,37 +1201,37 @@ if err := db.Update(
 ```go
 bucket6:="bucket6"
 if err := db.Update(
-	func(tx *nutsdb.Tx) error {
-		return tx.SAdd(bucket6, []byte("mySet"), []byte("a"), []byte("b"), []byte("c"))
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        return tx.SAdd(bucket6, []byte("mySet"), []byte("a"), []byte("b"), []byte("c"))
+    }); err != nil {
+    log.Fatal(err)
 }
 
 if err := db.Update(
-	func(tx *nutsdb.Tx) error {
-		if err := tx.SRem(bucket6, []byte("mySet"), []byte("a")); err != nil {
-			return err
-		} else {
-			fmt.Println("SRem ok")
-		}
-		return nil
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        if err := tx.SRem(bucket6, []byte("mySet"), []byte("a")); err != nil {
+            return err
+        } else {
+            fmt.Println("SRem ok")
+        }
+        return nil
+    }); err != nil {
+    log.Fatal(err)
 }
 
 if err := db.View(
-	func(tx *nutsdb.Tx) error {
-		if items, err := tx.SMembers(bucket6, []byte("mySet")); err != nil {
-			return err
-		} else {
-			fmt.Println("SMembers items:", items)
-			for _, item := range items {
-				fmt.Println("item:", string(item))
-			}
-		}
-		return nil
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        if items, err := tx.SMembers(bucket6, []byte("mySet")); err != nil {
+            return err
+        } else {
+            fmt.Println("SMembers items:", items)
+            for _, item := range items {
+                fmt.Println("item:", string(item))
+            }
+        }
+        return nil
+    }); err != nil {
+    log.Fatal(err)
 }
 ```
 ##### SUnionByOneBucket 
@@ -1242,32 +1244,32 @@ key1 := []byte("mySet1")
 key2 := []byte("mySet2")
 
 if err := db.Update(
-	func(tx *nutsdb.Tx) error {
-		return tx.SAdd(bucket7, key1, []byte("a"), []byte("b"), []byte("c"))
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        return tx.SAdd(bucket7, key1, []byte("a"), []byte("b"), []byte("c"))
+    }); err != nil {
+    log.Fatal(err)
 }
 
 if err := db.Update(
-	func(tx *nutsdb.Tx) error {
-		return tx.SAdd(bucket7, key2, []byte("c"), []byte("d"))
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        return tx.SAdd(bucket7, key2, []byte("c"), []byte("d"))
+    }); err != nil {
+    log.Fatal(err)
 }
 
 if err := db.View(
-	func(tx *nutsdb.Tx) error {
-		if items, err := tx.SUnionByOneBucket(bucket7, key1, key2); err != nil {
-			return err
-		} else {
-			fmt.Println("SUnionByOneBucket:", items)
-			for _, item := range items {
-				fmt.Println("item", string(item))
-			}
-		}
-		return nil
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        if items, err := tx.SUnionByOneBucket(bucket7, key1, key2); err != nil {
+            return err
+        } else {
+            fmt.Println("SUnionByOneBucket:", items)
+            for _, item := range items {
+                fmt.Println("item", string(item))
+            }
+        }
+        return nil
+    }); err != nil {
+    log.Fatal(err)
 }
 ```
 
@@ -1283,32 +1285,32 @@ bucket9 := "bucket2"
 key2 := []byte("mySet2")
 
 if err := db.Update(
-	func(tx *nutsdb.Tx) error {
-		return tx.SAdd(bucket8, key1, []byte("a"), []byte("b"), []byte("c"))
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        return tx.SAdd(bucket8, key1, []byte("a"), []byte("b"), []byte("c"))
+    }); err != nil {
+    log.Fatal(err)
 }
 
 if err := db.Update(
-	func(tx *nutsdb.Tx) error {
-		return tx.SAdd(bucket9, key2, []byte("c"), []byte("d"))
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        return tx.SAdd(bucket9, key2, []byte("c"), []byte("d"))
+    }); err != nil {
+    log.Fatal(err)
 }
 
 if err := db.View(
-	func(tx *nutsdb.Tx) error {
-		if items, err := tx.SUnionByTwoBuckets(bucket8, key1, bucket9, key2); err != nil {
-			return err
-		} else {
-			fmt.Println("SUnionByTwoBucket:", items)
-			for _, item := range items {
-				fmt.Println("item", string(item))
-			}
-		}
-		return nil
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        if items, err := tx.SUnionByTwoBuckets(bucket8, key1, bucket9, key2); err != nil {
+            return err
+        } else {
+            fmt.Println("SUnionByTwoBucket:", items)
+            for _, item := range items {
+                fmt.Println("item", string(item))
+            }
+        }
+        return nil
+    }); err != nil {
+    log.Fatal(err)
 }
 ```
 
@@ -1323,12 +1325,12 @@ if err := db.View(
 
 ```go
 if err := db.Update(
-	func(tx *nutsdb.Tx) error {
-		bucket := "myZSet1" // 注意：这边的bucket是有序集合名
-		key := []byte("key1")
-		return tx.ZAdd(bucket, key, 1, []byte("val1"))
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        bucket := "myZSet1" // 注意：这边的bucket是有序集合名
+        key := []byte("key1")
+        return tx.ZAdd(bucket, key, 1, []byte("val1"))
+    }); err != nil {
+    log.Fatal(err)
 }
 ```
 ##### ZCard 
@@ -1337,16 +1339,16 @@ if err := db.Update(
 
 ```go
 if err := db.View(
-	func(tx *nutsdb.Tx) error {
-		bucket := "myZSet1"
-		if num, err := tx.ZCard(bucket); err != nil {
-			return err
-		} else {
-			fmt.Println("ZCard num", num)
-		}
-		return nil
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        bucket := "myZSet1"
+        if num, err := tx.ZCard(bucket); err != nil {
+            return err
+        } else {
+            fmt.Println("ZCard num", num)
+        }
+        return nil
+    }); err != nil {
+    log.Fatal(err)
 }
 ```
 
@@ -1362,16 +1364,16 @@ Opts包含的参数：
 
 ```go
 if err := db.View(
-	func(tx *nutsdb.Tx) error {
-		bucket := "myZSet1"
-		if num, err := tx.ZCount(bucket, 0, 1, nil); err != nil {
-			return err
-		} else {
-			fmt.Println("ZCount num", num)
-		}
-		return nil
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        bucket := "myZSet1"
+        if num, err := tx.ZCount(bucket, 0, 1, nil); err != nil {
+            return err
+        } else {
+            fmt.Println("ZCount num", num)
+        }
+        return nil
+    }); err != nil {
+    log.Fatal(err)
 }
 ```
 ##### ZGetByKey 
@@ -1380,17 +1382,17 @@ if err := db.View(
 
 ```go
 if err := db.View(
-	func(tx *nutsdb.Tx) error {
-		bucket := "myZSet1"
-		key := []byte("key2")
-		if node, err := tx.ZGetByKey(bucket, key); err != nil {
-			return err
-		} else {
-			fmt.Println("ZGetByKey key2 val:", string(node.Value))
-		}
-		return nil
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        bucket := "myZSet1"
+        key := []byte("key2")
+        if node, err := tx.ZGetByKey(bucket, key); err != nil {
+            return err
+        } else {
+            fmt.Println("ZGetByKey key2 val:", string(node.Value))
+        }
+        return nil
+    }); err != nil {
+    log.Fatal(err)
 }
 ```
 ##### ZMembers 
@@ -1399,20 +1401,20 @@ if err := db.View(
 
 ```go
 if err := db.View(
-	func(tx *nutsdb.Tx) error {
-		bucket := "myZSet1"
-		if nodes, err := tx.ZMembers(bucket); err != nil {
-			return err
-		} else {
-			fmt.Println("ZMembers:", nodes)
+    func(tx *nutsdb.Tx) error {
+        bucket := "myZSet1"
+        if nodes, err := tx.ZMembers(bucket); err != nil {
+            return err
+        } else {
+            fmt.Println("ZMembers:", nodes)
 
-			for _, node := range nodes {
-				fmt.Println("member:", node.Key(), string(node.Value))
-			}
-		}
-		return nil
-	}); err != nil {
-	log.Fatal(err)
+            for _, node := range nodes {
+                fmt.Println("member:", node.Key(), string(node.Value))
+            }
+        }
+        return nil
+    }); err != nil {
+    log.Fatal(err)
 }
 ```
 ##### ZPeekMax 
@@ -1421,16 +1423,16 @@ if err := db.View(
 
 ```go
 if err := db.View(
-	func(tx *nutsdb.Tx) error {
-		bucket := "myZSet1"
-		if node, err := tx.ZPeekMax(bucket); err != nil {
-			return err
-		} else {
-			fmt.Println("ZPeekMax:", string(node.Value))
-		}
-		return nil
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        bucket := "myZSet1"
+        if node, err := tx.ZPeekMax(bucket); err != nil {
+            return err
+        } else {
+            fmt.Println("ZPeekMax:", string(node.Value))
+        }
+        return nil
+    }); err != nil {
+    log.Fatal(err)
 }
 ```
 
@@ -1440,16 +1442,16 @@ if err := db.View(
 
 ```go
 if err := db.View(
-	func(tx *nutsdb.Tx) error {
-		bucket := "myZSet1"
-		if node, err := tx.ZPeekMin(bucket); err != nil {
-			return err
-		} else {
-			fmt.Println("ZPeekMin:", string(node.Value))
-		}
-		return nil
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        bucket := "myZSet1"
+        if node, err := tx.ZPeekMin(bucket); err != nil {
+            return err
+        } else {
+            fmt.Println("ZPeekMin:", string(node.Value))
+        }
+        return nil
+    }); err != nil {
+    log.Fatal(err)
 }
 ```
 
@@ -1459,16 +1461,16 @@ if err := db.View(
 
 ```go
 if err := db.Update(
-	func(tx *nutsdb.Tx) error {
-		bucket := "myZSet1"
-		if node, err := tx.ZPopMax(bucket); err != nil {
-			return err
-		} else {
-			fmt.Println("ZPopMax:", string(node.Value)) //val3
-		}
-		return nil
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        bucket := "myZSet1"
+        if node, err := tx.ZPopMax(bucket); err != nil {
+            return err
+        } else {
+            fmt.Println("ZPopMax:", string(node.Value)) //val3
+        }
+        return nil
+    }); err != nil {
+    log.Fatal(err)
 }
 ```
 ##### ZPopMin 
@@ -1477,16 +1479,16 @@ if err := db.Update(
 
 ```go
 if err := db.Update(
-	func(tx *nutsdb.Tx) error {
-		bucket := "myZSet1"
-		if node, err := tx.ZPopMin(bucket); err != nil {
-			return err
-		} else {
-			fmt.Println("ZPopMin:", string(node.Value)) //val1
-		}
-		return nil
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        bucket := "myZSet1"
+        if node, err := tx.ZPopMin(bucket); err != nil {
+            return err
+        } else {
+            fmt.Println("ZPopMin:", string(node.Value)) //val1
+        }
+        return nil
+    }); err != nil {
+    log.Fatal(err)
 }
 ```
 
@@ -1497,50 +1499,50 @@ if err := db.Update(
 ```go
 // ZAdd add items
 if err := db.Update(
-	func(tx *nutsdb.Tx) error {
-		bucket := "myZSet2"
-		key1 := []byte("key1")
-		return tx.ZAdd(bucket, key1, 1, []byte("val1"))
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        bucket := "myZSet2"
+        key1 := []byte("key1")
+        return tx.ZAdd(bucket, key1, 1, []byte("val1"))
+    }); err != nil {
+    log.Fatal(err)
 }
 
 if err := db.Update(
-	func(tx *nutsdb.Tx) error {
-		bucket := "myZSet2"
-		key2 := []byte("key2")
-		return tx.ZAdd(bucket, key2, 2, []byte("val2"))
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        bucket := "myZSet2"
+        key2 := []byte("key2")
+        return tx.ZAdd(bucket, key2, 2, []byte("val2"))
+    }); err != nil {
+    log.Fatal(err)
 }
 
 if err := db.Update(
-	func(tx *nutsdb.Tx) error {
-		bucket := "myZSet2"
-		key3 := []byte("key3")
-		return tx.ZAdd(bucket, key3, 3, []byte("val3"))
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        bucket := "myZSet2"
+        key3 := []byte("key3")
+        return tx.ZAdd(bucket, key3, 3, []byte("val3"))
+    }); err != nil {
+    log.Fatal(err)
 }
 
 // ZRangeByRank
 if err := db.View(
-	func(tx *nutsdb.Tx) error {
-		bucket := "myZSet2"
-		if nodes, err := tx.ZRangeByRank(bucket, 1, 2); err != nil {
-			return err
-		} else {
-			fmt.Println("ZRangeByRank nodes :", nodes)
-			for _, node := range nodes {
-				fmt.Println("item:", node.Key(), node.Score())
-			}
-			
-			//item: key1 1
-			//item: key2 2
-		}
-		return nil
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        bucket := "myZSet2"
+        if nodes, err := tx.ZRangeByRank(bucket, 1, 2); err != nil {
+            return err
+        } else {
+            fmt.Println("ZRangeByRank nodes :", nodes)
+            for _, node := range nodes {
+                fmt.Println("item:", node.Key(), node.Score())
+            }
+            
+            //item: key1 1
+            //item: key2 2
+        }
+        return nil
+    }); err != nil {
+    log.Fatal(err)
 }
 ```
 
@@ -1551,50 +1553,50 @@ if err := db.View(
 ```go
 // ZAdd
 if err := db.Update(
-		func(tx *nutsdb.Tx) error {
-			bucket := "myZSet3"
-			key1 := []byte("key1")
-			return tx.ZAdd(bucket, key1, 70, []byte("val1"))
-		}); err != nil {
-		log.Fatal(err)
-	}
+        func(tx *nutsdb.Tx) error {
+            bucket := "myZSet3"
+            key1 := []byte("key1")
+            return tx.ZAdd(bucket, key1, 70, []byte("val1"))
+        }); err != nil {
+        log.Fatal(err)
+    }
 
 if err := db.Update(
-	func(tx *nutsdb.Tx) error {
-		bucket := "myZSet3"
-		key2 := []byte("key2")
-		return tx.ZAdd(bucket, key2, 90, []byte("val2"))
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        bucket := "myZSet3"
+        key2 := []byte("key2")
+        return tx.ZAdd(bucket, key2, 90, []byte("val2"))
+    }); err != nil {
+    log.Fatal(err)
 }
 
 if err := db.Update(
-	func(tx *nutsdb.Tx) error {
-		bucket := "myZSet3"
-		key3 := []byte("key3")
-		return tx.ZAdd(bucket, key3, 86, []byte("val3"))
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        bucket := "myZSet3"
+        key3 := []byte("key3")
+        return tx.ZAdd(bucket, key3, 86, []byte("val3"))
+    }); err != nil {
+    log.Fatal(err)
 }
 
 // ZRangeByScore
 if err := db.View(
-	func(tx *nutsdb.Tx) error {
-		bucket := "myZSet3"
-		if nodes, err := tx.ZRangeByScore(bucket, 80, 100,nil); err != nil {
-			return err
-		} else {
-			fmt.Println("ZRangeByScore nodes :", nodes)
-			for _, node := range nodes {
-				fmt.Println("item:", node.Key(), node.Score())
-			}
-			//item: key3 86
-			//item: key2 90
-		}
-		return nil
-	}); err != nil {
-	log.Fatal(err)
-}	
+    func(tx *nutsdb.Tx) error {
+        bucket := "myZSet3"
+        if nodes, err := tx.ZRangeByScore(bucket, 80, 100,nil); err != nil {
+            return err
+        } else {
+            fmt.Println("ZRangeByScore nodes :", nodes)
+            for _, node := range nodes {
+                fmt.Println("item:", node.Key(), node.Score())
+            }
+            //item: key3 86
+            //item: key2 90
+        }
+        return nil
+    }); err != nil {
+    log.Fatal(err)
+}   
 ```
 ##### ZRank
 
@@ -1605,45 +1607,45 @@ if err := db.View(
 
 // ZAdd
 if err := db.Update(
-	func(tx *nutsdb.Tx) error {
-		bucket := "myZSet4"
-		key1 := []byte("key1")
-		return tx.ZAdd(bucket, key1, 70, []byte("val1"))
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        bucket := "myZSet4"
+        key1 := []byte("key1")
+        return tx.ZAdd(bucket, key1, 70, []byte("val1"))
+    }); err != nil {
+    log.Fatal(err)
 }
 
 if err := db.Update(
-	func(tx *nutsdb.Tx) error {
-		bucket := "myZSet4"
-		key2 := []byte("key2")
-		return tx.ZAdd(bucket, key2, 90, []byte("val2"))
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        bucket := "myZSet4"
+        key2 := []byte("key2")
+        return tx.ZAdd(bucket, key2, 90, []byte("val2"))
+    }); err != nil {
+    log.Fatal(err)
 }
 
 if err := db.Update(
-	func(tx *nutsdb.Tx) error {
-		bucket := "myZSet4"
-		key3 := []byte("key3")
-		return tx.ZAdd(bucket, key3, 86, []byte("val3"))
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        bucket := "myZSet4"
+        key3 := []byte("key3")
+        return tx.ZAdd(bucket, key3, 86, []byte("val3"))
+    }); err != nil {
+    log.Fatal(err)
 }
 
 // ZRank
 if err := db.View(
-	func(tx *nutsdb.Tx) error {
-		bucket := "myZSet4"
-		key1 := []byte("key1")
-		if rank, err := tx.ZRank(bucket, key1); err != nil {
-			return err
-		} else {
-			fmt.Println("key1 ZRank :", rank) // key1 ZRank : 1
-		}
-		return nil
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        bucket := "myZSet4"
+        key1 := []byte("key1")
+        if rank, err := tx.ZRank(bucket, key1); err != nil {
+            return err
+        } else {
+            fmt.Println("key1 ZRank :", rank) // key1 ZRank : 1
+        }
+        return nil
+    }); err != nil {
+    log.Fatal(err)
 }
 ```
 
@@ -1654,42 +1656,42 @@ if err := db.View(
 ```go
 // ZAdd
 if err := db.Update(
-	func(tx *nutsdb.Tx) error {
-		bucket := "myZSet8"
-		key1 := []byte("key1")
-		return tx.ZAdd(bucket, key1, 10, []byte("val1"))
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        bucket := "myZSet8"
+        key1 := []byte("key1")
+        return tx.ZAdd(bucket, key1, 10, []byte("val1"))
+    }); err != nil {
+    log.Fatal(err)
 }
 if err := db.Update(
-	func(tx *nutsdb.Tx) error {
-		bucket := "myZSet8"
-		key2 := []byte("key2")
-		return tx.ZAdd(bucket, key2, 20, []byte("val2"))
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        bucket := "myZSet8"
+        key2 := []byte("key2")
+        return tx.ZAdd(bucket, key2, 20, []byte("val2"))
+    }); err != nil {
+    log.Fatal(err)
 }
 if err := db.Update(
-	func(tx *nutsdb.Tx) error {
-		bucket := "myZSet8"
-		key3 := []byte("key3")
-		return tx.ZAdd(bucket, key3, 30, []byte("val3"))
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        bucket := "myZSet8"
+        key3 := []byte("key3")
+        return tx.ZAdd(bucket, key3, 30, []byte("val3"))
+    }); err != nil {
+    log.Fatal(err)
 }
 
 // ZRevRank
 if err := db.View(
-	func(tx *nutsdb.Tx) error {
-		bucket := "myZSet8"
-		if rank, err := tx.ZRevRank(bucket, []byte("key3")); err != nil {
-			return err
-		} else {
-			fmt.Println("ZRevRank key1 rank:", rank) //ZRevRank key3 rank: 1
-		}
-		return nil
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        bucket := "myZSet8"
+        if rank, err := tx.ZRevRank(bucket, []byte("key3")); err != nil {
+            return err
+        } else {
+            fmt.Println("ZRevRank key1 rank:", rank) //ZRevRank key3 rank: 1
+        }
+        return nil
+    }); err != nil {
+    log.Fatal(err)
 }
 ```
 
@@ -1699,69 +1701,69 @@ if err := db.View(
 
 ```go
 if err := db.Update(
-	func(tx *nutsdb.Tx) error {
-		bucket := "myZSet5"
-		key1 := []byte("key1")
-		return tx.ZAdd(bucket, key1, 10, []byte("val1"))
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        bucket := "myZSet5"
+        key1 := []byte("key1")
+        return tx.ZAdd(bucket, key1, 10, []byte("val1"))
+    }); err != nil {
+    log.Fatal(err)
 }
 
 if err := db.Update(
-	func(tx *nutsdb.Tx) error {
-		bucket := "myZSet5"
-		key2 := []byte("key2")
-		return tx.ZAdd(bucket, key2, 20, []byte("val2"))
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        bucket := "myZSet5"
+        key2 := []byte("key2")
+        return tx.ZAdd(bucket, key2, 20, []byte("val2"))
+    }); err != nil {
+    log.Fatal(err)
 }
 
 if err := db.View(
-	func(tx *nutsdb.Tx) error {
-		bucket := "myZSet5"
-		if nodes,err := tx.ZMembers(bucket); err != nil {
-			return err
-		} else {
-			fmt.Println("before ZRem key1, ZMembers nodes",nodes)
-			for _,node:=range nodes {
-				fmt.Println("item:",node.Key(),node.Score())
-			}
-		}
-		// before ZRem key1, ZMembers nodes map[key1:0xc00008cfa0 key2:0xc00008d090]
-		// item: key1 10
-		// item: key2 20
-		return nil
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        bucket := "myZSet5"
+        if nodes,err := tx.ZMembers(bucket); err != nil {
+            return err
+        } else {
+            fmt.Println("before ZRem key1, ZMembers nodes",nodes)
+            for _,node:=range nodes {
+                fmt.Println("item:",node.Key(),node.Score())
+            }
+        }
+        // before ZRem key1, ZMembers nodes map[key1:0xc00008cfa0 key2:0xc00008d090]
+        // item: key1 10
+        // item: key2 20
+        return nil
+    }); err != nil {
+    log.Fatal(err)
 }
 
 if err := db.Update(
-	func(tx *nutsdb.Tx) error {
-		bucket := "myZSet5"
-		if err := tx.ZRem(bucket, "key1"); err != nil {
-			return err
-		}
-		return nil
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        bucket := "myZSet5"
+        if err := tx.ZRem(bucket, "key1"); err != nil {
+            return err
+        }
+        return nil
+    }); err != nil {
+    log.Fatal(err)
 }
 
 if err := db.View(
-	func(tx *nutsdb.Tx) error {
-		bucket := "myZSet5"
-		if nodes,err := tx.ZMembers(bucket); err != nil {
-			return err
-		} else {
-			fmt.Println("after ZRem key1, ZMembers nodes",nodes)
-			for _,node:=range nodes {
-				fmt.Println("item:",node.Key(),node.Score())
-			}
-			// after ZRem key1, ZMembers nodes map[key2:0xc00008d090]
-			// item: key2 20
-		}
-		return nil
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        bucket := "myZSet5"
+        if nodes,err := tx.ZMembers(bucket); err != nil {
+            return err
+        } else {
+            fmt.Println("after ZRem key1, ZMembers nodes",nodes)
+            for _,node:=range nodes {
+                fmt.Println("item:",node.Key(),node.Score())
+            }
+            // after ZRem key1, ZMembers nodes map[key2:0xc00008d090]
+            // item: key2 20
+        }
+        return nil
+    }); err != nil {
+    log.Fatal(err)
 }
 
 ```
@@ -1772,80 +1774,80 @@ if err := db.View(
 
 ```go
 if err := db.Update(
-	func(tx *nutsdb.Tx) error {
-		bucket := "myZSet6"
-		key1 := []byte("key1")
-		return tx.ZAdd(bucket, key1, 10, []byte("val1"))
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        bucket := "myZSet6"
+        key1 := []byte("key1")
+        return tx.ZAdd(bucket, key1, 10, []byte("val1"))
+    }); err != nil {
+    log.Fatal(err)
 }
 
 if err := db.Update(
-	func(tx *nutsdb.Tx) error {
-		bucket := "myZSet6"
-		key2 := []byte("key2")
-		return tx.ZAdd(bucket, key2, 20, []byte("val2"))
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        bucket := "myZSet6"
+        key2 := []byte("key2")
+        return tx.ZAdd(bucket, key2, 20, []byte("val2"))
+    }); err != nil {
+    log.Fatal(err)
 }
 
 if err := db.Update(
-	func(tx *nutsdb.Tx) error {
-		bucket := "myZSet6"
-		key3 := []byte("key3")
-		return tx.ZAdd(bucket, key3, 30, []byte("val2"))
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        bucket := "myZSet6"
+        key3 := []byte("key3")
+        return tx.ZAdd(bucket, key3, 30, []byte("val2"))
+    }); err != nil {
+    log.Fatal(err)
 }
 
 if err := db.View(
-	func(tx *nutsdb.Tx) error {
-		bucket := "myZSet6"
-		if nodes,err := tx.ZMembers(bucket); err != nil {
-			return err
-		} else {
-			fmt.Println("before ZRemRangeByRank, ZMembers nodes",nodes)
-			for _,node:=range nodes {
-				fmt.Println("item:",node.Key(),node.Score())
-			}
-			// before ZRemRangeByRank, ZMembers nodes map[key3:0xc00008d450 key1:0xc00008d270 key2:0xc00008d360]
-			// item: key1 10
-			// item: key2 20
-			// item: key3 30
-		}
-		return nil
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        bucket := "myZSet6"
+        if nodes,err := tx.ZMembers(bucket); err != nil {
+            return err
+        } else {
+            fmt.Println("before ZRemRangeByRank, ZMembers nodes",nodes)
+            for _,node:=range nodes {
+                fmt.Println("item:",node.Key(),node.Score())
+            }
+            // before ZRemRangeByRank, ZMembers nodes map[key3:0xc00008d450 key1:0xc00008d270 key2:0xc00008d360]
+            // item: key1 10
+            // item: key2 20
+            // item: key3 30
+        }
+        return nil
+    }); err != nil {
+    log.Fatal(err)
 }
 
 if err := db.Update(
-	func(tx *nutsdb.Tx) error {
-		bucket := "myZSet6"
-		if err := tx.ZRemRangeByRank(bucket, 1,2); err != nil {
-			return err
-		}
-		return nil
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        bucket := "myZSet6"
+        if err := tx.ZRemRangeByRank(bucket, 1,2); err != nil {
+            return err
+        }
+        return nil
+    }); err != nil {
+    log.Fatal(err)
 }
 
 if err := db.View(
-	func(tx *nutsdb.Tx) error {
-		bucket := "myZSet6"
-		if nodes,err := tx.ZMembers(bucket); err != nil {
-			return err
-		} else {
-			fmt.Println("after ZRemRangeByRank, ZMembers nodes",nodes)
-			for _,node:=range nodes {
-				fmt.Println("item:",node.Key(),node.Score())
-			}
-			// after ZRemRangeByRank, ZMembers nodes map[key3:0xc00008d450]
-			// item: key3 30
-			// key1 ZScore 10
-		}
-		return nil
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        bucket := "myZSet6"
+        if nodes,err := tx.ZMembers(bucket); err != nil {
+            return err
+        } else {
+            fmt.Println("after ZRemRangeByRank, ZMembers nodes",nodes)
+            for _,node:=range nodes {
+                fmt.Println("item:",node.Key(),node.Score())
+            }
+            // after ZRemRangeByRank, ZMembers nodes map[key3:0xc00008d450]
+            // item: key3 30
+            // key1 ZScore 10
+        }
+        return nil
+    }); err != nil {
+    log.Fatal(err)
 }
 ```
 ##### ZScore
@@ -1854,16 +1856,16 @@ if err := db.View(
 
 ```go
 if err := db.View(
-	func(tx *nutsdb.Tx) error {
-		bucket := "myZSet7"
-		if score,err := tx.ZScore(bucket, []byte("key1")); err != nil {
-			return err
-		} else {
-			fmt.Println("ZScore key1 score:",score)
-		}
-		return nil
-	}); err != nil {
-	log.Fatal(err)
+    func(tx *nutsdb.Tx) error {
+        bucket := "myZSet7"
+        if score,err := tx.ZScore(bucket, []byte("key1")); err != nil {
+            return err
+        } else {
+            fmt.Println("ZScore key1 score:",score)
+        }
+        return nil
+    }); err != nil {
+    log.Fatal(err)
 }
 ```
 ### 与其他数据库的比较
@@ -1906,24 +1908,24 @@ badger 2019/03/11 18:06:05 INFO: All 0 tables opened in 0s
 goos: darwin
 goarch: amd64
 pkg: github.com/xujiajun/kvstore-bench
-BenchmarkBadgerDBPutValue64B-8    	   10000	    112382 ns/op	    2374 B/op	      74 allocs/op
-BenchmarkBadgerDBPutValue128B-8   	   20000	     94110 ns/op	    2503 B/op	      74 allocs/op
-BenchmarkBadgerDBPutValue256B-8   	   20000	     93480 ns/op	    2759 B/op	      74 allocs/op
-BenchmarkBadgerDBPutValue512B-8   	   10000	    101407 ns/op	    3271 B/op	      74 allocs/op
-BenchmarkBadgerDBGet-8            	 1000000	      1552 ns/op	     416 B/op	       9 allocs/op
-BenchmarkBoltDBPutValue64B-8      	   10000	    203128 ns/op	   21231 B/op	      62 allocs/op
-BenchmarkBoltDBPutValue128B-8     	    5000	    229568 ns/op	   13716 B/op	      64 allocs/op
-BenchmarkBoltDBPutValue256B-8     	   10000	    196513 ns/op	   17974 B/op	      64 allocs/op
-BenchmarkBoltDBPutValue512B-8     	   10000	    199805 ns/op	   17064 B/op	      64 allocs/op
-BenchmarkBoltDBGet-8              	 1000000	      1122 ns/op	     592 B/op	      10 allocs/op
-BenchmarkNutsDBPutValue64B-8      	   30000	     53614 ns/op	     626 B/op	      14 allocs/op
-BenchmarkNutsDBPutValue128B-8     	   30000	     51998 ns/op	     664 B/op	      13 allocs/op
-BenchmarkNutsDBPutValue256B-8     	   30000	     53958 ns/op	     920 B/op	      13 allocs/op
-BenchmarkNutsDBPutValue512B-8     	   30000	     55787 ns/op	    1432 B/op	      13 allocs/op
-BenchmarkNutsDBGet-8              	 2000000	       661 ns/op	      88 B/op	       3 allocs/op
-BenchmarkNutsDBGetByHintKey-8     	   50000	     27255 ns/op	     840 B/op	      16 allocs/op
+BenchmarkBadgerDBPutValue64B-8         10000        112382 ns/op        2374 B/op         74 allocs/op
+BenchmarkBadgerDBPutValue128B-8        20000         94110 ns/op        2503 B/op         74 allocs/op
+BenchmarkBadgerDBPutValue256B-8        20000         93480 ns/op        2759 B/op         74 allocs/op
+BenchmarkBadgerDBPutValue512B-8        10000        101407 ns/op        3271 B/op         74 allocs/op
+BenchmarkBadgerDBGet-8               1000000          1552 ns/op         416 B/op          9 allocs/op
+BenchmarkBoltDBPutValue64B-8           10000        203128 ns/op       21231 B/op         62 allocs/op
+BenchmarkBoltDBPutValue128B-8           5000        229568 ns/op       13716 B/op         64 allocs/op
+BenchmarkBoltDBPutValue256B-8          10000        196513 ns/op       17974 B/op         64 allocs/op
+BenchmarkBoltDBPutValue512B-8          10000        199805 ns/op       17064 B/op         64 allocs/op
+BenchmarkBoltDBGet-8                 1000000          1122 ns/op         592 B/op         10 allocs/op
+BenchmarkNutsDBPutValue64B-8           30000         53614 ns/op         626 B/op         14 allocs/op
+BenchmarkNutsDBPutValue128B-8          30000         51998 ns/op         664 B/op         13 allocs/op
+BenchmarkNutsDBPutValue256B-8          30000         53958 ns/op         920 B/op         13 allocs/op
+BenchmarkNutsDBPutValue512B-8          30000         55787 ns/op        1432 B/op         13 allocs/op
+BenchmarkNutsDBGet-8                 2000000           661 ns/op          88 B/op          3 allocs/op
+BenchmarkNutsDBGetByHintKey-8          50000         27255 ns/op         840 B/op         16 allocs/op
 PASS
-ok  	github.com/xujiajun/kvstore-bench	83.856s
+ok      github.com/xujiajun/kvstore-bench   83.856s
 ```
 
 ## 结论:
