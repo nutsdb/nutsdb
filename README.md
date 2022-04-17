@@ -536,7 +536,9 @@ if err := db.View(
 ```
 ### Merge Operation
 
-NutsDB supports merge operation. you can use `db.Merge()` function removes dirty data and reduce data redundancy. Call this function from a read-write transaction. It will block other write request. So you can execute it at the appropriate time.
+In order to maintain high-performance writing, NutsDB will write multiple copies of the same key. If your service has multiple updates or deletions to the same key, and you want to merge the same key, you can use NutsDB to provide `db.Merge()`method. This method requires you to write a merge strategy according to the actual situation. Once executed, it will affect normal write requests, so it is best to avoid peak periods, such as scheduled execution in the middle of the night.
+
+Of course, if you don't have too many updates or deletes for the same key, it is recommended not to use the Merge() function.
 
 ```golang
 err := db.Merge()
