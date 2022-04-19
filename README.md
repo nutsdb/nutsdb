@@ -536,7 +536,7 @@ if err := db.View(
 ```
 ### Merge Operation
 
-In order to maintain high-performance writing, NutsDB will write multiple copies of the same key. If your service has multiple updates or deletions to the same key, and you want to merge the same key, you can use NutsDB to provide `db.Merge()`method. This method requires you to write a merge strategy according to the actual situation. Once executed, it will affect normal write requests, so it is best to avoid peak periods, such as scheduled execution in the middle of the night.
+In order to maintain high-performance writing, NutsDB will write multiple copies of the same key. If your service has multiple updates or deletions to the same key, and you want to merge the same key, you can use NutsDB to provide `db.Merge()`method. This method requires you to write a merge strategy according to the actual situation. Once executed, it will block normal write requests, so it is best to avoid peak periods, such as scheduled execution in the middle of the night.
 
 Of course, if you don't have too many updates or deletes for the same key, it is recommended not to use the Merge() function.
 
