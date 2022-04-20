@@ -25,8 +25,8 @@ import (
 
 type EntryTestSuite struct {
 	suite.Suite
-	entry        Entry
-	expectEncode []byte
+	entry          Entry
+	expectedEncode []byte
 }
 
 func (suite *EntryTestSuite) SetupSuite() {
@@ -44,11 +44,11 @@ func (suite *EntryTestSuite) SetupSuite() {
 		},
 		position: 0,
 	}
-	suite.expectEncode = []byte{48, 176, 185, 16, 1, 38, 64, 92, 0, 0, 0, 0, 8, 0, 0, 0, 8, 0, 0, 0, 1, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 116, 101, 115, 116, 95, 101, 110, 116, 114, 121, 107, 101, 121, 95, 48, 48, 48, 49, 118, 97, 108, 95, 48, 48, 48, 49}
+	suite.expectedEncode = []byte{48, 176, 185, 16, 1, 38, 64, 92, 0, 0, 0, 0, 8, 0, 0, 0, 8, 0, 0, 0, 1, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 116, 101, 115, 116, 95, 101, 110, 116, 114, 121, 107, 101, 121, 95, 48, 48, 48, 49, 118, 97, 108, 95, 48, 48, 48, 49}
 }
 
 func (suite *EntryTestSuite) TestEncode() {
-	ok := reflect.DeepEqual(suite.entry.Encode(), suite.expectEncode)
+	ok := reflect.DeepEqual(suite.entry.Encode(), suite.expectedEncode)
 	assert.True(suite.T(), ok, "entry's encode test fail")
 }
 
@@ -62,8 +62,8 @@ func (suite *EntryTestSuite) TestIsZero() {
 
 func (suite *EntryTestSuite) TestGetCrc() {
 
-	crc1 := suite.entry.GetCrc(suite.expectEncode[:42])
-	crc2 := binary.LittleEndian.Uint32(suite.expectEncode[:4])
+	crc1 := suite.entry.GetCrc(suite.expectedEncode[:42])
+	crc2 := binary.LittleEndian.Uint32(suite.expectedEncode[:4])
 
 	if crc1 != crc2 {
 		assert.Fail(suite.T(), "entry's GetCrc test fail")

@@ -26,9 +26,9 @@ import (
 
 type BucketTestSuite struct {
 	suite.Suite
-	bucketMeat   *BucketMeta
-	exceptEncode []byte
-	tempFile     string
+	bucketMeat     *BucketMeta
+	expectedEncode []byte
+	tempFile       string
 }
 
 func (suite *BucketTestSuite) SetupSuite() {
@@ -38,14 +38,14 @@ func (suite *BucketTestSuite) SetupSuite() {
 		startSize: 6,
 		endSize:   6,
 	}
-	suite.exceptEncode = []byte{51, 34, 113, 225, 6, 0, 0, 0, 6, 0, 0, 0, 107, 101, 121, 49, 48, 48, 107, 101, 121, 57, 57, 57}
+	suite.expectedEncode = []byte{51, 34, 113, 225, 6, 0, 0, 0, 6, 0, 0, 0, 107, 101, 121, 49, 48, 48, 107, 101, 121, 57, 57, 57}
 	suite.tempFile = "/tmp/metadata.meta"
 	fd, err := os.OpenFile(filepath.Clean(suite.tempFile), os.O_CREATE|os.O_RDWR, 0644)
 	if err != nil {
 		require.Failf(suite.T(), "init file fail", err.Error())
 	}
 
-	_, err = fd.WriteAt(suite.exceptEncode, 0)
+	_, err = fd.WriteAt(suite.expectedEncode, 0)
 	if err != nil {
 		require.Failf(suite.T(), "write data to file fail", err.Error())
 	}
@@ -54,7 +54,7 @@ func (suite *BucketTestSuite) SetupSuite() {
 
 func (suite *BucketTestSuite) TestEncode() {
 	encodeValue := suite.bucketMeat.Encode()
-	assert.Equal(suite.T(), suite.exceptEncode, encodeValue)
+	assert.Equal(suite.T(), suite.expectedEncode, encodeValue)
 }
 
 func (suite *BucketTestSuite) TestReadBucketMeta() {
