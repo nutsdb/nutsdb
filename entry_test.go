@@ -15,11 +15,22 @@
 package nutsdb
 
 import (
+	"encoding/binary"
+	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 )
 
-func TestEntry_All(t *testing.T) {
-	entry := Entry{
+type EntryTestSuite struct {
+	suite.Suite
+	entry          Entry
+	expectedEncode []byte
+}
+
+func (suite *EntryTestSuite) SetupSuite() {
+	suite.entry = Entry{
 		Key:   []byte("key_0001"),
 		Value: []byte("val_0001"),
 		Meta: &MetaData{
@@ -28,23 +39,37 @@ func TestEntry_All(t *testing.T) {
 			Timestamp:  1547707905,
 			TTL:        Persistent,
 			Bucket:     []byte("test_entry"),
-			BucketSize: uint32(len("test_datafile")),
+			BucketSize: uint32(len("test_entry")),
 			Flag:       DataSetFlag,
 		},
 		position: 0,
 	}
+	suite.expectedEncode = []byte{48, 176, 185, 16, 1, 38, 64, 92, 0, 0, 0, 0, 8, 0, 0, 0, 8, 0, 0, 0, 1, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 116, 101, 115, 116, 95, 101, 110, 116, 114, 121, 107, 101, 121, 95, 48, 48, 48, 49, 118, 97, 108, 95, 48, 48, 48, 49}
+}
 
-	expectedEncodeVal := []byte{172, 41, 40, 169, 1, 38, 64, 92, 0, 0, 0, 0, 8, 0, 0, 0, 8, 0, 0, 0, 1, 0, 0, 0, 0, 0, 13, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 116, 101, 115, 116, 95, 101, 110, 116, 114, 121, 0, 0, 0, 107, 101, 121, 95, 48, 48, 48, 49, 118, 97, 108, 95, 48, 48, 48, 49}
+func (suite *EntryTestSuite) TestEncode() {
+	ok := reflect.DeepEqual(suite.entry.Encode(), suite.expectedEncode)
+	assert.True(suite.T(), ok, "entry's encode test fail")
+}
 
-	if string(expectedEncodeVal) != string(entry.Encode()) {
-		t.Errorf("err TestEntry_Encode got %s want %s", string(entry.Encode()), string(expectedEncodeVal))
+func (suite *EntryTestSuite) TestIsZero() {
+
+	if ok := suite.entry.IsZero(); ok {
+		assert.Fail(suite.T(), "entry's IsZero test fail")
 	}
 
-	if entry.IsZero() {
-		t.Errorf("err entry.IsZero got %v want %v", true, false)
-	}
+}
 
-	if entry.GetCrc(entry.Encode()) != 529078050 {
-		t.Errorf("err entry.GetCrc got %d want %d", entry.GetCrc(entry.Encode()), 2777557425)
+func (suite *EntryTestSuite) TestGetCrc() {
+
+	crc1 := suite.entry.GetCrc(suite.expectedEncode[:42])
+	crc2 := binary.LittleEndian.Uint32(suite.expectedEncode[:4])
+
+	if crc1 != crc2 {
+		assert.Fail(suite.T(), "entry's GetCrc test fail")
 	}
+}
+
+func TestEntrySuit(t *testing.T) {
+	suite.Run(t, new(EntryTestSuite))
 }

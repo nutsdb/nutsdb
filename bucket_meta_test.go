@@ -15,29 +15,54 @@
 package nutsdb
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 )
 
-func TestBucketMeta_All(t *testing.T) {
-	bucketMeta := &BucketMeta{
+type BucketTestSuite struct {
+	suite.Suite
+	bucketMeat     *BucketMeta
+	expectedEncode []byte
+	tempFile       string
+}
+
+func (suite *BucketTestSuite) SetupSuite() {
+	suite.bucketMeat = &BucketMeta{
 		start:     []byte("key100"),
 		end:       []byte("key999"),
 		startSize: 6,
 		endSize:   6,
 	}
-
-	expectedEncodeVal := []byte{51, 34, 113, 225, 6, 0, 0, 0, 6, 0, 0, 0, 107, 101, 121, 49, 48, 48, 107, 101, 121, 57, 57, 57}
-	if string(expectedEncodeVal) != string(bucketMeta.Encode()) {
-		t.Errorf("err bucketMeta.Encode() got %s want %s", string(entry.Encode()), string(expectedEncodeVal))
+	suite.expectedEncode = []byte{51, 34, 113, 225, 6, 0, 0, 0, 6, 0, 0, 0, 107, 101, 121, 49, 48, 48, 107, 101, 121, 57, 57, 57}
+	suite.tempFile = "/tmp/metadata.meta"
+	fd, err := os.OpenFile(filepath.Clean(suite.tempFile), os.O_CREATE|os.O_RDWR, 0644)
+	if err != nil {
+		require.Failf(suite.T(), "init file fail", err.Error())
 	}
 
-	var expectedSize int64 = 24
-	if bucketMeta.Size() != expectedSize {
-		t.Errorf("err bucketMeta.Size() got %v want %v", bucketMeta.Size(), expectedSize)
+	_, err = fd.WriteAt(suite.expectedEncode, 0)
+	if err != nil {
+		require.Failf(suite.T(), "write data to file fail", err.Error())
 	}
+	defer fd.Close()
+}
 
-	var expectedCrc uint32 = 3410108940
-	if bucketMeta.GetCrc(bucketMeta.Encode()) != expectedCrc {
-		t.Errorf("err bucketMeta.GetCrc got %v want %v", bucketMeta.Size(), expectedCrc)
-	}
+func (suite *BucketTestSuite) TestEncode() {
+	encodeValue := suite.bucketMeat.Encode()
+	assert.Equal(suite.T(), suite.expectedEncode, encodeValue)
+}
+
+func (suite *BucketTestSuite) TestReadBucketMeta() {
+	bucket, err := ReadBucketMeta(suite.tempFile)
+	assert.Nil(suite.T(), err)
+	assert.ObjectsAreEqual(bucket, suite.bucketMeat)
+}
+
+func TestBucketSuit(t *testing.T) {
+	suite.Run(t, new(BucketTestSuite))
 }
