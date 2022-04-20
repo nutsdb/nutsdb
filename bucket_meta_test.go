@@ -44,7 +44,11 @@ func (suite *BucketTestSuite) SetupSuite() {
 	if err != nil {
 		require.Failf(suite.T(), "init file fail", err.Error())
 	}
-	fd.WriteAt(suite.exceptEncode, 0)
+
+	_, err = fd.WriteAt(suite.exceptEncode, 0)
+	if err != nil {
+		require.Failf(suite.T(), "write data to file fail", err.Error())
+	}
 	defer fd.Close()
 }
 
