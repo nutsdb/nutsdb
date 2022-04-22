@@ -497,7 +497,7 @@ func getRecordWrapper(numFound int, keys [][]byte, pointers []interface{}) (reco
 	return records, nil
 }
 
-// PrefixScan returns records at the given prefix and limitNum
+// PrefixScan returns records at the given prefix and limitNum.
 // limitNum: limit the number of the scanned records return.
 func (t *BPTree) PrefixScan(prefix []byte, offsetNum int, limitNum int) (records Records, off int, err error) {
 	var (
