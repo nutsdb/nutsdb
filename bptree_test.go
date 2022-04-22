@@ -352,12 +352,11 @@ func TestBPTree_Update(t *testing.T) {
 		err := tree.Insert(key, &Entry{Key: key, Value: val}, &Hint{Key: key, Meta: &MetaData{
 			Flag: DataSetFlag,
 		}}, CountFlagEnabled)
-		if err != nil {
-			t.Fatal(err)
-		}
+
+		require.NoError(t, err)
 	}
 
-	expected = Records{}
+	expected := Records{}
 	for i := 0; i <= limit; i++ {
 		key := []byte("key_" + fmt.Sprintf("%03d", i))
 		val := []byte("val_modify" + fmt.Sprintf("%03d", i))
@@ -368,14 +367,10 @@ func TestBPTree_Update(t *testing.T) {
 	}
 
 	rs, err := tree.Range([]byte("key_000"), []byte("key_009"))
-	if err != nil {
-		t.Error("err TestBPTree_Update tree.Range scan")
-	}
+	assert.NoError(t, err)
 
 	for i, e := range rs {
-		if string(expected[i].E.Key) != string(e.E.Key) {
-			t.Errorf("err prefix Scan. got %v want %v", string(expected[i].E.Key), string(e.E.Key))
-		}
+		assert.Equal(t, expected[i].E.Key, e.E.Key)
 	}
 
 	// delete
@@ -384,38 +379,24 @@ func TestBPTree_Update(t *testing.T) {
 		err := tree.Insert(key, &Entry{Key: key, Value: nil}, &Hint{Key: key, Meta: &MetaData{
 			Flag: DataDeleteFlag,
 		}}, CountFlagEnabled)
-		if err != nil {
-			t.Fatal(err)
-		}
+
+		assert.NoError(t, err)
 	}
 
 	rs, err = tree.Range([]byte("key_001"), []byte("key_010"))
-
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	for _, v := range rs {
-		if v.H.Meta.Flag != DataDeleteFlag {
-			t.Error("err TestBPTree_Update")
-		}
+		assert.Equal(t, DataDeleteFlag, v.H.Meta.Flag)
 	}
 
 	key := []byte("key_001")
 	err = tree.Insert(key, &Entry{Key: key, Value: nil}, &Hint{Key: key, Meta: &MetaData{
 		Flag: DataSetFlag,
 	}}, CountFlagEnabled)
-
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	r, err := tree.Find(key)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if r.H.Meta.Flag == DataDeleteFlag {
-		t.Error("err TestBPTree_Update")
-	}
+	assert.NoError(t, err)
+	assert.Equal(t, DataSetFlag, r.H.Meta.Flag)
 }
