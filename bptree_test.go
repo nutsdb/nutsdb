@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"regexp"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -308,24 +309,37 @@ func TestBPTree_FindLeaf(t *testing.T) {
 	assert.Equal(t, []byte("key_000"), node.Keys[0])
 }
 
-func TestIsExpired(t *testing.T) {
-	record := &Record{
-		H: &Hint{
-			Meta: &MetaData{
-				Timestamp: 1547707905,
-				TTL:       10,
-			},
-		},
-		E: nil,
-	}
-	if !record.IsExpired() {
-		t.Error("err TestIsExpired")
-	}
+func TestRecordExpired(t *testing.T) {
+	expiredTime := uint64(time.Now().Add(-1 * time.Hour).Unix())
 
-	record.H.Meta.TTL = Persistent
-	if record.IsExpired() {
-		t.Error("err TestIsExpired")
-	}
+	t.Run("test expired record", func(t *testing.T) {
+
+		record := &Record{
+			H: &Hint{
+				Meta: &MetaData{
+					Timestamp: expiredTime,
+					TTL:       10,
+				},
+			},
+			E: nil,
+		}
+
+		assert.True(t, record.IsExpired())
+	})
+
+	t.Run("test persistent record", func(t *testing.T) {
+		record := &Record{
+			H: &Hint{
+				Meta: &MetaData{
+					Timestamp: expiredTime,
+					TTL:       Persistent,
+				},
+			},
+			E: nil,
+		}
+
+		assert.False(t, record.IsExpired())
+	})
 }
 
 func TestBPTree_Update(t *testing.T) {
