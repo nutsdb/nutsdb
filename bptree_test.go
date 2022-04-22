@@ -185,9 +185,8 @@ func TestBPTree_PrefixSearchScan(t *testing.T) {
 
 	tree = NewTree()
 	_, _, err := tree.PrefixSearchScan([]byte("key_"), regs, 1, 10)
-	if err == nil {
-		t.Fatal("err prefix search Scan")
-	}
+	assert.Error(t, err)
+
 	limit := 10
 	setup(t, limit)
 
@@ -197,21 +196,15 @@ func TestBPTree_PrefixSearchScan(t *testing.T) {
 
 	// prefix search scan
 	rss, _, err := tree.PrefixSearchScan([]byte("key_"), regs, 1, limit)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	// prefix search scan
 	rsm, _, err := tree.PrefixSearchScan([]byte("key_"), regm, 5, limit)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	// prefix search scan
 	rsl, _, err := tree.PrefixSearchScan([]byte("key_"), regl, 99, limit)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	for i, e := range rss {
 
@@ -219,16 +212,13 @@ func TestBPTree_PrefixSearchScan(t *testing.T) {
 			continue
 		}
 
-		if string(expected[i].E.Key) != string(e.E.Key) {
-			t.Errorf("err prefix Scan. got %v want %v", string(expected[i].E.Key), string(e.E.Key))
-		}
+		assert.Equal(t, string(expected[i].E.Key), string(e.E.Key))
 
 		if string(expected[i].E.Key) == string(e.E.Key) {
 			break
 		}
 
 		t.Errorf("err prefix search Scan. Regexp not found")
-
 	}
 
 	for i, e := range rsm {
@@ -237,16 +227,13 @@ func TestBPTree_PrefixSearchScan(t *testing.T) {
 			continue
 		}
 
-		if string(expected[i].E.Key) != string(e.E.Key) {
-			t.Errorf("err prefix Scan. got %v want %v", string(expected[i].E.Key), string(e.E.Key))
-		}
+		assert.Equal(t, string(expected[i].E.Key), string(e.E.Key))
 
 		if string(expected[i].E.Key) == string(e.E.Key) {
 			break
 		}
 
 		t.Errorf("err prefix search Scan. Regexp not found")
-
 	}
 
 	for i, e := range rsl {
@@ -255,16 +242,13 @@ func TestBPTree_PrefixSearchScan(t *testing.T) {
 			continue
 		}
 
-		if string(expected[i].E.Key) != string(e.E.Key) {
-			t.Errorf("err prefix search Scan. got %v want %v", string(expected[i].E.Key), string(e.E.Key))
-		}
+		assert.Equal(t, string(expected[i].E.Key), string(e.E.Key))
 
 		if string(expected[i].E.Key) == string(e.E.Key) {
 			break
 		}
 
 		t.Errorf("err prefix search Scan. Regexp not found")
-
 	}
 
 	for i := 0; i <= 100; i++ {
@@ -273,19 +257,14 @@ func TestBPTree_PrefixSearchScan(t *testing.T) {
 		err := tree.Insert(key, &Entry{Key: key, Value: val}, &Hint{Key: key, Meta: &MetaData{
 			Flag: DataSetFlag,
 		}}, CountFlagEnabled)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 	}
 
 	_, _, err = tree.PrefixSearchScan([]byte("name_"), "005", 5, limit)
-	if err != nil {
-		t.Error("err prefix search Scan")
-	}
+	assert.NoError(t, err)
+
 	_, _, err = tree.PrefixSearchScan([]byte("key_"), "099", 99, limit)
-	if err != nil {
-		t.Error("err prefix search Scan")
-	}
+	assert.NoError(t, err)
 }
 
 func TestBPTree_All(t *testing.T) {
