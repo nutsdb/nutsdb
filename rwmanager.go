@@ -15,7 +15,7 @@
 package nutsdb
 
 // RWMode represents the read and write mode.
-type RWMode int
+type RWMode uint8
 
 const (
 	// FileIO represents the read and write mode using standard I/O.

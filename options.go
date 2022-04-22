@@ -15,7 +15,7 @@
 package nutsdb
 
 // EntryIdxMode represents entry index mode.
-type EntryIdxMode int
+type EntryIdxMode uint8
 
 const (
 	// HintKeyValAndRAMIdxMode represents ram index (key and value) mode.

@@ -55,7 +55,7 @@ var (
 
 const (
 	// DataDeleteFlag represents the data delete flag
-	DataDeleteFlag uint16 = iota
+	DataDeleteFlag uint8 = iota
 
 	// DataSetFlag represents the data set flag
 	DataSetFlag
@@ -125,7 +125,7 @@ const (
 
 const (
 	// DataStructureSet represents the data structure set flag
-	DataStructureSet uint16 = iota
+	DataStructureSet uint8 = iota
 
 	// DataStructureSortedSet represents the data structure sorted set flag
 	DataStructureSortedSet
