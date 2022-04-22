@@ -281,33 +281,23 @@ func TestBPTree_All(t *testing.T) {
 func TestBPTree_Range(t *testing.T) {
 	tree = NewTree()
 	_, err := tree.Range([]byte("key_001"), []byte("key_010"))
-	if err == nil {
-		t.Fatal("err prefix Scan")
-	}
+	assert.Error(t, err)
 
 	limit := 10
 	setup(t, limit)
-	// range scan
+
 	rs, err := tree.Range([]byte("key_000"), []byte("key_009"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	for i, e := range rs {
-		if string(expected[i].E.Key) != string(e.E.Key) {
-			t.Errorf("err prefix Scan. got %v want %v", string(expected[i].E.Key), string(e.E.Key))
-		}
+		assert.Equal(t, expected[i].E.Key, e.E.Key)
 	}
 
 	_, err = tree.Range([]byte("key_101"), []byte("key_110"))
-	if err == nil {
-		t.Error("err tree.Range scan")
-	}
+	assert.Error(t, err)
 
 	_, err = tree.Range([]byte("key_101"), []byte("key_100"))
-	if err == nil {
-		t.Error("err tree.Range scan")
-	}
+	assert.Error(t, err)
 }
 
 func TestBPTree_FindLeaf(t *testing.T) {
