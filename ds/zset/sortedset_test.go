@@ -14,299 +14,282 @@
 package zset
 
 import (
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 var ss *SortedSet
 
-func InitData() {
+func InitData(t *testing.T) {
 	ss = New()
-	ss.Put("key1", 1, []byte("a"))
-	ss.Put("key2", 10, []byte("b"))
-	ss.Put("key3", 99.9, []byte("c"))
-	ss.Put("key4", 100, []byte("d"))
-	ss.Put("key5", 100, []byte("b1"))
+	assertions := assert.New(t)
+	assertions.NoError(ss.Put("key1", 1, []byte("a")))
+	assertions.NoError(ss.Put("key2", 10, []byte("b")))
+	assertions.NoError(ss.Put("key3", 99.9, []byte("c")))
+	assertions.NoError(ss.Put("key4", 100, []byte("d")))
+	assertions.NoError(ss.Put("key5", 100, []byte("b1")))
 }
 
 func TestSortedSet_Put(t *testing.T) {
-	InitData()
-
-	if ss.Size() != 5 {
-		t.Error("TestSortedSet_Put err")
-	}
+	InitData(t)
+	assertions := assert.New(t)
+	assertions.Equal(5, ss.Size(), "TestSortedSet_Put err")
 
 	// update
-	ss.Put("key5", 100, []byte("b2"))
+	assertions.NoError(ss.Put("key5", 100, []byte("b2")))
 	n := ss.GetByKey("key5")
-	if string(n.Value) != "b2" {
-		t.Error("TestSortedSet_Put err")
-	}
+	assertions.Equal("b2", string(n.Value), "TestSortedSet_Put err")
 
-	ss.Put("key5", 91, []byte("b2"))
+	assertions.NoError(ss.Put("key5", 91, []byte("b2")))
 
 	n = ss.GetByKey("key5")
-	if n.score != 91 {
-		t.Error("TestSortedSet_Put err")
-	}
+	assertions.EqualValues(91, n.score, "TestSortedSet_Put err") // socre is zset.Score
 }
 
 func TestSortedSet_GetByKey(t *testing.T) {
-	InitData()
+	InitData(t)
+	assertions := assert.New(t)
 	n := ss.GetByKey("key1")
-	if string(n.Value) != "a" {
-		t.Error("TestSortedSet_GetByKey err")
-	}
+	assertions.Equal("a", string(n.Value), "TestSortedSet_GetByKey err")
 }
 
 func TestSortedSet_GetByRank(t *testing.T) {
-	InitData()
+	InitData(t)
+	assertions := assert.New(t)
 	n := ss.GetByRank(1, false)
-	if string(n.Value) != "a" {
-		t.Error("TestSortedSet_GetByRank err")
-	}
+	assertions.Equal("a", string(n.Value), "TestSortedSet_GetByRank err")
 
 	n = ss.GetByRank(4, false)
-	if string(n.Value) != "d" {
-		t.Error("TestSortedSet_GetByRank err")
-	}
+
+	assertions.Equal("d", string(n.Value), "TestSortedSet_GetByRank err")
 
 	n = ss.GetByRank(5, false)
-	if string(n.Value) != "b1" {
-		t.Error("TestSortedSet_GetByRank err")
-	}
 
-	if ss.Size() != 5 {
-		t.Error("TestSortedSet_GetByRank err")
-	}
+	assertions.Equal("b1", string(n.Value), "TestSortedSet_GetByRank err")
+	assertions.Equal(5, ss.Size(), "TestSortedSet_GetByRank err")
 
 	// remove
 	n = ss.GetByRank(5, true)
-	if string(n.Value) != "b1" {
-		t.Error("TestSortedSet_GetByRank err")
-	}
-	if ss.Size() != 4 {
-		t.Error("TestSortedSet_GetByRank err")
-	}
+
+	assertions.Equal("b1", string(n.Value), "TestSortedSet_GetByRank err")
+	assertions.Equal(4, ss.Size(), "TestSortedSet_GetByRank err")
 
 	n = ss.GetByRank(-1, false)
-	if n.key != "key4" {
-		t.Error("TestSortedSet_GetByRank err")
-	}
+
+	assertions.Equal("key4", n.key, "TestSortedSet_GetByRank err")
 
 	n = ss.GetByRank(-3, false)
-	if n.key != "key2" {
-		t.Error("TestSortedSet_GetByRank err")
-	}
+
+	assertions.Equal("key2", n.key, "TestSortedSet_GetByRank err")
 }
 
 func TestSortedSet_GetByRankRange(t *testing.T) {
-	resultSet := getResultSet("key1", "key2")
-	InitData()
+	assertions := assert.New(t)
 
-	for _, n := range ss.GetByRankRange(1, 2, false) {
-		if _, ok := resultSet[n.key]; !ok {
-			t.Error("TestSortedSet_GetByRankRange err")
-		}
+	InitData(t)
+
+	type args struct {
+		start  int
+		end    int
+		remove bool
 	}
 
-	resultSet = getResultSet("key5", "key4")
-
-	for _, n := range ss.GetByRankRange(-1, -2, false) {
-		if _, ok := resultSet[n.key]; !ok {
-			t.Error("TestSortedSet_GetByRankRange err")
-		}
+	tests := []struct {
+		name string
+		args *args
+		ss   *SortedSet
+		want []string
+	}{
+		{
+			"normal-1",
+			&args{1, 2, false},
+			ss,
+			[]string{"key1", "key2"},
+		},
+		{
+			"normal-2 reverse",
+			&args{-1, -2, false},
+			ss,
+			[]string{"key5", "key4"},
+		},
+		{
+			"normal-1",
+			&args{-2, -1, false},
+			ss,
+			[]string{"key4", "key5"},
+		},
+		{
+			"normal-1 reverse",
+			&args{-1, 1, false},
+			ss,
+			[]string{"key5", "key4", "key3", "key2", "key1"},
+		},
+		{
+			"normal",
+			&args{1, -1, false},
+			ss,
+			[]string{"key1", "key2", "key3", "key4", "key5"},
+		},
 	}
 
-	resultSet = getResultSet("key5", "key4", "key3", "key2", "key1")
-
-	for _, n := range ss.GetByRankRange(-1, 1, false) {
-		if _, ok := resultSet[n.key]; !ok {
-			t.Error("TestSortedSet_GetByRankRange err")
-		}
-	}
-
-	for _, n := range ss.GetByRankRange(1, -1, false) {
-		if _, ok := resultSet[n.key]; !ok {
-			t.Error("TestSortedSet_GetByRankRange err")
-		}
-	}
-
-	ss = New()
-	ss.Put("key1", 1, []byte("a"))
-
-	resultSet = getResultSet("key1")
-	for _, n := range ss.GetByRankRange(-1, -2, false) {
-		if _, ok := resultSet[n.key]; !ok {
-			t.Error("TestSortedSet_GetByRankRange err")
-		}
-	}
-
-	for _, n := range ss.GetByRankRange(-2, -1, false) {
-		if _, ok := resultSet[n.key]; !ok {
-			t.Error("TestSortedSet_GetByRankRange err")
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := make([]string, 0)
+			for _, n := range ss.GetByRankRange(tt.args.start, tt.args.end, tt.args.remove) {
+				got = append(got, n.key)
+			}
+			assertions.Equal(tt.want, got, "TestSortedSet_GetByScoreRange err")
+		})
 	}
 }
 
 func TestSortedSet_FindRank(t *testing.T) {
-	var rank int
+	//var rank int
 	ss = New()
-	ss.Put("key0", 0, []byte("a0"))
-	if rank = ss.FindRank("key1"); rank != 0 {
-		t.Error("TestSortedSet_FindRank err")
-	}
+	assertions := assert.New(t)
+	assertions.NoError(ss.Put("key0", 0, []byte("a0")))
 
-	InitData()
+	assertions.Equal(0, ss.FindRank("key1"), "TestSortedSet_FindRank err")
 
-	if rank = ss.FindRank("key1"); rank != 1 {
-		t.Error("TestSortedSet_FindRank err")
-	}
+	InitData(t)
 
-	if rank = ss.FindRank("key4"); rank != 4 {
-		t.Error("TestSortedSet_FindRank err")
-	}
+	assertions.Equal(1, ss.FindRank("key1"), "TestSortedSet_FindRank err")
 
-	if rank = ss.FindRank("key5"); rank != 5 {
-		t.Error("TestSortedSet_FindRank err")
-	}
+	assertions.Equal(4, ss.FindRank("key4"), "TestSortedSet_FindRank err")
+
+	assertions.Equal(5, ss.FindRank("key5"), "TestSortedSet_FindRank err")
+
 }
 
 func TestSortedSet_FindRevRank(t *testing.T) {
-	var rank int
+
 	ss = New()
+	assertions := assert.New(t)
 
-	if rank = ss.FindRevRank("key1"); rank != 0 {
-		t.Error("TestSortedSet_FindRevRank err")
-	}
-	ss.Put("key0", 0, []byte("a0"))
+	assertions.Equal(0, ss.FindRevRank("key1"), "TestSortedSet_FindRevRank err")
 
-	if rank = ss.FindRevRank("key1"); rank != 0 {
-		t.Error("TestSortedSet_FindRevRank err")
-	}
+	assertions.NoError(ss.Put("key0", 0, []byte("a0")))
 
-	InitData()
+	assertions.Equal(0, ss.FindRevRank("key1"), "TestSortedSet_FindRevRank err")
 
-	if rank = ss.FindRevRank("key1"); rank != 5 {
-		t.Error("TestSortedSet_FindRank err")
-	}
+	InitData(t)
 
-	if rank = ss.FindRevRank("key2"); rank != 4 {
-		t.Error("TestSortedSet_FindRank err")
-	}
+	assertions.Equal(5, ss.FindRevRank("key1"), "TestSortedSet_FindRevRank err")
 
-	if rank = ss.FindRevRank("key3"); rank != 3 {
-		t.Error("TestSortedSet_FindRank err")
-	}
+	assertions.Equal(4, ss.FindRevRank("key2"), "TestSortedSet_FindRevRank err")
 
-	if rank = ss.FindRevRank("key5"); rank != 1 {
-		t.Error("TestSortedSet_FindRank err")
-	}
+	assertions.Equal(3, ss.FindRevRank("key3"), "TestSortedSet_FindRevRank err")
+
+	assertions.Equal(1, ss.FindRevRank("key5"), "TestSortedSet_FindRevRank err")
 }
 
 func TestSortedSet_GetByScoreRange(t *testing.T) {
-	InitData()
-	resultSet := getResultSet("key5", "key4", "key3")
+	InitData(t)
+	assertions := assert.New(t)
 
-	for _, n := range ss.GetByScoreRange(90, 100, nil) {
-		if _, ok := resultSet[n.key]; !ok {
-			t.Error("TestSortedSet_GetByScoreRange err")
-		}
+	type args struct {
+		start   SCORE
+		end     SCORE
+		options *GetByScoreRangeOptions
 	}
 
-	resultSet = getResultSet("key3")
-	for _, n := range ss.GetByScoreRange(90, 100, &GetByScoreRangeOptions{
-		ExcludeEnd: true,
-	}) {
-		if _, ok := resultSet[n.key]; !ok {
-			t.Error("TestSortedSet_GetByScoreRange err")
-		}
+	tests := []struct {
+		name string
+		args *args
+		ss   *SortedSet
+		want []string
+	}{
+		{
+			"normal-1",
+			&args{90, 100, nil},
+			ss,
+			[]string{"key5", "key4", "key3"},
+		},
+		{
+			"normal-2 options",
+			&args{90, 100, &GetByScoreRangeOptions{ExcludeEnd: true}},
+			ss,
+			[]string{"key3"},
+		},
+		{
+			"normal-3 options",
+			&args{10, 100, &GetByScoreRangeOptions{ExcludeStart: true}},
+			ss,
+			[]string{"key5", "key4", "key3"},
+		},
+		{
+			"normal-4 options",
+			&args{10, 100, &GetByScoreRangeOptions{ExcludeStart: true, ExcludeEnd: true}},
+			ss,
+			[]string{"key3"},
+		},
+		{
+			"normal-5 options",
+			&args{10, 100, &GetByScoreRangeOptions{Limit: 3}},
+			ss,
+			[]string{"key2", "key3", "key4"},
+		},
+		{
+			"normal-6 reverse",
+			&args{100, 99.999, nil},
+			ss,
+			[]string{"key4", "key5"},
+		},
+		{
+			"normal-7 reverse",
+			&args{100, 99.9, &GetByScoreRangeOptions{
+				ExcludeEnd: true,
+			}},
+			ss,
+			[]string{"key5", "key4"},
+		},
+		{
+			"normal-8 reverse",
+			&args{100, 99.9, &GetByScoreRangeOptions{
+				ExcludeStart: true,
+			}},
+			ss,
+			[]string{"key3"},
+		},
 	}
 
-	resultSet = getResultSet("key5", "key4", "key3")
-
-	for _, n := range ss.GetByScoreRange(10, 100, &GetByScoreRangeOptions{
-		ExcludeStart: true,
-	}) {
-		if _, ok := resultSet[n.key]; !ok {
-			t.Error("TestSortedSet_GetByScoreRange err")
-		}
-	}
-
-	resultSet = getResultSet("key3")
-	for _, n := range ss.GetByScoreRange(10, 100, &GetByScoreRangeOptions{
-		ExcludeStart: true,
-		ExcludeEnd:   true,
-	}) {
-		if _, ok := resultSet[n.key]; !ok {
-			t.Error("TestSortedSet_GetByScoreRange err")
-		}
-	}
-}
-
-func TestSortedSet_GetByScoreRange2(t *testing.T) {
-	InitData()
-	resultSet := getResultSet("key2", "key3", "key4")
-	for _, n := range ss.GetByScoreRange(10, 100, &GetByScoreRangeOptions{
-		Limit: 3,
-	}) {
-		if _, ok := resultSet[n.key]; !ok {
-			t.Error("TestSortedSet_GetByScoreRange err")
-		}
-	}
-
-	resultSet = getResultSet("key4", "key5")
-	for _, n := range ss.GetByScoreRange(100, 99.999, nil) {
-		if _, ok := resultSet[n.key]; !ok {
-			t.Error("TestSortedSet_GetByScoreRange err")
-		}
-	}
-
-	resultSet = getResultSet("key4", "key5")
-	for _, n := range ss.GetByScoreRange(100, 99.9, &GetByScoreRangeOptions{
-		ExcludeEnd: true,
-	}) {
-		if _, ok := resultSet[n.key]; !ok {
-			t.Error("TestSortedSet_GetByScoreRange err")
-		}
-	}
-
-	resultSet = getResultSet("key3")
-
-	for _, n := range ss.GetByScoreRange(100, 99.9, &GetByScoreRangeOptions{
-		ExcludeStart: true,
-	}) {
-		if _, ok := resultSet[n.key]; !ok {
-			t.Error("TestSortedSet_GetByScoreRange err")
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := make([]string, 0)
+			for _, n := range ss.GetByScoreRange(tt.args.start, tt.args.end, tt.args.options) {
+				got = append(got, n.key)
+			}
+			assertions.ElementsMatch(tt.want, got, "TestSortedSet_GetByScoreRange err")
+		})
 	}
 }
 
 func TestSortedSet_PeekMax(t *testing.T) {
-	InitData()
+	InitData(t)
+	assertions := assert.New(t)
 
 	n := ss.PeekMax()
-	if n.Key() != "key5" || n.Score() != 100 {
-		t.Error("TestSortedSet_PeekMax err")
-	}
+
+	assertions.Equal("key5", n.Key(), "TestSortedSet_PeekMax err")
+	assertions.EqualValues(100, n.Score(), "TestSortedSet_PeekMax err")
 }
 
 func TestSortedSet_PeekMin(t *testing.T) {
-	InitData()
+	InitData(t)
+	assertions := assert.New(t)
 
 	n := ss.PeekMin()
-	if n.key != "key1" {
-		t.Error("TestSortedSet_PeekMax err")
-	}
+
+	assertions.Equal("key1", n.key, "TestSortedSet_PeekMax err")
 }
 
 func TestSortedSet_PopMin(t *testing.T) {
-	InitData()
+	InitData(t)
+	assertions := assert.New(t)
 
 	n := ss.PopMin()
-	if n.key != "key1" {
-		t.Error("TestSortedSet_PopMin err")
-	}
 
+	assertions.Equal("key1", n.key, "TestSortedSet_PopMin err")
 	resultSet := getResultSet("key2", "key3", "key4", "key5")
 
 	for key := range ss.Dict {
@@ -314,16 +297,16 @@ func TestSortedSet_PopMin(t *testing.T) {
 			t.Error("TestSortedSet_PopMin err")
 		}
 	}
+
 }
 
 func TestSortedSet_PopMax(t *testing.T) {
-	InitData()
+	InitData(t)
+	assertions := assert.New(t)
 
 	n := ss.PopMax()
-	if n.key != "key5" {
-		t.Error("TestSortedSet_PopMax err")
-	}
 
+	assertions.Equal("key5", n.key, "TestSortedSet_PopMax err")
 	resultSet := getResultSet("key1", "key2", "key3", "key4")
 	for key := range ss.Dict {
 		if _, ok := resultSet[key]; !ok {
@@ -333,7 +316,7 @@ func TestSortedSet_PopMax(t *testing.T) {
 }
 
 func TestSortedSet_Remove(t *testing.T) {
-	InitData()
+	InitData(t)
 
 	ss.Remove("key1")
 
@@ -347,11 +330,9 @@ func TestSortedSet_Remove(t *testing.T) {
 }
 
 func TestSortedSet_Size(t *testing.T) {
-	InitData()
-
-	if ss.Size() != 5 {
-		t.Error("TestSortedSet_Size err")
-	}
+	InitData(t)
+	assertions := assert.New(t)
+	assertions.Equal(5, ss.Size(), "TestSortedSet_Size err")
 }
 
 func getResultSet(items ...string) map[string]struct{} {
