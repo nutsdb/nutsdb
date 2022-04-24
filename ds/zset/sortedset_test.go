@@ -14,8 +14,9 @@
 package zset
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 var ss *SortedSet
