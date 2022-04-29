@@ -997,16 +997,21 @@ func (db *DB) getBPTRootTxIDPath(fID int64) string {
 
 func (db *DB) getPendingMergeEntries(entry *Entry, pendingMergeEntries []*Entry) []*Entry {
 	if entry.Meta.Ds == DataStructureBPTree {
-		if r, err := db.BPTreeIdx[string(entry.Meta.Bucket)].Find(entry.Key); err == nil {
-			if r.H.Meta.Flag == DataSetFlag {
+		bptIdx, exist := db.BPTreeIdx[string(entry.Meta.Bucket)]
+		if exist {
+			r, err := bptIdx.Find(entry.Key)
+			if err == nil && r.H.Meta.Flag == DataSetFlag {
 				pendingMergeEntries = append(pendingMergeEntries, entry)
 			}
 		}
 	}
 
 	if entry.Meta.Ds == DataStructureSet {
-		if db.SetIdx[string(entry.Meta.Bucket)].SIsMember(string(entry.Key), entry.Value) {
-			pendingMergeEntries = append(pendingMergeEntries, entry)
+		setIdx, exist := db.SetIdx[string(entry.Meta.Bucket)]
+		if exist {
+			if setIdx.SIsMember(string(entry.Key), entry.Value) {
+				pendingMergeEntries = append(pendingMergeEntries, entry)
+			}
 		}
 	}
 
@@ -1014,25 +1019,31 @@ func (db *DB) getPendingMergeEntries(entry *Entry, pendingMergeEntries []*Entry)
 		keyAndScore := strings.Split(string(entry.Key), SeparatorForZSetKey)
 		if len(keyAndScore) == 2 {
 			key := keyAndScore[0]
-			n := db.SortedSetIdx[string(entry.Meta.Bucket)].GetByKey(key)
-			if n != nil {
-				pendingMergeEntries = append(pendingMergeEntries, entry)
+			sortedSetIdx, exist := db.SortedSetIdx[string(entry.Meta.Bucket)]
+			if exist {
+				n := sortedSetIdx.GetByKey(key)
+				if n != nil {
+					pendingMergeEntries = append(pendingMergeEntries, entry)
+				}
 			}
 		}
 	}
 
 	if entry.Meta.Ds == DataStructureList {
-		items, _ := db.ListIdx[string(entry.Meta.Bucket)].LRange(string(entry.Key), 0, -1)
-		ok := false
-		if entry.Meta.Flag == DataRPushFlag || entry.Meta.Flag == DataLPushFlag {
-			for _, item := range items {
-				if string(entry.Value) == string(item) {
-					ok = true
-					break
+		listIdx, exist := db.ListIdx[string(entry.Meta.Bucket)]
+		if exist {
+			items, _ := listIdx.LRange(string(entry.Key), 0, -1)
+			ok := false
+			if entry.Meta.Flag == DataRPushFlag || entry.Meta.Flag == DataLPushFlag {
+				for _, item := range items {
+					if string(entry.Value) == string(item) {
+						ok = true
+						break
+					}
 				}
-			}
-			if ok {
-				pendingMergeEntries = append(pendingMergeEntries, entry)
+				if ok {
+					pendingMergeEntries = append(pendingMergeEntries, entry)
+				}
 			}
 		}
 	}
