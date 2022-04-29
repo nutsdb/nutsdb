@@ -20,6 +20,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/xujiajun/utils/strconv2"
 )
 
@@ -62,63 +64,55 @@ func InitForBPTSparseIdxMode() {
 }
 
 func TestTx_PutAndGet(t *testing.T) {
-	Init()
-	db, err = Open(opt)
-	if err != nil {
-		t.Fatal(err)
-	}
 
-	// write tx begin
-	tx, err := db.Begin(true)
-	if err != nil {
-		t.Fatal(err)
-	}
+	var (
+		bucket = "bucket1"
+		key    = []byte("key1")
+		val    = []byte("val1")
+	)
 
-	bucket := "bucket1"
-	key := []byte("key1")
-	val := []byte("val1")
+	t.Run("put_and_get", func(t *testing.T) {
 
-	if err = tx.Put(bucket, key, val, Persistent); err != nil {
-		// tx rollback
-		err = tx.Rollback()
-		t.Fatal(err)
-	} else {
-		// tx commit
-		tx.Commit()
-	}
+		withDefaultDB(t, func(t *testing.T, db *DB) {
 
-	// read tx begin
-	tx, err = db.Begin(false)
-	if err != nil {
-		t.Fatal(err)
-	}
+			{
+				tx, err := db.Begin(true)
+				require.NoError(t, err)
 
-	if e, err := tx.Get(bucket, key); err != nil {
-		// tx rollback
-		tx.Rollback()
-	} else {
-		// tx commit
-		tx.Commit()
+				err = tx.Put(bucket, key, val, Persistent)
+				assert.NoError(t, err)
 
-		if string(e.Value) != string(val) {
-			t.Errorf("err tx.Get. got %s want %s", string(e.Value), string(val))
-		}
+				err = tx.Commit()
+				assert.NoError(t, err)
+			}
 
-		e, err = tx.Get(bucket, key)
-		if err == nil {
-			t.Errorf("TestTx_PutAndGet err")
-		}
+			{
+				tx, err = db.Begin(false)
+				require.NoError(t, err)
 
-	}
+				e, err := tx.Get(bucket, key)
+				assert.NoError(t, err)
+				err = tx.Commit()
+				assert.NoError(t, err)
 
-	// test db close
-	db.Close()
+				assert.Equal(t, val, e.Value)
+			}
 
-	if err = tx.Put(bucket, key, val, Persistent); err != nil {
-		tx.Rollback()
-	} else {
-		t.Error("err tx.Put")
-	}
+		})
+	})
+
+	t.Run("get by closed tx", func(t *testing.T) {
+
+		withDefaultDB(t, func(t *testing.T, db *DB) {
+
+			tx, err := db.Begin(false)
+			require.NoError(t, err)
+			err = tx.Commit()
+
+			_, err = tx.Get(bucket, key) // use closed tx
+			assert.Error(t, err)
+		})
+	})
 
 }
 
