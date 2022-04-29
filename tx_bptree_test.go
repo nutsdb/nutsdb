@@ -117,62 +117,68 @@ func TestTx_PutAndGet(t *testing.T) {
 }
 
 func TestTx_GetAll(t *testing.T) {
-	Init()
-	db, err = Open(opt)
-	defer db.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
+	var (
+		bucket = "bucket_for_scanAll"
+	)
 
-	bucket := "bucket_for_scanAll"
+	t.Run("get_all_from_empty_db", func(t *testing.T) {
 
-	tx, err = db.Begin(false)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err := tx.GetAll(bucket)
-	if err == nil {
-		t.Error("err TestTx_GetAll")
-	}
-	tx.Commit()
+		withDefaultDB(t, func(t *testing.T, db *DB) {
 
-	tx, err := db.Begin(true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	key0 := []byte("key_" + fmt.Sprintf("%07d", 0))
-	val0 := []byte("val" + fmt.Sprintf("%07d", 0))
-	if err = tx.Put(bucket, key0, val0, Persistent); err != nil {
-		err = tx.Rollback()
-		t.Fatal(err)
-	}
+			tx, err := db.Begin(false)
+			require.NoError(t, err)
+			defer tx.Commit()
 
-	key1 := []byte("key_" + fmt.Sprintf("%07d", 1))
-	val1 := []byte("val" + fmt.Sprintf("%07d", 1))
-	if err = tx.Put(bucket, key1, val1, Persistent); err != nil {
-		err = tx.Rollback()
-		t.Fatal(err)
-	}
+			_, err = tx.GetAll(bucket)
+			assert.Error(t, err)
+		})
+	})
 
-	tx.Commit()
+	t.Run("get_all_from_db", func(t *testing.T) {
 
-	tx, err = db.Begin(false)
-	if err != nil {
-		t.Fatal(err)
-	}
+		withDefaultDB(t, func(t *testing.T, db *DB) {
 
-	if entries, err := tx.GetAll(bucket); err != nil {
-		tx.Rollback()
-		t.Error(err)
-	} else {
-		for i, entry := range entries {
-			key := []byte("key_" + fmt.Sprintf("%07d", i))
-			if string(key) != string(entry.Key) {
-				t.Error("err get all")
+			{
+				// setup the data
+
+				tx, err := db.Begin(true)
+				require.NoError(t, err)
+
+				key0 := []byte("key_" + fmt.Sprintf("%07d", 0))
+				val0 := []byte("val" + fmt.Sprintf("%07d", 0))
+				err = tx.Put(bucket, key0, val0, Persistent)
+				assert.NoError(t, err)
+
+				key1 := []byte("key_" + fmt.Sprintf("%07d", 1))
+				val1 := []byte("val" + fmt.Sprintf("%07d", 1))
+				err = tx.Put(bucket, key1, val1, Persistent)
+				assert.NoError(t, err)
+
+				assert.NoError(t, tx.Commit())
 			}
-		}
-		tx.Commit()
-	}
+
+			{
+				// check the data
+
+				tx, err = db.Begin(false)
+				require.NoError(t, err)
+
+				entries, err := tx.GetAll(bucket)
+				assert.NoError(t, err)
+
+				for i, entry := range entries {
+					wantKey := []byte("key_" + fmt.Sprintf("%07d", i))
+					wantVal := []byte("val" + fmt.Sprintf("%07d", i))
+
+					assert.Equal(t, wantKey, entry.Key)
+					assert.Equal(t, wantVal, entry.Value)
+				}
+
+				assert.NoError(t, tx.Commit())
+
+			}
+		})
+	})
 }
 
 func TestTx_RangeScan_Err(t *testing.T) {
