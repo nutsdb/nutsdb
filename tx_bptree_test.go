@@ -182,56 +182,40 @@ func TestTx_GetAll(t *testing.T) {
 }
 
 func TestTx_RangeScan_Err(t *testing.T) {
-	Init()
-	db, err = Open(opt)
-	defer db.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
+	withDefaultDB(t, func(t *testing.T, db *DB) {
 
-	bucket := "bucket_for_rangeScan"
+		bucket := "bucket_for_rangeScan"
 
-	tx, err := db.Begin(true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	key := []byte("key_" + fmt.Sprintf("%07d", 0))
-	val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 0))
-	if err = tx.Put(bucket, key, val, Persistent); err != nil {
-		// tx rollback
-		err = tx.Rollback()
-		t.Fatal(err)
-	}
-	// tx commit
-	tx.Commit()
+		{
+			// setup tht data
 
-	tx, err = db.Begin(true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	key = []byte("key_" + fmt.Sprintf("%07d", 1))
-	val = []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 1))
-	if err = tx.Put(bucket, key, val, Persistent); err != nil {
-		// tx rollback
-		err = tx.Rollback()
-		t.Fatal(err)
-	}
-	// tx commit
-	tx.Commit()
+			tx, err := db.Begin(true)
+			require.NoError(t, err)
 
-	tx, err = db.Begin(false)
-	if err != nil {
-		t.Fatal(err)
-	}
+			for i := 0; i < 10; i++ {
+				key := []byte("key_" + fmt.Sprintf("%07d", i))
+				val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", i))
+				err = tx.Put(bucket, key, val, Persistent)
+				assert.NoError(t, err)
+			}
 
-	start := []byte("key_0010001")
-	end := []byte("key_0010010")
-	if _, err := tx.RangeScan(bucket, start, end); err != nil {
-		// tx rollback
-		tx.Rollback()
-	} else {
-		t.Error("err range scan")
-	}
+			assert.NoError(t, tx.Commit()) // tx commit
+		}
+
+		{
+			// verify
+
+			tx, err := db.Begin(false)
+			assert.NoError(t, err)
+
+			start := []byte("key_0010001")
+			end := []byte("key_0010010")
+			_, err = tx.RangeScan(bucket, start, end)
+			assert.Error(t, err)
+
+			assert.NoError(t, tx.Rollback())
+		}
+	})
 }
 
 func TestTx_RangeScan(t *testing.T) {
