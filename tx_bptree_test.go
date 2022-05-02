@@ -326,75 +326,53 @@ func TestTx_PrefixScan(t *testing.T) {
 			}
 		}
 	})
-
 }
 
 func TestTx_PrefixSearchScan(t *testing.T) {
-	Init()
-	db, err = Open(opt)
-	defer db.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	bucket := "bucket_for_prefix_search_scan"
 
-	regs := "1"
+	withDefaultDB(t, func(t *testing.T, db *DB) {
 
-	tx, err := db.Begin(true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	key := []byte("key_" + fmt.Sprintf("%07d", 0))
-	val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 0))
-	if err = tx.Put(bucket, key, val, Persistent); err != nil {
-		// tx rollback
-		err = tx.Rollback()
-		t.Fatal(err)
-	}
-	// tx commit
-	tx.Commit()
+		regs := "1"
 
-	tx, err = db.Begin(true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	key = []byte("key_" + fmt.Sprintf("%07d", 1))
-	val = []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 1))
-	if err = tx.Put(bucket, key, val, Persistent); err != nil {
-		// tx rollback
-		err = tx.Rollback()
-		t.Fatal(err)
-	}
-	// tx commit
-	tx.Commit()
+		tx, err := db.Begin(true)
+		require.NoError(t, err)
 
-	tx, err = db.Begin(false)
-	if err != nil {
-		t.Fatal(err)
-	}
+		key := []byte("key_" + fmt.Sprintf("%07d", 0))
+		val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 0))
+		err = tx.Put(bucket, key, val, Persistent)
+		assert.NoError(t, err)
 
-	prefix := []byte("key_")
-	if entries, _, err := tx.PrefixSearchScan(bucket, prefix, regs, 0, 1); err != nil {
-		// tx rollback
-		tx.Rollback()
-	} else {
+		tx.Commit() // tx commit
+
+		tx, err = db.Begin(true)
+		require.NoError(t, err)
+
+		key = []byte("key_" + fmt.Sprintf("%07d", 1))
+		val = []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 1))
+		err = tx.Put(bucket, key, val, Persistent)
+		assert.NoError(t, err)
+		tx.Commit() // tx commit
+
+		tx, err = db.Begin(false)
+		require.NoError(t, err)
+
+		prefix := []byte("key_")
+		entries, _, err := tx.PrefixSearchScan(bucket, prefix, regs, 0, 1)
+		assert.NoError(t, err)
+
+		tx.Commit() // tx commit
+
 		c := 0
 		for _, entry := range entries {
 			key := []byte("key_" + fmt.Sprintf("%07d", 1))
-			if string(key) != string(entry.Key) {
-				continue
-			}
+
+			assert.Equal(t, key, entry.Key)
 			c++
 		}
 
-		if c == 0 || c > 1 {
-			t.Errorf("err tx PrefixSearchScan. Regexp trouble, or Not found key [%s]", string(key))
-		}
-
-	}
-	// tx commit
-	tx.Commit()
+		assert.Equal(t, 1, c)
+	})
 }
 
 func TestTx_DeleteAndGet(t *testing.T) {
