@@ -418,75 +418,56 @@ func TestTx_DeleteAndGet(t *testing.T) {
 }
 
 func TestTx_GetAndScansFromHintKey(t *testing.T) {
-	Init()
-	opt.EntryIdxMode = HintKeyAndRAMIdxMode
-	db, err = Open(opt)
-	defer db.Close()
-
-	if err != nil {
-		t.Fatal(err)
-	}
-	// write tx begin
-	tx, err := db.Begin(true)
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	bucket := "bucket_get_test"
+	withRAMIdxDB(t, func(t *testing.T, db *DB) {
+		// write tx begin
+		tx, err := db.Begin(true)
+		require.NoError(t, err)
 
-	for i := 0; i <= 10; i++ {
-		key := []byte("key_" + fmt.Sprintf("%07d", i))
-		val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", i))
-		if err = tx.Put(bucket, key, val, Persistent); err != nil {
-			// tx rollback
-			err = tx.Rollback()
-			t.Fatal(err)
-		}
-	}
-	// tx commit
-	tx.Commit()
-
-	for i := 0; i <= 10; i++ {
-		tx, err = db.Begin(false)
-		if err != nil {
-			t.Fatal(err)
-		}
-		key := []byte("key_" + fmt.Sprintf("%07d", i))
-		if entry, err := tx.Get(bucket, key); err != nil {
-			// tx rollback
-			tx.Rollback()
-		} else {
+		for i := 0; i <= 10; i++ {
+			key := []byte("key_" + fmt.Sprintf("%07d", i))
 			val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", i))
-			if string(val) != string(entry.Value) {
-				t.Error("err read tx ")
-			}
+			err = tx.Put(bucket, key, val, Persistent)
+			assert.NoError(t, err)
 		}
-		// tx commit
-		tx.Commit()
-	}
+		tx.Commit() // tx commit
 
-	tx, err = db.Begin(false)
-	if err != nil {
-		t.Fatal(err)
-	}
+		for i := 0; i <= 10; i++ {
+			tx, err = db.Begin(false)
+			require.NoError(t, err)
 
-	start := []byte("key_0000001")
-	end := []byte("key_0000010")
-	if entries, err := tx.RangeScan(bucket, start, end); err != nil {
-		// tx rollback
-		tx.Rollback()
-	} else {
+			key := []byte("key_" + fmt.Sprintf("%07d", i))
+			entry, err := tx.Get(bucket, key)
+			assert.NoError(t, err)
+
+			wantValue := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", i))
+			assert.Equal(t, wantValue, entry.Value)
+
+			// tx commit
+			tx.Commit()
+		}
+
+		tx, err = db.Begin(false)
+		require.NoError(t, err)
+
+		start := []byte("key_0000001")
+		end := []byte("key_0000010")
+		entries, err := tx.RangeScan(bucket, start, end)
+		assert.NoError(t, err)
+
 		j := 0
 		for i := 1; i <= 10; i++ {
-			key := []byte("key_" + fmt.Sprintf("%07d", i))
-			if string(key) != string(entries[j].Key) {
-				t.Errorf("err tx RangeScan. got %s want %s", string(entries[j].Key), string(key))
-			}
+			wantKey := []byte("key_" + fmt.Sprintf("%07d", i))
+			assert.Equal(t, wantKey, entries[j].Key)
+
 			j++
 		}
-	}
-	// tx commit
-	tx.Commit()
+
+		// tx commit
+		tx.Commit()
+	})
+
 }
 
 func TestTx_Put_Err(t *testing.T) {
