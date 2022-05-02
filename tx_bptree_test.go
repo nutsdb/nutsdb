@@ -728,84 +728,70 @@ func TestTx_Get_SCan_For_BPTSparseIdxMode(t *testing.T) {
 }
 
 func TestTx_SCan_For_BPTSparseIdxMode(t *testing.T) {
-	InitForBPTSparseIdxMode()
-
-	db, err = Open(opt)
-
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	tx, err := db.Begin(true)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	bucket := "bucket_get_test4"
 
-	for i := 0; i <= 10; i++ {
-		key := []byte("key_" + fmt.Sprintf("%07d", i))
-		val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", i))
-		if err = tx.Put(bucket, key, val, Persistent); err != nil {
-			err = tx.Rollback()
-			t.Fatal(err)
+	withBPTSpareeIdxDB(t, func(t *testing.T, db *DB) {
+
+		{
+			// set up the data
+
+			tx, err := db.Begin(true)
+			assert.NoError(t, err)
+
+			for i := 0; i <= 10; i++ {
+				key := []byte("key_" + fmt.Sprintf("%07d", i))
+				val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", i))
+				err := tx.Put(bucket, key, val, Persistent)
+				assert.NoError(t, err)
+			}
+			tx.Commit()
 		}
-	}
-	tx.Commit()
 
-	// range scans
-	tx, err = db.Begin(false)
-	if err != nil {
-		t.Fatal(err)
-	}
+		{ // range scans
 
-	startKey := []byte("key_" + fmt.Sprintf("%07d", 1))
-	endKey := []byte("key_" + fmt.Sprintf("%07d", 9))
-	es, err := tx.RangeScan(bucket, startKey, endKey)
+			tx, err = db.Begin(false)
+			require.NoError(t, err)
 
-	if err != nil {
-		t.Error(err)
-	}
+			startKey := []byte("key_" + fmt.Sprintf("%07d", 1))
+			endKey := []byte("key_" + fmt.Sprintf("%07d", 9))
+			es, err := tx.RangeScan(bucket, startKey, endKey)
+			assert.NoError(t, err)
 
-	for i := 0; i <= 8; i++ {
-		expectedVal := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", i+1))
-		if string(es[i].Value) != string(expectedVal) {
-			t.Error("err BPTSparseIdxMode RangeScan")
+			for i := 0; i <= 8; i++ {
+				wantValue := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", i+1))
+				assert.Equal(t, wantValue, es[i].Value)
+			}
+			tx.Commit()
 		}
-	}
 
-	tx.Commit()
+		{ // prefix scans
+			tx, err := db.Begin(false)
+			require.NoError(t, err)
 
-	// prefix scans
-	tx, err = db.Begin(false)
-	if err != nil {
-		t.Fatal(err)
-	}
+			limit := 5
+			es, _, err := tx.PrefixScan(bucket, []byte("key_"), 0, limit)
+			assert.NoError(t, err)
 
-	limit := 5
-	es, _, err = tx.PrefixScan(bucket, []byte("key_"), 0, limit)
+			tx.Commit()
 
-	if len(es) != limit || err != nil {
-		t.Error("err BPTSparseIdxMode prefixScan")
-	}
-	tx.Commit()
+			assert.Equal(t, limit, len(es))
+		}
 
-	// prefix search scans
+		{ // prefix search scans
 
-	regs := "(.+)"
+			regs := "(.+)"
 
-	tx, err = db.Begin(false)
-	if err != nil {
-		t.Fatal(err)
-	}
+			tx, err := db.Begin(false)
+			require.NoError(t, err)
 
-	limit = 5
-	es, _, err = tx.PrefixSearchScan(bucket, []byte("key_"), regs, 0, limit)
+			limit := 5
+			es, _, err := tx.PrefixSearchScan(bucket, []byte("key_"), regs, 0, limit)
+			tx.Commit()
+			assert.NoError(t, err)
+			assert.Equal(t, limit, len(es))
+		}
 
-	if len(es) != limit || err != nil {
-		t.Error("err BPTSparseIdxMode prefixSearchScan")
-	}
-	tx.Commit()
+	})
 
 }
 
