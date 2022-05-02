@@ -696,63 +696,35 @@ func TestTx_RangeScan_NotFound(t *testing.T) {
 }
 
 func TestTx_Get_SCan_For_BPTSparseIdxMode(t *testing.T) {
-	InitForBPTSparseIdxMode()
-
-	db, err = Open(opt)
-
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	tx, err := db.Begin(true)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	bucket := "bucket_get_test3"
 
-	for i := 0; i <= 10; i++ {
-		key := []byte("key_" + fmt.Sprintf("%07d", i))
-		val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", i))
-		if err = tx.Put(bucket, key, val, Persistent); err != nil {
-			err = tx.Rollback()
-			t.Fatal(err)
-		}
-	}
-	tx.Commit()
+	withBPTSpareeIdxDB(t, func(t *testing.T, db *DB) {
 
-	tx, err = db.Begin(false)
-	if err != nil {
-		t.Fatal(err)
-	}
+		tx, err := db.Begin(true)
+		require.NoError(t, err)
 
-	for i := 0; i <= 10; i++ {
-		key := []byte("key_" + fmt.Sprintf("%07d", i))
-		if e, err := tx.Get(bucket, key); err != nil {
-			err = tx.Rollback()
-			t.Fatal(err)
-		} else {
-
+		for i := 0; i <= 10; i++ {
+			key := []byte("key_" + fmt.Sprintf("%07d", i))
 			val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", i))
-
-			if string(val) != string(e.Value) {
-				t.Error("err TestTx_Get")
-			}
-
+			err := tx.Put(bucket, key, val, Persistent)
+			assert.NoError(t, err)
 		}
-	}
-	tx.Commit()
+		tx.Commit()
 
-	db.Close()
+		tx, err = db.Begin(false)
+		require.NoError(t, err)
 
-	// reopen
-	db, err = Open(opt)
+		for i := 0; i <= 10; i++ {
+			key := []byte("key_" + fmt.Sprintf("%07d", i))
+			e, err := tx.Get(bucket, key)
+			assert.NoError(t, err)
 
-	if err != nil {
-		t.Fatal(err)
-	}
+			wantValue := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", i))
+			assert.Equal(t, wantValue, e.Value)
+		}
+		tx.Commit()
+	})
 
-	db.Close()
 }
 
 func TestTx_SCan_For_BPTSparseIdxMode(t *testing.T) {
