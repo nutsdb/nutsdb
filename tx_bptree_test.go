@@ -607,81 +607,66 @@ func TestTx_PrefixScan_NotFound(t *testing.T) {
 }
 
 func TestTx_PrefixSearchScan_NotFound(t *testing.T) {
-	Init()
-	db, err = Open(opt)
-	defer db.Close()
-	tx, err := db.Begin(false)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	regs := "(.+)"
-
-	prefix := []byte("key_")
-	if entries, _, err := tx.PrefixSearchScan("foobucket", prefix, regs, 0, 10); err != nil {
-		// tx rollback
-		if entries != nil {
-			t.Error("err TestTx_PrefixSearchScan_NotFound")
-		}
-		tx.Rollback()
-	} else {
-		t.Error("err TestTx_PrefixSearchScan_NotFound")
-	}
-	// tx commit
-	tx.Commit()
-
-	// write tx begin
-	tx, err = db.Begin(true)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	bucket := "bucket_prefix_search_scan_test"
 
-	for i := 0; i <= 10; i++ {
-		key := []byte("key_" + fmt.Sprintf("%07d", i))
-		val := []byte("val" + fmt.Sprintf("%07d", i))
-		if err = tx.Put(bucket, key, val, Persistent); err != nil {
-			// tx rollback
-			err = tx.Rollback()
-			t.Fatal(err)
-		}
-	}
-	// tx commit
-	tx.Commit()
+	t.Run("prefix search in empty bucket", func(t *testing.T) {
 
-	tx, err = db.Begin(false)
-	if err != nil {
-		t.Fatal(err)
-	}
+		withDefaultDB(t, func(t *testing.T, db *DB) {
+			tx, err := db.Begin(false)
+			require.NoError(t, err)
 
-	prefix = []byte("key_foo")
-	if entries, _, err := tx.PrefixSearchScan(bucket, prefix, regs, 0, 10); err != nil {
-		// tx rollback
-		if entries != nil {
-			t.Error("err TestTx_PrefixSearchScan_NotFound")
-		}
-		tx.Rollback()
-	} else {
-		t.Error("err TestTx_PrefixSearchScan_NotFound")
-	}
+			prefix := []byte("key_")
+			_, _, err = tx.PrefixSearchScan("foobucket", prefix, regs, 0, 10)
+			assert.Error(t, err)
 
-	tx, err = db.Begin(false)
-	if err != nil {
-		t.Fatal(err)
-	}
+			tx.Commit()
+		})
+	})
 
-	entries, _, err := tx.PrefixSearchScan(bucket, []byte("key_"), regs, 0, 10)
-	if len(entries) == 0 || err != nil {
-		t.Error("err TestTx_PrefixSearchScan_NotFound")
-	}
+	t.Run("prefix search scan", func(t *testing.T) {
 
-	tx.Commit()
+		withDefaultDB(t, func(t *testing.T, db *DB) {
 
-	entries, _, err = tx.PrefixSearchScan(bucket, []byte("key_"), regs, 0, 10)
-	if len(entries) > 0 || err == nil {
-		t.Error("err TestTx_PrefixSearchScan_NotFound")
-	}
+			{
+				// set up the data
+
+				tx, err = db.Begin(true) // write tx begin
+				require.NoError(t, err)
+
+				for i := 0; i <= 10; i++ {
+					key := []byte("key_" + fmt.Sprintf("%07d", i))
+					val := []byte("val" + fmt.Sprintf("%07d", i))
+
+					err := tx.Put(bucket, key, val, Persistent)
+					assert.NoError(t, err)
+				}
+				// tx commit
+				tx.Commit()
+			}
+
+			{
+
+				tx, err = db.Begin(false)
+				require.NoError(t, err)
+
+				prefix := []byte("key_foo")
+				_, _, err := tx.PrefixSearchScan(bucket, prefix, regs, 0, 10)
+				assert.Error(t, err)
+
+				tx.Rollback()
+
+				_, _, err = tx.PrefixSearchScan(bucket, []byte("key_"), regs, 0, 10)
+				assert.Error(t, err)
+
+				tx.Rollback()
+
+				tx.Commit()
+			}
+		})
+
+	})
+
 }
 
 func TestTx_RangeScan_NotFound(t *testing.T) {
