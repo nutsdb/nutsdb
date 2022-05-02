@@ -471,66 +471,63 @@ func TestTx_GetAndScansFromHintKey(t *testing.T) {
 }
 
 func TestTx_Put_Err(t *testing.T) {
-	Init()
-	db, err = Open(opt)
-	defer db.Close()
 
-	if err != nil {
-		t.Fatal(err)
-	}
-	// write tx begin err setting here
-	tx, err := db.Begin(false) // tx not writable
-	if err != nil {
-		t.Fatal(err)
-	}
+	bucket := "bucket_tx_put"
 
-	bucket := "bucket_get_test2"
+	t.Run("write with read only tx", func(t *testing.T) {
 
-	key := []byte("key_" + fmt.Sprintf("%07d", 0))
-	val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 0))
-	if err = tx.Put(bucket, key, val, Persistent); err != nil {
-		// tx rollback
-		tx.Rollback()
-	} else {
-		t.Fatal("err TestTx_Put_Err")
-	}
+		withDefaultDB(t, func(t *testing.T, db *DB) {
 
-	tx, err = db.Begin(true)
-	if err != nil {
-		t.Fatal(err)
-	}
+			// write tx begin err setting here
+			tx, err := db.Begin(false) // tx not writable
+			require.NoError(t, err)
 
-	bucket = "bucket_get_test2"
+			key := []byte("key_" + fmt.Sprintf("%07d", 0))
+			val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 0))
+			err = tx.Put(bucket, key, val, Persistent)
+			assert.Error(t, err)
 
-	key = []byte("") // key cannot be empty
-	val = []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 0))
-	if err = tx.Put(bucket, key, val, Persistent); err != nil {
-		// tx rollback
-		tx.Rollback()
-	} else {
-		t.Fatal("err TestTx_Put_Err")
-	}
+			tx.Rollback()
+		})
+	})
 
-	// too big size
-	tx, err = db.Begin(true)
-	if err != nil {
-		t.Fatal(err)
-	}
+	t.Run("write with empty key", func(t *testing.T) {
 
-	key = []byte("key_bigone")
-	var bigVal string
-	for i := 1; i <= 9*1024; i++ {
-		bigVal += "val" + strconv2.IntToStr(i)
-	}
+		withDefaultDB(t, func(t *testing.T, db *DB) {
 
-	tx.Put(bucket, key, []byte(bigVal), Persistent)
+			tx, err := db.Begin(true)
+			require.NoError(t, err)
 
-	if err = tx.Commit(); err != nil {
-		tx.Rollback()
-	} else {
-		t.Error("err put too big val")
-	}
+			key := []byte("") // key cannot be empty
+			val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 0))
+			err = tx.Put(bucket, key, val, Persistent)
+			assert.Error(t, err)
 
+			tx.Rollback()
+		})
+	})
+
+	t.Run("write with TOO big size", func(t *testing.T) {
+		withDefaultDB(t, func(t *testing.T, db *DB) {
+
+			// too big size
+			tx, err := db.Begin(true)
+			require.NoError(t, err)
+
+			key := []byte("key_bigone")
+			var bigVal string
+			for i := 1; i <= 9*1024; i++ {
+				bigVal += "val" + strconv2.IntToStr(i)
+			}
+
+			err = tx.Put(bucket, key, []byte(bigVal), Persistent)
+			assert.NoError(t, err)
+
+			err = tx.Commit()
+			assert.Error(t, err)
+			tx.Rollback()
+		})
+	})
 }
 
 func TestTx_PrefixScan_NotFound(t *testing.T) {
