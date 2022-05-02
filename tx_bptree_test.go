@@ -376,67 +376,45 @@ func TestTx_PrefixSearchScan(t *testing.T) {
 }
 
 func TestTx_DeleteAndGet(t *testing.T) {
-	Init()
-	db, err = Open(opt)
 
-	defer db.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
+	withDefaultDB(t, func(t *testing.T, db *DB) {
 
-	bucket := "bucket_delete_test"
+		bucket := "bucket_delete_test"
 
-	tx, err := db.Begin(true)
-	if err != nil {
-		t.Fatal(err)
-	}
+		{
+			tx, err := db.Begin(true)
+			require.NoError(t, err)
 
-	for i := 0; i <= 10; i++ {
-		key := []byte("key_" + fmt.Sprintf("%07d", i))
-		val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", i))
-		if err = tx.Put(bucket, key, val, Persistent); err != nil {
-			// tx rollback
-			err = tx.Rollback()
-			t.Fatal(err)
+			for i := 0; i <= 10; i++ {
+				key := []byte("key_" + fmt.Sprintf("%07d", i))
+				val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", i))
+				err := tx.Put(bucket, key, val, Persistent)
+				assert.NoError(t, err)
+			}
+
+			// tx commit
+			tx.Commit()
 		}
-	}
-	// tx commit
-	tx.Commit()
 
-	tx, err = db.Begin(true)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for i := 0; i <= 5; i++ {
-		key := []byte("key_" + fmt.Sprintf("%07d", i))
-		if err = tx.Delete(bucket, key); err != nil {
-			// tx rollback
-			err = tx.Rollback()
-			t.Fatal(err)
+		{
+
+			tx, err := db.Begin(true)
+			require.NoError(t, err)
+
+			for i := 0; i <= 5; i++ {
+				key := []byte("key_" + fmt.Sprintf("%07d", i))
+				err := tx.Delete(bucket, key)
+				assert.NoError(t, err)
+			}
+
+			// tx commit
+			tx.Commit()
+
+			err = tx.Delete(bucket, []byte("key_"+fmt.Sprintf("%07d", 1)))
+			assert.Error(t, err)
 		}
-	}
+	})
 
-	// tx commit
-	tx.Commit()
-
-	err = tx.Delete(bucket, []byte("key_"+fmt.Sprintf("%07d", 1)))
-	if err == nil {
-		t.Error("TestTx_DeleteAndGet err")
-	}
-
-	for i := 0; i <= 5; i++ {
-		tx, err = db.Begin(false)
-		if err != nil {
-			t.Fatal(err)
-		}
-		key := []byte("key_" + fmt.Sprintf("%07d", i))
-		if _, err := tx.Get(bucket, key); err != nil {
-			// tx rollback
-			tx.Rollback()
-		} else {
-			t.Error("err read tx ")
-		}
-	}
 }
 
 func TestTx_GetAndScansFromHintKey(t *testing.T) {
