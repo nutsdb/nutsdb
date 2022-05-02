@@ -531,79 +531,79 @@ func TestTx_Put_Err(t *testing.T) {
 }
 
 func TestTx_PrefixScan_NotFound(t *testing.T) {
-	Init()
-	db, err = Open(opt)
-	defer db.Close()
-	tx, err := db.Begin(false)
-	if err != nil {
-		t.Fatal(err)
-	}
 
-	prefix := []byte("key_")
-	if entries, _, err := tx.PrefixScan("foobucket", prefix, 0, 10); err != nil {
-		// tx rollback
-		if entries != nil {
-			t.Error("err TestTx_PrefixScan_NotFound")
-		}
-		tx.Rollback()
-	} else {
-		t.Error("err TestTx_PrefixScan_NotFound")
-	}
-	// tx commit
-	tx.Commit()
+	t.Run("prefix scan in empty bucket", func(t *testing.T) {
 
-	// write tx begin
-	tx, err = db.Begin(true)
-	if err != nil {
-		t.Fatal(err)
-	}
+		withDefaultDB(t, func(t *testing.T, db *DB) {
 
-	bucket := "bucket_prefix_scan_test"
+			tx, err := db.Begin(false)
+			assert.NoError(t, err)
 
-	for i := 0; i <= 10; i++ {
-		key := []byte("key_" + fmt.Sprintf("%07d", i))
-		val := []byte("val" + fmt.Sprintf("%07d", i))
-		if err = tx.Put(bucket, key, val, Persistent); err != nil {
-			// tx rollback
-			err = tx.Rollback()
-			t.Fatal(err)
-		}
-	}
-	// tx commit
-	tx.Commit()
+			prefix := []byte("key_")
+			entries, _, err := tx.PrefixScan("foobucket", prefix, 0, 10)
+			assert.Error(t, err)
+			assert.Empty(t, entries)
 
-	tx, err = db.Begin(false)
-	if err != nil {
-		t.Fatal(err)
-	}
+			tx.Commit() // tx commit
+		})
+	})
 
-	prefix = []byte("key_foo")
-	if entries, _, err := tx.PrefixScan(bucket, prefix, 0, 10); err != nil {
-		// tx rollback
-		if entries != nil {
-			t.Error("err TestTx_PrefixScan_NotFound")
-		}
-		tx.Rollback()
-	} else {
-		t.Error("err TestTx_PrefixScan_NotFound")
-	}
+	t.Run("prefix scan", func(t *testing.T) {
+		bucket := "bucket_prefix_scan_test"
 
-	tx, err = db.Begin(false)
-	if err != nil {
-		t.Fatal(err)
-	}
+		withDefaultDB(t, func(t *testing.T, db *DB) {
 
-	entries, _, err := tx.PrefixScan(bucket, []byte("key_"), 0, 10)
-	if len(entries) == 0 || err != nil {
-		t.Error("err TestTx_PrefixScan_NotFound")
-	}
+			{
 
-	tx.Commit()
+				// write tx begin
+				tx, err := db.Begin(true)
+				require.NoError(t, err)
 
-	entries, _, err = tx.PrefixScan(bucket, []byte("key_"), 0, 10)
-	if len(entries) > 0 || err == nil {
-		t.Error("err TestTx_PrefixScan_NotFound")
-	}
+				for i := 0; i <= 10; i++ {
+					key := []byte("key_" + fmt.Sprintf("%07d", i))
+					val := []byte("val" + fmt.Sprintf("%07d", i))
+					err = tx.Put(bucket, key, val, Persistent)
+					assert.NoError(t, err)
+				}
+
+				tx.Commit() // tx commit
+			}
+
+			{
+				tx, err = db.Begin(false)
+				require.NoError(t, err)
+
+				prefix := []byte("key_foo")
+				entries, _, err := tx.PrefixScan(bucket, prefix, 0, 10)
+				assert.Error(t, err)
+				tx.Commit()
+
+				assert.Empty(t, entries)
+			}
+
+			{
+				tx, err = db.Begin(false)
+				require.NoError(t, err)
+
+				entries, _, err := tx.PrefixScan(bucket, []byte("key_"), 0, 10)
+				assert.NoError(t, err)
+				tx.Commit()
+
+				assert.NotEmpty(t, entries)
+
+			}
+
+			{ // scan by closed tx
+
+				entries, _, err := tx.PrefixScan(bucket, []byte("key_"), 0, 10)
+				assert.Error(t, err)
+				if len(entries) > 0 || err == nil {
+					t.Error("err TestTx_PrefixScan_NotFound")
+				}
+			}
+
+		})
+	})
 }
 
 func TestTx_PrefixSearchScan_NotFound(t *testing.T) {
