@@ -796,68 +796,55 @@ func TestTx_SCan_For_BPTSparseIdxMode(t *testing.T) {
 }
 
 func TestTx_Notfound_For_BPTSparseIdxMode(t *testing.T) {
-	InitForBPTSparseIdxMode()
-	db, err = Open(opt)
-	defer db.Close()
-
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// get not found
-	tx, err := db.Begin(false)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	bucket := "bucket_get_test3"
 
-	e, err := tx.Get(bucket, []byte("key_fake"))
+	withBPTSpareeIdxDB(t, func(t *testing.T, db *DB) {
 
-	if err == nil || e != nil {
-		t.Error("err BPTSparseIdxMode get")
-	}
+		{ // get not found
+			tx, err := db.Begin(false)
+			require.NoError(t, err)
 
-	tx.Commit()
+			e, err := tx.Get(bucket, []byte("key_fake"))
+			assert.Error(t, err)
+			tx.Commit()
+			assert.Nil(t, e)
+		}
 
-	// prefix scan not found
-	tx, err = db.Begin(false)
-	if err != nil {
-		t.Fatal(err)
-	}
+		{ // prefix scan not found
+			tx, err = db.Begin(false)
+			require.NoError(t, err)
 
-	es, _, err := tx.PrefixScan(bucket, []byte("key_prefix_fake"), 0, 10)
+			es, _, err := tx.PrefixScan(bucket, []byte("key_prefix_fake"), 0, 10)
+			assert.Error(t, err)
+			tx.Commit()
 
-	if es != nil || err == nil {
-		t.Error("err BPTSparseIdxMode PrefixScan")
-	}
-	tx.Commit()
+			assert.Nil(t, es)
+		}
 
-	// prefix search scan not found
+		{ // prefix search scan not found
 
-	regs := "(.+)"
+			regs := "(.+)"
 
-	tx, err = db.Begin(false)
-	if err != nil {
-		t.Fatal(err)
-	}
+			tx, err := db.Begin(false)
+			require.NoError(t, err)
 
-	es, _, err = tx.PrefixSearchScan(bucket, []byte("key_prefix_fake"), regs, 0, 10)
+			es, _, err := tx.PrefixSearchScan(bucket, []byte("key_prefix_fake"), regs, 0, 10)
+			assert.Error(t, err)
+			tx.Commit()
 
-	if es != nil || err == nil {
-		t.Error("err BPTSparseIdxMode PrefixSearchScan")
-	}
-	tx.Commit()
+			assert.Nil(t, es)
+		}
 
-	// range scan not found
-	tx, err = db.Begin(false)
-	if err != nil {
-		t.Fatal(err)
-	}
+		{ // range scan not found
+			tx, err = db.Begin(false)
+			require.NoError(t, err)
 
-	es, err = tx.RangeScan(bucket, []byte("key_start_fake"), []byte("key_end_fake"))
-	if es != nil || err == nil {
-		t.Error("err BPTSparseIdxMode get")
-	}
-	tx.Commit()
+			es, err := tx.RangeScan(bucket, []byte("key_start_fake"), []byte("key_end_fake"))
+			assert.Error(t, err)
+			tx.Commit()
+
+			assert.Nil(t, es)
+		}
+	})
+
 }
