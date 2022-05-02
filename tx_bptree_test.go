@@ -664,50 +664,35 @@ func TestTx_PrefixSearchScan_NotFound(t *testing.T) {
 				tx.Commit()
 			}
 		})
-
 	})
-
 }
 
 func TestTx_RangeScan_NotFound(t *testing.T) {
-	Init()
-	db, err = Open(opt)
-	defer db.Close()
-
-	// write tx begin
-	tx, err := db.Begin(true)
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	bucket := "bucket_range_scan_test"
 
-	for i := 0; i <= 10; i++ {
-		key := []byte("key_" + fmt.Sprintf("%03d", i))
-		val := []byte("val" + fmt.Sprintf("%03d", i))
-		if err = tx.Put(bucket, key, val, Persistent); err != nil {
-			// tx rollback
-			err = tx.Rollback()
-			t.Fatal(err)
+	withDefaultDB(t, func(t *testing.T, db *DB) {
+		tx, err := db.Begin(true) // write tx begin
+		require.NoError(t, err)
+
+		for i := 0; i <= 10; i++ {
+			key := []byte("key_" + fmt.Sprintf("%03d", i))
+			val := []byte("val" + fmt.Sprintf("%03d", i))
+			err = tx.Put(bucket, key, val, Persistent)
+			assert.NoError(t, err)
 		}
-	}
-	// tx commit
-	tx.Commit()
+		tx.Commit() // tx commit
 
-	tx, err = db.Begin(false)
-	if err != nil {
-		t.Fatal(err)
-	}
+		tx, err = db.Begin(false)
+		require.NoError(t, err)
 
-	start := []byte("key_011")
-	end := []byte("key_012")
-	_, err = tx.RangeScan(bucket, start, end)
-	if err != nil {
-		tx.Rollback()
-	} else {
+		start := []byte("key_011")
+		end := []byte("key_012")
+		_, err = tx.RangeScan(bucket, start, end)
+		assert.Error(t, err)
+
 		tx.Commit()
-		t.Error("err TestTx_RangeScan_NotFound")
-	}
+	})
 }
 
 func TestTx_Get_SCan_For_BPTSparseIdxMode(t *testing.T) {
