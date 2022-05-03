@@ -646,21 +646,29 @@ func TestTx_PrefixSearchScan_NotFound(t *testing.T) {
 
 			{
 
-				tx, err = db.Begin(false)
+				// no key exists in bucket
+
+				tx, err := db.Begin(false)
 				require.NoError(t, err)
 
 				prefix := []byte("key_foo")
-				_, _, err := tx.PrefixSearchScan(bucket, prefix, regs, 0, 10)
+				_, _, err = tx.PrefixSearchScan(bucket, prefix, regs, 0, 10)
 				assert.Error(t, err)
 
-				tx.Rollback()
+				assert.NoError(t, tx.Rollback())
+
+			}
+
+			{
+				// scan by closed tx
+
+				tx, err := db.Begin(false)
+				require.NoError(t, err)
+
+				assert.NoError(t, tx.Commit())
 
 				_, _, err = tx.PrefixSearchScan(bucket, []byte("key_"), regs, 0, 10)
 				assert.Error(t, err)
-
-				tx.Rollback()
-
-				assert.NoError(t, tx.Commit())
 			}
 		})
 	})
