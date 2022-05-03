@@ -82,8 +82,7 @@ func TestTx_PutAndGet(t *testing.T) {
 				err = tx.Put(bucket, key, val, Persistent)
 				assert.NoError(t, err)
 
-				err = tx.Commit()
-				assert.NoError(t, err)
+				assert.NoError(t, tx.Commit())
 			}
 
 			{
@@ -92,8 +91,7 @@ func TestTx_PutAndGet(t *testing.T) {
 
 				e, err := tx.Get(bucket, key)
 				assert.NoError(t, err)
-				err = tx.Commit()
-				assert.NoError(t, err)
+				assert.NoError(t, tx.Commit())
 
 				assert.Equal(t, val, e.Value)
 			}
@@ -107,7 +105,7 @@ func TestTx_PutAndGet(t *testing.T) {
 
 			tx, err := db.Begin(false)
 			require.NoError(t, err)
-			err = tx.Commit()
+			assert.NoError(t, tx.Commit())
 
 			_, err = tx.Get(bucket, key) // use closed tx
 			assert.Error(t, err)
@@ -127,7 +125,7 @@ func TestTx_GetAll(t *testing.T) {
 
 			tx, err := db.Begin(false)
 			require.NoError(t, err)
-			defer tx.Commit()
+			defer assert.NoError(t, tx.Commit())
 
 			_, err = tx.GetAll(bucket)
 			assert.Error(t, err)
@@ -187,7 +185,7 @@ func TestTx_RangeScan_Err(t *testing.T) {
 		bucket := "bucket_for_rangeScan"
 
 		{
-			// setup tht data
+			// setup the data
 
 			tx, err := db.Begin(true)
 			require.NoError(t, err)
@@ -224,7 +222,7 @@ func TestTx_RangeScan(t *testing.T) {
 	withDefaultDB(t, func(t *testing.T, db *DB) {
 
 		{
-			// setup tht data
+			// setup the data
 
 			tx, err := db.Begin(true)
 			require.NoError(t, err)
@@ -281,7 +279,7 @@ func TestTx_PrefixScan(t *testing.T) {
 	withDefaultDB(t, func(t *testing.T, db *DB) {
 
 		{
-			// setup tht data
+			// setup the data
 
 			tx, err := db.Begin(true)
 			require.NoError(t, err)
@@ -343,7 +341,7 @@ func TestTx_PrefixSearchScan(t *testing.T) {
 		err = tx.Put(bucket, key, val, Persistent)
 		assert.NoError(t, err)
 
-		tx.Commit() // tx commit
+		assert.NoError(t, tx.Commit()) // tx commit
 
 		tx, err = db.Begin(true)
 		require.NoError(t, err)
@@ -352,7 +350,8 @@ func TestTx_PrefixSearchScan(t *testing.T) {
 		val = []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 1))
 		err = tx.Put(bucket, key, val, Persistent)
 		assert.NoError(t, err)
-		tx.Commit() // tx commit
+
+		assert.NoError(t, tx.Commit()) // tx commit
 
 		tx, err = db.Begin(false)
 		require.NoError(t, err)
@@ -361,7 +360,7 @@ func TestTx_PrefixSearchScan(t *testing.T) {
 		entries, _, err := tx.PrefixSearchScan(bucket, prefix, regs, 0, 1)
 		assert.NoError(t, err)
 
-		tx.Commit() // tx commit
+		assert.NoError(t, tx.Commit()) // tx commit
 
 		c := 0
 		for _, entry := range entries {
@@ -393,7 +392,7 @@ func TestTx_DeleteAndGet(t *testing.T) {
 			}
 
 			// tx commit
-			tx.Commit()
+			assert.NoError(t, tx.Commit())
 		}
 
 		{
@@ -408,7 +407,7 @@ func TestTx_DeleteAndGet(t *testing.T) {
 			}
 
 			// tx commit
-			tx.Commit()
+			assert.NoError(t, tx.Commit())
 
 			err = tx.Delete(bucket, []byte("key_"+fmt.Sprintf("%07d", 1)))
 			assert.Error(t, err)
@@ -431,7 +430,7 @@ func TestTx_GetAndScansFromHintKey(t *testing.T) {
 			err = tx.Put(bucket, key, val, Persistent)
 			assert.NoError(t, err)
 		}
-		tx.Commit() // tx commit
+		assert.NoError(t, tx.Commit()) // tx commit
 
 		for i := 0; i <= 10; i++ {
 			tx, err = db.Begin(false)
@@ -445,7 +444,7 @@ func TestTx_GetAndScansFromHintKey(t *testing.T) {
 			assert.Equal(t, wantValue, entry.Value)
 
 			// tx commit
-			tx.Commit()
+			assert.NoError(t, tx.Commit())
 		}
 
 		tx, err = db.Begin(false)
@@ -465,7 +464,7 @@ func TestTx_GetAndScansFromHintKey(t *testing.T) {
 		}
 
 		// tx commit
-		tx.Commit()
+		assert.NoError(t, tx.Commit())
 	})
 
 }
@@ -487,7 +486,7 @@ func TestTx_Put_Err(t *testing.T) {
 			err = tx.Put(bucket, key, val, Persistent)
 			assert.Error(t, err)
 
-			tx.Rollback()
+			assert.NoError(t, tx.Rollback())
 		})
 	})
 
@@ -503,7 +502,7 @@ func TestTx_Put_Err(t *testing.T) {
 			err = tx.Put(bucket, key, val, Persistent)
 			assert.Error(t, err)
 
-			tx.Rollback()
+			assert.NoError(t, tx.Rollback())
 		})
 	})
 
@@ -523,9 +522,9 @@ func TestTx_Put_Err(t *testing.T) {
 			err = tx.Put(bucket, key, []byte(bigVal), Persistent)
 			assert.NoError(t, err)
 
-			err = tx.Commit()
-			assert.Error(t, err)
-			tx.Rollback()
+			assert.Error(t, tx.Commit()) // too big cannot commit by tx
+
+			assert.NoError(t, tx.Rollback())
 		})
 	})
 }
@@ -544,7 +543,7 @@ func TestTx_PrefixScan_NotFound(t *testing.T) {
 			assert.Error(t, err)
 			assert.Empty(t, entries)
 
-			tx.Commit() // tx commit
+			assert.NoError(t, tx.Commit()) // tx commit
 		})
 	})
 
@@ -566,7 +565,7 @@ func TestTx_PrefixScan_NotFound(t *testing.T) {
 					assert.NoError(t, err)
 				}
 
-				tx.Commit() // tx commit
+				assert.NoError(t, tx.Commit()) // tx commit
 			}
 
 			{
@@ -576,7 +575,7 @@ func TestTx_PrefixScan_NotFound(t *testing.T) {
 				prefix := []byte("key_foo")
 				entries, _, err := tx.PrefixScan(bucket, prefix, 0, 10)
 				assert.Error(t, err)
-				tx.Commit()
+				assert.NoError(t, tx.Commit())
 
 				assert.Empty(t, entries)
 			}
@@ -587,7 +586,7 @@ func TestTx_PrefixScan_NotFound(t *testing.T) {
 
 				entries, _, err := tx.PrefixScan(bucket, []byte("key_"), 0, 10)
 				assert.NoError(t, err)
-				tx.Commit()
+				assert.NoError(t, tx.Commit())
 
 				assert.NotEmpty(t, entries)
 
@@ -620,7 +619,7 @@ func TestTx_PrefixSearchScan_NotFound(t *testing.T) {
 			_, _, err = tx.PrefixSearchScan("foobucket", prefix, regs, 0, 10)
 			assert.Error(t, err)
 
-			tx.Commit()
+			assert.NoError(t, tx.Commit())
 		})
 	})
 
@@ -642,7 +641,7 @@ func TestTx_PrefixSearchScan_NotFound(t *testing.T) {
 					assert.NoError(t, err)
 				}
 				// tx commit
-				tx.Commit()
+				assert.NoError(t, tx.Commit())
 			}
 
 			{
@@ -661,7 +660,7 @@ func TestTx_PrefixSearchScan_NotFound(t *testing.T) {
 
 				tx.Rollback()
 
-				tx.Commit()
+				assert.NoError(t, tx.Commit())
 			}
 		})
 	})
@@ -681,7 +680,7 @@ func TestTx_RangeScan_NotFound(t *testing.T) {
 			err = tx.Put(bucket, key, val, Persistent)
 			assert.NoError(t, err)
 		}
-		tx.Commit() // tx commit
+		assert.NoError(t, tx.Commit()) // tx commit
 
 		tx, err = db.Begin(false)
 		require.NoError(t, err)
@@ -691,7 +690,7 @@ func TestTx_RangeScan_NotFound(t *testing.T) {
 		_, err = tx.RangeScan(bucket, start, end)
 		assert.Error(t, err)
 
-		tx.Commit()
+		assert.NoError(t, tx.Commit())
 	})
 }
 
@@ -709,7 +708,7 @@ func TestTx_Get_SCan_For_BPTSparseIdxMode(t *testing.T) {
 			err := tx.Put(bucket, key, val, Persistent)
 			assert.NoError(t, err)
 		}
-		tx.Commit()
+		assert.NoError(t, tx.Commit())
 
 		tx, err = db.Begin(false)
 		require.NoError(t, err)
@@ -722,7 +721,7 @@ func TestTx_Get_SCan_For_BPTSparseIdxMode(t *testing.T) {
 			wantValue := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", i))
 			assert.Equal(t, wantValue, e.Value)
 		}
-		tx.Commit()
+		assert.NoError(t, tx.Commit())
 	})
 
 }
@@ -744,7 +743,7 @@ func TestTx_SCan_For_BPTSparseIdxMode(t *testing.T) {
 				err := tx.Put(bucket, key, val, Persistent)
 				assert.NoError(t, err)
 			}
-			tx.Commit()
+			assert.NoError(t, tx.Commit())
 		}
 
 		{ // range scans
@@ -761,7 +760,7 @@ func TestTx_SCan_For_BPTSparseIdxMode(t *testing.T) {
 				wantValue := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", i+1))
 				assert.Equal(t, wantValue, es[i].Value)
 			}
-			tx.Commit()
+			assert.NoError(t, tx.Commit())
 		}
 
 		{ // prefix scans
@@ -772,7 +771,7 @@ func TestTx_SCan_For_BPTSparseIdxMode(t *testing.T) {
 			es, _, err := tx.PrefixScan(bucket, []byte("key_"), 0, limit)
 			assert.NoError(t, err)
 
-			tx.Commit()
+			assert.NoError(t, tx.Commit())
 
 			assert.Equal(t, limit, len(es))
 		}
@@ -786,7 +785,7 @@ func TestTx_SCan_For_BPTSparseIdxMode(t *testing.T) {
 
 			limit := 5
 			es, _, err := tx.PrefixSearchScan(bucket, []byte("key_"), regs, 0, limit)
-			tx.Commit()
+			assert.NoError(t, tx.Commit())
 			assert.NoError(t, err)
 			assert.Equal(t, limit, len(es))
 		}
@@ -806,7 +805,7 @@ func TestTx_Notfound_For_BPTSparseIdxMode(t *testing.T) {
 
 			e, err := tx.Get(bucket, []byte("key_fake"))
 			assert.Error(t, err)
-			tx.Commit()
+			assert.NoError(t, tx.Commit())
 			assert.Nil(t, e)
 		}
 
@@ -816,7 +815,7 @@ func TestTx_Notfound_For_BPTSparseIdxMode(t *testing.T) {
 
 			es, _, err := tx.PrefixScan(bucket, []byte("key_prefix_fake"), 0, 10)
 			assert.Error(t, err)
-			tx.Commit()
+			assert.NoError(t, tx.Commit())
 
 			assert.Nil(t, es)
 		}
@@ -830,7 +829,7 @@ func TestTx_Notfound_For_BPTSparseIdxMode(t *testing.T) {
 
 			es, _, err := tx.PrefixSearchScan(bucket, []byte("key_prefix_fake"), regs, 0, 10)
 			assert.Error(t, err)
-			tx.Commit()
+			assert.NoError(t, tx.Commit())
 
 			assert.Nil(t, es)
 		}
@@ -841,7 +840,7 @@ func TestTx_Notfound_For_BPTSparseIdxMode(t *testing.T) {
 
 			es, err := tx.RangeScan(bucket, []byte("key_start_fake"), []byte("key_end_fake"))
 			assert.Error(t, err)
-			tx.Commit()
+			assert.NoError(t, tx.Commit())
 
 			assert.Nil(t, es)
 		}
