@@ -100,9 +100,7 @@ func TestTx_PutAndGet(t *testing.T) {
 	})
 
 	t.Run("get by closed tx", func(t *testing.T) {
-
 		withDefaultDB(t, func(t *testing.T, db *DB) {
-
 			tx, err := db.Begin(false)
 			require.NoError(t, err)
 			assert.NoError(t, tx.Commit())
@@ -115,9 +113,7 @@ func TestTx_PutAndGet(t *testing.T) {
 }
 
 func TestTx_GetAll(t *testing.T) {
-	var (
-		bucket = "bucket_for_scanAll"
-	)
+	bucket := "bucket_for_scanAll"
 
 	t.Run("get_all_from_empty_db", func(t *testing.T) {
 
@@ -285,7 +281,6 @@ func TestTx_PrefixScan(t *testing.T) {
 			require.NoError(t, err)
 
 			for _, prefix := range []string{"key1_", "key2_"} {
-
 				for i := 0; i < 10; i++ {
 					key := []byte(prefix + fmt.Sprintf("%07d", i))
 					val := []byte("foobar" + fmt.Sprintf("%07d", i))
@@ -298,7 +293,6 @@ func TestTx_PrefixScan(t *testing.T) {
 		}
 
 		{
-
 			tx, err = db.Begin(false)
 			require.NoError(t, err)
 
@@ -330,7 +324,6 @@ func TestTx_PrefixSearchScan(t *testing.T) {
 	bucket := "bucket_for_prefix_search_scan"
 
 	withDefaultDB(t, func(t *testing.T, db *DB) {
-
 		regs := "1"
 
 		tx, err := db.Begin(true)
@@ -396,7 +389,6 @@ func TestTx_DeleteAndGet(t *testing.T) {
 		}
 
 		{
-
 			tx, err := db.Begin(true)
 			require.NoError(t, err)
 
@@ -474,9 +466,7 @@ func TestTx_Put_Err(t *testing.T) {
 	bucket := "bucket_tx_put"
 
 	t.Run("write with read only tx", func(t *testing.T) {
-
 		withDefaultDB(t, func(t *testing.T, db *DB) {
-
 			// write tx begin err setting here
 			tx, err := db.Begin(false) // tx not writable
 			require.NoError(t, err)
@@ -491,9 +481,7 @@ func TestTx_Put_Err(t *testing.T) {
 	})
 
 	t.Run("write with empty key", func(t *testing.T) {
-
 		withDefaultDB(t, func(t *testing.T, db *DB) {
-
 			tx, err := db.Begin(true)
 			require.NoError(t, err)
 
@@ -508,13 +496,11 @@ func TestTx_Put_Err(t *testing.T) {
 
 	t.Run("write with TOO big size", func(t *testing.T) {
 		withDefaultDB(t, func(t *testing.T, db *DB) {
-
-			// too big size
 			tx, err := db.Begin(true)
 			require.NoError(t, err)
 
 			key := []byte("key_bigone")
-			var bigVal string
+			var bigVal string // too big size
 			for i := 1; i <= 9*1024; i++ {
 				bigVal += "val" + strconv2.IntToStr(i)
 			}
@@ -530,11 +516,8 @@ func TestTx_Put_Err(t *testing.T) {
 }
 
 func TestTx_PrefixScan_NotFound(t *testing.T) {
-
 	t.Run("prefix scan in empty bucket", func(t *testing.T) {
-
 		withDefaultDB(t, func(t *testing.T, db *DB) {
-
 			tx, err := db.Begin(false)
 			assert.NoError(t, err)
 
@@ -551,10 +534,8 @@ func TestTx_PrefixScan_NotFound(t *testing.T) {
 		bucket := "bucket_prefix_scan_test"
 
 		withDefaultDB(t, func(t *testing.T, db *DB) {
+			{ // write tx begin
 
-			{
-
-				// write tx begin
 				tx, err := db.Begin(true)
 				require.NoError(t, err)
 
@@ -593,7 +574,6 @@ func TestTx_PrefixScan_NotFound(t *testing.T) {
 			}
 
 			{ // scan by closed tx
-
 				entries, _, err := tx.PrefixScan(bucket, []byte("key_"), 0, 10)
 				assert.Error(t, err)
 				if len(entries) > 0 || err == nil {
@@ -610,7 +590,6 @@ func TestTx_PrefixSearchScan_NotFound(t *testing.T) {
 	bucket := "bucket_prefix_search_scan_test"
 
 	t.Run("prefix search in empty bucket", func(t *testing.T) {
-
 		withDefaultDB(t, func(t *testing.T, db *DB) {
 			tx, err := db.Begin(false)
 			require.NoError(t, err)
@@ -626,10 +605,7 @@ func TestTx_PrefixSearchScan_NotFound(t *testing.T) {
 	t.Run("prefix search scan", func(t *testing.T) {
 
 		withDefaultDB(t, func(t *testing.T, db *DB) {
-
-			{
-				// set up the data
-
+			{ // set up the data
 				tx, err = db.Begin(true) // write tx begin
 				require.NoError(t, err)
 
@@ -644,10 +620,7 @@ func TestTx_PrefixSearchScan_NotFound(t *testing.T) {
 				assert.NoError(t, tx.Commit())
 			}
 
-			{
-
-				// no key exists in bucket
-
+			{ // no key exists in bucket
 				tx, err := db.Begin(false)
 				require.NoError(t, err)
 
@@ -656,12 +629,9 @@ func TestTx_PrefixSearchScan_NotFound(t *testing.T) {
 				assert.Error(t, err)
 
 				assert.NoError(t, tx.Rollback())
-
 			}
 
-			{
-				// scan by closed tx
-
+			{ // scan by closed tx
 				tx, err := db.Begin(false)
 				require.NoError(t, err)
 
@@ -706,7 +676,6 @@ func TestTx_Get_SCan_For_BPTSparseIdxMode(t *testing.T) {
 	bucket := "bucket_get_test3"
 
 	withBPTSpareeIdxDB(t, func(t *testing.T, db *DB) {
-
 		tx, err := db.Begin(true)
 		require.NoError(t, err)
 
@@ -738,10 +707,7 @@ func TestTx_SCan_For_BPTSparseIdxMode(t *testing.T) {
 	bucket := "bucket_get_test4"
 
 	withBPTSpareeIdxDB(t, func(t *testing.T, db *DB) {
-
-		{
-			// set up the data
-
+		{ // set up the data
 			tx, err := db.Begin(true)
 			assert.NoError(t, err)
 
@@ -755,7 +721,6 @@ func TestTx_SCan_For_BPTSparseIdxMode(t *testing.T) {
 		}
 
 		{ // range scans
-
 			tx, err = db.Begin(false)
 			require.NoError(t, err)
 
@@ -785,7 +750,6 @@ func TestTx_SCan_For_BPTSparseIdxMode(t *testing.T) {
 		}
 
 		{ // prefix search scans
-
 			regs := "(.+)"
 
 			tx, err := db.Begin(false)
@@ -806,7 +770,6 @@ func TestTx_Notfound_For_BPTSparseIdxMode(t *testing.T) {
 	bucket := "bucket_get_test3"
 
 	withBPTSpareeIdxDB(t, func(t *testing.T, db *DB) {
-
 		{ // get not found
 			tx, err := db.Begin(false)
 			require.NoError(t, err)
@@ -853,5 +816,4 @@ func TestTx_Notfound_For_BPTSparseIdxMode(t *testing.T) {
 			assert.Nil(t, es)
 		}
 	})
-
 }
