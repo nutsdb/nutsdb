@@ -45,11 +45,11 @@ func (suite *TxBucketTestSuite) SetupSuite() {
 	assert.Nil(suite.T(), err)
 
 	//list bucket
-	tx.LPush("list_bucket", []byte("list_key"), []byte("list_value"))
+	err = tx.LPush("list_bucket", []byte("list_key"), []byte("list_value"))
 	assert.Nil(suite.T(), err)
 
 	//string bucket
-	tx.Put("string_bucket", []byte("string_key"), []byte("string_value"), 0)
+	err = tx.Put("string_bucket", []byte("string_key"), []byte("string_value"), 0)
 	assert.Nil(suite.T(), err)
 
 	err = tx.Commit()
@@ -101,7 +101,8 @@ func (suite *TxBucketTestSuite) TestA_IterateBuckets() {
 	err = tx.IterateBuckets(DataStructureNone, func(bucket string) {})
 	assert.Nil(suite.T(), err)
 
-	tx.Commit()
+	err = tx.Commit()
+	assert.Nil(suite.T(), err)
 }
 
 func (suite *TxBucketTestSuite) TestB_DeleteBucket() {
