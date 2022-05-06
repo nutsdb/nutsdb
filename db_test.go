@@ -21,8 +21,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/xujiajun/utils/strconv2"
 )
 
@@ -1099,6 +1099,15 @@ func withDefaultDB(t *testing.T, fn func(t *testing.T, db *DB)) {
 }
 
 func withRAMIdxDB(t *testing.T, fn func(t *testing.T, db *DB)) {
+	tmpdir, _ := ioutil.TempDir("", "nutsdb")
+	opt := DefaultOptions
+	opt.Dir = tmpdir
+	opt.EntryIdxMode = HintKeyAndRAMIdxMode
+
+	withDBOption(t, opt, fn)
+}
+
+func withBPTSpareeIdxDB(t *testing.T, fn func(t *testing.T, db *DB)) {
 	tmpdir, _ := ioutil.TempDir("", "nutsdb")
 	opt := DefaultOptions
 	opt.Dir = tmpdir
