@@ -52,6 +52,13 @@ func (suite *BucketTestSuite) SetupSuite() {
 	defer fd.Close()
 }
 
+func (suite *BucketTestSuite) TearDownSuite() {
+	err := os.RemoveAll(suite.tempFile)
+	if err != nil {
+		require.Failf(suite.T(), "remve file fail", err.Error())
+	}
+}
+
 func (suite *BucketTestSuite) TestEncode() {
 	encodeValue := suite.bucketMeat.Encode()
 	assert.Equal(suite.T(), suite.expectedEncode, encodeValue)
