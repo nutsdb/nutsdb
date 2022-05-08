@@ -1955,7 +1955,7 @@ BoltDB最慢。
 
 * Segment配置问题
 
-NutsDB会自动切割分成一个个块（Segment），默认`SegmentSize`是8MB，这个参数可以自己配置（比如16MB、64MB等），但是**一旦配置不能修改**。
+NutsDB会自动切割分成一个个块（Segment），默认`SegmentSize`是8MB，这个参数可以自己需要配置（比如16MB、32MB、64MB、128MB、512MB等），但是**一旦配置不能修改**。
 
 * key和value的大小限制问题
 
