@@ -91,7 +91,6 @@ type (
 		LastKey          []byte
 		LastAddress      int64
 		Filepath         string
-		bucketSize       uint32
 		keyPosMap        map[string]int64
 		enabledKeyPosMap bool
 	}
