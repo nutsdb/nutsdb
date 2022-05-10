@@ -267,7 +267,6 @@ func TestTx_ZPopMin(t *testing.T) {
 	}
 
 	node, err = tx.ZPopMin(bucket)
-
 	require.Error(t, err, "TestTx_ZPopMin err")
 }
 
