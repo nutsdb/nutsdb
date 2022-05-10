@@ -48,7 +48,10 @@ func TestTx_ZAdd(t *testing.T) {
 	InitForZSet()
 	db, err = Open(opt)
 	tx, err := db.Begin(true)
-	defer db.Close()
+	defer func(db *DB) {
+		err := db.Close()
+		assert.NoError(t, err)
+	}(db)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,16 +59,15 @@ func TestTx_ZAdd(t *testing.T) {
 	bucket := "myZSet"
 
 	if err := tx.ZAdd(bucket, []byte("key1"), 100, []byte("val1")); err != nil {
+		assert.NoError(t, tx.Rollback())
 		t.Fatal(err)
-		tx.Rollback()
 	} else {
 		err := tx.ZAdd(bucket, []byte("key1"+SeparatorForZSetKey), 100, []byte("val1"))
 		if err == nil {
-			tx.Rollback()
+			assert.NoError(t, tx.Rollback())
 			t.Fatal("TestTx_ZAdd err")
 		}
-
-		tx.Commit()
+		assert.NoError(t, tx.Commit())
 	}
 
 	tx, err = db.Begin(false)
@@ -78,7 +80,7 @@ func TestTx_ZAdd(t *testing.T) {
 		t.Error("TestTx_ZAdd err")
 	}
 
-	tx.Commit()
+	assert.NoError(t, tx.Commit())
 }
 
 func InitDataForZSet(t *testing.T) (bucket, key1, key2, key3 string) {
@@ -94,19 +96,19 @@ func InitDataForZSet(t *testing.T) (bucket, key1, key2, key3 string) {
 	key2 = "key2"
 	key3 = "key3"
 	if err := tx.ZAdd(bucket, []byte(key1), 79, []byte("val1")); err != nil {
-		tx.Rollback()
+		assert.NoError(t, tx.Rollback())
 		t.Fatal(err)
 	}
 	if err := tx.ZAdd(bucket, []byte(key2), 98, []byte("val2")); err != nil {
-		tx.Rollback()
+		assert.NoError(t, tx.Rollback())
 		t.Fatal(err)
 	}
 	if err := tx.ZAdd(bucket, []byte(key3), 99, []byte("val3")); err != nil {
-		tx.Rollback()
+		assert.NoError(t, tx.Rollback())
 		t.Fatal(err)
 	}
 
-	tx.Commit()
+	assert.NoError(t, tx.Commit())
 
 	return
 }
@@ -115,16 +117,19 @@ func TestTx_ZMembers(t *testing.T) {
 	bucket, key1, key2, key3 := InitDataForZSet(t)
 	assertions := assert.New(t)
 	tx, err = db.Begin(false)
-	defer db.Close()
+	defer func(db *DB) {
+		err := db.Close()
+		assert.NoError(t, err)
+	}(db)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	if nodes, err := tx.ZMembers(bucket); err != nil {
-		tx.Rollback()
+		assert.NoError(t, tx.Rollback())
 		t.Fatal(err)
 	} else {
-		tx.Commit()
+		assert.NoError(t, tx.Commit())
 
 		assertions.Len(nodes, 3, "TestTx_ZMembers err")
 
@@ -144,21 +149,23 @@ func TestTx_ZCard(t *testing.T) {
 	bucket, _, _, _ := InitDataForZSet(t)
 	assertions := assert.New(t)
 	tx, err = db.Begin(false)
-	defer db.Close()
-	defer db.Close()
+	defer func(db *DB) {
+		err := db.Close()
+		assert.NoError(t, err)
+	}(db)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	if num, err := tx.ZCard(bucket); err != nil {
 		fmt.Println("err", err)
-		tx.Rollback()
+		assert.NoError(t, tx.Rollback())
 		t.Fatal("TestTx_ZCard err")
 	} else {
 		assertions.Equal(3, num, "TestTx_ZCard err")
 	}
 
-	tx.Commit()
+	assert.NoError(t, tx.Commit())
 	_, err := tx.ZCard(bucket)
 	assertions.Error(err)
 }
@@ -167,27 +174,30 @@ func TestTx_ZCount(t *testing.T) {
 	bucket, _, _, _ := InitDataForZSet(t)
 
 	tx, err = db.Begin(false)
-	defer db.Close()
+	defer func(db *DB) {
+		err := db.Close()
+		assert.NoError(t, err)
+	}(db)
 
 	require.NoError(t, err)
 
 	num, err := tx.ZCount(bucket, 90, 100, nil)
 	if err != nil {
-		tx.Rollback()
+		assert.NoError(t, tx.Rollback())
 		t.Fatal(err)
 	} else {
 		if num != 2 {
-			tx.Rollback()
+			assert.NoError(t, tx.Rollback())
 			t.Fatal("TestTx_ZCount err")
 		}
 
 		num, err := tx.ZCount("bucket_fake", 90, 100, nil)
 		if err == nil || num != 0 {
-			tx.Rollback()
+			assert.NoError(t, tx.Rollback())
 			t.Fatal("TestTx_ZCount err")
 		}
 
-		tx.Commit()
+		assert.NoError(t, tx.Commit())
 	}
 
 	num, err = tx.ZCount(bucket, 90, 100, nil)
@@ -198,26 +208,29 @@ func TestTx_ZCount(t *testing.T) {
 func TestTx_ZPopMax(t *testing.T) {
 	bucket, _, _, _ := InitDataForZSet(t)
 	tx, err = db.Begin(true)
-	defer db.Close()
+	defer func(db *DB) {
+		err := db.Close()
+		assert.NoError(t, err)
+	}(db)
 
 	require.NoError(t, err)
 
 	node, err := tx.ZPopMax(bucket)
 	if err != nil {
-		tx.Rollback()
+		assert.NoError(t, tx.Rollback())
 		t.Fatal(err)
 	}
 
 	if node.Key() != "key3" || node.Score() != 99 {
-		tx.Rollback()
+		assert.NoError(t, tx.Rollback())
 		t.Fatal("TestTx_ZPopMax err")
 	} else {
 		_, err := tx.ZPopMax("bucket_fake")
 		if err == nil {
-			tx.Rollback()
+			assert.NoError(t, tx.Rollback())
 			t.Fatal("TestTx_ZPopMax err")
 		}
-		tx.Commit()
+		assert.NoError(t, tx.Commit())
 	}
 
 	node, err = tx.ZPopMax(bucket)
@@ -228,26 +241,29 @@ func TestTx_ZPopMax(t *testing.T) {
 func TestTx_ZPopMin(t *testing.T) {
 	bucket, _, _, _ := InitDataForZSet(t)
 	tx, err = db.Begin(true)
-	defer db.Close()
+	defer func(db *DB) {
+		err := db.Close()
+		assert.NoError(t, err)
+	}(db)
 
 	require.NoError(t, err)
 
 	node, err := tx.ZPopMin(bucket)
 	if err != nil {
-		tx.Rollback()
+		assert.NoError(t, tx.Rollback())
 		t.Fatal(err)
 	}
 
 	if node.Key() != "key1" || node.Score() != 79 {
-		tx.Rollback()
+		assert.NoError(t, tx.Rollback())
 		t.Fatal("TestTx_ZPopMin err")
 	} else {
 		_, err := tx.ZPopMin("bucket_fake")
 		if err == nil {
-			tx.Rollback()
+			assert.NoError(t, tx.Rollback())
 			t.Fatal("TestTx_ZPopMin err")
 		}
-		tx.Commit()
+		assert.NoError(t, tx.Commit())
 	}
 
 	node, err = tx.ZPopMin(bucket)
@@ -258,7 +274,10 @@ func TestTx_ZPopMin(t *testing.T) {
 func TestTx_ZPickMax(t *testing.T) {
 	bucket, _, _, _ := InitDataForZSet(t)
 	tx, err = db.Begin(false)
-	defer db.Close()
+	defer func(db *DB) {
+		err := db.Close()
+		assert.NoError(t, err)
+	}(db)
 
 	require.NoError(t, err)
 
@@ -269,10 +288,10 @@ func TestTx_ZPickMax(t *testing.T) {
 
 	node, err = tx.ZPeekMax(bucket)
 	if err != nil {
-		tx.Rollback()
+		assert.NoError(t, tx.Rollback())
 		t.Fatal(err)
 	} else {
-		tx.Commit()
+		assert.NoError(t, tx.Commit())
 
 		assert.Equal(t, "key3", node.Key(), "TestTx_ZPickMax err")
 
@@ -285,7 +304,10 @@ func TestTx_ZPickMax(t *testing.T) {
 func TestTx_ZPickMin(t *testing.T) {
 	bucket, _, _, _ := InitDataForZSet(t)
 	tx, err = db.Begin(false)
-	defer db.Close()
+	defer func(db *DB) {
+		err := db.Close()
+		assert.NoError(t, err)
+	}(db)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -297,10 +319,10 @@ func TestTx_ZPickMin(t *testing.T) {
 
 	node, err = tx.ZPeekMin(bucket)
 	if err != nil {
-		tx.Rollback()
+		assert.NoError(t, tx.Rollback())
 		t.Fatal(err)
 	} else {
-		tx.Commit()
+		assert.NoError(t, tx.Commit())
 
 		if node.Key() != "key1" {
 			t.Error("TestTx_ZPickMin err")
@@ -316,7 +338,10 @@ func TestTx_ZPickMin(t *testing.T) {
 func TestTx_ZRangByRank(t *testing.T) {
 	bucket, key1, key2, _ := InitDataForZSet(t)
 	tx, err = db.Begin(false)
-	defer db.Close()
+	defer func(db *DB) {
+		err := db.Close()
+		assert.NoError(t, err)
+	}(db)
 	require.NoError(t, err)
 
 	var expectResult map[string]struct{}
@@ -331,10 +356,10 @@ func TestTx_ZRangByRank(t *testing.T) {
 
 	nodes, err = tx.ZRangeByRank(bucket, 1, 2)
 	if err != nil {
-		tx.Rollback()
+		assert.NoError(t, tx.Rollback())
 		t.Fatal(err)
 	} else {
-		tx.Commit()
+		assert.NoError(t, tx.Commit())
 
 		assert.Len(t, nodes, 2, "TestTx_ZRangByRank err")
 
@@ -353,7 +378,10 @@ func TestTx_ZRem(t *testing.T) {
 	bucket, key1, key2, _ := InitDataForZSet(t)
 	assertions := assert.New(t)
 	tx, err = db.Begin(true)
-	defer db.Close()
+	defer func(db *DB) {
+		err := db.Close()
+		assert.NoError(t, err)
+	}(db)
 
 	require.NoError(t, err)
 
@@ -368,7 +396,7 @@ func TestTx_ZRem(t *testing.T) {
 
 	assertions.NoError(err, "TestTx_ZRem err")
 
-	tx.Commit()
+	assert.NoError(t, tx.Commit())
 	tx, err = db.Begin(false)
 	if err != nil {
 		t.Fatal(err)
@@ -385,7 +413,7 @@ func TestTx_ZRem(t *testing.T) {
 	assertions.NotNil(n, "TestTx_ZRem err")
 	assertions.NoError(err, "TestTx_ZRem err")
 
-	tx.Commit()
+	assert.NoError(t, tx.Commit())
 
 	err = tx.ZRem(bucket, "key2")
 
@@ -396,7 +424,10 @@ func TestTx_ZRemRangeByRank(t *testing.T) {
 	bucket, key1, key2, key3 := InitDataForZSet(t)
 	assertions := assert.New(t)
 	tx, err = db.Begin(true)
-	defer db.Close()
+	defer func(db *DB) {
+		err := db.Close()
+		assert.NoError(t, err)
+	}(db)
 
 	require.NoError(t, err)
 
@@ -408,7 +439,7 @@ func TestTx_ZRemRangeByRank(t *testing.T) {
 
 	assertions.NoError(err, "TestTx_ZRemRangeByRank err")
 
-	tx.Commit()
+	assert.NoError(t, tx.Commit())
 
 	tx, err = db.Begin(false)
 
@@ -423,7 +454,7 @@ func TestTx_ZRemRangeByRank(t *testing.T) {
 	_, ok = dict[key1]
 	assertions.False(ok, "TestTx_ZRemRangeByRank err")
 
-	tx.Commit()
+	assertions.NoError(tx.Commit())
 
 	tx, err = db.Begin(true)
 
@@ -431,7 +462,7 @@ func TestTx_ZRemRangeByRank(t *testing.T) {
 	err = tx.ZRemRangeByRank(bucket, 1, 2)
 
 	assertions.NoError(err, "TestTx_ZRemRangeByRank err")
-	tx.Commit()
+	assertions.NoError(tx.Commit())
 
 	tx, err = db.Begin(false)
 
@@ -440,7 +471,7 @@ func TestTx_ZRemRangeByRank(t *testing.T) {
 	assertions.NoError(err, "TestTx_ZRemRangeByRank err")
 	assertions.Len(items, 0, "TestTx_ZRemRangeByRank err")
 
-	tx.Commit()
+	assertions.NoError(tx.Commit())
 
 	err = tx.ZRemRangeByRank(bucket, 1, 2)
 	assertions.Error(err, "TestTx_ZRemRangeByRank err")
@@ -450,7 +481,10 @@ func TestTx_ZRank(t *testing.T) {
 	bucket, key1, key2, key3 := InitDataForZSet(t)
 	assertions := assert.New(t)
 	tx, err = db.Begin(false)
-	defer db.Close()
+	defer func(db *DB) {
+		err := db.Close()
+		assert.NoError(t, err)
+	}(db)
 
 	require.NoError(t, err)
 
@@ -470,7 +504,7 @@ func TestTx_ZRank(t *testing.T) {
 	assertions.NoError(err, "TestTx_ZRank err")
 	assertions.Equal(3, rank, "TestTx_ZRank err")
 
-	tx.Commit()
+	assertions.NoError(tx.Commit())
 
 	rank, err = tx.ZRank(bucket, []byte(key3))
 
@@ -482,7 +516,10 @@ func TestTx_ZRevRank(t *testing.T) {
 	bucket, key1, key2, key3 := InitDataForZSet(t)
 	assertions := assert.New(t)
 	tx, err = db.Begin(false)
-	defer db.Close()
+	defer func(db *DB) {
+		err := db.Close()
+		assert.NoError(t, err)
+	}(db)
 
 	require.NoError(t, err)
 
@@ -502,7 +539,7 @@ func TestTx_ZRevRank(t *testing.T) {
 	assertions.NoError(err, "TestTx_ZRevRank err")
 	assertions.Equal(1, rank, "TestTx_ZRevRank err")
 
-	tx.Commit()
+	assertions.NoError(tx.Commit())
 
 	rank, err = tx.ZRevRank(bucket, []byte(key3))
 
@@ -514,7 +551,10 @@ func TestTx_ZScore(t *testing.T) {
 	bucket, key1, _, _ := InitDataForZSet(t)
 	assertions := assert.New(t)
 	tx, err = db.Begin(false)
-	defer db.Close()
+	defer func(db *DB) {
+		err := db.Close()
+		assert.NoError(t, err)
+	}(db)
 
 	require.NoError(t, err)
 
@@ -531,7 +571,7 @@ func TestTx_ZScore(t *testing.T) {
 	assertions.Error(err, "TestTx_ZScore err")
 	assertions.NotEqual(0, score, "TestTx_ZScore err")
 
-	tx.Commit()
+	assertions.NoError(tx.Commit())
 
 	score, err = tx.ZScore(bucket, []byte(key1))
 
@@ -544,7 +584,10 @@ func TestTx_ZGetByKey(t *testing.T) {
 	bucket, key1, _, _ := InitDataForZSet(t)
 	assertions := assert.New(t)
 	tx, err = db.Begin(false)
-	defer db.Close()
+	defer func(db *DB) {
+		err := db.Close()
+		assert.NoError(t, err)
+	}(db)
 
 	require.NoError(t, err)
 
@@ -561,7 +604,7 @@ func TestTx_ZGetByKey(t *testing.T) {
 	assertions.Error(err, "TestTx_ZGetByKey err")
 	assertions.Nil(node, "TestTx_ZGetByKey err")
 
-	tx.Commit()
+	assertions.NoError(tx.Commit())
 	node, err = tx.ZGetByKey(bucket, []byte(key1))
 
 	assertions.Error(err, "TestTx_ZGetByKey err")
