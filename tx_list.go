@@ -16,12 +16,17 @@ package nutsdb
 
 import (
 	"bytes"
-	"errors"
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/xujiajun/nutsdb/ds/list"
 	"github.com/xujiajun/utils/strconv2"
+)
+
+var (
+	// ErrSeparatorForListKey returns when list key contains the SeparatorForListKey.
+	ErrSeparatorForListKey = errors.Errorf("contain separator (%s) for List key", SeparatorForListKey)
 )
 
 // SeparatorForListKey represents separator for listKey
@@ -71,7 +76,7 @@ func (tx *Tx) RPush(bucket string, key []byte, values ...[]byte) error {
 	}
 
 	if strings.Contains(string(key), SeparatorForListKey) {
-		return ErrSeparatorForListKey()
+		return ErrSeparatorForListKey
 	}
 
 	return tx.push(bucket, key, DataRPushFlag, values...)
@@ -84,7 +89,7 @@ func (tx *Tx) LPush(bucket string, key []byte, values ...[]byte) error {
 	}
 
 	if strings.Contains(string(key), SeparatorForListKey) {
-		return ErrSeparatorForListKey()
+		return ErrSeparatorForListKey
 	}
 
 	return tx.push(bucket, key, DataLPushFlag, values...)
@@ -244,9 +249,4 @@ func (tx *Tx) LTrim(bucket string, key []byte, start, end int) error {
 	newKey := buffer.Bytes()
 
 	return tx.push(bucket, newKey, DataLTrimFlag, []byte(strconv2.IntToStr(end)))
-}
-
-// ErrSeparatorForListKey returns when list key contains the SeparatorForListKey.
-func ErrSeparatorForListKey() error {
-	return errors.New("contain separator (" + SeparatorForListKey + ") for List key")
 }

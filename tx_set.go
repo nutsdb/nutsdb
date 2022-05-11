@@ -15,9 +15,9 @@
 package nutsdb
 
 import (
-	"fmt"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/xujiajun/nutsdb/ds/set"
 )
 
@@ -302,10 +302,10 @@ func (tx *Tx) SUnionByTwoBuckets(bucket1 string, key1 []byte, bucket2 string, ke
 
 // ErrBucketAndKey returns when bucket or key not found.
 func ErrBucketAndKey(bucket string, key []byte) error {
-	return fmt.Errorf("%w:bucket:%s,key:%s", ErrBucketNotFound, bucket, key)
+	return errors.Wrapf(ErrBucketNotFound, "bucket:%s, key:%s", bucket, key)
 }
 
 // ErrNotFoundKeyInBucket returns when key not in the bucket.
 func ErrNotFoundKeyInBucket(bucket string, key []byte) error {
-	return fmt.Errorf("%w: %s is not found in %s", ErrKeyNotFound, key, bucket)
+	return errors.Wrapf(ErrKeyNotFound, "%s is not found in %s", key, bucket)
 }

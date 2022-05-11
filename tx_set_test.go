@@ -15,9 +15,12 @@
 package nutsdb
 
 import (
+	"errors"
 	"io/ioutil"
 	"os"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func InitForSet() {
@@ -965,4 +968,20 @@ func TestTx_SAreMembers(t *testing.T) {
 
 	tx.Commit()
 	opSAreMembersForTest(bucket, key, t)
+}
+
+func TestErrBucketAndKey(t *testing.T) {
+
+	got := ErrBucketAndKey("foo", []byte("bar"))
+
+	assert.True(t,
+		errors.Is(got, ErrBucketNotFound))
+}
+
+func TestErrNotFoundKeyInBucket(t *testing.T) {
+
+	got := ErrNotFoundKeyInBucket("foo", []byte("bar"))
+
+	assert.True(t,
+		errors.Is(got, ErrKeyNotFound))
 }
