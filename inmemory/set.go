@@ -15,10 +15,10 @@
 package inmemory
 
 import (
-	"fmt"
-
 	"github.com/xujiajun/nutsdb"
 	"github.com/xujiajun/nutsdb/ds/set"
+
+	"github.com/pkg/errors"
 )
 
 // SAdd adds the specified members to the set stored int the bucket at given bucket,key and items.
@@ -231,11 +231,11 @@ func (db *DB) SUnionByTwoBuckets(bucket1 string, key1 string, bucket2 string, ke
 
 func (db *DB) checkTwoSets(set1, set2 *set.Set, key1, key2 string, bucket1, bucket2 string) error {
 	if !set1.SHasKey(key1) {
-		return fmt.Errorf(" key %s is not in the bucket %s", key1, bucket1)
+		return errors.Wrapf(nutsdb.ErrKeyNotFound, "key %s is not in the bucket %s", key1, bucket1)
 	}
 
 	if !set2.SHasKey(key2) {
-		return fmt.Errorf(" key %s is not in the bucket %s", key2, bucket2)
+		return errors.Wrapf(nutsdb.ErrKeyNotFound, "key %s is not in the bucket %s", key2, bucket2)
 	}
 	return nil
 }

@@ -15,9 +15,9 @@
 package inmemory
 
 import (
-	"fmt"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/xujiajun/nutsdb"
 )
 
@@ -49,7 +49,7 @@ func (db *DB) Get(bucket string, key []byte) (*nutsdb.Entry, error) {
 		return entry, nil
 	}
 
-	return nil, fmt.Errorf("not found bucket %s, key %s", bucket, key)
+	return nil, errors.Wrapf(nutsdb.ErrKeyNotFound, "not found bucket %s, key %s", bucket, key)
 }
 
 func (db *DB) Put(bucket string, key, value []byte, ttl uint32) (err error) {
