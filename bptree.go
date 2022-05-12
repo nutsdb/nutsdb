@@ -34,9 +34,6 @@ var (
 	// ErrScansNoResult is returned when Range or prefixScan or prefixSearchScan are called no result to found.
 	ErrScansNoResult = errors.New("range scans or prefix or prefix and search scans no result")
 
-	// ErrPrefixScansNoResult is returned when prefixScan is called no result to found.
-	ErrPrefixScansNoResult = errors.New("prefix scans no result")
-
 	// ErrPrefixSearchScansNoResult is returned when prefixSearchScan is called no result to found.
 	ErrPrefixSearchScansNoResult = errors.New("prefix and search scans no result")
 
@@ -511,7 +508,7 @@ func (t *BPTree) PrefixScan(prefix []byte, offsetNum int, limitNum int) (records
 	n = t.FindLeaf(prefix)
 
 	if n == nil {
-		return nil, off, ErrPrefixScansNoResult
+		return nil, off, ErrPrefixScan
 	}
 
 	for j = 0; j < n.KeysNum && compare(n.Keys[j], prefix) < 0; {
