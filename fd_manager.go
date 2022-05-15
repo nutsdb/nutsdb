@@ -125,7 +125,7 @@ func (fdm *fdManager) reduceUsing(path string) error {
 
 func (fdm *fdManager) close() error {
 	fdm.Lock()
-	fdm.Unlock()
+	defer fdm.Unlock()
 	node := fdm.fdList.tail.prev
 	for node != fdm.fdList.head {
 		err := node.fd.Close()

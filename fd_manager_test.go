@@ -10,7 +10,8 @@ import (
 func TestFdManager_All(t *testing.T) {
 	dir := "test-data"
 	testBasePath := dir + "/data-"
-	os.Mkdir(dir, os.ModePerm)
+	err := os.Mkdir(dir, os.ModePerm)
+	assert.Nil(t, err)
 	defer os.RemoveAll(dir)
 
 	var startFdNums uint = 1
@@ -30,7 +31,8 @@ func TestFdManager_All(t *testing.T) {
 		assert.NotNil(t, fdm)
 		assert.Equal(t, DefaultMaxFdNums, fdm.maxFdNums)
 		assert.Equal(t, 0.5, fdm.cleanThreshold)
-		newFdm(maxFdNums, cleanThreshold)
+		err = newFdm(maxFdNums, cleanThreshold)
+		assert.Nil(t, err)
 		assert.Equal(t, maxFdNums, fdm.maxFdNums)
 		assert.Equal(t, 0.5, fdm.cleanThreshold)
 	})
@@ -82,7 +84,8 @@ func TestFdManager_All(t *testing.T) {
 		_, err := fdm.getFd(path)
 		assert.Nil(t, err)
 		using := fdm.fdList.head.next.using
-		fdm.getFd(path)
+		_, err = fdm.getFd(path)
+		assert.Nil(t, err)
 		assert.Equal(t, using+1, fdm.fdList.head.next.using)
 		err = fdm.reduceUsing(path)
 		assert.Nil(t, err)
@@ -93,7 +96,8 @@ func TestFdManager_All(t *testing.T) {
 		preReducePath := []int{2, 3, 4, 6, 7, 8}
 		for _, pathNum := range preReducePath {
 			path := testBasePath + fmt.Sprint(pathNum)
-			fdm.reduceUsing(path)
+			err := fdm.reduceUsing(path)
+			assert.Nil(t, err)
 		}
 		path := testBasePath + fmt.Sprint(11)
 		fd, err := fdm.getFd(path)
