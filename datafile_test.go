@@ -40,6 +40,7 @@ func init() {
 		},
 		position: 0,
 	}
+	newFdm(1024, 0.5)
 }
 func TestDataFile_Err(t *testing.T) {
 	_, err := NewDataFile(filePath, -1, FileIO)
