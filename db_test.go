@@ -21,8 +21,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/xujiajun/utils/strconv2"
 )
 

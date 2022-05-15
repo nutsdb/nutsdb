@@ -199,6 +199,10 @@ func Open(opt Options) (*DB, error) {
 		ActiveCommittedTxIdsIdx: NewTree(),
 	}
 
+	if err := newFdm(opt.MaxFdNumsInCache, opt.CleanFdsCacheThreshold); err != nil {
+		return nil, err
+	}
+
 	if ok := filesystem.PathIsExist(db.opt.Dir); !ok {
 		if err := os.MkdirAll(db.opt.Dir, os.ModePerm); err != nil {
 			return nil, err
@@ -388,8 +392,9 @@ func (db *DB) Merge() error {
 			return err
 		}
 
+		path := db.getDataPath(int64(pendingMergeFId))
 		f.rwManager.Close()
-		if err := os.Remove(db.getDataPath(int64(pendingMergeFId))); err != nil {
+		if err := os.Remove(path); err != nil {
 			db.isMerging = false
 			return fmt.Errorf("when merge err: %s", err)
 		}
@@ -423,11 +428,19 @@ func (db *DB) Close() error {
 
 	db.closed = true
 
-	db.ActiveFile.rwManager.Close()
+	err := db.ActiveFile.rwManager.Close()
+	if err != nil {
+		return err
+	}
 
 	db.ActiveFile = nil
 
 	db.BPTreeIdx = nil
+
+	err = fdm.close()
+	if err != nil {
+		return err
+	}
 
 	return nil
 }

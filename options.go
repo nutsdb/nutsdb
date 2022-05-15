@@ -54,6 +54,10 @@ type Options struct {
 
 	// StartFileLoadingMode represents when open a database which RWMode to load files.
 	StartFileLoadingMode RWMode
+
+	MaxFdNumsInCache uint
+
+	CleanFdsCacheThreshold float64
 }
 
 var defaultSegmentSize int64 = 8 * 1024 * 1024

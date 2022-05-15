@@ -16,17 +16,17 @@ package nutsdb
 
 import (
 	"os"
-	"path/filepath"
 )
 
 // FileIORWManager represents the RWManager which using standard I/O.
 type FileIORWManager struct {
-	fd *os.File
+	fd   *os.File
+	path string
 }
 
 // NewFileIORWManager returns a newly initialized FileIORWManager.
 func NewFileIORWManager(path string, capacity int64) (*FileIORWManager, error) {
-	fd, err := os.OpenFile(filepath.Clean(path), os.O_CREATE|os.O_RDWR, 0644)
+	fd, err := fdm.getFd(path)
 	if err != nil {
 		return nil, err
 	}
@@ -36,7 +36,7 @@ func NewFileIORWManager(path string, capacity int64) (*FileIORWManager, error) {
 		return nil, err
 	}
 
-	return &FileIORWManager{fd: fd}, nil
+	return &FileIORWManager{fd: fd, path: path}, nil
 }
 
 // WriteAt writes len(b) bytes to the File starting at byte offset off.
@@ -64,5 +64,5 @@ func (fm *FileIORWManager) Sync() (err error) {
 // be canceled and return immediately with an error.
 // `Close` is a wrapper of the *File.Close.
 func (fm *FileIORWManager) Close() (err error) {
-	return fm.fd.Close()
+	return fdm.reduceUsing(fm.path)
 }
