@@ -25,17 +25,16 @@ func TestFdManager_All(t *testing.T) {
 		os.RemoveAll(testBasePath)
 	}()
 
-	t.Run("test new fdm", func(t *testing.T) {
-		err := newFdm(1025, 0.7)
-		assert.Nil(t, err)
-		assert.NotNil(t, fdm)
-		assert.Equal(t, DefaultMaxFdNums, fdm.maxFdNums)
-		assert.Equal(t, 0.5, fdm.cleanThreshold)
-		err = newFdm(maxFdNums, cleanThreshold)
+	t.Run("test set params to fdm", func(t *testing.T) {
+		fdm.setOptions(maxFdNums, cleanThreshold)
 		assert.Nil(t, err)
 		assert.Equal(t, maxFdNums, fdm.maxFdNums)
 		assert.Equal(t, 0.5, fdm.cleanThreshold)
 	})
+
+	defer func() {
+		fdm.setOptions(DefaultMaxFdNums, 0.5)
+	}()
 
 	t.Run("create fd to cache", func(t *testing.T) {
 		for i := startFdNums; i < maxFdNums; i++ {

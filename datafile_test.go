@@ -40,7 +40,6 @@ func init() {
 		},
 		position: 0,
 	}
-	err := newFdm(1024, 0.5)
 	if err != nil {
 		return
 	}

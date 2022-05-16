@@ -983,6 +983,7 @@ func TestTx_SCan_For_BPTSparseIdxMode(t *testing.T) {
 
 func TestTx_Notfound_For_BPTSparseIdxMode(t *testing.T) {
 	InitForBPTSparseIdxMode()
+	InitOpt("", true)
 	db, err = Open(opt)
 	defer db.Close()
 

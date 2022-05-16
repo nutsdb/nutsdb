@@ -31,23 +31,22 @@ func getMaxFdNumsInSystem() uint {
 }
 
 // fdm is singleton object stands of fd cache
-var fdm *fdManager
+var fdm = &fdManager{
+	cache:          map[string]*FdInfo{},
+	fdList:         initList(),
+	size:           0,
+	maxFdNums:      getMaxFdNumsInSystem(),
+	cleanThreshold: 0.5,
+}
 
-func newFdm(maxFdNums uint, cleanThreshold float64) error {
-	fdm = &fdManager{
-		cache:          map[string]*FdInfo{},
-		fdList:         initList(),
-		size:           0,
-		maxFdNums:      maxFdNums,
-		cleanThreshold: cleanThreshold,
+func (fdm *fdManager) setOptions(maxFdNums uint, cleanThreshold float64) {
+	if maxFdNums > 0 {
+		fdm.maxFdNums = maxFdNums
 	}
-	if sysMaxFdNums := getMaxFdNumsInSystem(); maxFdNums > sysMaxFdNums {
-		fdm.maxFdNums = sysMaxFdNums
+
+	if cleanThreshold < 0.5 && cleanThreshold > 0.0 {
+		fdm.cleanThreshold = cleanThreshold
 	}
-	if cleanThreshold > 0.5 {
-		fdm.cleanThreshold = 0.5
-	}
-	return nil
 }
 
 type fdManager struct {
@@ -136,7 +135,8 @@ func (fdm *fdManager) close() error {
 		fdm.size--
 		node = node.prev
 	}
-	fdm.fdList = nil
+	fdm.fdList.head.next = fdm.fdList.tail
+	fdm.fdList.tail.prev = fdm.fdList.head
 	return nil
 }
 

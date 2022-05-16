@@ -52,6 +52,8 @@ func InitOpt(fileDir string, isRemoveFiles bool) {
 	opt = DefaultOptions
 	opt.Dir = fileDir
 	opt.SegmentSize = 8 * 1024
+	opt.CleanFdsCacheThreshold = 0.5
+	opt.MaxFdNumsInCache = 1024
 }
 
 func TestDB_Basic(t *testing.T) {

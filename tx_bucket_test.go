@@ -117,6 +117,7 @@ func TestTx_DeleteBucket(t *testing.T) {
 
 func TestTx_IterateBuckets(t *testing.T) {
 	InitForBucket()
+	InitOpt("", true)
 	db, err = Open(opt)
 	if err != nil {
 		t.Fatal(err)

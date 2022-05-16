@@ -199,9 +199,7 @@ func Open(opt Options) (*DB, error) {
 		ActiveCommittedTxIdsIdx: NewTree(),
 	}
 
-	if err := newFdm(opt.MaxFdNumsInCache, opt.CleanFdsCacheThreshold); err != nil {
-		return nil, err
-	}
+	fdm.setOptions(opt.MaxFdNumsInCache, opt.CleanFdsCacheThreshold)
 
 	if ok := filesystem.PathIsExist(db.opt.Dir); !ok {
 		if err := os.MkdirAll(db.opt.Dir, os.ModePerm); err != nil {
