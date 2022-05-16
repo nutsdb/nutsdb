@@ -60,7 +60,6 @@ func InitForBPTSparseIdxMode() {
 	opt.Dir = fileDir
 	opt.SegmentSize = 1024
 	opt.EntryIdxMode = HintBPTSparseIdxMode
-	return
 }
 
 func TestTx_PutAndGet(t *testing.T) {
