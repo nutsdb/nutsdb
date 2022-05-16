@@ -36,6 +36,7 @@ func InitForZSet() {
 		}
 	}
 
+	fdm.close()
 	opt = DefaultOptions
 	opt.Dir = fileDir
 	opt.SegmentSize = 8 * 1024

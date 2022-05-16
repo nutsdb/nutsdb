@@ -32,6 +32,7 @@ func InitForSet() {
 			}
 		}
 	}
+	fdm.close()
 
 	opt = DefaultOptions
 	opt.Dir = fileDir
