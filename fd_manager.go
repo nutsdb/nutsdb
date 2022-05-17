@@ -125,7 +125,7 @@ func (fdm *fdManager) reduceUsing(path string) {
 		panic("unexpected the node is not in cache")
 	}
 	fdm.Lock()
-	fdm.Unlock()
+	defer fdm.Unlock()
 	node.using--
 }
 
