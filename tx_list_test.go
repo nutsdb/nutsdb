@@ -32,7 +32,6 @@ func InitForList() {
 			}
 		}
 	}
-	fdm.close()
 
 	opt = DefaultOptions
 	opt.Dir = fileDir

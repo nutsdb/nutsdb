@@ -15,9 +15,9 @@
 package nutsdb
 
 import (
-	"fmt"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/xujiajun/nutsdb/ds/set"
 )
 
@@ -81,7 +81,7 @@ func (tx *Tx) SAreMembers(bucket string, key []byte, items ...[]byte) (bool, err
 		return sets.SAreMembers(string(key), items...)
 	}
 
-	return false, ErrBucketAndKey(bucket, key)
+	return false, ErrBucketNotFound
 }
 
 // SIsMember returns if member is a member of the set stored int the bucket at given bucket,key and item.
@@ -92,12 +92,12 @@ func (tx *Tx) SIsMember(bucket string, key, item []byte) (bool, error) {
 
 	if set, ok := tx.db.SetIdx[bucket]; ok {
 		if !set.SIsMember(string(key), item) {
-			return false, ErrBucketAndKey(bucket, key)
+			return false, ErrBucketNotFound
 		}
 		return true, nil
 	}
 
-	return false, ErrBucketAndKey(bucket, key)
+	return false, ErrBucketNotFound
 }
 
 // SMembers returns all the members of the set value stored int the bucket at given bucket and key.
@@ -110,7 +110,7 @@ func (tx *Tx) SMembers(bucket string, key []byte) (list [][]byte, err error) {
 		return set.SMembers(string(key))
 	}
 
-	return nil, ErrBucketAndKey(bucket, key)
+	return nil, ErrBucketNotFound
 
 }
 
@@ -124,7 +124,7 @@ func (tx *Tx) SHasKey(bucket string, key []byte) (bool, error) {
 		return set.SHasKey(string(key)), nil
 	}
 
-	return false, ErrBucketAndKey(bucket, key)
+	return false, ErrBucketNotFound
 }
 
 // SPop removes and returns one or more random elements from the set value store in the bucket at given bucket and key.
@@ -139,7 +139,7 @@ func (tx *Tx) SPop(bucket string, key []byte) ([]byte, error) {
 		}
 	}
 
-	return nil, ErrBucketAndKey(bucket, key)
+	return nil, ErrBucketNotFound
 }
 
 // SCard returns the set cardinality (number of elements) of the set stored in the bucket at given bucket and key.
@@ -152,7 +152,7 @@ func (tx *Tx) SCard(bucket string, key []byte) (int, error) {
 		return set.SCard(string(key)), nil
 	}
 
-	return 0, ErrBucketAndKey(bucket, key)
+	return 0, ErrBucketNotFound
 }
 
 // SDiffByOneBucket returns the members of the set resulting from the difference
@@ -166,7 +166,7 @@ func (tx *Tx) SDiffByOneBucket(bucket string, key1, key2 []byte) (list [][]byte,
 		return set.SDiff(string(key1), string(key2))
 	}
 
-	return nil, ErrBucketAndKey(bucket, key1)
+	return nil, ErrBucketNotFound
 }
 
 // SDiffByTwoBuckets returns the members of the set resulting from the difference
@@ -302,10 +302,10 @@ func (tx *Tx) SUnionByTwoBuckets(bucket1 string, key1 []byte, bucket2 string, ke
 
 // ErrBucketAndKey returns when bucket or key not found.
 func ErrBucketAndKey(bucket string, key []byte) error {
-	return fmt.Errorf("%w:bucket:%s,key:%s", ErrBucketNotFound, bucket, key)
+	return errors.Wrapf(ErrBucketNotFound, "bucket:%s, key:%s", bucket, key)
 }
 
 // ErrNotFoundKeyInBucket returns when key not in the bucket.
 func ErrNotFoundKeyInBucket(bucket string, key []byte) error {
-	return fmt.Errorf("%w: %s is not found in %s", ErrKeyNotFound, key, bucket)
+	return errors.Wrapf(ErrKeyNotFound, "%s is not found in %s", key, bucket)
 }

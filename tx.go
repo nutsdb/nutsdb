@@ -550,7 +550,7 @@ func (tx *Tx) rotateActiveFile() error {
 
 	// reset ActiveFile
 	path := tx.db.getDataPath(tx.db.MaxFileID)
-	tx.db.ActiveFile, err = NewDataFile(path, tx.db.opt.SegmentSize, tx.db.opt.RWMode)
+	tx.db.ActiveFile, err = NewDataFile(path, tx.db.opt.SegmentSize, tx.db.opt.RWMode, tx.db.fdm)
 	if err != nil {
 		return err
 	}

@@ -1108,3 +1108,12 @@ func withRAMIdxDB(t *testing.T, fn func(t *testing.T, db *DB)) {
 
 	withDBOption(t, opt, fn)
 }
+
+func withBPTSpareeIdxDB(t *testing.T, fn func(t *testing.T, db *DB)) {
+	tmpdir, _ := ioutil.TempDir("", "nutsdb")
+	opt := DefaultOptions
+	opt.Dir = tmpdir
+	opt.EntryIdxMode = HintKeyAndRAMIdxMode
+
+	withDBOption(t, opt, fn)
+}

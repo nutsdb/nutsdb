@@ -160,6 +160,7 @@ type (
 		KeyCount                int // total key number ,include expired, deleted, repeated.
 		closed                  bool
 		isMerging               bool
+		fdm                     *fdManager
 	}
 
 	// BPTreeIdx represents the B+ tree index
@@ -197,9 +198,8 @@ func Open(opt Options) (*DB, error) {
 		BPTreeKeyEntryPosMap:    make(map[string]int64),
 		bucketMetas:             make(map[string]*BucketMeta),
 		ActiveCommittedTxIdsIdx: NewTree(),
+		fdm:                     newFdm(opt.MaxFdNumsInCache, opt.CleanFdsCacheThreshold),
 	}
-
-	fdm.setOptions(opt.MaxFdNumsInCache, opt.CleanFdsCacheThreshold)
 
 	if ok := filesystem.PathIsExist(db.opt.Dir); !ok {
 		if err := os.MkdirAll(db.opt.Dir, os.ModePerm); err != nil {
@@ -329,7 +329,7 @@ func (db *DB) Merge() error {
 
 	for _, pendingMergeFId := range pendingMergeFIds {
 		off = 0
-		f, err := NewDataFile(db.getDataPath(int64(pendingMergeFId)), db.opt.SegmentSize, db.opt.RWMode)
+		f, err := NewDataFile(db.getDataPath(int64(pendingMergeFId)), db.opt.SegmentSize, db.opt.RWMode, db.fdm)
 		if err != nil {
 			db.isMerging = false
 			return err
@@ -434,8 +434,8 @@ func (db *DB) Close() error {
 	db.ActiveFile = nil
 
 	db.BPTreeIdx = nil
+	db.fdm.close()
 
-	err = fdm.close()
 	if err != nil {
 		return err
 	}
@@ -446,7 +446,7 @@ func (db *DB) Close() error {
 // setActiveFile sets the ActiveFile (DataFile object).
 func (db *DB) setActiveFile() (err error) {
 	filepath := db.getDataPath(db.MaxFileID)
-	db.ActiveFile, err = NewDataFile(filepath, db.opt.SegmentSize, db.opt.RWMode)
+	db.ActiveFile, err = NewDataFile(filepath, db.opt.SegmentSize, db.opt.RWMode, db.fdm)
 	if err != nil {
 		return
 	}
@@ -530,7 +530,7 @@ func (db *DB) parseDataFiles(dataFileIds []int) (unconfirmedRecords []*Record, c
 	for _, dataID := range dataFileIds {
 		off = 0
 		fID := int64(dataID)
-		f, err := NewDataFile(db.getDataPath(fID), db.opt.SegmentSize, db.opt.StartFileLoadingMode)
+		f, err := NewDataFile(db.getDataPath(fID), db.opt.SegmentSize, db.opt.StartFileLoadingMode, db.fdm)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -1008,16 +1008,21 @@ func (db *DB) getBPTRootTxIDPath(fID int64) string {
 
 func (db *DB) getPendingMergeEntries(entry *Entry, pendingMergeEntries []*Entry) []*Entry {
 	if entry.Meta.Ds == DataStructureBPTree {
-		if r, err := db.BPTreeIdx[string(entry.Meta.Bucket)].Find(entry.Key); err == nil {
-			if r.H.Meta.Flag == DataSetFlag {
+		bptIdx, exist := db.BPTreeIdx[string(entry.Meta.Bucket)]
+		if exist {
+			r, err := bptIdx.Find(entry.Key)
+			if err == nil && r.H.Meta.Flag == DataSetFlag {
 				pendingMergeEntries = append(pendingMergeEntries, entry)
 			}
 		}
 	}
 
 	if entry.Meta.Ds == DataStructureSet {
-		if db.SetIdx[string(entry.Meta.Bucket)].SIsMember(string(entry.Key), entry.Value) {
-			pendingMergeEntries = append(pendingMergeEntries, entry)
+		setIdx, exist := db.SetIdx[string(entry.Meta.Bucket)]
+		if exist {
+			if setIdx.SIsMember(string(entry.Key), entry.Value) {
+				pendingMergeEntries = append(pendingMergeEntries, entry)
+			}
 		}
 	}
 
@@ -1025,25 +1030,31 @@ func (db *DB) getPendingMergeEntries(entry *Entry, pendingMergeEntries []*Entry)
 		keyAndScore := strings.Split(string(entry.Key), SeparatorForZSetKey)
 		if len(keyAndScore) == 2 {
 			key := keyAndScore[0]
-			n := db.SortedSetIdx[string(entry.Meta.Bucket)].GetByKey(key)
-			if n != nil {
-				pendingMergeEntries = append(pendingMergeEntries, entry)
+			sortedSetIdx, exist := db.SortedSetIdx[string(entry.Meta.Bucket)]
+			if exist {
+				n := sortedSetIdx.GetByKey(key)
+				if n != nil {
+					pendingMergeEntries = append(pendingMergeEntries, entry)
+				}
 			}
 		}
 	}
 
 	if entry.Meta.Ds == DataStructureList {
-		items, _ := db.ListIdx[string(entry.Meta.Bucket)].LRange(string(entry.Key), 0, -1)
-		ok := false
-		if entry.Meta.Flag == DataRPushFlag || entry.Meta.Flag == DataLPushFlag {
-			for _, item := range items {
-				if string(entry.Value) == string(item) {
-					ok = true
-					break
+		listIdx, exist := db.ListIdx[string(entry.Meta.Bucket)]
+		if exist {
+			items, _ := listIdx.LRange(string(entry.Key), 0, -1)
+			ok := false
+			if entry.Meta.Flag == DataRPushFlag || entry.Meta.Flag == DataLPushFlag {
+				for _, item := range items {
+					if string(entry.Value) == string(item) {
+						ok = true
+						break
+					}
 				}
-			}
-			if ok {
-				pendingMergeEntries = append(pendingMergeEntries, entry)
+				if ok {
+					pendingMergeEntries = append(pendingMergeEntries, entry)
+				}
 			}
 		}
 	}
@@ -1061,7 +1072,7 @@ func (db *DB) reWriteData(pendingMergeEntries []*Entry) error {
 		return err
 	}
 
-	dataFile, err := NewDataFile(db.getDataPath(db.MaxFileID+1), db.opt.SegmentSize, db.opt.RWMode)
+	dataFile, err := NewDataFile(db.getDataPath(db.MaxFileID+1), db.opt.SegmentSize, db.opt.RWMode, db.fdm)
 	if err != nil {
 		db.isMerging = false
 		return err

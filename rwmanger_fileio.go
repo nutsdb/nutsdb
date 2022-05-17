@@ -22,10 +22,11 @@ import (
 type FileIORWManager struct {
 	fd   *os.File
 	path string
+	fdm  *fdManager
 }
 
 // NewFileIORWManager returns a newly initialized FileIORWManager.
-func NewFileIORWManager(path string, capacity int64) (*FileIORWManager, error) {
+func NewFileIORWManager(path string, capacity int64, fdm *fdManager) (*FileIORWManager, error) {
 	fd, err := fdm.getFd(path)
 	if err != nil {
 		return nil, err
@@ -36,7 +37,7 @@ func NewFileIORWManager(path string, capacity int64) (*FileIORWManager, error) {
 		return nil, err
 	}
 
-	return &FileIORWManager{fd: fd, path: path}, nil
+	return &FileIORWManager{fd: fd, path: path, fdm: fdm}, nil
 }
 
 // WriteAt writes len(b) bytes to the File starting at byte offset off.
@@ -64,5 +65,6 @@ func (fm *FileIORWManager) Sync() (err error) {
 // be canceled and return immediately with an error.
 // `Close` is a wrapper of the *File.Close.
 func (fm *FileIORWManager) Close() (err error) {
-	return fdm.reduceUsing(fm.path)
+	fm.fdm.reduceUsing(fm.path)
+	return nil
 }

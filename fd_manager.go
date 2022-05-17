@@ -1,7 +1,6 @@
 package nutsdb
 
 import (
-	"errors"
 	"math"
 	"os"
 	"path/filepath"
@@ -30,13 +29,22 @@ func getMaxFdNumsInSystem() uint {
 	}
 }
 
-// fdm is singleton object stands of fd cache
-var fdm = &fdManager{
-	cache:          map[string]*FdInfo{},
-	fdList:         initList(),
-	size:           0,
-	maxFdNums:      getMaxFdNumsInSystem(),
-	cleanThreshold: 0.5,
+func newFdm(maxFdNums uint, cleanThreshold float64) (fdm *fdManager) {
+	fdm = &fdManager{
+		cache:          map[string]*FdInfo{},
+		fdList:         initList(),
+		size:           0,
+		maxFdNums:      getMaxFdNumsInSystem(),
+		cleanThreshold: 0.5,
+	}
+	if maxFdNums > 0 {
+		fdm.maxFdNums = maxFdNums
+	}
+
+	if cleanThreshold < 0.5 && cleanThreshold > 0.0 {
+		fdm.cleanThreshold = cleanThreshold
+	}
+	return fdm
 }
 
 func (fdm *fdManager) setOptions(maxFdNums uint, cleanThreshold float64) {
@@ -110,16 +118,15 @@ func (fdm *fdManager) getFd(path string) (fd *os.File, err error) {
 	}
 }
 
-func (fdm *fdManager) reduceUsing(path string) error {
+func (fdm *fdManager) reduceUsing(path string) {
 	cleanPath := filepath.Clean(path)
 	node := fdm.cache[cleanPath]
 	if node == nil {
-		return errors.New("unexpected the node is not in cache")
+		panic("unexpected the node is not in cache")
 	}
 	fdm.Lock()
 	fdm.Unlock()
 	node.using--
-	return nil
 }
 
 func (fdm *fdManager) close() error {

@@ -48,7 +48,7 @@ type DataFile struct {
 }
 
 // NewDataFile returns a newly initialized DataFile object.
-func NewDataFile(path string, capacity int64, rwMode RWMode) (df *DataFile, err error) {
+func NewDataFile(path string, capacity int64, rwMode RWMode, fdm *fdManager) (df *DataFile, err error) {
 	var rwManager RWManager
 
 	if capacity <= 0 {
@@ -56,7 +56,7 @@ func NewDataFile(path string, capacity int64, rwMode RWMode) (df *DataFile, err 
 	}
 
 	if rwMode == FileIO {
-		rwManager, err = NewFileIORWManager(path, capacity)
+		rwManager, err = NewFileIORWManager(path, capacity, fdm)
 		if err != nil {
 			return nil, err
 		}
