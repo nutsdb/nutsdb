@@ -75,6 +75,8 @@ type FdInfo struct {
 }
 
 func (fdm *fdManager) getFd(path string) (fd *os.File, err error) {
+	fdm.Lock()
+	defer fdm.Unlock()
 	cleanPath := filepath.Clean(path)
 	if fdInfo := fdm.cache[cleanPath]; fdInfo == nil {
 		fd, err = os.OpenFile(cleanPath, os.O_CREATE|os.O_RDWR, 0644)
@@ -84,8 +86,6 @@ func (fdm *fdManager) getFd(path string) (fd *os.File, err error) {
 				using: 1,
 				path:  cleanPath,
 			}
-			fdm.Lock()
-			defer fdm.Unlock()
 			fdm.fdList.addNode(fdInfo)
 			fdm.size++
 			fdm.cache[cleanPath] = fdInfo
@@ -110,8 +110,6 @@ func (fdm *fdManager) getFd(path string) (fd *os.File, err error) {
 		}
 		return fd, err
 	} else {
-		fdm.Lock()
-		defer fdm.Unlock()
 		fdInfo.using++
 		fdm.fdList.moveNodeToFront(fdInfo)
 		return fdInfo.fd, nil
@@ -119,13 +117,13 @@ func (fdm *fdManager) getFd(path string) (fd *os.File, err error) {
 }
 
 func (fdm *fdManager) reduceUsing(path string) {
+	fdm.Lock()
+	defer fdm.Unlock()
 	cleanPath := filepath.Clean(path)
 	node := fdm.cache[cleanPath]
 	if node == nil {
 		panic("unexpected the node is not in cache")
 	}
-	fdm.Lock()
-	defer fdm.Unlock()
 	node.using--
 }
 
