@@ -64,7 +64,7 @@ func (fdm *fdManager) getFd(path string) (fd *os.File, err error) {
 		if err == nil {
 			// if the numbers of fd in cache larger than the cleanThreshold in config, we will clean useless fd in cache
 			if fdm.size >= fdm.cleanThreshold {
-				fdm.cleanUselessFd()
+				err = fdm.cleanUselessFd()
 			}
 			// if the numbers of fd in cache larger than the max numbers of fd in config, we will not add this fd to cache
 			if fdm.size >= fdm.maxFdNums {
@@ -72,6 +72,7 @@ func (fdm *fdManager) getFd(path string) (fd *os.File, err error) {
 			}
 			// add this fd to cache
 			fdm.addToCache(fd, cleanPath)
+			return fd, nil
 		} else {
 			// determine if there are too many open files, we will first clean useless fd in cache and try open this file again
 			if strings.HasSuffix(err.Error(), TooManyFileOpenErrSuffix) {
@@ -88,8 +89,8 @@ func (fdm *fdManager) getFd(path string) (fd *os.File, err error) {
 				// add to cache if open this file successfully
 				fdm.addToCache(fd, cleanPath)
 			}
+			return fd, err
 		}
-		return fd, err
 	} else {
 		fdInfo.using++
 		fdm.fdList.moveNodeToFront(fdInfo)

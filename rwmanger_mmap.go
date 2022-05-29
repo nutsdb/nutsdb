@@ -34,27 +34,6 @@ var (
 	ErrIndexOutOfBound = errors.New("offset out of mapped region")
 )
 
-//// NewMMapRWManager returns a newly initialized MMapRWManager.
-//func NewMMapRWManager(path string, capacity int64) (*MMapRWManager, error) {
-//	f, err := os.OpenFile(filepath.Clean(path), os.O_CREATE|os.O_RDWR, 0644)
-//	if err != nil {
-//		return nil, err
-//	}
-//	defer f.Close()
-//
-//	err = Truncate(path, capacity, f)
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	m, err := mmap.Map(f, mmap.RDWR, 0)
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	return &MMapRWManager{m: m}, nil
-//}
-
 // WriteAt copies data to mapped region from the b slice starting at
 // given off and returns number of bytes copied to the mapped region.
 func (mm *MMapRWManager) WriteAt(b []byte, off int64) (n int, err error) {

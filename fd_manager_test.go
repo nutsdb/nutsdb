@@ -225,7 +225,8 @@ func assertChainFromTail(t *testing.T, fdm *fdManager, testBasePath string, posi
 func TestGetMaxNums(t *testing.T) {
 	maxNums := 30000
 	basePath := "test-path/"
-	os.Mkdir(basePath, os.ModePerm)
+	err := os.Mkdir(basePath, os.ModePerm)
+	assert.Nil(t, err)
 	defer func() {
 		err := os.RemoveAll(basePath)
 		if err != nil {
