@@ -1073,7 +1073,6 @@ func (db *DB) reWriteData(pendingMergeEntries []*Entry) error {
 		return err
 	}
 
-	//dataFile, err := NewDataFile(db.getDataPath(db.MaxFileID+1), db.opt.SegmentSize, db.opt.RWMode, db.fdm)
 	dataFile, err := db.fm.getDataFile(db.getDataPath(db.MaxFileID+1), db.opt.SegmentSize)
 	if err != nil {
 		db.isMerging = false

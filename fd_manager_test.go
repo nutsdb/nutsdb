@@ -16,16 +16,17 @@ func TestFdManager_All(t *testing.T) {
 	assert.Nil(t, err)
 	defer os.RemoveAll(dir)
 
-	var startFdNums = 1
-	var maxFdNums = 20
-	var createFileLimit = 11
+	startFdNums := 1
+	maxFdNums := 20
+	createFileLimit := 11
 	cleanThreshold := 0.5
 
 	defer func() {
 		if panicErr := recover(); panicErr != nil {
 			t.Logf("panic is %s", panicErr)
 		}
-		os.RemoveAll(testBasePath)
+		err := os.RemoveAll(testBasePath)
+		assert.Nil(t, err)
 	}()
 
 	var fdm *fdManager
@@ -43,7 +44,7 @@ func TestFdManager_All(t *testing.T) {
 			assert.Nil(t, err)
 			assert.NotNil(t, fd)
 		}
-		var positiveFdsSeq = []int{10, 9, 8, 7, 6, 5, 4, 3, 2, 1}
+		positiveFdsSeq := []int{10, 9, 8, 7, 6, 5, 4, 3, 2, 1}
 
 		assertChainFromTailAndHead(t, fdm, testBasePath, positiveFdsSeq)
 	})
@@ -54,7 +55,7 @@ func TestFdManager_All(t *testing.T) {
 			assert.Nil(t, err)
 			assert.NotNil(t, fd)
 			assert.Equal(t, fdm.fdList.head.next.fd, fd)
-			var positiveFdsSeq = []int{10, 9, 8, 7, 6, 5, 4, 3, 2, 1}
+			positiveFdsSeq := []int{10, 9, 8, 7, 6, 5, 4, 3, 2, 1}
 			assertChainFromTailAndHead(t, fdm, testBasePath, positiveFdsSeq)
 		})
 
@@ -63,7 +64,7 @@ func TestFdManager_All(t *testing.T) {
 			assert.Nil(t, err)
 			assert.NotNil(t, fd)
 			assert.Equal(t, fdm.fdList.head.next.fd, fd)
-			var positiveFdsSeq = []int{1, 10, 9, 8, 7, 6, 5, 4, 3, 2}
+			positiveFdsSeq := []int{1, 10, 9, 8, 7, 6, 5, 4, 3, 2}
 			assertChainFromTailAndHead(t, fdm, testBasePath, positiveFdsSeq)
 		})
 
@@ -73,7 +74,7 @@ func TestFdManager_All(t *testing.T) {
 			assert.Nil(t, err)
 			assert.NotNil(t, fd)
 			assert.Equal(t, fdm.fdList.head.next.fd, fd)
-			var positiveFdsSeq = []int{5, 1, 10, 9, 8, 7, 6, 4, 3, 2}
+			positiveFdsSeq := []int{5, 1, 10, 9, 8, 7, 6, 4, 3, 2}
 			assertChainFromTailAndHead(t, fdm, testBasePath, positiveFdsSeq)
 		})
 	})
@@ -102,7 +103,7 @@ func TestFdManager_All(t *testing.T) {
 		fd, err := fdm.getFd(path)
 		assert.Nil(t, err)
 		assert.NotNil(t, fd)
-		var positiveFdsSeq = []int{11, 5, 1, 10, 9}
+		positiveFdsSeq := []int{11, 5, 1, 10, 9}
 		assertChainFromTailAndHead(t, fdm, testBasePath, positiveFdsSeq)
 	})
 
@@ -195,7 +196,7 @@ func assertChainFromTailAndHead(t *testing.T, fdm *fdManager, testBasePath strin
 func assertChainFromHead(t *testing.T, fdm *fdManager, testBasePath string, positiveFdsSeq []int) {
 	node := fdm.fdList.head.next
 	index := 0
-	var nums = 0
+	nums := 0
 	for node != fdm.fdList.tail {
 		expectedPath := testBasePath + fmt.Sprint(positiveFdsSeq[index])
 		assert.NotNil(t, node.fd)
@@ -210,7 +211,7 @@ func assertChainFromHead(t *testing.T, fdm *fdManager, testBasePath string, posi
 func assertChainFromTail(t *testing.T, fdm *fdManager, testBasePath string, positiveFdsSeq []int) {
 	index := len(positiveFdsSeq) - 1
 	node := fdm.fdList.tail.prev
-	var nums = 0
+	nums := 0
 	for node != fdm.fdList.head {
 		expectedPath := testBasePath + fmt.Sprint(positiveFdsSeq[index])
 		assert.NotNil(t, node.fd)
