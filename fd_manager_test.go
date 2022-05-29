@@ -3,7 +3,9 @@ package nutsdb
 import (
 	"fmt"
 	"github.com/stretchr/testify/assert"
+	"math"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -14,9 +16,10 @@ func TestFdManager_All(t *testing.T) {
 	assert.Nil(t, err)
 	defer os.RemoveAll(dir)
 
-	var startFdNums uint = 1
-	var maxFdNums uint = 11
-	cleanThreshold := 0.7
+	var startFdNums = 1
+	var maxFdNums = 20
+	var createFileLimit = 11
+	cleanThreshold := 0.5
 
 	defer func() {
 		if panicErr := recover(); panicErr != nil {
@@ -30,15 +33,11 @@ func TestFdManager_All(t *testing.T) {
 		fdm = newFdm(maxFdNums, cleanThreshold)
 		assert.NotNil(t, fdm)
 		assert.Equal(t, maxFdNums, fdm.maxFdNums)
-		assert.Equal(t, 0.5, fdm.cleanThreshold)
+		assert.Equal(t, int(math.Floor(cleanThreshold*float64(fdm.maxFdNums))), fdm.cleanThreshold)
 	})
 
-	defer func() {
-		fdm.setOptions(DefaultMaxFdNums, 0.5)
-	}()
-
 	t.Run("create fd to cache", func(t *testing.T) {
-		for i := startFdNums; i < maxFdNums; i++ {
+		for i := startFdNums; i < createFileLimit; i++ {
 			path := testBasePath + fmt.Sprint(i)
 			fd, err := fdm.getFd(path)
 			assert.Nil(t, err)
@@ -103,18 +102,18 @@ func TestFdManager_All(t *testing.T) {
 		fd, err := fdm.getFd(path)
 		assert.Nil(t, err)
 		assert.NotNil(t, fd)
-		var positiveFdsSeq = []int{11, 5, 1, 10, 9, 8}
+		var positiveFdsSeq = []int{11, 5, 1, 10, 9}
 		assertChainFromTailAndHead(t, fdm, testBasePath, positiveFdsSeq)
 	})
 
-	t.Run("test close", func(t *testing.T) {
+	t.Run("test close fdm", func(t *testing.T) {
 		err := fdm.close()
 		if err != nil {
 			t.Logf("err during close is:%s", err)
 		}
 		assert.Nil(t, err)
 		assert.Equal(t, 0, len(fdm.cache))
-		assert.Equal(t, uint(0), fdm.size)
+		assert.Equal(t, 0, fdm.size)
 	})
 }
 
@@ -196,7 +195,7 @@ func assertChainFromTailAndHead(t *testing.T, fdm *fdManager, testBasePath strin
 func assertChainFromHead(t *testing.T, fdm *fdManager, testBasePath string, positiveFdsSeq []int) {
 	node := fdm.fdList.head.next
 	index := 0
-	var nums uint = 0
+	var nums = 0
 	for node != fdm.fdList.tail {
 		expectedPath := testBasePath + fmt.Sprint(positiveFdsSeq[index])
 		assert.NotNil(t, node.fd)
@@ -211,7 +210,7 @@ func assertChainFromHead(t *testing.T, fdm *fdManager, testBasePath string, posi
 func assertChainFromTail(t *testing.T, fdm *fdManager, testBasePath string, positiveFdsSeq []int) {
 	index := len(positiveFdsSeq) - 1
 	node := fdm.fdList.tail.prev
-	var nums uint = 0
+	var nums = 0
 	for node != fdm.fdList.head {
 		expectedPath := testBasePath + fmt.Sprint(positiveFdsSeq[index])
 		assert.NotNil(t, node.fd)
@@ -221,4 +220,35 @@ func assertChainFromTail(t *testing.T, fdm *fdManager, testBasePath string, posi
 		nums++
 	}
 	assert.Equal(t, fdm.size, nums)
+}
+
+func TestGetMaxNums(t *testing.T) {
+	maxNums := 30000
+	basePath := "test-path/"
+	os.Mkdir(basePath, os.ModePerm)
+	defer func() {
+		err := os.RemoveAll(basePath)
+		if err != nil {
+			t.Logf("err is %s", err)
+		}
+	}()
+	var fdList []*os.File
+	for i := 1; i <= maxNums; i++ {
+		path := basePath + fmt.Sprintf("%d", i)
+		fd, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0644)
+		if err != nil {
+			if strings.HasSuffix(err.Error(), TooManyFileOpenErrSuffix) {
+				t.Logf("file num is %d, err is %s, and it had handle", i, err)
+			}
+			for _, fd := range fdList {
+				err := fd.Close()
+				if err != nil {
+					t.Logf("err is %s, and it had handle", err)
+				}
+			}
+			return
+		} else {
+			fdList = append(fdList, fd)
+		}
+	}
 }

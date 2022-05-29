@@ -25,21 +25,6 @@ type FileIORWManager struct {
 	fdm  *fdManager
 }
 
-// NewFileIORWManager returns a newly initialized FileIORWManager.
-func NewFileIORWManager(path string, capacity int64, fdm *fdManager) (*FileIORWManager, error) {
-	fd, err := fdm.getFd(path)
-	if err != nil {
-		return nil, err
-	}
-
-	err = Truncate(path, capacity, fd)
-	if err != nil {
-		return nil, err
-	}
-
-	return &FileIORWManager{fd: fd, path: path, fdm: fdm}, nil
-}
-
 // WriteAt writes len(b) bytes to the File starting at byte offset off.
 // `WriteAt` is a wrapper of the *File.WriteAt.
 func (fm *FileIORWManager) WriteAt(b []byte, off int64) (n int, err error) {

@@ -4,68 +4,48 @@ import (
 	"math"
 	"os"
 	"path/filepath"
-	"runtime"
+	"strings"
 	"sync"
 )
 
 const (
-	// MaxFdNumInLinux means max opening fd numbers of Linux is 1024
-	MaxFdNumInLinux uint = 1024
-	// MaxFdNumInWindows means max opening fd numbers of Windows is 512
-	MaxFdNumInWindows uint = 512
-	// DefaultMaxFdNums means max opening fd numbers beside Windows and Linux
-	DefaultMaxFdNums uint = 1024
+	DefaultMaxFileNums = 256
 )
 
-//getMaxFdNumsInSystem
-func getMaxFdNumsInSystem() uint {
-	switch runtime.GOOS {
-	case "linux":
-		return MaxFdNumInLinux
-	case "windows":
-		return MaxFdNumInWindows
-	default:
-		return DefaultMaxFdNums
-	}
-}
+const (
+	TooManyFileOpenErrSuffix = "too many open files"
+)
 
-func newFdm(maxFdNums uint, cleanThreshold float64) (fdm *fdManager) {
-	fdm = &fdManager{
-		cache:          map[string]*FdInfo{},
-		fdList:         initList(),
-		size:           0,
-		maxFdNums:      getMaxFdNumsInSystem(),
-		cleanThreshold: 0.5,
-	}
-	if maxFdNums > 0 {
-		fdm.maxFdNums = maxFdNums
-	}
-
-	if cleanThreshold < 0.5 && cleanThreshold > 0.0 {
-		fdm.cleanThreshold = cleanThreshold
-	}
-	return fdm
-}
-
-func (fdm *fdManager) setOptions(maxFdNums uint, cleanThreshold float64) {
-	if maxFdNums > 0 {
-		fdm.maxFdNums = maxFdNums
-	}
-
-	if cleanThreshold < 0.5 && cleanThreshold > 0.0 {
-		fdm.cleanThreshold = cleanThreshold
-	}
-}
-
+// fdManager hold a fd cache in memory, it lru based cache.
 type fdManager struct {
 	sync.Mutex
 	cache          map[string]*FdInfo
 	fdList         *doubleLinkedList
-	size           uint
-	cleanThreshold float64
-	maxFdNums      uint
+	size           int
+	cleanThreshold int
+	maxFdNums      int
 }
 
+// newFdm will return a fdManager object
+func newFdm(maxFdNums int, cleanThreshold float64) (fdm *fdManager) {
+	fdm = &fdManager{
+		cache:     map[string]*FdInfo{},
+		fdList:    initList(),
+		size:      0,
+		maxFdNums: DefaultMaxFileNums,
+	}
+	fdm.cleanThreshold = int(math.Floor(0.5 * float64(fdm.maxFdNums)))
+	if maxFdNums > 0 {
+		fdm.maxFdNums = maxFdNums
+	}
+
+	if cleanThreshold > 0.0 && cleanThreshold < 1.0 {
+		fdm.cleanThreshold = int(math.Floor(cleanThreshold * float64(fdm.maxFdNums)))
+	}
+	return fdm
+}
+
+// FdInfo holds base fd info
 type FdInfo struct {
 	fd    *os.File
 	path  string
@@ -74,6 +54,7 @@ type FdInfo struct {
 	prev  *FdInfo
 }
 
+// getFd go through this method to get fd.
 func (fdm *fdManager) getFd(path string) (fd *os.File, err error) {
 	fdm.Lock()
 	defer fdm.Unlock()
@@ -81,31 +62,31 @@ func (fdm *fdManager) getFd(path string) (fd *os.File, err error) {
 	if fdInfo := fdm.cache[cleanPath]; fdInfo == nil {
 		fd, err = os.OpenFile(cleanPath, os.O_CREATE|os.O_RDWR, 0644)
 		if err == nil {
-			fdInfo := &FdInfo{
-				fd:    fd,
-				using: 1,
-				path:  cleanPath,
+			// if the numbers of fd in cache larger than the cleanThreshold in config, we will clean useless fd in cache
+			if fdm.size >= fdm.cleanThreshold {
+				fdm.cleanUselessFd()
 			}
-			fdm.fdList.addNode(fdInfo)
-			fdm.size++
-			fdm.cache[cleanPath] = fdInfo
+			// if the numbers of fd in cache larger than the max numbers of fd in config, we will not add this fd to cache
 			if fdm.size >= fdm.maxFdNums {
-				cleanNums := int(math.Floor(fdm.cleanThreshold * float64(fdm.size)))
-				node := fdm.fdList.tail.prev
-				for node != nil && node != fdm.fdList.head && cleanNums > 0 {
-					nextItem := node.prev
-					if node.using == 0 {
-						fdm.fdList.remoteNode(node)
-						err := node.fd.Close()
-						if err != nil {
-							return nil, err
-						}
-						fdm.size--
-						delete(fdm.cache, node.path)
-						cleanNums--
-					}
-					node = nextItem
+				return fd, nil
+			}
+			// add this fd to cache
+			fdm.addToCache(fd, cleanPath)
+		} else {
+			// determine if there are too many open files, we will first clean useless fd in cache and try open this file again
+			if strings.HasSuffix(err.Error(), TooManyFileOpenErrSuffix) {
+				cleanErr := fdm.cleanUselessFd()
+				// if something wrong in cleanUselessFd, we will return "open too many files" err, because we want user not the main err is that
+				if cleanErr != nil {
+					return nil, err
 				}
+				// try open this file again，if it still returns err, we will show this error to user
+				fd, err = os.OpenFile(cleanPath, os.O_CREATE|os.O_RDWR, 0644)
+				if err != nil {
+					return nil, err
+				}
+				// add to cache if open this file successfully
+				fdm.addToCache(fd, cleanPath)
 			}
 		}
 		return fd, err
@@ -116,17 +97,31 @@ func (fdm *fdManager) getFd(path string) (fd *os.File, err error) {
 	}
 }
 
+// addToCache add fd to cache
+func (fdm *fdManager) addToCache(fd *os.File, cleanPath string) {
+	fdInfo := &FdInfo{
+		fd:    fd,
+		using: 1,
+		path:  cleanPath,
+	}
+	fdm.fdList.addNode(fdInfo)
+	fdm.size++
+	fdm.cache[cleanPath] = fdInfo
+}
+
+// reduceUsing when RWManager object close, it will go through this method let fdm know it return the fd to cache
 func (fdm *fdManager) reduceUsing(path string) {
 	fdm.Lock()
 	defer fdm.Unlock()
 	cleanPath := filepath.Clean(path)
-	node := fdm.cache[cleanPath]
-	if node == nil {
+	node, isExist := fdm.cache[cleanPath]
+	if !isExist {
 		panic("unexpected the node is not in cache")
 	}
 	node.using--
 }
 
+// close means close the cache.
 func (fdm *fdManager) close() error {
 	fdm.Lock()
 	defer fdm.Unlock()
@@ -180,4 +175,24 @@ func (list *doubleLinkedList) remoteNode(node *FdInfo) {
 func (list *doubleLinkedList) moveNodeToFront(node *FdInfo) {
 	list.remoteNode(node)
 	list.addNode(node)
+}
+
+func (fdm *fdManager) cleanUselessFd() error {
+	cleanNums := fdm.cleanThreshold
+	node := fdm.fdList.tail.prev
+	for node != nil && node != fdm.fdList.head && cleanNums > 0 {
+		nextItem := node.prev
+		if node.using == 0 {
+			fdm.fdList.remoteNode(node)
+			err := node.fd.Close()
+			if err != nil {
+				return err
+			}
+			fdm.size--
+			delete(fdm.cache, node.path)
+			cleanNums--
+		}
+		node = nextItem
+	}
+	return nil
 }

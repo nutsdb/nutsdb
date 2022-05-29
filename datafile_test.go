@@ -15,6 +15,7 @@
 package nutsdb
 
 import (
+	"github.com/stretchr/testify/assert"
 	"os"
 	"testing"
 )
@@ -43,26 +44,27 @@ func init() {
 	if err != nil {
 		return
 	}
-	InitOpt("", true)
-	db, err = Open(opt)
 }
+
 func TestDataFile_Err(t *testing.T) {
-	_, err := NewDataFile(filePath, -1, FileIO, db.fdm)
-	defer os.Remove(filePath)
+	fm := newFileManager(MMap, 1024, 0.5)
+	defer fm.close()
+	_, err := fm.getDataFile(filePath, -1)
+	defer func() {
+		os.Remove(filePath)
+	}()
 
-	if err == nil {
-		t.Error("err invalid argument")
-	}
-
+	assert.NotNil(t, err)
 }
 
 func TestDataFile1(t *testing.T) {
-	df, err := NewDataFile(filePath, 1024, MMap, db.fdm)
+	fm := newFileManager(MMap, 1024, 0.5)
+	defer fm.close()
+	df, err := fm.getDataFile(filePath, 1024)
 	defer os.Remove(filePath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer df.rwManager.Close()
 
 	n, err := df.WriteAt(entry.Encode(), 0)
 	if err != nil {
@@ -86,14 +88,12 @@ func TestDataFile1(t *testing.T) {
 }
 
 func TestDataFile2(t *testing.T) {
-	filePath2 := "/tmp/foo2"
-	df, err := NewDataFile(filePath2, 39, FileIO, db.fdm)
-	defer os.Remove(filePath2)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer df.rwManager.Close()
+	fm := newFileManager(FileIO, 1024, 0.5)
 
+	filePath2 := "/tmp/foo2"
+	df, err := fm.getDataFile(filePath2, 39)
+	assert.Nil(t, err)
+	defer os.Remove(filePath2)
 	content := entry.Encode()[0 : DataEntryHeaderSize-1]
 	_, err = df.WriteAt(content, 0)
 	if err != nil {
@@ -106,32 +106,37 @@ func TestDataFile2(t *testing.T) {
 	}
 
 	filePath3 := "/tmp/foo3"
-	df, err = NewDataFile(filePath3, 41, FileIO, db.fdm)
+
+	df2, err := fm.getDataFile(filePath3, 41)
 	defer os.Remove(filePath3)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer df.Close()
+	assert.Nil(t, err)
 
 	content = entry.Encode()[0 : DataEntryHeaderSize+1]
-	_, err = df.WriteAt(content, 0)
-	if err != nil {
-		t.Error("err TestDataFile_All WriteAt")
-	}
+	_, err = df2.WriteAt(content, 0)
+	assert.Nil(t, err)
 
-	e, err = df.ReadAt(0)
+	e, err = df2.ReadAt(0)
 	if err == nil || e != nil {
 		t.Error("err TestDataFile_All ReadAt")
 	}
+
+	df.Close()
+	df2.Close()
+	fm.close()
 }
 
 func TestDataFile_ReadAt(t *testing.T) {
-	df, err := NewDataFile(filePath, 1024, FileIO, db.fdm)
-	defer os.Remove(filePath)
+	fm := newFileManager(FileIO, 1024, 0.5)
+	filePath4 := "/tmp/foo4"
+	df, err := fm.getDataFile(filePath4, 1024)
+	defer func() {
+		df.Close()
+		fm.close()
+	}()
+	assert.Nil(t, err)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer df.Close()
 
 	e, err := df.ReadAt(0)
 	if err != nil && e != nil {
@@ -145,34 +150,49 @@ func TestDataFile_ReadAt(t *testing.T) {
 }
 
 func TestDataFile_Err_Path(t *testing.T) {
+	fm := newFileManager(FileIO, 1024, 0.5)
+	defer fm.close()
 	filePath5 := ":/tmp/foo5"
-	df, err := NewDataFile(filePath5, entry.Size(), FileIO, db.fdm)
+	df, err := fm.getDataFile(filePath5, entry.Size())
 	if err == nil && df != nil {
 		t.Error("err TestDataFile_All open")
 	}
 }
 
 func TestDataFile_Crc_Err(t *testing.T) {
-	filePath4 := "/tmp/foo4"
+	fm := newFileManager(FileIO, 1024, 0.5)
+	filePath4 := "/tmp/foo6"
 
-	df, err := NewDataFile(filePath4, entry.Size(), FileIO, db.fdm)
-	defer os.Remove(filePath4)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer df.Close()
+	df, err := fm.getDataFile(filePath4, entry.Size())
+	assert.Nil(t, err)
+	assert.NotNil(t, df)
+	defer func() {
+		df.Close()
+		fm.close()
+		os.Remove(filePath4)
+	}()
 
 	var errContent []byte
 	errContent = append(errContent, entry.Encode()[0:4]...)
 	errContent = append(errContent, entry.Encode()[4:entry.Size()-1]...)
 	errContent = append(errContent, 0)
 	_, err = df.WriteAt(errContent, 0)
-	if err != nil {
-		t.Error("err TestDataFile_All WriteAt")
-	}
+	assert.Nil(t, err)
 
 	e, err := df.ReadAt(0)
 	if err == nil || e != nil {
 		t.Error("err TestDataFile_All ReadAt")
 	}
+}
+
+func TestFileManager1(t *testing.T) {
+	fm := newFileManager(FileIO, 1024, 0.5)
+	filePath4 := "/tmp/foo6"
+	df, err := fm.getDataFile(filePath4, entry.Size())
+	assert.Nil(t, err)
+	defer func() {
+		df.Close()
+		fm.close()
+		os.Remove(filePath)
+	}()
 }
