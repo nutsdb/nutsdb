@@ -153,6 +153,8 @@ FileIO represents the read and write mode using standard I/O. And MMap represent
 
 NutsDB will truncate data file if the active file is larger than `SegmentSize`.
 Current version default `SegmentSize` is 8MB,but you can custom it.
+**The defaultSegmentSize becomes 256MB when the version is greater than 0.8.0.**
+
 Once set, it cannot be changed. see [caveats--limitations](https://github.com/xujiajun/nutsdb#caveats--limitations) for detail.
 
 * NodeNum              int64
