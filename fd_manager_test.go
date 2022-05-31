@@ -34,7 +34,7 @@ func TestFdManager_All(t *testing.T) {
 		fdm = newFdm(maxFdNums, cleanThreshold)
 		assert.NotNil(t, fdm)
 		assert.Equal(t, maxFdNums, fdm.maxFdNums)
-		assert.Equal(t, int(math.Floor(cleanThreshold*float64(fdm.maxFdNums))), fdm.cleanThreshold)
+		assert.Equal(t, int(math.Floor(cleanThreshold*float64(fdm.maxFdNums))), fdm.cleanThresholdNums)
 	})
 
 	t.Run("create fd to cache", func(t *testing.T) {
@@ -119,7 +119,7 @@ func TestFdManager_All(t *testing.T) {
 }
 
 func TestDoubleLinkedList_All(t *testing.T) {
-	list := initList()
+	list := initDoubleLinkedList()
 	nodeMap := make(map[int]*FdInfo)
 	t.Run("test add node", func(t *testing.T) {
 		for i := 1; i <= 10; i++ {
@@ -135,17 +135,17 @@ func TestDoubleLinkedList_All(t *testing.T) {
 
 	t.Run("test remove node", func(t *testing.T) {
 		t.Run("test remove first node", func(t *testing.T) {
-			list.remoteNode(nodeMap[10])
+			list.removeNode(nodeMap[10])
 			assert.Equal(t, "[9 8 7 6 5 4 3 2 1 ]", fmt.Sprintf("%+v", getAllNodePathFromHead(list)))
 			assert.Equal(t, "[1 2 3 4 5 6 7 8 9 ]", fmt.Sprintf("%+v", getAllNodePathFromTail(list)))
 		})
 		t.Run("test remove last node", func(t *testing.T) {
-			list.remoteNode(nodeMap[1])
+			list.removeNode(nodeMap[1])
 			assert.Equal(t, "[9 8 7 6 5 4 3 2 ]", fmt.Sprintf("%+v", getAllNodePathFromHead(list)))
 			assert.Equal(t, "[2 3 4 5 6 7 8 9 ]", fmt.Sprintf("%+v", getAllNodePathFromTail(list)))
 		})
 		t.Run("test remove middle node", func(t *testing.T) {
-			list.remoteNode(nodeMap[5])
+			list.removeNode(nodeMap[5])
 			assert.Equal(t, "[9 8 7 6 4 3 2 ]", fmt.Sprintf("%+v", getAllNodePathFromHead(list)))
 			assert.Equal(t, "[2 3 4 6 7 8 9 ]", fmt.Sprintf("%+v", getAllNodePathFromTail(list)))
 		})

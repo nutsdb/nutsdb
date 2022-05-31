@@ -41,9 +41,6 @@ func init() {
 		},
 		position: 0,
 	}
-	if err != nil {
-		return
-	}
 }
 
 func TestDataFile_Err(t *testing.T) {
@@ -91,7 +88,7 @@ func TestDataFile2(t *testing.T) {
 	fm := newFileManager(FileIO, 1024, 0.5)
 
 	filePath2 := "/tmp/foo2"
-	df, err := fm.getDataFile(filePath2, 39)
+	df, err := fm.getDataFile(filePath2, 64)
 	assert.Nil(t, err)
 	defer os.Remove(filePath2)
 	content := entry.Encode()[0 : DataEntryHeaderSize-1]
@@ -107,7 +104,7 @@ func TestDataFile2(t *testing.T) {
 
 	filePath3 := "/tmp/foo3"
 
-	df2, err := fm.getDataFile(filePath3, 41)
+	df2, err := fm.getDataFile(filePath3, 64)
 	defer os.Remove(filePath3)
 	assert.Nil(t, err)
 

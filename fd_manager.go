@@ -19,28 +19,28 @@ const (
 // fdManager hold a fd cache in memory, it lru based cache.
 type fdManager struct {
 	sync.Mutex
-	cache          map[string]*FdInfo
-	fdList         *doubleLinkedList
-	size           int
-	cleanThreshold int
-	maxFdNums      int
+	cache              map[string]*FdInfo
+	fdList             *doubleLinkedList
+	size               int
+	cleanThresholdNums int
+	maxFdNums          int
 }
 
 // newFdm will return a fdManager object
 func newFdm(maxFdNums int, cleanThreshold float64) (fdm *fdManager) {
 	fdm = &fdManager{
 		cache:     map[string]*FdInfo{},
-		fdList:    initList(),
+		fdList:    initDoubleLinkedList(),
 		size:      0,
 		maxFdNums: DefaultMaxFileNums,
 	}
-	fdm.cleanThreshold = int(math.Floor(0.5 * float64(fdm.maxFdNums)))
+	fdm.cleanThresholdNums = int(math.Floor(0.5 * float64(fdm.maxFdNums)))
 	if maxFdNums > 0 {
 		fdm.maxFdNums = maxFdNums
 	}
 
 	if cleanThreshold > 0.0 && cleanThreshold < 1.0 {
-		fdm.cleanThreshold = int(math.Floor(cleanThreshold * float64(fdm.maxFdNums)))
+		fdm.cleanThresholdNums = int(math.Floor(cleanThreshold * float64(fdm.maxFdNums)))
 	}
 	return fdm
 }
@@ -63,7 +63,7 @@ func (fdm *fdManager) getFd(path string) (fd *os.File, err error) {
 		fd, err = os.OpenFile(cleanPath, os.O_CREATE|os.O_RDWR, 0o644)
 		if err == nil {
 			// if the numbers of fd in cache larger than the cleanThreshold in config, we will clean useless fd in cache
-			if fdm.size >= fdm.cleanThreshold {
+			if fdm.size >= fdm.cleanThresholdNums {
 				err = fdm.cleanUselessFd()
 			}
 			// if the numbers of fd in cache larger than the max numbers of fd in config, we will not add this fd to cache
@@ -147,7 +147,7 @@ type doubleLinkedList struct {
 	size int
 }
 
-func initList() *doubleLinkedList {
+func initDoubleLinkedList() *doubleLinkedList {
 	list := &doubleLinkedList{
 		head: &FdInfo{},
 		tail: &FdInfo{},
@@ -166,7 +166,7 @@ func (list *doubleLinkedList) addNode(node *FdInfo) {
 	list.size++
 }
 
-func (list *doubleLinkedList) remoteNode(node *FdInfo) {
+func (list *doubleLinkedList) removeNode(node *FdInfo) {
 	node.prev.next = node.next
 	node.next.prev = node.prev
 	node.prev = nil
@@ -174,17 +174,17 @@ func (list *doubleLinkedList) remoteNode(node *FdInfo) {
 }
 
 func (list *doubleLinkedList) moveNodeToFront(node *FdInfo) {
-	list.remoteNode(node)
+	list.removeNode(node)
 	list.addNode(node)
 }
 
 func (fdm *fdManager) cleanUselessFd() error {
-	cleanNums := fdm.cleanThreshold
+	cleanNums := fdm.cleanThresholdNums
 	node := fdm.fdList.tail.prev
 	for node != nil && node != fdm.fdList.head && cleanNums > 0 {
 		nextItem := node.prev
 		if node.using == 0 {
-			fdm.fdList.remoteNode(node)
+			fdm.fdList.removeNode(node)
 			err := node.fd.Close()
 			if err != nil {
 				return err
