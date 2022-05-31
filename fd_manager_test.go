@@ -2,11 +2,12 @@ package nutsdb
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"math"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestFdManager_All(t *testing.T) {
