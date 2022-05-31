@@ -54,9 +54,15 @@ type Options struct {
 
 	// StartFileLoadingMode represents when open a database which RWMode to load files.
 	StartFileLoadingMode RWMode
+
+	// MaxFdNumsInCache represents the max numbers of fd in cache.
+	MaxFdNumsInCache int
+
+	// CleanFdsCacheThreshold represents the maximum threshold for recycling fd, it should be between 0 and 1.
+	CleanFdsCacheThreshold float64
 }
 
-var defaultSegmentSize int64 = 8 * 1024 * 1024
+var defaultSegmentSize int64 = 256 * 1024 * 1024
 
 // DefaultOptions represents the default options.
 var DefaultOptions = Options{

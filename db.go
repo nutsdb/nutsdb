@@ -160,6 +160,7 @@ type (
 		KeyCount                int // total key number ,include expired, deleted, repeated.
 		closed                  bool
 		isMerging               bool
+		fm                      *fileManager
 	}
 
 	// BPTreeIdx represents the B+ tree index
@@ -197,6 +198,7 @@ func Open(opt Options) (*DB, error) {
 		BPTreeKeyEntryPosMap:    make(map[string]int64),
 		bucketMetas:             make(map[string]*BucketMeta),
 		ActiveCommittedTxIdsIdx: NewTree(),
+		fm:                      newFileManager(opt.RWMode, opt.MaxFdNumsInCache, opt.CleanFdsCacheThreshold),
 	}
 
 	if ok := filesystem.PathIsExist(db.opt.Dir); !ok {
@@ -327,7 +329,7 @@ func (db *DB) Merge() error {
 
 	for _, pendingMergeFId := range pendingMergeFIds {
 		off = 0
-		f, err := NewDataFile(db.getDataPath(int64(pendingMergeFId)), db.opt.SegmentSize, db.opt.RWMode)
+		f, err := db.fm.getDataFile(db.getDataPath(int64(pendingMergeFId)), db.opt.SegmentSize)
 		if err != nil {
 			db.isMerging = false
 			return err
@@ -388,8 +390,9 @@ func (db *DB) Merge() error {
 			return err
 		}
 
+		path := db.getDataPath(int64(pendingMergeFId))
 		f.rwManager.Close()
-		if err := os.Remove(db.getDataPath(int64(pendingMergeFId))); err != nil {
+		if err := os.Remove(path); err != nil {
 			db.isMerging = false
 			return fmt.Errorf("when merge err: %s", err)
 		}
@@ -423,11 +426,20 @@ func (db *DB) Close() error {
 
 	db.closed = true
 
-	db.ActiveFile.rwManager.Close()
+	err := db.ActiveFile.rwManager.Close()
+	if err != nil {
+		return err
+	}
 
 	db.ActiveFile = nil
 
 	db.BPTreeIdx = nil
+
+	err = db.fm.close()
+
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -435,7 +447,7 @@ func (db *DB) Close() error {
 // setActiveFile sets the ActiveFile (DataFile object).
 func (db *DB) setActiveFile() (err error) {
 	filepath := db.getDataPath(db.MaxFileID)
-	db.ActiveFile, err = NewDataFile(filepath, db.opt.SegmentSize, db.opt.RWMode)
+	db.ActiveFile, err = db.fm.getDataFile(filepath, db.opt.SegmentSize)
 	if err != nil {
 		return
 	}
@@ -519,7 +531,7 @@ func (db *DB) parseDataFiles(dataFileIds []int) (unconfirmedRecords []*Record, c
 	for _, dataID := range dataFileIds {
 		off = 0
 		fID := int64(dataID)
-		f, err := NewDataFile(db.getDataPath(fID), db.opt.SegmentSize, db.opt.StartFileLoadingMode)
+		f, err := db.fm.getDataFile(db.getDataPath(fID), db.opt.SegmentSize)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -1061,7 +1073,7 @@ func (db *DB) reWriteData(pendingMergeEntries []*Entry) error {
 		return err
 	}
 
-	dataFile, err := NewDataFile(db.getDataPath(db.MaxFileID+1), db.opt.SegmentSize, db.opt.RWMode)
+	dataFile, err := db.fm.getDataFile(db.getDataPath(db.MaxFileID+1), db.opt.SegmentSize)
 	if err != nil {
 		db.isMerging = false
 		return err

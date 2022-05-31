@@ -28,6 +28,7 @@ func (suite *TxBucketTestSuite) SetupSuite() {
 			}
 		}
 	}
+
 	opt = DefaultOptions
 	opt.Dir = fileDir
 	opt.SegmentSize = 8 * 1024
@@ -59,7 +60,6 @@ func (suite *TxBucketTestSuite) SetupSuite() {
 func (suite *TxBucketTestSuite) TearDownSuite() {
 	err := suite.Db.Close()
 	assert.Nil(suite.T(), err)
-
 	err = os.RemoveAll("/tmp/nutsdbtestbuckettx")
 	if err != nil {
 		require.Failf(suite.T(), "remve file fail", err.Error())

@@ -47,36 +47,6 @@ type DataFile struct {
 	rwManager  RWManager
 }
 
-// NewDataFile returns a newly initialized DataFile object.
-func NewDataFile(path string, capacity int64, rwMode RWMode) (df *DataFile, err error) {
-	var rwManager RWManager
-
-	if capacity <= 0 {
-		return nil, ErrCapacity
-	}
-
-	if rwMode == FileIO {
-		rwManager, err = NewFileIORWManager(path, capacity)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if rwMode == MMap {
-		rwManager, err = NewMMapRWManager(path, capacity)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return &DataFile{
-		path:       path,
-		writeOff:   0,
-		ActualSize: 0,
-		rwManager:  rwManager,
-	}, nil
-}
-
 // ReadAt returns entry at the given off(offset).
 func (df *DataFile) ReadAt(off int) (e *Entry, err error) {
 	buf := make([]byte, DataEntryHeaderSize)
