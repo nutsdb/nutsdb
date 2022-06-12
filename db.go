@@ -380,18 +380,18 @@ func (db *DB) Merge() error {
 				if err == ErrIndexOutOfBound {
 					break
 				}
-				f.rwManager.Release()
+				_ = f.rwManager.Release()
 				return fmt.Errorf("when merge operation build hintIndex readAt err: %s", err)
 			}
 		}
 
 		if err := db.reWriteData(pendingMergeEntries); err != nil {
-			f.rwManager.Release()
+			_ = f.rwManager.Release()
 			return err
 		}
 
 		path := db.getDataPath(int64(pendingMergeFId))
-		f.rwManager.Release()
+		_ = f.rwManager.Release()
 		err = f.rwManager.Close()
 		if err != nil {
 			return err

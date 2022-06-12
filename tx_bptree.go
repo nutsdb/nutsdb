@@ -39,7 +39,12 @@ func (tx *Tx) getByHintBPTSparseIdxInMem(key []byte) (e *Entry, err error) {
 			if err != nil {
 				return nil, err
 			}
-			defer df.rwManager.Release()
+			defer func(rwManager RWManager) {
+				err := rwManager.Release()
+				if err != nil {
+					return
+				}
+			}(df.rwManager)
 
 			return df.ReadAt(int(r.H.DataPos))
 		}
@@ -162,7 +167,12 @@ func (tx *Tx) Get(bucket string, key []byte) (e *Entry, err error) {
 				if err != nil {
 					return nil, err
 				}
-				defer df.rwManager.Release()
+				defer func(rwManager RWManager) {
+					err := rwManager.Release()
+					if err != nil {
+						return
+					}
+				}(df.rwManager)
 
 				item, err := df.ReadAt(int(r.H.DataPos))
 				if err != nil {
@@ -226,7 +236,10 @@ func (tx *Tx) RangeScan(bucket string, start, end []byte) (es Entries, err error
 				path := tx.db.getDataPath(r.H.FileID)
 				df, err := tx.db.fm.getDataFile(path, tx.db.opt.SegmentSize)
 				if err != nil {
-					df.rwManager.Release()
+					err := df.rwManager.Release()
+					if err != nil {
+						return nil, err
+					}
 					return nil, err
 				}
 				if item, err := df.ReadAt(int(r.H.DataPos)); err == nil {
