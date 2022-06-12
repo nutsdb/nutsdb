@@ -118,8 +118,8 @@ func TestDataFile2(t *testing.T) {
 		t.Error("err TestDataFile_All ReadAt")
 	}
 
-	df.Close()
-	df2.Close()
+	df.Release()
+	df2.Release()
 	fm.close()
 }
 
@@ -128,7 +128,7 @@ func TestDataFile_ReadAt(t *testing.T) {
 	filePath4 := "/tmp/foo4"
 	df, err := fm.getDataFile(filePath4, 1024)
 	defer func() {
-		df.Close()
+		df.Release()
 		fm.close()
 	}()
 	assert.Nil(t, err)
@@ -165,7 +165,7 @@ func TestDataFile_Crc_Err(t *testing.T) {
 	assert.Nil(t, err)
 	assert.NotNil(t, df)
 	defer func() {
-		df.Close()
+		df.Release()
 		fm.close()
 		os.Remove(filePath4)
 	}()
@@ -189,7 +189,7 @@ func TestFileManager1(t *testing.T) {
 	df, err := fm.getDataFile(filePath4, entry.Size())
 	assert.Nil(t, err)
 	defer func() {
-		df.Close()
+		df.Release()
 		fm.close()
 		os.Remove(filePath)
 	}()

@@ -39,7 +39,7 @@ func (tx *Tx) getByHintBPTSparseIdxInMem(key []byte) (e *Entry, err error) {
 			if err != nil {
 				return nil, err
 			}
-			defer df.rwManager.Close()
+			defer df.rwManager.Release()
 
 			return df.ReadAt(int(r.H.DataPos))
 		}
@@ -162,7 +162,7 @@ func (tx *Tx) Get(bucket string, key []byte) (e *Entry, err error) {
 				if err != nil {
 					return nil, err
 				}
-				defer df.rwManager.Close()
+				defer df.rwManager.Release()
 
 				item, err := df.ReadAt(int(r.H.DataPos))
 				if err != nil {
@@ -226,16 +226,16 @@ func (tx *Tx) RangeScan(bucket string, start, end []byte) (es Entries, err error
 				path := tx.db.getDataPath(r.H.FileID)
 				df, err := tx.db.fm.getDataFile(path, tx.db.opt.SegmentSize)
 				if err != nil {
-					df.rwManager.Close()
+					df.rwManager.Release()
 					return nil, err
 				}
 				if item, err := df.ReadAt(int(r.H.DataPos)); err == nil {
 					es = append(es, item)
 				} else {
-					df.rwManager.Close()
+					df.rwManager.Release()
 					return nil, fmt.Errorf("HintIdx r.Hi.dataPos %d, err %s", r.H.DataPos, err)
 				}
-				df.rwManager.Close()
+				df.rwManager.Release()
 			}
 		}
 
@@ -406,7 +406,7 @@ func (tx *Tx) getStartIndexForFindPrefix(fID int64, curr *BinaryNode, prefix []b
 		}
 
 		entry, err = df.ReadAt(int(curr.Keys[j]))
-		df.rwManager.Close()
+		df.rwManager.Release()
 		if err != nil {
 			return 0, err
 		}
@@ -455,7 +455,7 @@ func (tx *Tx) findPrefixOnDisk(bucket string, fID, rootOff int64, prefix, newPre
 			}
 
 			entry, err = df.ReadAt(int(curr.Keys[i]))
-			df.rwManager.Close()
+			df.rwManager.Release()
 			if err != nil {
 				return nil, off, err
 			}
@@ -530,7 +530,7 @@ func (tx *Tx) findPrefixSearchOnDisk(bucket string, fID, rootOff int64, prefix [
 			}
 
 			entry, err = df.ReadAt(int(curr.Keys[i]))
-			df.rwManager.Close()
+			df.rwManager.Release()
 			if err != nil {
 				return nil, off, err
 			}
@@ -580,7 +580,7 @@ func (tx *Tx) getStartIndexForFindRange(fID int64, curr *BinaryNode, start, newS
 		}
 
 		entry, err = df.ReadAt(int(curr.Keys[j]))
-		df.rwManager.Close()
+		df.rwManager.Release()
 
 		if err != nil {
 			return 0, err
@@ -621,7 +621,7 @@ func (tx *Tx) findRangeOnDisk(fID, rootOff int64, start, end, newStart, newEnd [
 			}
 
 			entry, err = df.ReadAt(int(curr.Keys[i]))
-			df.rwManager.Close()
+			df.rwManager.Release()
 
 			if err != nil {
 				return nil, err
@@ -660,7 +660,7 @@ func (tx *Tx) prefixScanByHintBPTSparseIdx(bucket string, prefix []byte, offsetN
 			path := tx.db.getDataPath(r.H.FileID)
 			df, err := tx.db.fm.getDataFile(path, tx.db.opt.SegmentSize)
 			if err != nil {
-				df.rwManager.Close()
+				df.rwManager.Release()
 				return nil, off, err
 			}
 			if item, err := df.ReadAt(int(r.H.DataPos)); err == nil {
@@ -670,10 +670,10 @@ func (tx *Tx) prefixScanByHintBPTSparseIdx(bucket string, prefix []byte, offsetN
 					return es, off, nil
 				}
 			} else {
-				df.rwManager.Close()
+				df.rwManager.Release()
 				return nil, off, fmt.Errorf("HintIdx r.Hi.dataPos %d, err %s", r.H.DataPos, err)
 			}
-			df.rwManager.Close()
+			df.rwManager.Release()
 		}
 	}
 
@@ -704,7 +704,7 @@ func (tx *Tx) prefixSearchScanByHintBPTSparseIdx(bucket string, prefix []byte, r
 			path := tx.db.getDataPath(r.H.FileID)
 			df, err := tx.db.fm.getDataFile(path, tx.db.opt.SegmentSize)
 			if err != nil {
-				df.rwManager.Close()
+				df.rwManager.Release()
 				return nil, off, err
 			}
 			if item, err := df.ReadAt(int(r.H.DataPos)); err == nil {
@@ -714,10 +714,10 @@ func (tx *Tx) prefixSearchScanByHintBPTSparseIdx(bucket string, prefix []byte, r
 					return es, off, nil
 				}
 			} else {
-				df.rwManager.Close()
+				df.rwManager.Release()
 				return nil, off, fmt.Errorf("HintIdx r.Hi.dataPos %d, err %s", r.H.DataPos, err)
 			}
-			df.rwManager.Close()
+			df.rwManager.Release()
 		}
 	}
 
@@ -839,10 +839,10 @@ func (tx *Tx) getHintIdxDataItemsWrapper(records Records, limitNum int, es Entri
 				if item, err := df.ReadAt(int(r.H.DataPos)); err == nil {
 					es = append(es, item)
 				} else {
-					df.rwManager.Close()
+					df.rwManager.Release()
 					return nil, fmt.Errorf("HintIdx r.Hi.dataPos %d, err %s", r.H.DataPos, err)
 				}
-				df.rwManager.Close()
+				df.rwManager.Release()
 			}
 
 			if idxMode == HintKeyValAndRAMIdxMode {
@@ -927,7 +927,7 @@ func (tx *Tx) FindOnDisk(fID uint64, rootOff uint64, key, newKey []byte) (entry 
 		}
 
 		entry, err = df.ReadAt(int(bnLeaf.Keys[i]))
-		df.rwManager.Close()
+		df.rwManager.Release()
 
 		if err != nil {
 			return nil, err
@@ -966,7 +966,7 @@ func (tx *Tx) FindLeafOnDisk(fID int64, rootOff int64, key, newKey []byte) (bn *
 			}
 
 			item, err := df.ReadAt(int(curr.Keys[i]))
-			df.rwManager.Close()
+			df.rwManager.Release()
 
 			if err != nil {
 				return nil, err

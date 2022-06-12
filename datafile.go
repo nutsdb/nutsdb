@@ -125,6 +125,10 @@ func (df *DataFile) Close() (err error) {
 	return df.rwManager.Close()
 }
 
+func (df *DataFile) Release() (err error) {
+	return df.rwManager.Release()
+}
+
 // readMetaData returns MetaData at given buf slice.
 func readMetaData(buf []byte) *MetaData {
 	return &MetaData{

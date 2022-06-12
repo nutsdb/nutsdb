@@ -45,11 +45,18 @@ func (fm *FileIORWManager) Sync() (err error) {
 	return fm.fd.Sync()
 }
 
-// Close closes the File, rendering it unusable for I/O.
-// On files that support SetDeadline, any pending I/O operations will
-// be canceled and return immediately with an error.
-// `Close` is a wrapper of the *File.Close.
-func (fm *FileIORWManager) Close() (err error) {
+// Release is a wrapper around the reduceUsing method
+func (fm *FileIORWManager) Release() (err error) {
 	fm.fdm.reduceUsing(fm.path)
 	return nil
+}
+
+// Close will remove the cache in the fdm of the specified path, and call the close method of the os of the file
+func (fm *FileIORWManager) Close() (err error) {
+	fdInfo, ok := fm.fdm.cache[fm.path]
+	if !ok {
+		return nil
+	}
+	fm.fdm.fdList.removeNode(fdInfo)
+	return fdInfo.fd.Close()
 }
