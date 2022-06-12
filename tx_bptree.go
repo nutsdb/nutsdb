@@ -245,10 +245,16 @@ func (tx *Tx) RangeScan(bucket string, start, end []byte) (es Entries, err error
 				if item, err := df.ReadAt(int(r.H.DataPos)); err == nil {
 					es = append(es, item)
 				} else {
-					df.rwManager.Release()
+					err := df.rwManager.Release()
+					if err != nil {
+						return nil, err
+					}
 					return nil, fmt.Errorf("HintIdx r.Hi.dataPos %d, err %s", r.H.DataPos, err)
 				}
-				df.rwManager.Release()
+				err = df.rwManager.Release()
+				if err != nil {
+					return nil, err
+				}
 			}
 		}
 
@@ -419,7 +425,10 @@ func (tx *Tx) getStartIndexForFindPrefix(fID int64, curr *BinaryNode, prefix []b
 		}
 
 		entry, err = df.ReadAt(int(curr.Keys[j]))
-		df.rwManager.Release()
+		err = df.rwManager.Release()
+		if err != nil {
+			return 0, err
+		}
 		if err != nil {
 			return 0, err
 		}

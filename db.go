@@ -587,12 +587,18 @@ func (db *DB) parseDataFiles(dataFileIds []int) (unconfirmedRecords []*Record, c
 				if off >= db.opt.SegmentSize {
 					break
 				}
-				f.rwManager.Release()
+				err := f.rwManager.Release()
+				if err != nil {
+					return nil, nil, err
+				}
 				return nil, nil, fmt.Errorf("when build hintIndex readAt err: %s", err)
 			}
 		}
 
-		f.rwManager.Release()
+		err = f.rwManager.Release()
+		if err != nil {
+			return nil, nil, err
+		}
 	}
 
 	return
