@@ -477,7 +477,10 @@ func (tx *Tx) findPrefixOnDisk(bucket string, fID, rootOff int64, prefix, newPre
 			}
 
 			entry, err = df.ReadAt(int(curr.Keys[i]))
-			df.rwManager.Release()
+			if err != nil {
+				return nil, off, err
+			}
+			err = df.rwManager.Release()
 			if err != nil {
 				return nil, off, err
 			}
@@ -552,11 +555,13 @@ func (tx *Tx) findPrefixSearchOnDisk(bucket string, fID, rootOff int64, prefix [
 			}
 
 			entry, err = df.ReadAt(int(curr.Keys[i]))
-			df.rwManager.Release()
 			if err != nil {
 				return nil, off, err
 			}
-
+			err = df.rwManager.Release()
+			if err != nil {
+				return nil, off, err
+			}
 			if !bytes.HasPrefix(entry.Key, prefix) || string(entry.Meta.Bucket) != bucket {
 				scanFlag = false
 				break
@@ -602,8 +607,11 @@ func (tx *Tx) getStartIndexForFindRange(fID int64, curr *BinaryNode, start, newS
 		}
 
 		entry, err = df.ReadAt(int(curr.Keys[j]))
-		df.rwManager.Release()
+		if err != nil {
+			return 0, err
+		}
 
+		err = df.rwManager.Release()
 		if err != nil {
 			return 0, err
 		}
