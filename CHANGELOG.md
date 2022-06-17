@@ -76,3 +76,25 @@
 * [Chore] chore(ds/list): replace for-loop with append  (#127)
 * [Chore] add push check for lint, typo  (#131)
 * [Style] style: fix typo and ineffectual assignment  (#130)
+
+## v0.9.0 (2022-06-17)
+* [Bug Fix] close file before error check &remove redundant judgments （#137） @xujiajun
+* [Bug Fix] update golang.org/x/sys to support go1.18 build （#139）@ag9920
+* [Bug Fix] when use merge, error: The process cannot access the file because it is being used by another process (#166) @xujiajun
+* [Bug Fix] fix code example. (#143) @gphper
+* [Bug Fix] merge error after delete bucket (#153) @xujiajun
+* [Perf] add fd cache(#164) @elliotchenzichang
+* [Perf] optimize sadd function inserting duplicate data leads to datafile growth (#146) @gphper
+* [Refactor] rewrite managed to support panic rollback （#136）@ag9920
+* [Refactor] errors: optimize error management (#163) @xpzouying
+* [Test] Update testcase: use testify test tools (#138) @xpzouying
+* [Test] change list and set test with table driven test and testify (#145） @bigdaronlee163
+* [Test] refactor db_test for string use testify (#147) @Rand01ph
+* [Test] add [bucket_meat/entry] unit test (#148) @gphper
+* [Test] update bptree unittest (#149) @xpzouying
+* [Test] Update tx bptree testcase (#155) @xpzouying
+* [Test] complete zset tests with testify (#151) @bigdaronlee163
+* [Test] optimization tx_bucket_test and bucket_meta_test  (#156) @gphper
+* [Test] test:complete tx_zset tests with testify (#162) @bigdaronlee163
+* [Chore] remove unused member (#157) @xpzouying
+* [Style]  format code comments etc. (#140) @moyrne
