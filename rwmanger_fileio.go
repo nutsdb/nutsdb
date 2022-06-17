@@ -53,10 +53,5 @@ func (fm *FileIORWManager) Release() (err error) {
 
 // Close will remove the cache in the fdm of the specified path, and call the close method of the os of the file
 func (fm *FileIORWManager) Close() (err error) {
-	fdInfo, ok := fm.fdm.cache[fm.path]
-	if !ok {
-		return nil
-	}
-	fm.fdm.fdList.removeNode(fdInfo)
-	return fdInfo.fd.Close()
+	return fm.fdm.closeByPath(fm.path)
 }

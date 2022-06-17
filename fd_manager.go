@@ -197,3 +197,14 @@ func (fdm *fdManager) cleanUselessFd() error {
 	}
 	return nil
 }
+
+func (fdm *fdManager) closeByPath(path string) error {
+	fdm.Lock()
+	defer fdm.Unlock()
+	fdInfo, ok := fdm.cache[path]
+	if !ok {
+		return nil
+	}
+	fdm.fdList.removeNode(fdInfo)
+	return fdInfo.fd.Close()
+}

@@ -72,10 +72,5 @@ func (mm *MMapRWManager) Release() (err error) {
 
 // Close will remove the cache in the fdm of the specified path, and call the close method of the os of the file
 func (mm *MMapRWManager) Close() (err error) {
-	fdInfo, ok := mm.fdm.cache[mm.path]
-	if !ok {
-		return nil
-	}
-	mm.fdm.fdList.removeNode(fdInfo)
-	return fdInfo.fd.Close()
+	return mm.fdm.closeByPath(mm.path)
 }
