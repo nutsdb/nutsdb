@@ -118,9 +118,12 @@ func TestDataFile2(t *testing.T) {
 		t.Error("err TestDataFile_All ReadAt")
 	}
 
-	df.Close()
-	df2.Close()
-	fm.close()
+	err = df.Release()
+	assert.Nil(t, err)
+	err = df2.Release()
+	assert.Nil(t, err)
+	err = fm.close()
+	assert.Nil(t, err)
 }
 
 func TestDataFile_ReadAt(t *testing.T) {
@@ -128,8 +131,10 @@ func TestDataFile_ReadAt(t *testing.T) {
 	filePath4 := "/tmp/foo4"
 	df, err := fm.getDataFile(filePath4, 1024)
 	defer func() {
-		df.Close()
-		fm.close()
+		err = df.Release()
+		assert.Nil(t, err)
+		err = fm.close()
+		assert.Nil(t, err)
 	}()
 	assert.Nil(t, err)
 	if err != nil {
@@ -165,9 +170,12 @@ func TestDataFile_Crc_Err(t *testing.T) {
 	assert.Nil(t, err)
 	assert.NotNil(t, df)
 	defer func() {
-		df.Close()
-		fm.close()
-		os.Remove(filePath4)
+		err = df.Release()
+		assert.Nil(t, err)
+		err = fm.close()
+		assert.Nil(t, err)
+		err = os.Remove(filePath4)
+		assert.Nil(t, err)
 	}()
 
 	var errContent []byte
@@ -189,8 +197,10 @@ func TestFileManager1(t *testing.T) {
 	df, err := fm.getDataFile(filePath4, entry.Size())
 	assert.Nil(t, err)
 	defer func() {
-		df.Close()
-		fm.close()
+		err = df.Release()
+		assert.Nil(t, err)
+		err = fm.close()
+		assert.Nil(t, err)
 		os.Remove(filePath)
 	}()
 }

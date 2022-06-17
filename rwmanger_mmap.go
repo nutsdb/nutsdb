@@ -16,6 +16,7 @@ package nutsdb
 
 import (
 	"errors"
+
 	mmap "github.com/xujiajun/mmap-go"
 )
 
@@ -63,8 +64,13 @@ func (mm *MMapRWManager) Sync() (err error) {
 	return mm.m.Flush()
 }
 
-// Close deletes the memory mapped region, flushes any remaining changes
-func (mm *MMapRWManager) Close() (err error) {
+// Release deletes the memory mapped region, flushes any remaining changes
+func (mm *MMapRWManager) Release() (err error) {
 	mm.fdm.reduceUsing(mm.path)
 	return mm.m.Unmap()
+}
+
+// Close will remove the cache in the fdm of the specified path, and call the close method of the os of the file
+func (mm *MMapRWManager) Close() (err error) {
+	return mm.fdm.closeByPath(mm.path)
 }

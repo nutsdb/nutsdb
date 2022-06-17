@@ -380,18 +380,22 @@ func (db *DB) Merge() error {
 				if err == ErrIndexOutOfBound {
 					break
 				}
-				f.rwManager.Close()
+				_ = f.rwManager.Release()
 				return fmt.Errorf("when merge operation build hintIndex readAt err: %s", err)
 			}
 		}
 
 		if err := db.reWriteData(pendingMergeEntries); err != nil {
-			f.rwManager.Close()
+			_ = f.rwManager.Release()
 			return err
 		}
 
 		path := db.getDataPath(int64(pendingMergeFId))
-		f.rwManager.Close()
+		_ = f.rwManager.Release()
+		err = f.rwManager.Close()
+		if err != nil {
+			return err
+		}
 		if err := os.Remove(path); err != nil {
 			db.isMerging = false
 			return fmt.Errorf("when merge err: %s", err)
@@ -426,7 +430,7 @@ func (db *DB) Close() error {
 
 	db.closed = true
 
-	err := db.ActiveFile.rwManager.Close()
+	err := db.ActiveFile.rwManager.Release()
 	if err != nil {
 		return err
 	}
@@ -583,12 +587,18 @@ func (db *DB) parseDataFiles(dataFileIds []int) (unconfirmedRecords []*Record, c
 				if off >= db.opt.SegmentSize {
 					break
 				}
-				f.rwManager.Close()
+				err := f.rwManager.Release()
+				if err != nil {
+					return nil, nil, err
+				}
 				return nil, nil, fmt.Errorf("when build hintIndex readAt err: %s", err)
 			}
 		}
 
-		f.rwManager.Close()
+		err = f.rwManager.Release()
+		if err != nil {
+			return nil, nil, err
+		}
 	}
 
 	return
@@ -972,39 +982,48 @@ const bptDir = "bpt"
 
 // getDataPath returns the data path at given fid.
 func (db *DB) getDataPath(fID int64) string {
-	return db.opt.Dir + "/" + strconv2.Int64ToStr(fID) + DataSuffix
+	separator := string(filepath.Separator)
+	return db.opt.Dir + separator + strconv2.Int64ToStr(fID) + DataSuffix
 }
 
 func (db *DB) getMetaPath() string {
-	return db.opt.Dir + "/meta"
+	separator := string(filepath.Separator)
+	return db.opt.Dir + separator + "meta"
 }
 
 func (db *DB) getBucketMetaPath() string {
-	return db.getMetaPath() + "/bucket"
+	separator := string(filepath.Separator)
+	return db.getMetaPath() + separator + "bucket"
 }
 
 func (db *DB) getBucketMetaFilePath(name string) string {
-	return db.getBucketMetaPath() + "/" + name + BucketMetaSuffix
+	separator := string(filepath.Separator)
+	return db.getBucketMetaPath() + separator + name + BucketMetaSuffix
 }
 
 func (db *DB) getBPTDir() string {
-	return db.opt.Dir + "/" + bptDir
+	separator := string(filepath.Separator)
+	return db.opt.Dir + separator + bptDir
 }
 
 func (db *DB) getBPTPath(fID int64) string {
-	return db.getBPTDir() + "/" + strconv2.Int64ToStr(fID) + BPTIndexSuffix
+	separator := string(filepath.Separator)
+	return db.getBPTDir() + separator + strconv2.Int64ToStr(fID) + BPTIndexSuffix
 }
 
 func (db *DB) getBPTRootPath(fID int64) string {
-	return db.getBPTDir() + "/root/" + strconv2.Int64ToStr(fID) + BPTRootIndexSuffix
+	separator := string(filepath.Separator)
+	return db.getBPTDir() + separator + "root" + separator + strconv2.Int64ToStr(fID) + BPTRootIndexSuffix
 }
 
 func (db *DB) getBPTTxIDPath(fID int64) string {
-	return db.getBPTDir() + "/txid/" + strconv2.Int64ToStr(fID) + BPTTxIDIndexSuffix
+	separator := string(filepath.Separator)
+	return db.getBPTDir() + separator + "txid" + separator + strconv2.Int64ToStr(fID) + BPTTxIDIndexSuffix
 }
 
 func (db *DB) getBPTRootTxIDPath(fID int64) string {
-	return db.getBPTDir() + "/txid/" + strconv2.Int64ToStr(fID) + BPTRootTxIDIndexSuffix
+	separator := string(filepath.Separator)
+	return db.getBPTDir() + separator + "txid" + separator + strconv2.Int64ToStr(fID) + BPTRootTxIDIndexSuffix
 }
 
 func (db *DB) getPendingMergeEntries(entry *Entry, pendingMergeEntries []*Entry) []*Entry {

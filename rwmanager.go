@@ -30,5 +30,6 @@ type RWManager interface {
 	WriteAt(b []byte, off int64) (n int, err error)
 	ReadAt(b []byte, off int64) (n int, err error)
 	Sync() (err error)
+	Release() (err error)
 	Close() (err error)
 }

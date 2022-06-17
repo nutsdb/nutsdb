@@ -502,7 +502,7 @@ func (tx *Tx) rotateActiveFile() error {
 		}
 	}
 
-	if err := tx.db.ActiveFile.rwManager.Close(); err != nil {
+	if err := tx.db.ActiveFile.rwManager.Release(); err != nil {
 		return err
 	}
 
