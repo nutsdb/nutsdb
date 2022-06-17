@@ -13,7 +13,7 @@ It supports fully serializable transactions and many data structures such as lis
 ## Announcement
 v0.9.0 release, see for details: https://github.com/nutsdb/nutsdb/issues/167
 
-📢 Note: Starting from v0.9.0, **defaultSegmentSize** in **DefaultOptions** has been adjusted from **8MB** to **256MB**. The original value is the default value, which needs to be manually changed to 8MB, otherwise the original data will not be parsed. The reason for the size adjustment here is that there is a cache for file descriptors starting from v0.9.0, so users need to look at the number of fds they use on the server, which can be set manually. If you have any questions, you can open an issue.
+📢 Note: Starting from v0.9.0, **defaultSegmentSize** in **DefaultOptions** has been adjusted from **8MB** to **256MB**. The original value is the default value, which needs to be manually changed to 8MB, otherwise the original data will not be parsed. The reason for the size adjustment here is that there is a cache for file descriptors starting from v0.9.0 (detail see https://github.com/nutsdb/nutsdb/pull/164 ), so users need to look at the number of fds they use on the server, which can be set manually. If you have any questions, you can open an issue.
 
 ## Architecture
 ![image](https://user-images.githubusercontent.com/6065007/163713248-73a80478-8d6a-4c53-927c-71ba34569ae7.png)
