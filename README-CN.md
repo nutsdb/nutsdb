@@ -17,7 +17,7 @@ NutsDB支持事务，从v0.2.0之后的版本开始支持ACID的特性，建议�
 ### 公告
 v0.9.0 release，详情见： https://github.com/nutsdb/nutsdb/issues/167
 
-📢 注意：从v0.9.0开始，**DefaultOptions**里面的**defaultSegmentSize**做了调整从原来的**8MB**变成了**256MB**，如果你原来设置256MB不用改，如果原来使用的是默认值的，需要手动改成8MB，不然原来的数据不会解析。这边的大小调整原因是从v0.9.0开始有对文件描述符的缓存，所以需要用户看下自己的fd数量，有不清楚可以提issue或者群里问。
+📢 注意：从v0.9.0开始，**DefaultOptions**里面的**defaultSegmentSize**做了调整从原来的**8MB**变成了**256MB**，如果你原来设置256MB不用改，如果原来使用的是默认值的，需要手动改成8MB，不然原来的数据不会解析。这边的大小调整原因是从v0.9.0开始有对文件描述符的缓存（详解见PR https://github.com/nutsdb/nutsdb/issues/164 ），所以需要用户看下自己的fd数量，有不清楚可以提issue或者群里问。
 
 ### 学习资料
 
