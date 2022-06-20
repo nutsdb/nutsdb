@@ -23,10 +23,6 @@ v0.9.0 release, see for details: https://github.com/nutsdb/nutsdb/issues/167
 
 ## Table of Contents
 
-- [NutsDB ![GoDoc](https://godoc.org/github.com/xujiajun/nutsdb)  [![Go Report Card](https://goreportcard.com/badge/github.com/xujiajun/nutsdb)](https://goreportcard.com/report/github.com/xujiajun/nutsdb) <a href="https://travis-ci.org/xujiajun/nutsdb"><img src="https://travis-ci.org/xujiajun/nutsdb.svg?branch=master" alt="Build Status"></a> [![Coverage Status](https://coveralls.io/repos/github/xujiajun/nutsdb/badge.svg?branch=master)](https://coveralls.io/github/xujiajun/nutsdb?branch=master) [![License](http://img.shields.io/badge/license-Apache_2-blue.svg?style=flat-square)](https://raw.githubusercontent.com/xujiajun/nutsdb/master/LICENSE) [![Mentioned in Awesome Go](https://awesome.re/mentioned-badge.svg)](https://github.com/avelino/awesome-go#database)](#nutsdb-------)
-  - [Announcement](#announcement)
-  - [Architecture](#architecture)
-  - [Table of Contents](#table-of-contents)
   - [Getting Started](#getting-started)
     - [Installing](#installing)
     - [Opening a database](#opening-a-database)
