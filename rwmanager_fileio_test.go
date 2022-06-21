@@ -1,9 +1,10 @@
 package nutsdb
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestRWManager_FileIO_All(t *testing.T) {
