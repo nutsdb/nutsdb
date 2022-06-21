@@ -23,7 +23,10 @@ func TestRWManager_FileIO_All(t *testing.T) {
 		rwManager := &FileIORWManager{fd, filePath, fdm}
 		b := []byte("hello")
 		off := int64(3)
-		rwManager.WriteAt(b, off)
+		_, err = rwManager.WriteAt(b, off)
+		if err != nil {
+			require.NoError(t, err)
+		}
 
 		bucketBufLen := len(b)
 		bucketBuf := make([]byte, bucketBufLen)
