@@ -487,6 +487,9 @@ func (tx *Tx) buildListIdx(bucket string, entry *Entry) {
 		start, _ := strconv2.StrToInt(keyAndStartIndex[1])
 		end, _ := strconv2.StrToInt(string(value))
 		_ = tx.db.ListIdx[bucket].Ltrim(newKey, start, end)
+	case DataLRemByIndex:
+		indexes, _ := UnmarshalInts(value)
+		_, _ = tx.db.ListIdx[bucket].LRemByIndex(string(key), indexes)
 	}
 }
 

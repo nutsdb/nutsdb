@@ -64,6 +64,8 @@ func main() {
 	testLRange()
 
 	testLSize()
+
+	testLRemByIndex()
 }
 
 func testRPushAndLPush() {
@@ -286,6 +288,18 @@ func testLSize() {
 
 			fmt.Println("myList size is ", size)
 			return nil
+		}); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func testLRemByIndex() {
+	if err := db.Update(
+		func(tx *nutsdb.Tx) error {
+			key := []byte("myList")
+			removedNum, err := tx.LRemByIndex(bucket, key, 0)
+			fmt.Printf("removed num %d\n", removedNum)
+			return err
 		}); err != nil {
 		log.Fatal(err)
 	}
