@@ -15,6 +15,7 @@
 package nutsdb
 
 import (
+	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -663,4 +664,39 @@ func TestTx_LSize(t *testing.T) {
 			t.Error("TestTx_LSize err")
 		}
 	}
+}
+
+func TestTx_LRemByIndex(t *testing.T) {
+	InitForList()
+	assertions := assert.New(t)
+	db, err = Open(opt)
+	assertions.NoError(err, "TestTx_LRemByIndex")
+
+	tx, err = db.Begin(true)
+
+	bucket := "myBucket"
+	key := []byte("myList")
+
+	removedNum, err := tx.LRemByIndex(bucket, []byte("fake_key"))
+	assertions.Error(err, "TestTx_LRemByIndex")
+	assertions.Equal(0, removedNum, "TestTx_LRemByIndex")
+	tx.Rollback()
+
+	InitDataForList(bucket, key, t)
+
+	tx, _ = db.Begin(true)
+
+	removedNum, err = tx.LRemByIndex(bucket, key, 1, 0, 8, -8)
+	assertions.NoError(err, "TestTx_LRemByIndex")
+	assertions.Equal(2, removedNum, "TestTx_LRemByIndex")
+
+	removedNum, err = tx.LRemByIndex(bucket, key, 88, -88)
+	assertions.NoError(err, "TestTx_LRemByIndex")
+	assertions.Equal(0, removedNum, "TestTx_LRemByIndex")
+
+	tx.Commit()
+
+	removedNum, err = tx.LRemByIndex(bucket, key, 1, 0, 8, -8)
+	assertions.Error(err, "TestTx_LRemByIndex")
+	assertions.Equal(0, removedNum, "TestTx_LRemByIndex")
 }

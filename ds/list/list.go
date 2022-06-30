@@ -307,3 +307,62 @@ func (l *List) Ltrim(key string, start, end int) error {
 
 	return nil
 }
+
+// LRemByIndex remove the list element at specified index
+func (l *List) LRemByIndex(key string, indexes []int) (int, error) {
+	removedNum := 0
+	if _, ok := l.Items[key]; !ok {
+		return 0, ErrListNotFound
+	}
+
+	item := l.Items[key]
+	if len(indexes) == 0 || len(item) == 0 {
+		return removedNum, nil
+	}
+
+	preIndex := -1
+	for _, index := range indexes {
+		if index < 0 || index == preIndex {
+			continue
+		}
+		if index >= len(item) {
+			break
+		}
+		if preIndex != -1 {
+			_ = append(item[preIndex-removedNum:preIndex-removedNum], item[preIndex+1:index]...)
+			removedNum++
+		}
+		preIndex = index
+	}
+	_ = append(item[preIndex-removedNum:preIndex-removedNum], item[preIndex+1:]...)
+	removedNum++
+	item = item[0 : len(item)-removedNum]
+	l.Items[key] = item
+	return removedNum, nil
+}
+
+// LRemByIndexPreCheck count the number of valid indexes
+func (l *List) LRemByIndexPreCheck(key string, indexes []int) (int, error) {
+	removedNum := 0
+	if _, ok := l.Items[key]; !ok {
+		return 0, ErrListNotFound
+	}
+
+	item := l.Items[key]
+	if len(indexes) == 0 || len(item) == 0 {
+		return removedNum, nil
+	}
+
+	preIndex := -1
+	for _, index := range indexes {
+		if index < 0 || index == preIndex {
+			continue
+		}
+		if index >= len(item) {
+			break
+		}
+		removedNum++
+		preIndex = index
+	}
+	return removedNum, nil
+}

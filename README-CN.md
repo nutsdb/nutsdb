@@ -63,6 +63,7 @@ https://www.bilibili.com/video/BV1T34y1x7AS/
      - [RPeek](#rpeek)
      - [LRange](#lrange)
      - [LRem](#lrem)
+     - [LRemByIndex](#lrembyindex)
      - [LSet](#lset)    
      - [Ltrim](#ltrim)
      - [LSize](#lsize)      
@@ -790,6 +791,25 @@ if err := db.Update(
             bucket := "bucketForList"
         key := []byte("myList")
         return tx.LRem(bucket, key, 1, []byte("val11"))
+    }); err != nil {
+    log.Fatal(err)
+}
+```
+
+##### LRemByIndex
+
+注意: 这个方法在 v0.10.0版本开始支持
+
+移除列表中指定位置（单个或多个位置）的元素
+
+```golang
+if err := db.Update(
+    func(tx *nutsdb.Tx) error {
+        bucket := "bucketForList"
+        key := []byte("myList")
+        removedNum, err := tx.LRemByIndex(bucket, key, 0, 1)
+        fmt.Printf("removed num %d\n", removedNum)
+        return err
     }); err != nil {
     log.Fatal(err)
 }

@@ -55,6 +55,7 @@ v0.9.0 release, see for details: https://github.com/nutsdb/nutsdb/issues/167
         - [RPeek](#rpeek)
         - [LRange](#lrange)
         - [LRem](#lrem)
+        - [LRemByIndex](#lrembyindex)
         - [LSet](#lset)
         - [Ltrim](#ltrim)
         - [LSize](#lsize)
@@ -773,6 +774,26 @@ if err := db.Update(
             bucket := "bucketForList"
         key := []byte("myList")
         return tx.LRem(bucket, key, 1, []byte("value11))
+    }); err != nil {
+    log.Fatal(err)
+}
+```
+
+##### LRemByIndex
+
+Note: This feature can be used starting from v0.10.0
+
+Remove the element at a specified position (single or multiple) from the list
+
+
+```golang
+if err := db.Update(
+    func(tx *nutsdb.Tx) error {
+        bucket := "bucketForList"
+        key := []byte("myList")
+        removedNum, err := tx.LRemByIndex(bucket, key, 0, 1)
+        fmt.Printf("removed num %d\n", removedNum)
+        return err
     }); err != nil {
     log.Fatal(err)
 }

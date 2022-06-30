@@ -15,6 +15,10 @@
 package nutsdb
 
 import (
+	"bytes"
+	"encoding/binary"
+	"errors"
+	"io"
 	"os"
 	"sort"
 )
@@ -39,4 +43,30 @@ func Truncate(path string, capacity int64, f *os.File) error {
 		}
 	}
 	return nil
+}
+
+func MarshalInts(ints []int) ([]byte, error) {
+	buffer := bytes.NewBuffer([]byte{})
+	for _, x := range ints {
+		if err := binary.Write(buffer, binary.LittleEndian, int64(x)); err != nil {
+			return nil, err
+		}
+	}
+	return buffer.Bytes(), nil
+}
+
+func UnmarshalInts(data []byte) ([]int, error) {
+	var ints []int
+	buffer := bytes.NewBuffer(data)
+	for {
+		var i int64
+		err := binary.Read(buffer, binary.LittleEndian, &i)
+		if errors.Is(err, io.EOF) {
+			break
+		} else if err != nil {
+			return nil, err
+		}
+		ints = append(ints, int(i))
+	}
+	return ints, nil
 }

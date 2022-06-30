@@ -16,6 +16,7 @@ package nutsdb
 
 import (
 	"bytes"
+	"sort"
 	"strings"
 	"time"
 
@@ -249,4 +250,29 @@ func (tx *Tx) LTrim(bucket string, key []byte, start, end int) error {
 	newKey := buffer.Bytes()
 
 	return tx.push(bucket, newKey, DataLTrimFlag, []byte(strconv2.IntToStr(end)))
+}
+
+// LRemByIndex remove the list element at specified index
+func (tx *Tx) LRemByIndex(bucket string, key []byte, indexes ...int) (removedNum int, err error) {
+	if err := tx.checkTxIsClosed(); err != nil {
+		return 0, err
+	}
+
+	if _, ok := tx.db.ListIdx[bucket]; !ok {
+		return 0, ErrBucket
+	}
+	sort.Ints(indexes)
+	removedNum, err = tx.db.ListIdx[bucket].LRemByIndexPreCheck(string(key), indexes)
+	if removedNum == 0 || err != nil {
+		return
+	}
+	data, err := MarshalInts(indexes)
+	if err != nil {
+		return 0, err
+	}
+	err = tx.push(bucket, key, DataLRemByIndex, data)
+	if err != nil {
+		return 0, err
+	}
+	return
 }

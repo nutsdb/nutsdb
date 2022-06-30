@@ -17,6 +17,7 @@ package nutsdb
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/xujiajun/utils/strconv2"
 )
 
@@ -35,4 +36,23 @@ func TestPrintSortedMap(t *testing.T) {
 			t.Errorf("err TestPrintSortedMap. got %s want %s", keys[i], k)
 		}
 	}
+}
+
+func TestMarshalInts(t *testing.T) {
+	assertions := assert.New(t)
+	data, err := MarshalInts([]int{})
+	assertions.NoError(err, "TestMarshalInts")
+
+	ints, err := UnmarshalInts(data)
+	assertions.NoError(err, "TestMarshalInts")
+	assertions.Equal(0, len(ints), "TestMarshalInts")
+
+	data, err = MarshalInts([]int{1, 3})
+	assertions.NoError(err, "TestMarshalInts")
+
+	ints, err = UnmarshalInts(data)
+	assertions.NoError(err, "TestMarshalInts")
+	assertions.Equal(2, len(ints), "TestMarshalInts")
+	assertions.Equal(1, ints[0], "TestMarshalInts")
+	assertions.Equal(3, ints[1], "TestMarshalInts")
 }

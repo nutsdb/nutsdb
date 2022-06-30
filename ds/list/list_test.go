@@ -360,6 +360,89 @@ func TestList_LRem7(t *testing.T) {
 	assertions.Equal(3, size, "TestList_LRem err")
 }
 
+func TestList_LRemByIndex(t *testing.T) {
+	list, key := InitListData()
+	assertions := assert.New(t)
+
+	tests := []struct {
+		name           string
+		key            string
+		item           [][]byte
+		indexes        []int
+		wantItem       [][]byte
+		wantRemovedNum int
+		wantErr        bool
+	}{
+		{
+			"exception-1",
+			"key2",
+			[][]byte{[]byte("a"), []byte("b"), []byte("c"), []byte("d")},
+			[]int{},
+			[][]byte{[]byte("a"), []byte("b"), []byte("c"), []byte("d")},
+			0,
+			true,
+		},
+		{
+			"normal-1",
+			key,
+			[][]byte{[]byte("a"), []byte("b"), []byte("c"), []byte("d")},
+			[]int{},
+			[][]byte{[]byte("a"), []byte("b"), []byte("c"), []byte("d")},
+			0,
+			false,
+		},
+		{
+			"normal-2",
+			key,
+			[][]byte{[]byte("a"), []byte("b"), []byte("c"), []byte("d")},
+			[]int{0},
+			[][]byte{[]byte("b"), []byte("c"), []byte("d")},
+			1,
+			false,
+		},
+		{
+			"normal-3",
+			key,
+			[][]byte{[]byte("a"), []byte("b"), []byte("c"), []byte("d")},
+			[]int{0, 0, 0},
+			[][]byte{[]byte("b"), []byte("c"), []byte("d")},
+			1,
+			false,
+		},
+		{
+			"normal-4",
+			key,
+			[][]byte{[]byte("a"), []byte("b"), []byte("c"), []byte("d")},
+			[]int{0, 0, 2, 8},
+			[][]byte{[]byte("b"), []byte("d")},
+			2,
+			false,
+		},
+		{
+			"normal-5",
+			key,
+			[][]byte{[]byte("a"), []byte("b"), []byte("c"), []byte("d")},
+			[]int{-1, 0, 1, 2, 3, 4, 5},
+			[][]byte{},
+			4,
+			false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			list.Items[key] = tt.item
+			removedNum, err := list.LRemByIndexPreCheck(tt.key, tt.indexes)
+			assertions.Equal(tt.wantErr, err != nil, "TestList_LRemByIndexNum err")
+			assertions.Equal(tt.wantRemovedNum, removedNum, "TestList_LRemByIndexNum %v err", tt.name)
+
+			removedNum, err = list.LRemByIndex(tt.key, tt.indexes)
+			assertions.Equal(tt.wantErr, err != nil, "TestList_LRemByIndex err")
+			assertions.ElementsMatchf(tt.wantItem, list.Items[key], "TestList_LRemByIndex %v err", tt.name)
+			assertions.Equal(tt.wantRemovedNum, removedNum, "TestList_LRemByIndex %v err", tt.name)
+		})
+	}
+}
+
 func TestList_LSet(t *testing.T) {
 	list, key := InitListData()
 	assertions := assert.New(t)
