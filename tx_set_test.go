@@ -970,6 +970,49 @@ func TestTx_SAreMembers(t *testing.T) {
 	opSAreMembersForTest(bucket, key, t)
 }
 
+func TestTx_SKeys(t *testing.T) {
+	InitForSet()
+	assertions := assert.New(t)
+	db, err = Open(opt)
+	assertions.NoError(err, "TestTx_SKeys")
+	bucket := "myBucket"
+
+	tx, err = db.Begin(true)
+	tx.SAdd(bucket, []byte("hello"), []byte("data"))
+	tx.SAdd(bucket, []byte("hello1"), []byte("data"))
+	tx.SAdd(bucket, []byte("hello12"), []byte("data"))
+	tx.SAdd(bucket, []byte("hello123"), []byte("data"))
+	tx.Commit()
+
+	tx, err = db.Begin(false)
+
+	var keys []string
+	err = tx.SKeys(bucket, "*", func(key string) bool {
+		keys = append(keys, key)
+		return true
+	})
+	assertions.NoError(err, "TestTx_SKeys")
+	assertions.Equal(4, len(keys), "TestTx_SKeys")
+
+	keys = []string{}
+	err = tx.SKeys(bucket, "*", func(key string) bool {
+		keys = append(keys, key)
+		return len(keys) != 2
+	})
+	assertions.NoError(err, "TestTx_SKeys")
+	assertions.Equal(2, len(keys), "TestTx_SKeys")
+
+	keys = []string{}
+	err = tx.SKeys(bucket, "hello1*", func(key string) bool {
+		keys = append(keys, key)
+		return true
+	})
+	assertions.NoError(err, "TestTx_SKeys")
+	assertions.Equal(3, len(keys), "TestTx_SKeys")
+
+	tx.Commit()
+}
+
 func TestErrBucketAndKey(t *testing.T) {
 
 	got := ErrBucketAndKey("foo", []byte("bar"))

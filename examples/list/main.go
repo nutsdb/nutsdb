@@ -66,6 +66,8 @@ func main() {
 	testLSize()
 
 	testLRemByIndex()
+
+	testLKeys()
 }
 
 func testRPushAndLPush() {
@@ -299,6 +301,22 @@ func testLRemByIndex() {
 			key := []byte("myList")
 			removedNum, err := tx.LRemByIndex(bucket, key, 0)
 			fmt.Printf("removed num %d\n", removedNum)
+			return err
+		}); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func testLKeys() {
+	if err := db.View(
+		func(tx *nutsdb.Tx) error {
+			var keys []string
+			err := tx.LKeys(bucket, "*", func(key string) bool {
+				keys = append(keys, key)
+				// true: continue, false: break
+				return true
+			})
+			fmt.Printf("keys: %v\n", keys)
 			return err
 		}); err != nil {
 		log.Fatal(err)

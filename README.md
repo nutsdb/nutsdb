@@ -59,6 +59,7 @@ v0.9.0 release, see for details: https://github.com/nutsdb/nutsdb/issues/167
         - [LSet](#lset)
         - [Ltrim](#ltrim)
         - [LSize](#lsize)
+        - [LKeys](#lkeys)
       - [Set](#set)
         - [SAdd](#sadd)
         - [SAreMembers](#saremembers)
@@ -74,6 +75,7 @@ v0.9.0 release, see for details: https://github.com/nutsdb/nutsdb/issues/167
         - [SRem](#srem)
         - [SUnionByOneBucket](#sunionbyonebucket)
         - [SUnionByTwoBuckets](#sunionbytwobuckets)
+        - [SKeys](#skeys)
       - [Sorted Set](#sorted-set)
         - [ZAdd](#zadd)
         - [ZCard](#zcard)
@@ -87,6 +89,7 @@ v0.9.0 release, see for details: https://github.com/nutsdb/nutsdb/issues/167
         - [ZRangeByRank](#zrangebyrank)
         - [ZRangeByScore](#zrangebyscore)
         - [ZRank](#zrank)
+        - [ZKeys](#zkeys)
       - [ZRevRank](#zrevrank)
         - [ZRem](#zrem)
         - [ZRemRangeByRank](#zremrangebyrank)
@@ -857,6 +860,28 @@ if err := db.Update(
 }
 ```
 
+##### LKeys
+
+find all `keys` of type `List` matching a given `pattern`, similar to Redis command: [KEYS](https://redis.io/commands/keys/)
+
+Note: pattern matching use `filepath.Match`, It is different from redis' behavior in some details, such as `[`.
+
+```golang
+if err := db.View(
+    func(tx *nutsdb.Tx) error {
+        var keys []string
+        err := tx.LKeys(bucket, "*", func(key string) bool {
+            keys = append(keys, key)
+            // true: continue, false: break
+            return true
+        })
+        fmt.Printf("keys: %v\n", keys)
+        return err
+    }); err != nil {
+    log.Fatal(err)
+}
+```
+
 #### Set
 
 ##### SAdd
@@ -1318,6 +1343,28 @@ if err := db.View(
             }
         }
         return nil
+    }); err != nil {
+    log.Fatal(err)
+}
+```
+
+##### SKeys
+
+find all `keys` of type `Set` matching a given `pattern`, similar to Redis command: [KEYS](https://redis.io/commands/keys/)
+
+Note: pattern matching use `filepath.Match`, It is different from redis' behavior in some details, such as `[`.
+
+```golang
+if err := db.View(
+    func(tx *nutsdb.Tx) error {
+        var keys []string
+        err := tx.SKeys(bucket, "*", func(key string) bool {
+            keys = append(keys, key)
+            // true: continue, false: break
+            return true
+        })
+        fmt.Printf("keys: %v\n", keys)
+        return err
     }); err != nil {
     log.Fatal(err)
 }
@@ -1875,6 +1922,29 @@ if err := db.View(
     log.Fatal(err)
 }
 ```
+
+##### ZKeys
+
+find all `keys` of type `Sorted Set` matching a given `pattern`, similar to Redis command: [KEYS](https://redis.io/commands/keys/)
+
+Note: pattern matching use `filepath.Match`, It is different from redis' behavior in some details, such as `[`.
+
+```golang
+if err := db.View(
+    func(tx *nutsdb.Tx) error {
+        var keys []string
+        err := tx.ZKeys(bucket, "*", func(key string) bool {
+            keys = append(keys, key)
+            // true: continue, false: break
+            return true
+        })
+        fmt.Printf("keys: %v\n", keys)
+        return err
+    }); err != nil {
+    log.Fatal(err)
+}
+```
+
 ### Comparison with other databases
 
 #### BoltDB
