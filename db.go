@@ -110,6 +110,9 @@ const (
 
 	// LRemByIndex represents the data LRemByIndex flag
 	DataLRemByIndex
+
+	// DataSetExpireFlag represents the data expire Set flag
+	DataSetExpireFlag
 )
 
 const (
@@ -815,18 +818,22 @@ func (db *DB) buildSetIdx(bucket string, r *Record) error {
 		return ErrEntryIdxModeOpt
 	}
 
-	if r.H.Meta.Flag == DataSetFlag {
-		if err := db.SetIdx[bucket].SAdd(string(r.E.Key), r.E.Value); err != nil {
-			return fmt.Errorf("when build SetIdx SAdd index err: %s", err)
-		}
-	}
-
-	if r.H.Meta.Flag == DataDeleteFlag {
+	if r.H.Meta.Flag == DataDeleteFlag || IsExpired(r.E.Meta.TTL, r.E.Meta.Timestamp) {
 		if err := db.SetIdx[bucket].SRem(string(r.E.Key), r.E.Value); err != nil {
 			return fmt.Errorf("when build SetIdx SRem index err: %s", err)
 		}
+		return nil
 	}
 
+	isExpireFlag := r.H.Meta.Flag == DataSetExpireFlag
+	if r.H.Meta.Flag == DataSetFlag || isExpireFlag {
+		if err := db.SetIdx[bucket].SAdd(string(r.E.Key), r.E.Value); err != nil {
+			return fmt.Errorf("when build SetIdx SAdd index err: %s", err)
+		}
+		if isExpireFlag {
+			db.SetIdx[bucket].T[string(r.E.Key)] = set.TsAndTtl{Timestamp: r.E.Meta.Timestamp, TTL: r.E.Meta.TTL}
+		}
+	}
 	return nil
 }
 

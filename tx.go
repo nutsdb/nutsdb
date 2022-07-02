@@ -632,6 +632,23 @@ func (tx *Tx) Put(bucket string, key, value []byte, ttl uint32) error {
 	return tx.put(bucket, key, value, ttl, DataSetFlag, uint64(time.Now().Unix()), DataStructureBPTree)
 }
 
+// ExpireSet set a timeout on a Set. After the timeout has expired, the Set will automatically be deleted.
+func (tx *Tx) ExpireSet(bucket string, key []byte, ttl uint32) error {
+	if s, ok := tx.db.SetIdx[bucket]; ok {
+		if _, ok := s.M[string(key)]; ok {
+			now := uint64(time.Now().Unix())
+			s.T[string(key)] = set.TsAndTtl{Timestamp: now, TTL: ttl}
+			for item := range s.M[string(key)] {
+				err := tx.put(bucket, key, []byte(item), ttl, DataSetExpireFlag, now, DataStructureSet)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
+}
+
 func (tx *Tx) checkTxIsClosed() error {
 	if tx.db == nil {
 		return ErrTxClosed

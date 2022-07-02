@@ -26,15 +26,22 @@ var (
 	ErrKeyNotExist = errors.New("key not exist")
 )
 
+type TsAndTtl struct {
+	Timestamp uint64
+	TTL       uint32
+}
+
 // Set represents the Set.
 type Set struct {
 	M map[string]map[string]struct{}
+	T map[string]TsAndTtl
 }
 
 // New returns a newly initialized Set Object that implements the Set.
 func New() *Set {
 	return &Set{
 		M: make(map[string]map[string]struct{}),
+		T: make(map[string]TsAndTtl),
 	}
 }
 
