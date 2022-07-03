@@ -22,6 +22,16 @@ import (
 )
 
 func (tx *Tx) sPut(bucket string, key []byte, dataFlag uint16, items ...[]byte) error {
+	if set, ok := tx.db.SetIdx[bucket]; ok {
+		if set.IsExpired(string(key)) {
+			for item := range set.M[string(key)] {
+				err := tx.put(bucket, key, []byte(item), Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureSet)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
 
 	if dataFlag == DataSetFlag {
 

@@ -16,6 +16,7 @@ package set
 
 import (
 	"errors"
+	"time"
 )
 
 var (
@@ -24,6 +25,9 @@ var (
 
 	// ErrKeyNotExist is returned when the key not exist.
 	ErrKeyNotExist = errors.New("key not exist")
+
+	// ErrKeyExpired is returned when the key is expired.
+	ErrKeyExpired = errors.New("key expired")
 )
 
 type TsAndTtl struct {
@@ -45,10 +49,32 @@ func New() *Set {
 	}
 }
 
+func (s *Set) IsExpired(key string) bool {
+	var t TsAndTtl
+	var ok bool
+	if t, ok = s.T[key]; !ok {
+		return false
+	}
+
+	ttl, timestamp := t.TTL, t.Timestamp
+	now := time.Now().Unix()
+
+	if ttl > 0 && uint64(ttl)+timestamp > uint64(now) || ttl == 0 {
+		return false
+	}
+
+	return true
+}
+
 // SAdd adds the specified members to the set stored at key.
 func (s *Set) SAdd(key string, items ...[]byte) error {
 	if _, ok := s.M[key]; !ok {
 		s.M[key] = make(map[string]struct{})
+	}
+
+	if s.IsExpired(key) {
+		s.M[key] = make(map[string]struct{})
+		delete(s.T, key)
 	}
 
 	for _, item := range items {
@@ -64,6 +90,12 @@ func (s *Set) SRem(key string, items ...[]byte) error {
 		return ErrKeyNotFound
 	}
 
+	if s.IsExpired(key) {
+		delete(s.T, key)
+		delete(s.M, key)
+		return nil
+	}
+
 	if len(items[0]) == 0 {
 		return errors.New("item empty")
 	}
@@ -77,6 +109,10 @@ func (s *Set) SRem(key string, items ...[]byte) error {
 
 // SHasKey returns if has the set at given key.
 func (s *Set) SHasKey(key string) bool {
+	if s.IsExpired(key) {
+		return false
+	}
+
 	if _, ok := s.M[key]; !ok {
 		return false
 	}
@@ -90,6 +126,12 @@ func (s *Set) SPop(key string) []byte {
 		return nil
 	}
 
+	if s.IsExpired(key) {
+		delete(s.T, key)
+		delete(s.M, key)
+		return nil
+	}
+
 	for item := range s.M[key] {
 		delete(s.M[key], item)
 		return []byte(item)
@@ -100,6 +142,10 @@ func (s *Set) SPop(key string) []byte {
 
 // SCard Returns the set cardinality (number of elements) of the set stored at key.
 func (s *Set) SCard(key string) int {
+	if s.IsExpired(key) {
+		return 0
+	}
+
 	if !s.SHasKey(key) {
 		return 0
 	}
@@ -142,8 +188,16 @@ func (s *Set) checkKey1AndKey2(key1, key2 string) (list [][]byte, err error) {
 		return nil, errors.New("set1 is not exists")
 	}
 
+	if s.IsExpired(key1) {
+		return nil, errors.New("set1 is expired")
+	}
+
 	if _, ok := s.M[key2]; !ok {
 		return nil, errors.New("set2 is not exists")
+	}
+
+	if s.IsExpired(key2) {
+		return nil, errors.New("set2 is expired")
 	}
 
 	return nil, nil
@@ -152,6 +206,10 @@ func (s *Set) checkKey1AndKey2(key1, key2 string) (list [][]byte, err error) {
 // SIsMember Returns if member is a member of the set stored at key.
 func (s *Set) SIsMember(key string, item []byte) bool {
 	if _, ok := s.M[key]; !ok {
+		return false
+	}
+
+	if s.IsExpired(key) {
 		return false
 	}
 
@@ -169,6 +227,10 @@ func (s *Set) SAreMembers(key string, items ...[]byte) (bool, error) {
 		return false, ErrKeyNotExist
 	}
 
+	if s.IsExpired(key) {
+		return false, ErrKeyExpired
+	}
+
 	for _, item := range items {
 		if _, ok := s.M[key][string(item)]; !ok {
 			return false, errors.New("item not exits")
@@ -184,6 +246,10 @@ func (s *Set) SMembers(key string) (list [][]byte, err error) {
 		return nil, errors.New("set not exists")
 	}
 
+	if s.IsExpired(key) {
+		return nil, ErrKeyExpired
+	}
+
 	for item := range s.M[key] {
 		list = append(list, []byte(item))
 	}
@@ -197,8 +263,16 @@ func (s *Set) SMove(key1, key2 string, item []byte) (bool, error) {
 		return false, errors.New("key1 is not exists")
 	}
 
+	if s.IsExpired(key1) {
+		return false, errors.New("key1 is expired")
+	}
+
 	if !s.SHasKey(key2) {
 		return false, errors.New("key2 is not exists")
+	}
+
+	if s.IsExpired(key2) {
+		return false, errors.New("key2 is expired")
 	}
 
 	if _, ok := s.M[key2][string(item)]; !ok {
