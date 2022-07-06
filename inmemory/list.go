@@ -142,7 +142,7 @@ func (db *DB) LRem(bucket string, key string, count int, value []byte) (removedN
 			return err
 		}
 
-		if count > size || -count > size {
+		if count > size || count < -size {
 			return list.ErrCount
 		}
 		removedNum, err = shardDB.ListIdx[bucket].LRem(key, count, value)
