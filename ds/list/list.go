@@ -17,6 +17,7 @@ package list
 import (
 	"bytes"
 	"errors"
+	"math"
 )
 
 var (
@@ -223,7 +224,11 @@ func (l *List) LRem(key string, count int, value []byte) (int, error) {
 	}
 
 	if count < 0 {
-		count = -count
+		if count == math.MinInt {
+			count = math.MaxInt
+		} else {
+			count = -count
+		}
 		for i := size - 1; i >= 0; i-- {
 			v := tempVal[i]
 			if realRemovedNum < count && bytes.Equal(v, value) {
@@ -260,7 +265,11 @@ func (l *List) LRemNum(key string, count int, value []byte) (int, error) {
 	tempVal := l.Items[key]
 
 	if count < 0 {
-		count = -count
+		if count == math.MinInt {
+			count = math.MaxInt
+		} else {
+			count = -count
+		}
 	}
 
 	for _, v := range tempVal {
