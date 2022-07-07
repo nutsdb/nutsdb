@@ -248,8 +248,8 @@ func (l *List) LRem(key string, count int, value []byte) (int, error) {
 
 func abs(num int) (res int) {
 	switch {
-	case num == math.MinInt:
-		res = math.MaxInt
+	case num == math.MinInt64:
+		res = math.MaxInt64
 	case num < 0:
 		res = -num
 	default:

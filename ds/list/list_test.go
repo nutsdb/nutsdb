@@ -362,8 +362,8 @@ func TestList_LRem7(t *testing.T) {
 }
 
 func TestList_abs(t *testing.T) {
-	input := []int{math.MinInt, -1, 0, math.MaxInt}
-	output := []int{math.MaxInt, 1, 0, math.MaxInt}
+	input := []int{math.MinInt64, -1, 0, math.MaxInt64}
+	output := []int{math.MaxInt64, 1, 0, math.MaxInt64}
 	for i := range input {
 		if abs(input[i]) != output[i] {
 			t.Error("wrong return for abs(num int)")
