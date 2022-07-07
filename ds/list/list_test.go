@@ -15,6 +15,7 @@
 package list
 
 import (
+	"math"
 	"reflect"
 	"testing"
 
@@ -358,6 +359,16 @@ func TestList_LRem7(t *testing.T) {
 	size, err := list.Size(key)
 	assertions.NoError(err, "TestList_LRem err")
 	assertions.Equal(3, size, "TestList_LRem err")
+}
+
+func TestList_abs(t *testing.T) {
+	input := []int{math.MinInt, -1, 0, math.MaxInt}
+	output := []int{math.MaxInt, 1, 0, math.MaxInt}
+	for i := range input {
+		if abs(input[i]) != output[i] {
+			t.Error("wrong return for abs(num int)")
+		}
+	}
 }
 
 func TestList_LRemByIndex(t *testing.T) {

@@ -224,11 +224,7 @@ func (l *List) LRem(key string, count int, value []byte) (int, error) {
 	}
 
 	if count < 0 {
-		if count == math.MinInt {
-			count = math.MaxInt
-		} else {
-			count = -count
-		}
+		count = abs(count)
 		for i := size - 1; i >= 0; i-- {
 			v := tempVal[i]
 			if realRemovedNum < count && bytes.Equal(v, value) {
@@ -250,6 +246,18 @@ func (l *List) LRem(key string, count int, value []byte) (int, error) {
 	return realRemovedNum, nil
 }
 
+func abs(num int) (res int) {
+	switch {
+	case num == math.MinInt:
+		res = math.MaxInt
+	case num < 0:
+		res = -num
+	default:
+		res = num
+	}
+	return
+}
+
 func (l *List) LRemNum(key string, count int, value []byte) (int, error) {
 	if _, ok := l.Items[key]; !ok {
 		return 0, ErrListNotFound
@@ -264,13 +272,7 @@ func (l *List) LRemNum(key string, count int, value []byte) (int, error) {
 
 	tempVal := l.Items[key]
 
-	if count < 0 {
-		if count == math.MinInt {
-			count = math.MaxInt
-		} else {
-			count = -count
-		}
-	}
+	count = abs(count)
 
 	for _, v := range tempVal {
 		if count > 0 && (removedNum == count) {
