@@ -17,6 +17,7 @@ package list
 import (
 	"bytes"
 	"errors"
+	"math"
 )
 
 var (
@@ -223,6 +224,9 @@ func (l *List) LRem(key string, count int, value []byte) (int, error) {
 	}
 
 	if count < 0 {
+		if count == math.MinInt64 {
+			return 0, errors.New("count is not allowed to receive value of math.MinInt64")
+		}
 		count = -count
 		for i := size - 1; i >= 0; i-- {
 			v := tempVal[i]
@@ -260,6 +264,9 @@ func (l *List) LRemNum(key string, count int, value []byte) (int, error) {
 	tempVal := l.Items[key]
 
 	if count < 0 {
+		if count == math.MinInt64 {
+			return 0, errors.New("count is not allowed to receive value of math.MinInt64")
+		}
 		count = -count
 	}
 
