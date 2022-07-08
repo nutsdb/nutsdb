@@ -15,6 +15,8 @@
 package inmemory
 
 import (
+	"github.com/xujiajun/nutsdb"
+	"github.com/xujiajun/nutsdb/ds/list"
 	"testing"
 )
 
@@ -29,6 +31,9 @@ func TestDB_RPush_RPop(t *testing.T) {
 	initTestDB()
 	bucket := "bucket1"
 	key := "myList1"
+	if _, err := testDB.RPop(bucket, key); err == nil {
+		t.Error("should return error for a nonExisted bucket")
+	}
 	err := initRPushData(bucket, key)
 	if err != nil {
 		t.Error(err)
@@ -73,6 +78,9 @@ func TestDB_LPush_LPop(t *testing.T) {
 	initTestDB()
 	bucket := "bucket1"
 	key := "myList1"
+	if _, err := testDB.LPop(bucket, key); err == nil {
+		t.Error("should return error for a nonExisted bucket")
+	}
 	err := initLPushData(bucket, key)
 	if err != nil {
 		t.Error(err)
@@ -98,6 +106,9 @@ func TestDB_LPeek(t *testing.T) {
 	initTestDB()
 	bucket := "bucket1"
 	key := "myList1"
+	if _, err := testDB.LPeek(bucket, key); err == nil {
+		t.Error("should return error for a nonExisted bucket")
+	}
 	err := initLPushData(bucket, key)
 	if err != nil {
 		t.Error(err)
@@ -116,6 +127,9 @@ func TestDB_LSize(t *testing.T) {
 	initTestDB()
 	bucket := "bucket1"
 	key := "myList1"
+	if _, err := testDB.LSize(bucket, key); err != nutsdb.ErrBucket {
+		t.Error("should return error for a nonExisted bucket")
+	}
 	err := initLPushData(bucket, key)
 	if err != nil {
 		t.Error(err)
@@ -133,6 +147,9 @@ func TestDB_LRange(t *testing.T) {
 	initTestDB()
 	bucket := "bucket1"
 	key := "myList1"
+	if _, err := testDB.LRange(bucket, key, -1, -2); err != nutsdb.ErrBucket {
+		t.Error("should return error for a nonExisted bucket")
+	}
 	err := initLPushData(bucket, key)
 	if err != nil {
 		t.Error(err)
@@ -160,9 +177,22 @@ func TestDB_LRem(t *testing.T) {
 	initTestDB()
 	bucket := "bucket1"
 	key := "myList1"
+	if _, err := testDB.LRem(bucket, key, -1, nil); err != nutsdb.ErrBucket {
+		t.Error("should return error for a nonExisted bucket")
+	}
 	err := initLPushData(bucket, key)
 	if err != nil {
 		t.Error(err)
+	}
+
+	if _, err := testDB.LRem(bucket, "nonExistedKey", -1, []byte("a")); err == nil {
+		t.Error("should return error for a nonExisted Key")
+	}
+	if _, err := testDB.LRem(bucket, key, 1<<63-1, nil); err != list.ErrCount {
+		t.Error("should return error for a count larger than size")
+	}
+	if _, err := testDB.LRem(bucket, key, -1<<63, nil); err != list.ErrCount {
+		t.Error("should return error for a count value of -1<<63")
 	}
 	err = testDB.LPush(bucket, key, []byte("a"))
 	if err != nil {
@@ -196,7 +226,21 @@ func TestDB_LSet(t *testing.T) {
 	initTestDB()
 	bucket := "bucket1"
 	key := "myList1"
+	if err := testDB.LSet(bucket, key, 1, []byte("d")); err != nutsdb.ErrBucket {
+		t.Error("should return error for a count value of -1<<63")
+	}
+
 	err := initLPushData(bucket, key)
+
+	if err := testDB.LSet(bucket, "nonExistedKey", 1, []byte("a")); err == nil {
+		t.Error("should return error for a nonExisted Key")
+	}
+	if err := testDB.LSet(bucket, key, 1<<63-1, nil); err != list.ErrIndexOutOfRange {
+		t.Error("should return error for a count larger than size")
+	}
+	if err := testDB.LSet(bucket, key, -1<<63, nil); err != list.ErrIndexOutOfRange {
+		t.Error("should return error for a count value of -1<<63")
+	}
 	if err != nil {
 		t.Error(err)
 	}
@@ -225,6 +269,9 @@ func TestDB_LTrim(t *testing.T) {
 	initTestDB()
 	bucket := "bucket1"
 	key := "myList1"
+	if err := testDB.LTrim(bucket, key, 1, 2); err != nutsdb.ErrBucket {
+		t.Error("should return error for a count value of -1<<63")
+	}
 	err := initLPushData(bucket, key)
 	if err != nil {
 		t.Error(err)
