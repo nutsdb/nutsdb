@@ -15,6 +15,7 @@
 package list
 
 import (
+	"math"
 	"reflect"
 	"testing"
 
@@ -40,6 +41,17 @@ func TestList_RPush(t *testing.T) {
 		if err == nil && string(item) != expectResult[i] {
 			t.Error("TestList_LPush err")
 		}
+	}
+}
+
+func TestList_RPeek(t *testing.T) {
+	list, key := InitListData()
+	for i := 0; i < 4; {
+		_, _ = list.RPop(key)
+		i++
+	}
+	if _, _, err := list.RPeek(key); err == nil {
+		t.Error("should return error for a empty key")
 	}
 }
 
@@ -358,6 +370,9 @@ func TestList_LRem7(t *testing.T) {
 	size, err := list.Size(key)
 	assertions.NoError(err, "TestList_LRem err")
 	assertions.Equal(3, size, "TestList_LRem err")
+
+	num, err = list.LRem(key, math.MinInt64, []byte("b"))
+	assertions.Error(err, "TestList_LRem err")
 }
 
 func TestList_LRemByIndex(t *testing.T) {
