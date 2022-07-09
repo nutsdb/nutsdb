@@ -39,7 +39,6 @@ func InitForSet() {
 	opt = DefaultOptions
 	opt.Dir = fileDir
 	opt.SegmentSize = 8 * 1024
-	return
 }
 
 func TestTx_SAdd(t *testing.T) {
@@ -984,4 +983,8 @@ func TestErrNotFoundKeyInBucket(t *testing.T) {
 
 	assert.True(t,
 		errors.Is(got, ErrKeyNotFound))
+}
+
+func TestTx_ExpireSet(t *testing.T) {
+	
 }

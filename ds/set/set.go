@@ -39,6 +39,8 @@ type TsAndTtl struct {
 type Set struct {
 	M map[string]map[string]struct{}
 	T map[string]TsAndTtl
+	// internally used for staging values when building set index
+	H map[string]map[string]struct{}
 }
 
 // New returns a newly initialized Set Object that implements the Set.
@@ -46,6 +48,7 @@ func New() *Set {
 	return &Set{
 		M: make(map[string]map[string]struct{}),
 		T: make(map[string]TsAndTtl),
+		H: make(map[string]map[string]struct{}),
 	}
 }
 
@@ -90,6 +93,7 @@ func (s *Set) SRem(key string, items ...[]byte) error {
 		return ErrKeyNotFound
 	}
 
+	// bug: build index 时会导致问题
 	if s.IsExpired(key) {
 		delete(s.T, key)
 		delete(s.M, key)
@@ -299,6 +303,5 @@ func (s *Set) SUnion(key1, key2 string) (list [][]byte, err error) {
 			list = append(list, []byte(item2))
 		}
 	}
-
 	return
 }

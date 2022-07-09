@@ -818,21 +818,77 @@ func (db *DB) buildSetIdx(bucket string, r *Record) error {
 		return ErrEntryIdxModeOpt
 	}
 
-	if r.H.Meta.Flag == DataDeleteFlag || IsExpired(r.E.Meta.TTL, r.E.Meta.Timestamp) {
-		if err := db.SetIdx[bucket].SRem(string(r.E.Key), r.E.Value); err != nil {
-			return fmt.Errorf("when build SetIdx SRem index err: %s", err)
+	isExpired := IsExpired(r.E.Meta.TTL, r.E.Meta.Timestamp)
+	keyStr := string(r.E.Key)
+
+	if r.H.Meta.Flag == DataSetExpireFlag {
+		// if encounter a record with `DataSetExpireFlag` who's TTL is persistent,
+		// which means the set was reassigned a persistent lifetime. So restore all values from staging area.
+		if r.E.Meta.TTL == Persistent {
+			for k, v := range db.SetIdx[bucket].H[keyStr] {
+				db.SetIdx[bucket].M[keyStr][k] = v
+			}
+			delete(db.SetIdx[bucket].H, keyStr)
+			delete(db.SetIdx[bucket].T, keyStr)
+			return nil
+		}
+
+		if isExpired {
+			// if encounter a expired record with `DataSetExpireFlag`, which means all records before *MAYBE* expired.
+			// So move all of them to staging area for futher processing.
+			if _, ok := db.SetIdx[bucket].H[keyStr]; !ok {
+				db.SetIdx[bucket].H[keyStr] = make(map[string]struct{})
+			}
+
+			for k, v := range db.SetIdx[bucket].M[keyStr] {
+				db.SetIdx[bucket].H[keyStr][k] = v
+			}
+			delete(db.SetIdx[bucket].M, keyStr)
+		} else {
+			// if encounter a fresh record with `DataSetExpireFlag`, which means all records before are also fresh.
+			// So restore all of them from staging area.
+			if _, ok := db.SetIdx[bucket].M[keyStr]; !ok {
+				db.SetIdx[bucket].M[keyStr] = make(map[string]struct{})
+			}
+
+			for k, v := range db.SetIdx[bucket].H[keyStr] {
+				db.SetIdx[bucket].M[keyStr][k] = v
+			}
+			delete(db.SetIdx[bucket].H, keyStr)
+			db.SetIdx[bucket].T[keyStr] = set.TsAndTtl{Timestamp: r.E.Meta.Timestamp, TTL: r.E.Meta.TTL}
 		}
 		return nil
 	}
 
-	isExpireFlag := r.H.Meta.Flag == DataSetExpireFlag
-	if r.H.Meta.Flag == DataSetFlag || isExpireFlag {
-		if err := db.SetIdx[bucket].SAdd(string(r.E.Key), r.E.Value); err != nil {
-			return fmt.Errorf("when build SetIdx SAdd index err: %s", err)
+	if r.H.Meta.Flag == DataDeleteFlag {
+		if _, ok := db.SetIdx[bucket].M[keyStr]; !ok {
+			return fmt.Errorf("when build SetIdx SRem index err: %s", ErrKeyNotFound)
 		}
-		if isExpireFlag {
-			db.SetIdx[bucket].T[string(r.E.Key)] = set.TsAndTtl{Timestamp: r.E.Meta.Timestamp, TTL: r.E.Meta.TTL}
+
+		if _, ok := db.SetIdx[bucket].H[keyStr]; ok {
+			delete(db.SetIdx[bucket].H[keyStr], string(r.E.Value))
+			return nil
 		}
+
+		delete(db.SetIdx[bucket].M[keyStr], string(r.E.Value))
+
+		return nil
+	}
+
+	if r.H.Meta.Flag == DataSetFlag {
+		if r.E.Meta.TTL == Persistent {
+			delete(db.SetIdx[bucket].H, keyStr)
+		}
+
+		if isExpired {
+			db.SetIdx[bucket].H[keyStr][string(r.E.Value)] = struct{}{}
+			return nil
+		}
+
+		if _, ok := db.SetIdx[bucket].M[keyStr]; !ok {
+			db.SetIdx[bucket].M[keyStr] = make(map[string]struct{})
+		}
+		db.SetIdx[bucket].M[keyStr][string(r.E.Value)] = struct{}{}
 	}
 	return nil
 }

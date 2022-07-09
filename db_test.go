@@ -19,7 +19,9 @@ import (
 	"io/ioutil"
 	"os"
 	"reflect"
+	"strconv"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -1003,6 +1005,169 @@ func TestOpen(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestDB_OpenForSet_Case1(t *testing.T) {
+	InitOpt("/tmp/nutsdbtestfordbopen", true)
+
+	db, err = Open(opt)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	setBucket := "mySetBucket"
+	key := []byte("mySetKey")
+	now := uint64(time.Now().Unix())
+	if err := db.Update(func(tx *Tx) error {
+		err := tx.put(setBucket, key, []byte("val1"), Persistent, DataSetFlag, now-15, DataStructureSet)
+		if err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := db.Update(func(tx *Tx) error {
+		err := tx.put(setBucket, key, []byte("val2"), Persistent, DataSetFlag, now-13, DataStructureSet)
+		if err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := db.Update(func(tx *Tx) error {
+		err := tx.put(setBucket, key, []byte(strconv.Itoa(2)), 10, DataSetExpireFlag, now-11, DataStructureSet)
+		if err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	db, err = Open(opt)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, len(db.SetIdx[setBucket].M[string(key)]), 0)
+	_, ok := db.SetIdx[setBucket].T[string(key)]
+	assert.False(t, ok)
+}
+
+func TestDB_OpenForSet_Case2(t *testing.T) {
+	InitOpt("/tmp/nutsdbtestfordbopen", true)
+
+	db, err = Open(opt)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	setBucket := "mySetBucket"
+	key := []byte("mySetKey")
+	now := uint64(time.Now().Unix())
+	if err := db.Update(func(tx *Tx) error {
+		err := tx.put(setBucket, key, []byte("val1"), Persistent, DataSetFlag, now-15, DataStructureSet)
+		if err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := db.Update(func(tx *Tx) error {
+		err := tx.put(setBucket, key, []byte("val2"), Persistent, DataSetFlag, now-13, DataStructureSet)
+		if err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := db.Update(func(tx *Tx) error {
+		err := tx.put(setBucket, key, []byte(strconv.Itoa(2)), 30, DataSetExpireFlag, now-11, DataStructureSet)
+		if err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	db, err = Open(opt)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, len(db.SetIdx[setBucket].M[string(key)]), 2)
+	_, ok := db.SetIdx[setBucket].T[string(key)]
+	assert.True(t, ok)
+}
+
+func TestDB_OpenForSet_Case3(t *testing.T) {
+	InitOpt("/tmp/nutsdbtestfordbopen", true)
+
+	db, err = Open(opt)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	setBucket := "mySetBucket"
+	key := []byte("mySetKey")
+	now := uint64(time.Now().Unix())
+	if err := db.Update(func(tx *Tx) error {
+		err := tx.put(setBucket, key, []byte("val1"), Persistent, DataSetFlag, now-15, DataStructureSet)
+		if err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := db.Update(func(tx *Tx) error {
+		err := tx.put(setBucket, key, []byte("val2"), Persistent, DataSetFlag, now-14, DataStructureSet)
+		if err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := db.Update(func(tx *Tx) error {
+		err := tx.put(setBucket, key, []byte(strconv.Itoa(2)), 10, DataSetExpireFlag, now-13, DataStructureSet)
+		if err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := db.Update(func(tx *Tx) error {
+		err := tx.put(setBucket, key, []byte(strconv.Itoa(2)), 30, DataSetExpireFlag, now-12, DataStructureSet)
+		if err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	db, err = Open(opt)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, len(db.SetIdx[setBucket].M[string(key)]), 2)
+	_, ok := db.SetIdx[setBucket].T[string(key)]
+	assert.True(t, ok)
 }
 
 func TestDB_Backup(t *testing.T) {

@@ -15,6 +15,7 @@
 package nutsdb
 
 import (
+	"strconv"
 	"time"
 
 	"github.com/pkg/errors"
@@ -30,6 +31,7 @@ func (tx *Tx) sPut(bucket string, key []byte, dataFlag uint16, items ...[]byte) 
 					return err
 				}
 			}
+			delete(set.T, string(key))
 		}
 	}
 
@@ -50,7 +52,14 @@ func (tx *Tx) sPut(bucket string, key []byte, dataFlag uint16, items ...[]byte) 
 		for _, item := range items {
 			if _, ok := filter[string(item)]; !ok {
 				filter[string(item)] = struct{}{}
-				err := tx.put(bucket, key, item, Persistent, dataFlag, uint64(time.Now().Unix()), DataStructureSet)
+				now := uint64(time.Now().Unix())
+				ttl := Persistent
+				if set, ok := tx.db.SetIdx[bucket]; ok {
+					if tsAndTtl, ok := set.T[string(key)]; ok {
+						ttl = uint32(tsAndTtl.Timestamp - now + uint64(tsAndTtl.TTL))
+					}
+				}
+				err := tx.put(bucket, key, item, ttl, dataFlag, now, DataStructureSet)
 				if err != nil {
 					return err
 				}
@@ -308,6 +317,28 @@ func (tx *Tx) SUnionByTwoBuckets(bucket1 string, key1 []byte, bucket2 string, ke
 	}
 
 	return
+}
+
+// ExpireSet set a timeout on a Set. After the timeout has expired, the Set will automatically be deleted.
+func (tx *Tx) ExpireSet(bucket string, key []byte, ttl uint32) error {
+	if s, ok := tx.db.SetIdx[bucket]; ok {
+		keyStr := string(key)
+		if _, ok := s.M[keyStr]; ok {
+			size := s.SCard(keyStr)
+			now := uint64(time.Now().Unix())
+			err := tx.put(bucket, key, []byte(strconv.Itoa(size)), ttl, DataSetExpireFlag, now, DataStructureSet)
+			if err != nil {
+				return err
+			}
+
+			if ttl == Persistent {
+				delete(s.T, keyStr)
+			} else {
+				s.T[string(key)] = set.TsAndTtl{Timestamp: now, TTL: ttl}
+			}
+		}
+	}
+	return nil
 }
 
 // ErrBucketAndKey returns when bucket or key not found.
