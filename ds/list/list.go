@@ -227,9 +227,6 @@ func (l *List) LRem(key string, count int, value []byte) (int, error) {
 	}
 
 	if count < 0 {
-		if count == math.MinInt64 {
-			return 0, ErrMinInt
-		}
 		count = -count
 		for i := size - 1; i >= 0; i-- {
 			v := tempVal[i]
