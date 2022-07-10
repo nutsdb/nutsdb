@@ -1007,6 +1007,27 @@ func TestOpen(t *testing.T) {
 	}
 }
 
+type SetMeta struct {
+	value     []byte
+	Timestamp uint64
+	TTL       uint32
+	Flag      uint16
+}
+
+func bulkPutSet(t *testing.T, bucket string, key []byte, data []SetMeta) {
+	for _, meta := range data {
+		if err := db.Update(func(tx *Tx) error {
+			err := tx.put(bucket, key, meta.value, meta.TTL, meta.Flag, meta.Timestamp, DataStructureSet)
+			if err != nil {
+				return err
+			}
+			return nil
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
 func TestDB_OpenForSet_Case1(t *testing.T) {
 	InitOpt("/tmp/nutsdbtestfordbopen", true)
 
@@ -1018,35 +1039,13 @@ func TestDB_OpenForSet_Case1(t *testing.T) {
 	setBucket := "mySetBucket"
 	key := []byte("mySetKey")
 	now := uint64(time.Now().Unix())
-	if err := db.Update(func(tx *Tx) error {
-		err := tx.put(setBucket, key, []byte("val1"), Persistent, DataSetFlag, now-15, DataStructureSet)
-		if err != nil {
-			return err
-		}
-		return nil
-	}); err != nil {
-		t.Fatal(err)
+	oneMinAgo := now - 60
+	data := []SetMeta{
+		{value: []byte("val1"), Timestamp: oneMinAgo, TTL: Persistent, Flag: DataSetFlag},
+		{value: []byte("val2"), Timestamp: oneMinAgo + 30, TTL: Persistent, Flag: DataSetFlag},
+		{value: []byte(strconv.Itoa(2)), Timestamp: oneMinAgo + 49, TTL: 10, Flag: DataSetExpireFlag}, // expired
 	}
-
-	if err := db.Update(func(tx *Tx) error {
-		err := tx.put(setBucket, key, []byte("val2"), Persistent, DataSetFlag, now-13, DataStructureSet)
-		if err != nil {
-			return err
-		}
-		return nil
-	}); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := db.Update(func(tx *Tx) error {
-		err := tx.put(setBucket, key, []byte(strconv.Itoa(2)), 10, DataSetExpireFlag, now-11, DataStructureSet)
-		if err != nil {
-			return err
-		}
-		return nil
-	}); err != nil {
-		t.Fatal(err)
-	}
+	bulkPutSet(t, setBucket, key, data)
 
 	db, err = Open(opt)
 	if err != nil {
@@ -1069,44 +1068,24 @@ func TestDB_OpenForSet_Case2(t *testing.T) {
 	setBucket := "mySetBucket"
 	key := []byte("mySetKey")
 	now := uint64(time.Now().Unix())
-	if err := db.Update(func(tx *Tx) error {
-		err := tx.put(setBucket, key, []byte("val1"), Persistent, DataSetFlag, now-15, DataStructureSet)
-		if err != nil {
-			return err
-		}
-		return nil
-	}); err != nil {
-		t.Fatal(err)
+	oneMinAgo := now - 60
+	data := []SetMeta{
+		{value: []byte("val1"), Timestamp: oneMinAgo, TTL: Persistent, Flag: DataSetFlag},
+		{value: []byte("val2"), Timestamp: oneMinAgo + 30, TTL: Persistent, Flag: DataSetFlag},
+		{value: []byte(strconv.Itoa(2)), Timestamp: oneMinAgo + 49, TTL: 20, Flag: DataSetExpireFlag}, // still fresh
 	}
-
-	if err := db.Update(func(tx *Tx) error {
-		err := tx.put(setBucket, key, []byte("val2"), Persistent, DataSetFlag, now-13, DataStructureSet)
-		if err != nil {
-			return err
-		}
-		return nil
-	}); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := db.Update(func(tx *Tx) error {
-		err := tx.put(setBucket, key, []byte(strconv.Itoa(2)), 30, DataSetExpireFlag, now-11, DataStructureSet)
-		if err != nil {
-			return err
-		}
-		return nil
-	}); err != nil {
-		t.Fatal(err)
-	}
+	bulkPutSet(t, setBucket, key, data)
 
 	db, err = Open(opt)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	assert.Equal(t, len(db.SetIdx[setBucket].M[string(key)]), 2)
-	_, ok := db.SetIdx[setBucket].T[string(key)]
+	assert.Equal(t, 2, len(db.SetIdx[setBucket].M[string(key)]))
+	tsAndTtl, ok := db.SetIdx[setBucket].T[string(key)]
 	assert.True(t, ok)
+	assert.Equal(t, uint32(20), tsAndTtl.TTL)
+	assert.Equal(t, oneMinAgo+49, tsAndTtl.Timestamp)
 }
 
 func TestDB_OpenForSet_Case3(t *testing.T) {
@@ -1120,45 +1099,14 @@ func TestDB_OpenForSet_Case3(t *testing.T) {
 	setBucket := "mySetBucket"
 	key := []byte("mySetKey")
 	now := uint64(time.Now().Unix())
-	if err := db.Update(func(tx *Tx) error {
-		err := tx.put(setBucket, key, []byte("val1"), Persistent, DataSetFlag, now-15, DataStructureSet)
-		if err != nil {
-			return err
-		}
-		return nil
-	}); err != nil {
-		t.Fatal(err)
+	oneMinAgo := now - 60
+	data := []SetMeta{
+		{value: []byte("val1"), Timestamp: oneMinAgo, TTL: Persistent, Flag: DataSetFlag},
+		{value: []byte("val2"), Timestamp: oneMinAgo + 30, TTL: Persistent, Flag: DataSetFlag},
+		{value: []byte(strconv.Itoa(2)), Timestamp: oneMinAgo + 40, TTL: 10, Flag: DataSetExpireFlag}, // expired
+		{value: []byte(strconv.Itoa(2)), Timestamp: oneMinAgo + 50, TTL: 20, Flag: DataSetExpireFlag}, // reset to fresh
 	}
-
-	if err := db.Update(func(tx *Tx) error {
-		err := tx.put(setBucket, key, []byte("val2"), Persistent, DataSetFlag, now-14, DataStructureSet)
-		if err != nil {
-			return err
-		}
-		return nil
-	}); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := db.Update(func(tx *Tx) error {
-		err := tx.put(setBucket, key, []byte(strconv.Itoa(2)), 10, DataSetExpireFlag, now-13, DataStructureSet)
-		if err != nil {
-			return err
-		}
-		return nil
-	}); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := db.Update(func(tx *Tx) error {
-		err := tx.put(setBucket, key, []byte(strconv.Itoa(2)), 30, DataSetExpireFlag, now-12, DataStructureSet)
-		if err != nil {
-			return err
-		}
-		return nil
-	}); err != nil {
-		t.Fatal(err)
-	}
+	bulkPutSet(t, setBucket, key, data)
 
 	db, err = Open(opt)
 	if err != nil {
@@ -1166,8 +1114,115 @@ func TestDB_OpenForSet_Case3(t *testing.T) {
 	}
 
 	assert.Equal(t, len(db.SetIdx[setBucket].M[string(key)]), 2)
-	_, ok := db.SetIdx[setBucket].T[string(key)]
+	tsAndTtl, ok := db.SetIdx[setBucket].T[string(key)]
 	assert.True(t, ok)
+	assert.Equal(t, uint32(20), tsAndTtl.TTL)
+	assert.Equal(t, oneMinAgo+50, tsAndTtl.Timestamp)
+}
+
+func TestDB_OpenForSet_Case4(t *testing.T) {
+	InitOpt("/tmp/nutsdbtestfordbopen", true)
+
+	db, err = Open(opt)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	setBucket := "mySetBucket"
+	key := []byte("mySetKey")
+	now := uint64(time.Now().Unix())
+	oneMinAgo := now - 60
+	data := []SetMeta{
+		{value: []byte("val1"), Timestamp: oneMinAgo, TTL: Persistent, Flag: DataSetFlag},
+		{value: []byte("val2"), Timestamp: oneMinAgo + 30, TTL: Persistent, Flag: DataSetFlag},
+		{value: []byte(strconv.Itoa(2)), Timestamp: oneMinAgo + 40, TTL: 10, Flag: DataSetExpireFlag}, // expired
+		{value: []byte("val3"), Timestamp: oneMinAgo + 43, TTL: 7, Flag: DataSetFlag},
+	}
+	bulkPutSet(t, setBucket, key, data)
+
+	db, err = Open(opt)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, len(db.SetIdx[setBucket].M[string(key)]), 0)
+	_, ok := db.SetIdx[setBucket].T[string(key)]
+	assert.False(t, ok)
+}
+
+func TestDB_OpenForSet_Case5(t *testing.T) {
+	InitOpt("/tmp/nutsdbtestfordbopen", true)
+
+	db, err = Open(opt)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	setBucket := "mySetBucket"
+	key := []byte("mySetKey")
+	now := uint64(time.Now().Unix())
+	oneMinAgo := now - 60
+	data := []SetMeta{
+		{value: []byte("val1"), Timestamp: oneMinAgo, TTL: Persistent, Flag: DataSetFlag},
+		{value: []byte("val2"), Timestamp: oneMinAgo + 30, TTL: Persistent, Flag: DataSetFlag},
+		{value: []byte(strconv.Itoa(2)), Timestamp: oneMinAgo + 40, TTL: 10, Flag: DataSetExpireFlag}, // expired
+		{value: []byte("val3"), Timestamp: oneMinAgo + 43, TTL: 7, Flag: DataSetFlag},
+		{value: []byte(strconv.Itoa(3)), Timestamp: oneMinAgo + 59, TTL: Persistent, Flag: DataSetExpireFlag}, // reset to fresh
+	}
+	bulkPutSet(t, setBucket, key, data)
+
+	db, err = Open(opt)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, len(db.SetIdx[setBucket].M[string(key)]), 3)
+	_, ok := db.SetIdx[setBucket].T[string(key)]
+	assert.False(t, ok)
+}
+
+func TestDB_OpenForSet_Complex_Case(t *testing.T) {
+	InitOpt("/tmp/nutsdbtestfordbopen", true)
+
+	db, err = Open(opt)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	setBucket := "mySetBucket"
+	key := []byte("mySetKey")
+	now := uint64(time.Now().Unix())
+	tenMinAgo := now - 10*60
+	data := []SetMeta{
+		{value: []byte("val1"), Timestamp: tenMinAgo, TTL: Persistent, Flag: DataSetFlag},
+		{value: []byte("val2"), Timestamp: tenMinAgo + 1, TTL: Persistent, Flag: DataSetFlag},
+		{value: []byte(strconv.Itoa(2)), Timestamp: tenMinAgo + 2, TTL: 58, Flag: DataSetExpireFlag}, // expired, the set was deleted
+
+		{value: []byte("val3"), Timestamp: tenMinAgo + 60, TTL: Persistent, Flag: DataSetFlag}, // create a new set
+		{value: []byte("val4"), Timestamp: tenMinAgo + 61, TTL: Persistent, Flag: DataSetFlag},
+		{value: []byte(strconv.Itoa(2)), Timestamp: tenMinAgo + 120, TTL: 60, Flag: DataSetExpireFlag}, // set to expired
+		{value: []byte("val5"), Timestamp: tenMinAgo + 121, TTL: 59, Flag: DataSetFlag},
+		{value: []byte("val6"), Timestamp: tenMinAgo + 122, TTL: 58, Flag: DataSetFlag},
+		{value: []byte("val3"), Timestamp: tenMinAgo + 170, TTL: Persistent, Flag: DataDeleteFlag},             // delete a record
+		{value: []byte(strconv.Itoa(3)), Timestamp: tenMinAgo + 179, TTL: Persistent, Flag: DataSetExpireFlag}, // reset to persistent
+		{value: []byte("val7"), Timestamp: tenMinAgo + 200, TTL: Persistent, Flag: DataSetFlag},
+		{value: []byte("val8"), Timestamp: tenMinAgo + 300, TTL: Persistent, Flag: DataSetFlag},
+		{value: []byte("val6"), Timestamp: tenMinAgo + 301, TTL: Persistent, Flag: DataDeleteFlag},      // delete a record
+		{value: []byte(strconv.Itoa(4)), Timestamp: tenMinAgo + 360, TTL: 600, Flag: DataSetExpireFlag}, // still fresh
+		{value: []byte("val9"), Timestamp: tenMinAgo + 370, TTL: 590, Flag: DataSetFlag},
+	}
+	bulkPutSet(t, setBucket, key, data)
+
+	db, err = Open(opt)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, len(db.SetIdx[setBucket].M[string(key)]), 5)
+	tsAndTtl, ok := db.SetIdx[setBucket].T[string(key)]
+	assert.True(t, ok)
+	assert.Equal(t, uint32(600), tsAndTtl.TTL)
+	assert.Equal(t, tenMinAgo+360, tsAndTtl.Timestamp)
 }
 
 func TestDB_Backup(t *testing.T) {

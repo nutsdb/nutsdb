@@ -825,6 +825,10 @@ func (db *DB) buildSetIdx(bucket string, r *Record) error {
 		// if encounter a record with `DataSetExpireFlag` who's TTL is persistent,
 		// which means the set was reassigned a persistent lifetime. So restore all values from staging area.
 		if r.E.Meta.TTL == Persistent {
+			if _, ok := db.SetIdx[bucket].M[keyStr]; !ok {
+				db.SetIdx[bucket].M[keyStr] = make(map[string]struct{})
+			}
+
 			for k, v := range db.SetIdx[bucket].H[keyStr] {
 				db.SetIdx[bucket].M[keyStr][k] = v
 			}
@@ -861,8 +865,9 @@ func (db *DB) buildSetIdx(bucket string, r *Record) error {
 	}
 
 	if r.H.Meta.Flag == DataDeleteFlag {
-		if _, ok := db.SetIdx[bucket].M[keyStr]; !ok {
-			return fmt.Errorf("when build SetIdx SRem index err: %s", ErrKeyNotFound)
+		if _, ok := db.SetIdx[bucket].M[keyStr]; ok {
+			delete(db.SetIdx[bucket].M[keyStr], string(r.E.Value))
+			return nil
 		}
 
 		if _, ok := db.SetIdx[bucket].H[keyStr]; ok {
@@ -870,9 +875,7 @@ func (db *DB) buildSetIdx(bucket string, r *Record) error {
 			return nil
 		}
 
-		delete(db.SetIdx[bucket].M[keyStr], string(r.E.Value))
-
-		return nil
+		return fmt.Errorf("when build SetIdx SRem index err: %s", ErrKeyNotFound)
 	}
 
 	if r.H.Meta.Flag == DataSetFlag {
