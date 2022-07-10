@@ -839,7 +839,7 @@ func (db *DB) buildSetIdx(bucket string, r *Record) error {
 
 		if isExpired {
 			// if encounter a expired record with `DataSetExpireFlag`, which means all records before *MAYBE* expired.
-			// So move all of them to staging area for futher processing.
+			// So move all of them to staging area for further processing.
 			if _, ok := db.SetIdx[bucket].H[keyStr]; !ok {
 				db.SetIdx[bucket].H[keyStr] = make(map[string]struct{})
 			}
