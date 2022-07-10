@@ -373,6 +373,7 @@ func TestList_LRem7(t *testing.T) {
 
 	num, err = list.LRem(key, math.MinInt64, []byte("b"))
 	assertions.Error(err, "TestList_LRem err")
+	assertions.Equal(0, num, "TestList_LRem err")
 }
 
 func TestList_LRemByIndex(t *testing.T) {
