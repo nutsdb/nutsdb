@@ -46,13 +46,16 @@ func TestList_RPush(t *testing.T) {
 
 func TestList_RPeek(t *testing.T) {
 	list, key := InitListData()
-	for i := 0; i < 4; {
-		_, _ = list.RPop(key)
-		i++
+	assertions := assert.New(t)
+	expectResult := []string{"d", "c", "b", "a"}
+	for _, item := range expectResult {
+		rpk, _, _ := list.RPeek(key)
+		assertions.Equal(item, string(rpk))
+		rpp, _ := list.RPop(key)
+		assertions.Equal(item, string(rpp))
 	}
-	if _, _, err := list.RPeek(key); err == nil {
-		t.Error("should return error for a empty key")
-	}
+	_, _, err := list.RPeek(key)
+	assertions.EqualError(err, ErrListNotFound.Error())
 }
 
 func TestList_LPush(t *testing.T) {
@@ -372,8 +375,8 @@ func TestList_LRem7(t *testing.T) {
 	assertions.Equal(3, size, "TestList_LRem err")
 
 	num, err = list.LRem(key, math.MinInt64, []byte("b"))
-	assertions.Error(err, "TestList_LRem err")
-	assertions.Equal(0, num, "TestList_LRem err")
+	assertions.EqualError(err, ErrMinInt.Error())
+	assertions.Equal(0, num)
 }
 
 func TestList_LRemByIndex(t *testing.T) {
