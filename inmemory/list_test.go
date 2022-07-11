@@ -18,7 +18,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-
 	"github.com/xujiajun/nutsdb"
 	"github.com/xujiajun/nutsdb/ds/list"
 )
