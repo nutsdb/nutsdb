@@ -17,6 +17,7 @@ package nutsdb
 import (
 	"bytes"
 	"errors"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -244,6 +245,26 @@ func (tx *Tx) ZGetByKey(bucket string, key []byte) (*zset.SortedSetNode, error) 
 	}
 
 	return nil, ErrNotFoundKey
+}
+
+// ZKeys find all keys matching a given pattern
+func (tx *Tx) ZKeys(bucket, pattern string, f func(key string) bool) error {
+	if err := tx.checkTxIsClosed(); err != nil {
+		return err
+	}
+	if _, ok := tx.db.SortedSetIdx[bucket]; !ok {
+		return ErrBucket
+	}
+	for key := range tx.db.SortedSetIdx[bucket].Dict {
+		match, err := filepath.Match(pattern, key)
+		if err != nil {
+			return err
+		}
+		if match && !f(key) {
+			return nil
+		}
+	}
+	return nil
 }
 
 // ErrSeparatorForZSetKey returns when zSet key contains the SeparatorForZSetKey flag.

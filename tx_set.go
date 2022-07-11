@@ -15,6 +15,7 @@
 package nutsdb
 
 import (
+	"path/filepath"
 	"time"
 
 	"github.com/pkg/errors"
@@ -298,6 +299,26 @@ func (tx *Tx) SUnionByTwoBuckets(bucket1 string, key1 []byte, bucket2 string, ke
 	}
 
 	return
+}
+
+// SKeys find all keys matching a given pattern
+func (tx *Tx) SKeys(bucket, pattern string, f func(key string) bool) error {
+	if err := tx.checkTxIsClosed(); err != nil {
+		return err
+	}
+	if _, ok := tx.db.SetIdx[bucket]; !ok {
+		return ErrBucket
+	}
+	for key := range tx.db.SetIdx[bucket].M {
+		match, err := filepath.Match(pattern, key)
+		if err != nil {
+			return err
+		}
+		if match && !f(key) {
+			return nil
+		}
+	}
+	return nil
 }
 
 // ErrBucketAndKey returns when bucket or key not found.
