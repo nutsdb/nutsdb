@@ -139,9 +139,10 @@ import (
 )
 
 func main() {
-    opt := nutsdb.DefaultOptions
-    opt.Dir = "/tmp/nutsdb" //这边数据库会自动创建这个目录文件
-    db, err := nutsdb.Open(opt)
+    db, err := nutsdb.Open(
+        nutsdb.DefaultOptions,
+        nutsdb.WithDir("/tmp/nutsdb"), // 数据库会自动创建这个目录文件
+    )
     if err != nil {
         log.Fatal(err)
     }

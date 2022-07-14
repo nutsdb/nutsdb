@@ -185,8 +185,8 @@ type (
 	BucketMetasIdx map[string]*BucketMeta
 )
 
-// Open returns a newly initialized DB object.
-func Open(opt Options) (*DB, error) {
+// open returns a newly initialized DB object.
+func open(opt Options) (*DB, error) {
 	db := &DB{
 		BPTreeIdx:               make(BPTreeIdx),
 		SetIdx:                  make(SetIdx),
@@ -242,6 +242,15 @@ func Open(opt Options) (*DB, error) {
 	}
 
 	return db, nil
+}
+
+// Open returns a newly initialized DB object with Option.
+func Open(options Options, ops ...Option) (*DB, error) {
+	opts := &options
+	for _, do := range ops {
+		do(opts)
+	}
+	return open(*opts)
 }
 
 func (db *DB) checkEntryIdxMode() error {

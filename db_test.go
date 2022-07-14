@@ -135,11 +135,11 @@ func TestDB_Merge_For_string(t *testing.T) {
 		}
 	}
 
-	opt := DefaultOptions
-	opt.Dir = fileDir
-	opt.SegmentSize = 1 * 100
-
-	db2, err := Open(opt)
+	db2, err := Open(
+		DefaultOptions,
+		WithDir(fileDir),
+		WithSegmentSize(1*100),
+	)
 
 	require.NoError(t, err)
 
@@ -185,8 +185,10 @@ func TestDB_Merge_For_string(t *testing.T) {
 
 func Test_MergeRepeated(t *testing.T) {
 	InitOpt("", true)
-	opt.SegmentSize = 120
-	db, err = Open(opt)
+	db, err = Open(
+		opt,
+		WithSegmentSize(120),
+	)
 	if err != nil {
 		t.Errorf("wanted nil, got %v", err)
 	}
@@ -1044,9 +1046,10 @@ func TestDB_Close(t *testing.T) {
 
 func Test_getRecordFromKey(t *testing.T) {
 	InitOpt("", true)
-	opt.SegmentSize = 120
-	opt.EntryIdxMode = HintKeyAndRAMIdxMode
-	db, err = Open(opt)
+	db, err = Open(opt,
+		WithSegmentSize(120),
+		WithEntryIdxMode(HintKeyAndRAMIdxMode),
+	)
 	if err != nil {
 		t.Errorf("wanted nil, got %v", err)
 	}

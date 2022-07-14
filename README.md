@@ -131,9 +131,10 @@ import (
 func main() {
     // Open the database located in the /tmp/nutsdb directory.
     // It will be created if it doesn't exist.
-    opt := nutsdb.DefaultOptions
-    opt.Dir = "/tmp/nutsdb"
-    db, err := nutsdb.Open(opt)
+    db, err := nutsdb.Open(
+        nutsdb.DefaultOptions,
+        nutsdb.WithDir("/tmp/nutsdb"),
+    )
     if err != nil {
         log.Fatal(err)
     }
