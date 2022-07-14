@@ -16,7 +16,6 @@ var (
 )
 
 func init() {
-	opt := nutsdb.DefaultOptions
 	fileDir := "/tmp/nutsdb_example"
 
 	files, _ := ioutil.ReadDir(fileDir)
@@ -29,9 +28,11 @@ func init() {
 			}
 		}
 	}
-	opt.Dir = fileDir
-	opt.SegmentSize = 1024 * 1024 // 1MB
-	db, err = nutsdb.Open(opt)
+	db, _ = nutsdb.Open(
+		nutsdb.DefaultOptions,
+		nutsdb.WithDir(fileDir),
+		nutsdb.WithSegmentSize(1024*1024), // 1MB
+	)
 	if err != nil {
 		panic(err)
 	}

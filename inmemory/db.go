@@ -15,6 +15,8 @@
 package inmemory
 
 type (
+	Option func(*Options)
+
 	Options struct {
 		// ShardsCount represents Number of cache shards.
 		ShardsCount uint64
@@ -34,8 +36,13 @@ var DefaultOptions = Options{
 	ShardsCount: 256,
 }
 
-// Open returns a newly initialized in memory DB object.
-func Open(opts Options) (*DB, error) {
+func WithShardsCount(shardsCount uint64) Option {
+	return func(opt *Options) {
+		opt.ShardsCount = shardsCount
+	}
+}
+
+func open(opts Options) (*DB, error) {
 	db := &DB{
 		opts:   opts,
 		Hasher: newDefaultHasher(),
@@ -47,6 +54,15 @@ func Open(opts Options) (*DB, error) {
 	}
 
 	return db, nil
+}
+
+// Open returns a newly initialized in memory DB object.
+func Open(options Options, ops ...Option) (*DB, error) {
+	opts := &options
+	for _, do := range ops {
+		do(opts)
+	}
+	return open(*opts)
 }
 
 // GetShard Get sharded db according to bucket as hashedKey

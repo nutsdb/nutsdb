@@ -114,12 +114,11 @@ func BenchmarkDB_TestMap_Put_RunParallel(b *testing.B) {
 }
 
 func BenchmarkShardDB_Get(b *testing.B) {
-	opts := DefaultOptions
 	bucket := "bucket1"
 	key := []byte("key1")
 	value := bytes.Repeat([]byte("a"), 1024)
 
-	testDB, _ = Open(opts)
+	testDB, _ = Open(DefaultOptions)
 	err := testDB.Put(bucket, key, value, 0)
 	if err != nil {
 		log.Fatal(err)
@@ -142,8 +141,7 @@ func BenchmarkShardDB_GET_RunParallel(b *testing.B) {
 	key := []byte("key1")
 	value := bytes.Repeat([]byte("a"), 1024)
 
-	opts := DefaultOptions
-	testDB, _ = Open(opts)
+	testDB, _ = Open(DefaultOptions)
 	err := testDB.Put(bucket, key, value, 0)
 	if err != nil {
 		log.Fatal(err)
@@ -165,8 +163,7 @@ func BenchmarkShardDB_GET_RunParallel(b *testing.B) {
 
 func BenchmarkDB_Put(b *testing.B) {
 	values := bytes.Repeat([]byte("a"), 1024)
-	opts := DefaultOptions
-	testDB, _ = Open(opts)
+	testDB, _ = Open(DefaultOptions)
 
 	bucket := "bucket1"
 	b.ReportAllocs()
@@ -181,9 +178,10 @@ func BenchmarkDB_Put(b *testing.B) {
 }
 
 func BenchmarkShardDB_Put_OneBucket_RunParallel(b *testing.B) {
-	opts := DefaultOptions
-	opts.ShardsCount = 1024
-	testDB, _ = Open(opts)
+	testDB, _ = Open(
+		DefaultOptions,
+		WithShardsCount(1024),
+	)
 
 	bucket := "bucket1"
 
@@ -205,9 +203,10 @@ func BenchmarkShardDB_Put_OneBucket_RunParallel(b *testing.B) {
 }
 
 func BenchmarkShardDB_Put_MultiBuckets_RunParallel(b *testing.B) {
-	opts := DefaultOptions
-	opts.ShardsCount = 1024
-	testDB, _ = Open(opts)
+	testDB, _ = Open(
+		DefaultOptions,
+		WithShardsCount(1024),
+	)
 
 	rand.Seed(time.Now().UnixNano())
 

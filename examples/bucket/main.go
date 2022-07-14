@@ -12,11 +12,12 @@ var (
 )
 
 func init() {
-	opt := nutsdb.DefaultOptions
-	// opt.RWMode = nutsdb.MMap
-	// opt.SyncEnable = false
-	opt.Dir = "/tmp/nutsdbexample/example_bucket"
-	db, _ = nutsdb.Open(opt)
+	db, _ = nutsdb.Open(
+		nutsdb.DefaultOptions,
+		nutsdb.WithDir("/tmp/nutsdbexample/example_bucket"),
+	// nutsdb.WithRWMode(nutsdb.MMap),
+	// nutsdb.WithSyncEnable(false),
+	)
 }
 
 func main() {

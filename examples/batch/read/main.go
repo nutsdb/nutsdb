@@ -16,12 +16,13 @@ var (
 
 func init() {
 	time2.Start()
-	opt := nutsdb.DefaultOptions
-	opt.StartFileLoadingMode = nutsdb.MMap
-	// opt.RWMode = nutsdb.MMap
-	// opt.SyncEnable = false
-	opt.Dir = "/tmp/nutsdbexample/example_batch"
-	db, _ = nutsdb.Open(opt)
+	db, _ = nutsdb.Open(
+		nutsdb.DefaultOptions,
+		nutsdb.WithDir("/tmp/nutsdbexample/example_batch"),
+		nutsdb.WithStartFileLoadingMode(nutsdb.MMap),
+		// nutsdb.WithRWMode(nutsdb.MMap),
+		// nutsdb.WithSyncEnable(false),
+	)
 	bucket = "bucket1"
 	fmt.Println("load cost:", time2.End())
 }
