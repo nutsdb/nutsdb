@@ -17,11 +17,17 @@ package inmemory
 import (
 	"bytes"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/xujiajun/nutsdb"
+	"github.com/xujiajun/nutsdb/ds/set"
 )
 
 var (
-	bucket = "bucket1"
-	key    = "key1"
+	bucket   = "bucket1"
+	key      = "key1"
+	neBucket = "nonExistedBucket"
+	neKey    = "nonExistedKey"
 )
 
 func initSAddItems(t *testing.T) {
@@ -59,6 +65,29 @@ func TestDB_SAdd(t *testing.T) {
 	if num != 4 {
 		t.Errorf("expect %d, but get %d", 2, num)
 	}
+}
+
+func TestDB_SRem(t *testing.T) {
+	initSAddItems(t)
+	tests := []struct {
+		bucket  string
+		key     string
+		item    []byte
+		wantErr error
+	}{
+		{neBucket, neKey, nil, nutsdb.ErrBucket},
+		{bucket, neKey, nil, set.ErrKeyNotFound},
+		{bucket, key, nil, set.ErrItemEmpty},
+		{bucket, key, []byte("fdsfsd"), nil},
+	}
+	assertions := assert.New(t)
+	for _, tt := range tests {
+		err := testDB.SRem(tt.bucket, tt.key, tt.item)
+		assertions.Equal(err, tt.wantErr)
+	}
+	// one more test for empty items
+	err := testDB.SRem(bucket, key)
+	assertions.Equal(err, set.ErrItemEmpty)
 }
 
 func TestDB_SHasKey(t *testing.T) {
