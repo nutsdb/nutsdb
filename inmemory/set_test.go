@@ -17,11 +17,17 @@ package inmemory
 import (
 	"bytes"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/xujiajun/nutsdb"
+	"github.com/xujiajun/nutsdb/ds/set"
 )
 
 var (
-	bucket = "bucket1"
-	key    = "key1"
+	bucket   = "bucket1"
+	key      = "key1"
+	neBucket = "nonExistedBucket"
+	neKey    = "nonExistedKey"
 )
 
 func initSAddItems(t *testing.T) {
@@ -59,6 +65,29 @@ func TestDB_SAdd(t *testing.T) {
 	if num != 4 {
 		t.Errorf("expect %d, but get %d", 2, num)
 	}
+}
+
+func TestDB_SRem(t *testing.T) {
+	initSAddItems(t)
+	tests := []struct {
+		bucket  string
+		key     string
+		item    []byte
+		wantErr error
+	}{
+		{neBucket, neKey, nil, nutsdb.ErrBucket},
+		{bucket, neKey, nil, set.ErrKeyNotFound},
+		{bucket, key, nil, set.ErrItemEmpty},
+		{bucket, key, []byte("fdsfsd"), nil},
+	}
+	assertions := assert.New(t)
+	for _, tt := range tests {
+		err := testDB.SRem(tt.bucket, tt.key, tt.item)
+		assertions.Equal(err, tt.wantErr)
+	}
+	// one more test for empty items
+	err := testDB.SRem(bucket, key)
+	assertions.Equal(err, set.ErrItemEmpty)
 }
 
 func TestDB_SHasKey(t *testing.T) {
@@ -325,4 +354,60 @@ func TestDB_SPop(t *testing.T) {
 	if len(list) != 0 {
 		t.Errorf("expect %d, but get %d", 0, len(list))
 	}
+}
+
+func TestForErrBucket(t *testing.T) {
+	initTestDB()
+	assertions := assert.New(t)
+	var err error
+	//err = testDB.SAdd(neBucket, neKey, nil)
+	//assertions.Equal(err, nutsdb.ErrBucket)
+
+	//err = testDB.SRem(neBucket, neKey, nil)
+	//assertions.Equal(err, nutsdb.ErrBucket)
+
+	_, err = testDB.SAreMembers(neBucket, neKey, nil)
+	assertions.Equal(err, nutsdb.ErrBucket)
+
+	_, err = testDB.SMembers(neBucket, neKey)
+	assertions.Equal(nutsdb.ErrBucket, err)
+
+	_, err = testDB.SHasKey(neBucket, neKey)
+	assertions.Equal(nutsdb.ErrBucket, err)
+
+	_, err = testDB.SPop(neBucket, neKey)
+	assertions.Equal(nutsdb.ErrBucket, err)
+
+	_, err = testDB.SCard(neBucket, neKey)
+	assertions.Equal(nutsdb.ErrBucket, err)
+
+	_, err = testDB.SDiffByOneBucket(neBucket, neKey, neKey)
+	assertions.Equal(nutsdb.ErrBucket, err)
+
+	_, err = testDB.SDiffByTwoBuckets(neBucket, neKey, neBucket, neKey)
+	assertions.Equal(nutsdb.ErrBucket, err)
+
+	//_,err = testDB.SPop(neBucket, neKey)
+	//assertions.Equal(err,nutsdb.ErrBucket)
+	//
+	//
+	//_,err = testDB.SPop(neBucket, neKey)
+	//assertions.Equal(err,nutsdb.ErrBucket)
+	//
+	//
+	//_,err = testDB.SPop(neBucket, neKey)
+	//assertions.Equal(err,nutsdb.ErrBucket)
+
+	_, err = testDB.SMoveByOneBucket(neBucket, neKey, neKey, nil)
+	assertions.Equal(nutsdb.ErrBucket, err)
+
+	_, err = testDB.SMoveByTwoBuckets(neBucket, neKey, neBucket, neKey, nil)
+	assertions.Equal(nutsdb.ErrBucket, err)
+
+	_, err = testDB.SUnionByOneBucket(neBucket, neKey, neKey)
+	assertions.Equal(nutsdb.ErrBucket, err)
+
+	_, _, err = testDB.getTwoSetsByBuckets(neBucket, neBucket)
+	assertions.Equal(nutsdb.ErrBucket, err)
+
 }
