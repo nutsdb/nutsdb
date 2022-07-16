@@ -24,10 +24,11 @@ import (
 )
 
 var (
-	bucket   = "bucket1"
-	key      = "key1"
-	neBucket = "nonExistedBucket"
-	neKey    = "nonExistedKey"
+	assertions *assert.Assertions
+	bucket     = "bucket1"
+	key        = "key1"
+	neBucket   = "nonExistedBucket"
+	neKey      = "nonExistedKey"
 )
 
 func initSAddItems(t *testing.T) {
@@ -90,30 +91,11 @@ func TestDB_SRem(t *testing.T) {
 	assertions.Equal(err, set.ErrItemEmpty)
 }
 
-func TestDB_SHasKey(t *testing.T) {
-	initSAddItems(t)
-	isOk, err := testDB.SHasKey(bucket, key)
-	if err != nil {
-		t.Error(err)
-	}
-	if !isOk {
-		t.Errorf("err SHasKey bucket %s, key %s", bucket, key)
-	}
-}
-func TestDB_SIsMember(t *testing.T) {
-	initSAddItems(t)
-	val1 := []byte("val1_1_1")
-	isMember, err := testDB.SIsMember(bucket, key, val1)
-	if err != nil {
-		t.Error(err)
-	}
-	if !isMember {
-		t.Error("err SIsMember")
-	}
-}
-
 func TestDB_SAreMembers(t *testing.T) {
 	initSAddItems(t)
+	assertions = assert.New(t)
+	_, err := testDB.SAreMembers(neBucket, neKey, nil)
+	assertions.Equal(nutsdb.ErrBucket, err)
 	val1 := []byte("val1_1_1")
 	val2 := []byte("val1_1_2")
 	areMembers, err := testDB.SAreMembers(bucket, key, val1, val2)
@@ -125,8 +107,26 @@ func TestDB_SAreMembers(t *testing.T) {
 	}
 }
 
+func TestDB_SIsMember(t *testing.T) {
+	initSAddItems(t)
+	assertions = assert.New(t)
+	_, err := testDB.SIsMember(neBucket, neKey, nil)
+	assertions.Equal(nutsdb.ErrBucket, err)
+	val1 := []byte("val1_1_1")
+	isMember, err := testDB.SIsMember(bucket, key, val1)
+	if err != nil {
+		t.Error(err)
+	}
+	if !isMember {
+		t.Error("err SIsMember")
+	}
+}
+
 func TestDB_SMembers(t *testing.T) {
 	initSAddItems(t)
+	assertions = assert.New(t)
+	_, err := testDB.SMembers(neBucket, neKey)
+	assertions.Equal(nutsdb.ErrBucket, err)
 	list, err := testDB.SMembers(bucket, key)
 	if err != nil {
 		t.Error(err)
@@ -142,12 +142,64 @@ func TestDB_SMembers(t *testing.T) {
 	}
 }
 
+func TestDB_SHasKey(t *testing.T) {
+	initSAddItems(t)
+	assertions = assert.New(t)
+	_, err := testDB.SHasKey(neBucket, neKey)
+	assertions.Equal(nutsdb.ErrBucket, err)
+	isOk, err := testDB.SHasKey(bucket, key)
+	if err != nil {
+		t.Error(err)
+	}
+	if !isOk {
+		t.Errorf("err SHasKey bucket %s, key %s", bucket, key)
+	}
+}
+
+func TestDB_SPop(t *testing.T) {
+	initTestDB()
+	assertions = assert.New(t)
+	_, err := testDB.SPop(neBucket, neKey)
+	assertions.Equal(nutsdb.ErrBucket, err)
+	key1 := "key1"
+	val1 := []byte("val1_1_1")
+	bucket1 := "bucket1"
+
+	err = testDB.SAdd(bucket1, key1, val1)
+	if err != nil {
+		t.Error(err)
+	}
+
+	_, err = testDB.SPop(bucket1, key1)
+	if err != nil {
+		t.Error(err)
+	}
+
+	list, err := testDB.SMembers(bucket1, key1)
+	if err != nil {
+		t.Error(err)
+	}
+	if len(list) != 0 {
+		t.Errorf("expect %d, but get %d", 0, len(list))
+	}
+}
+
+func TestDB_SCard(t *testing.T) {
+	initTestDB()
+	assertions = assert.New(t)
+	_, err := testDB.SCard(neBucket, neKey)
+	assertions.Equal(nutsdb.ErrBucket, err)
+}
+
 func TestDB_SDiffByOneBucket(t *testing.T) {
 	initTestDB()
+	assertions = assert.New(t)
+	_, err := testDB.SDiffByOneBucket(neBucket, neKey, neKey)
+	assertions.Equal(nutsdb.ErrBucket, err)
 	commonVal := []byte("val")
 	key1 := "key1"
 	key2 := "key2"
-	err := testDB.SAdd(bucket, key1, []byte("val1_1_1"), []byte("val1_1_2"), commonVal)
+	err = testDB.SAdd(bucket, key1, []byte("val1_1_1"), []byte("val1_1_2"), commonVal)
 	if err != nil {
 		t.Error(err)
 	}
@@ -179,6 +231,13 @@ func TestDB_SDiffByTwoBuckets(t *testing.T) {
 
 	val := []byte("val2_2_1")
 	bucket2 := "bucket2"
+
+	assertions = assert.New(t)
+	_, err = testDB.SDiffByTwoBuckets(neBucket, neKey, neBucket, neKey)
+	assertions.Equal(nutsdb.ErrBucket, err)
+	_, err = testDB.SDiffByTwoBuckets(bucket, key, neBucket, neKey)
+	assertions.Equal(nutsdb.ErrBucket, err)
+
 	err = testDB.SAdd(bucket2, key, val, commonVal)
 	if err != nil {
 		t.Error(err)
@@ -197,10 +256,13 @@ func TestDB_SDiffByTwoBuckets(t *testing.T) {
 
 func TestDB_SMoveByOneBucket(t *testing.T) {
 	initTestDB()
+	assertions = assert.New(t)
+	_, err := testDB.SMoveByOneBucket(neBucket, neKey, neKey, nil)
+	assertions.Equal(nutsdb.ErrBucket, err)
 	key1 := "key1"
 	key2 := "key2"
 	val1 := []byte("val1_1_1")
-	err := testDB.SAdd(bucket, key1, val1, []byte("val1_1_2"))
+	err = testDB.SAdd(bucket, key1, val1, []byte("val1_1_2"))
 	if err != nil {
 		t.Error(err)
 	}
@@ -254,6 +316,16 @@ func TestDB_SMoveByTwoBuckets(t *testing.T) {
 		t.Error(err)
 	}
 
+	assertions = assert.New(t)
+	_, err = testDB.SMoveByTwoBuckets(neBucket, neKey, bucket2, neKey, nil)
+	assertions.Equal(nutsdb.ErrBucket, err)
+	_, err = testDB.SMoveByTwoBuckets(bucket1, neKey, neBucket, neKey, nil)
+	assertions.Equal(nutsdb.ErrBucket, err)
+	_, err = testDB.SMoveByTwoBuckets(bucket1, key1, bucket2, neKey, nil)
+	assertions.Error(err)
+	_, err = testDB.SMoveByTwoBuckets(bucket1, neKey, bucket2, key2, nil)
+	assertions.Error(err)
+
 	isOK, err := testDB.SMoveByTwoBuckets(bucket1, key1, bucket2, key2, val1)
 	if err != nil {
 		t.Error(err)
@@ -280,13 +352,16 @@ func TestDB_SMoveByTwoBuckets(t *testing.T) {
 
 func TestDB_SUnionByOneBucket(t *testing.T) {
 	initTestDB()
+	assertions = assert.New(t)
+	_, err := testDB.SUnionByOneBucket(neBucket, neKey, neKey)
+	assertions.Equal(nutsdb.ErrBucket, err)
 	key1 := "key1"
 	key2 := "key2"
 	val1 := []byte("val1_1_1")
 	val2 := []byte("val1_1_2")
 	bucket1 := "bucket1"
 
-	err := testDB.SAdd(bucket1, key1, val1)
+	err = testDB.SAdd(bucket1, key1, val1)
 	if err != nil {
 		t.Error(err)
 	}
@@ -322,6 +397,16 @@ func TestDB_SUnionByTwoBuckets(t *testing.T) {
 		t.Error(err)
 	}
 
+	assertions = assert.New(t)
+	_, err = testDB.SUnionByTwoBuckets(neBucket, neKey, bucket2, key2)
+	assertions.Equal(nutsdb.ErrBucket, err)
+	_, err = testDB.SUnionByTwoBuckets(bucket1, key1, neBucket, neKey)
+	assertions.Equal(nutsdb.ErrBucket, err)
+	_, err = testDB.SUnionByTwoBuckets(bucket1, key1, bucket2, neKey)
+	assertions.Error(err)
+	_, err = testDB.SUnionByTwoBuckets(bucket1, neKey, bucket2, key2)
+	assertions.Error(err)
+
 	list, err := testDB.SUnionByTwoBuckets(bucket1, key1, bucket2, key2)
 	if err != nil {
 		t.Error(err)
@@ -329,85 +414,4 @@ func TestDB_SUnionByTwoBuckets(t *testing.T) {
 	if len(list) != 2 {
 		t.Error("err num")
 	}
-}
-
-func TestDB_SPop(t *testing.T) {
-	initTestDB()
-	key1 := "key1"
-	val1 := []byte("val1_1_1")
-	bucket1 := "bucket1"
-
-	err := testDB.SAdd(bucket1, key1, val1)
-	if err != nil {
-		t.Error(err)
-	}
-
-	_, err = testDB.SPop(bucket1, key1)
-	if err != nil {
-		t.Error(err)
-	}
-
-	list, err := testDB.SMembers(bucket1, key1)
-	if err != nil {
-		t.Error(err)
-	}
-	if len(list) != 0 {
-		t.Errorf("expect %d, but get %d", 0, len(list))
-	}
-}
-
-func TestForErrBucket(t *testing.T) {
-	initTestDB()
-	assertions := assert.New(t)
-	var err error
-	//err = testDB.SAdd(neBucket, neKey, nil)
-	//assertions.Equal(err, nutsdb.ErrBucket)
-
-	//err = testDB.SRem(neBucket, neKey, nil)
-	//assertions.Equal(err, nutsdb.ErrBucket)
-
-	_, err = testDB.SAreMembers(neBucket, neKey, nil)
-	assertions.Equal(err, nutsdb.ErrBucket)
-
-	_, err = testDB.SMembers(neBucket, neKey)
-	assertions.Equal(nutsdb.ErrBucket, err)
-
-	_, err = testDB.SHasKey(neBucket, neKey)
-	assertions.Equal(nutsdb.ErrBucket, err)
-
-	_, err = testDB.SPop(neBucket, neKey)
-	assertions.Equal(nutsdb.ErrBucket, err)
-
-	_, err = testDB.SCard(neBucket, neKey)
-	assertions.Equal(nutsdb.ErrBucket, err)
-
-	_, err = testDB.SDiffByOneBucket(neBucket, neKey, neKey)
-	assertions.Equal(nutsdb.ErrBucket, err)
-
-	_, err = testDB.SDiffByTwoBuckets(neBucket, neKey, neBucket, neKey)
-	assertions.Equal(nutsdb.ErrBucket, err)
-
-	//_,err = testDB.SPop(neBucket, neKey)
-	//assertions.Equal(err,nutsdb.ErrBucket)
-	//
-	//
-	//_,err = testDB.SPop(neBucket, neKey)
-	//assertions.Equal(err,nutsdb.ErrBucket)
-	//
-	//
-	//_,err = testDB.SPop(neBucket, neKey)
-	//assertions.Equal(err,nutsdb.ErrBucket)
-
-	_, err = testDB.SMoveByOneBucket(neBucket, neKey, neKey, nil)
-	assertions.Equal(nutsdb.ErrBucket, err)
-
-	_, err = testDB.SMoveByTwoBuckets(neBucket, neKey, neBucket, neKey, nil)
-	assertions.Equal(nutsdb.ErrBucket, err)
-
-	_, err = testDB.SUnionByOneBucket(neBucket, neKey, neKey)
-	assertions.Equal(nutsdb.ErrBucket, err)
-
-	_, _, err = testDB.getTwoSetsByBuckets(neBucket, neBucket)
-	assertions.Equal(nutsdb.ErrBucket, err)
-
 }
