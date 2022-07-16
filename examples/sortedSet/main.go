@@ -15,7 +15,6 @@ var (
 )
 
 func init() {
-	opt := nutsdb.DefaultOptions
 	fileDir := "/tmp/nutsdb_example"
 
 	files, _ := ioutil.ReadDir(fileDir)
@@ -28,9 +27,11 @@ func init() {
 			}
 		}
 	}
-	opt.Dir = fileDir
-	opt.SegmentSize = 1024 * 1024 // 1MB
-	db, err = nutsdb.Open(opt)
+	db, _ = nutsdb.Open(
+		nutsdb.DefaultOptions,
+		nutsdb.WithDir(fileDir),
+		nutsdb.WithSegmentSize(1024*1024), // 1MB
+	)
 	if err != nil {
 		panic(err)
 	}
@@ -69,6 +70,8 @@ func main() {
 	testZScore()
 
 	testZRevRank()
+
+	testZKeys()
 }
 
 func testZAdd() {
@@ -612,6 +615,30 @@ func testZRevRank() {
 			}
 			fmt.Println("ZRevRank key3 rank:", rank) // ZRevRank key3 rank: 1
 			return nil
+		}); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func testZKeys() {
+	bucket := "myZSet9"
+	if err := db.Update(
+		func(tx *nutsdb.Tx) error {
+			key1 := []byte("key9")
+			return tx.ZAdd(bucket, key1, 10, []byte("val1"))
+		}); err != nil {
+		log.Fatal(err)
+	}
+	if err := db.View(
+		func(tx *nutsdb.Tx) error {
+			var keys []string
+			err := tx.ZKeys(bucket, "*", func(key string) bool {
+				keys = append(keys, key)
+				// true: continue, false: break
+				return true
+			})
+			fmt.Printf("keys: %v\n", keys)
+			return err
 		}); err != nil {
 		log.Fatal(err)
 	}

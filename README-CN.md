@@ -67,6 +67,7 @@ https://www.bilibili.com/video/BV1T34y1x7AS/
      - [LSet](#lset)    
      - [Ltrim](#ltrim)
      - [LSize](#lsize)      
+     - [LKeys](#lkeys)
    - [Set](#set)
      - [SAdd](#sadd)
      - [SAreMembers](#saremembers)
@@ -82,6 +83,7 @@ https://www.bilibili.com/video/BV1T34y1x7AS/
      - [SRem](#srem)
      - [SUnionByOneBucket](#sunionbyonebucket)
      - [SUnionByTwoBucket](#sunionbytwobuckets)
+     - [SKeys](#skeys)
    - [Sorted Set](#sorted-set)
      - [ZAdd](#zadd)
      - [ZCard](#zcard)
@@ -99,6 +101,7 @@ https://www.bilibili.com/video/BV1T34y1x7AS/
      - [ZRem](#zrem)
      - [ZRemRangeByRank](#zremrangebyrank)
      - [ZScore](#zscore)
+     - [ZKeys](#zkeys)
 - [与其他数据库的比较](#与其他数据库的比较)
    - [BoltDB](#boltdb)
    - [LevelDB, RocksDB](#leveldb-rocksdb)
@@ -136,9 +139,10 @@ import (
 )
 
 func main() {
-    opt := nutsdb.DefaultOptions
-    opt.Dir = "/tmp/nutsdb" //这边数据库会自动创建这个目录文件
-    db, err := nutsdb.Open(opt)
+    db, err := nutsdb.Open(
+        nutsdb.DefaultOptions,
+        nutsdb.WithDir("/tmp/nutsdb"), // 数据库会自动创建这个目录文件
+    )
     if err != nil {
         log.Fatal(err)
     }
@@ -874,6 +878,28 @@ if err := db.Update(
 }
 ```
 
+##### LKeys
+
+查找`List`类型的所有匹配指定模式`pattern`的`key`，类似于Redis命令: [KEYS](https://redis.io/commands/keys/)
+
+注意：模式匹配使用 Go 标准库的`filepath.Match`，部分细节上和redis的行为有区别，比如对于 `[` 的处理。
+
+```golang
+if err := db.View(
+    func(tx *nutsdb.Tx) error {
+        var keys []string
+        err := tx.LKeys(bucket, "*", func(key string) bool {
+            keys = append(keys, key)
+            // true: continue, false: break
+            return true
+        })
+        fmt.Printf("keys: %v\n", keys)
+        return err
+    }); err != nil {
+    log.Fatal(err)
+}
+```
+
 #### Set
 
 ##### SAdd
@@ -1335,6 +1361,28 @@ if err := db.View(
             }
         }
         return nil
+    }); err != nil {
+    log.Fatal(err)
+}
+```
+
+##### SKeys
+
+查找`Set`类型的所有匹配指定模式`pattern`的`key`，类似于Redis命令: [KEYS](https://redis.io/commands/keys/)
+
+注意：模式匹配使用 Go 标准库的`filepath.Match`，部分细节上和redis的行为有区别，比如对于 `[` 的处理。
+
+```golang
+if err := db.View(
+    func(tx *nutsdb.Tx) error {
+        var keys []string
+        err := tx.SKeys(bucket, "*", func(key string) bool {
+            keys = append(keys, key)
+            // true: continue, false: break
+            return true
+        })
+        fmt.Printf("keys: %v\n", keys)
+        return err
     }); err != nil {
     log.Fatal(err)
 }
@@ -1894,6 +1942,29 @@ if err := db.View(
     log.Fatal(err)
 }
 ```
+
+##### ZKeys
+
+查找`Sorted Set`类型的所有匹配指定模式`pattern`的`key`，类似于Redis命令: [KEYS](https://redis.io/commands/keys/)
+
+注意：模式匹配使用 Go 标准库的`filepath.Match`，部分细节上和redis的行为有区别，比如对于 `[` 的处理。
+
+```golang
+if err := db.View(
+    func(tx *nutsdb.Tx) error {
+        var keys []string
+        err := tx.ZKeys(bucket, "*", func(key string) bool {
+            keys = append(keys, key)
+            // true: continue, false: break
+            return true
+        })
+        fmt.Printf("keys: %v\n", keys)
+        return err
+    }); err != nil {
+    log.Fatal(err)
+}
+```
+
 ### 与其他数据库的比较
 
 #### BoltDB

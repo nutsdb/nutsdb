@@ -700,3 +700,43 @@ func TestTx_LRemByIndex(t *testing.T) {
 	assertions.Error(err, "TestTx_LRemByIndex")
 	assertions.Equal(0, removedNum, "TestTx_LRemByIndex")
 }
+
+func TestTx_LKeys(t *testing.T) {
+	InitForList()
+	assertions := assert.New(t)
+	db, err = Open(opt)
+	assertions.NoError(err, "TestTx_LKeys")
+	bucket := "myBucket"
+	InitDataForList(bucket, []byte("hello"), t)
+	InitDataForList(bucket, []byte("hello1"), t)
+	InitDataForList(bucket, []byte("hello12"), t)
+	InitDataForList(bucket, []byte("hello123"), t)
+
+	tx, err = db.Begin(false)
+
+	var keys []string
+	err = tx.LKeys(bucket, "*", func(key string) bool {
+		keys = append(keys, key)
+		return true
+	})
+	assertions.NoError(err, "TestTx_LKeys")
+	assertions.Equal(4, len(keys), "TestTx_LKeys")
+
+	keys = []string{}
+	err = tx.LKeys(bucket, "*", func(key string) bool {
+		keys = append(keys, key)
+		return len(keys) != 2
+	})
+	assertions.NoError(err, "TestTx_LKeys")
+	assertions.Equal(2, len(keys), "TestTx_LKeys")
+
+	keys = []string{}
+	err = tx.LKeys(bucket, "hello1*", func(key string) bool {
+		keys = append(keys, key)
+		return true
+	})
+	assertions.NoError(err, "TestTx_LKeys")
+	assertions.Equal(3, len(keys), "TestTx_LKeys")
+
+	tx.Commit()
+}

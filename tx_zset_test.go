@@ -610,3 +610,52 @@ func TestTx_ZGetByKey(t *testing.T) {
 	assertions.Error(err, "TestTx_ZGetByKey err")
 	assertions.Nil(node, "TestTx_ZGetByKey err")
 }
+
+func TestTx_ZKeys(t *testing.T) {
+	InitForZSet()
+	assertions := assert.New(t)
+	db, err = Open(opt)
+	assertions.NoError(err, "TestTx_ZKeys")
+	bucket := "myBucket"
+
+	tx, err = db.Begin(true)
+	assertions.NoError(err, "TestTx_ZKeys")
+	// Prepare data
+	err = tx.ZAdd(bucket, []byte("hello"), 0, []byte("data"))
+	assertions.NoError(err, "TestTx_ZKeys")
+	err = tx.ZAdd(bucket, []byte("hello1"), 1, []byte("data"))
+	assertions.NoError(err, "TestTx_ZKeys")
+	err = tx.ZAdd(bucket, []byte("hello12"), 2, []byte("data"))
+	assertions.NoError(err, "TestTx_ZKeys")
+	err = tx.ZAdd(bucket, []byte("hello123"), 3, []byte("data"))
+	assertions.NoError(err, "TestTx_ZKeys")
+	tx.Commit()
+
+	tx, err = db.Begin(false)
+
+	var keys []string
+	err = tx.ZKeys(bucket, "*", func(key string) bool {
+		keys = append(keys, key)
+		return true
+	})
+	assertions.NoError(err, "TestTx_ZKeys")
+	assertions.Equal(4, len(keys), "TestTx_ZKeys")
+
+	keys = []string{}
+	err = tx.ZKeys(bucket, "*", func(key string) bool {
+		keys = append(keys, key)
+		return len(keys) != 2
+	})
+	assertions.NoError(err, "TestTx_ZKeys")
+	assertions.Equal(2, len(keys), "TestTx_ZKeys")
+
+	keys = []string{}
+	err = tx.ZKeys(bucket, "hello1*", func(key string) bool {
+		keys = append(keys, key)
+		return true
+	})
+	assertions.NoError(err, "TestTx_ZKeys")
+	assertions.Equal(3, len(keys), "TestTx_ZKeys")
+
+	tx.Commit()
+}

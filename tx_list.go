@@ -16,6 +16,7 @@ package nutsdb
 
 import (
 	"bytes"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -275,4 +276,24 @@ func (tx *Tx) LRemByIndex(bucket string, key []byte, indexes ...int) (removedNum
 		return 0, err
 	}
 	return
+}
+
+// LKeys find all keys matching a given pattern
+func (tx *Tx) LKeys(bucket, pattern string, f func(key string) bool) error {
+	if err := tx.checkTxIsClosed(); err != nil {
+		return err
+	}
+	if _, ok := tx.db.ListIdx[bucket]; !ok {
+		return ErrBucket
+	}
+	for key := range tx.db.ListIdx[bucket].Items {
+		match, err := filepath.Match(pattern, key)
+		if err != nil {
+			return err
+		}
+		if match && !f(key) {
+			return nil
+		}
+	}
+	return nil
 }

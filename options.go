@@ -73,3 +73,59 @@ var DefaultOptions = Options{
 	SyncEnable:           true,
 	StartFileLoadingMode: MMap,
 }
+
+type Option func(*Options)
+
+func WithDir(dir string) Option {
+	return func(opt *Options) {
+		opt.Dir = dir
+	}
+}
+
+func WithEntryIdxMode(entryIdxMode EntryIdxMode) Option {
+	return func(opt *Options) {
+		opt.EntryIdxMode = entryIdxMode
+	}
+}
+
+func WithRWMode(rwMode RWMode) Option {
+	return func(opt *Options) {
+		opt.RWMode = rwMode
+	}
+}
+
+func WithSegmentSize(size int64) Option {
+	return func(opt *Options) {
+		opt.SegmentSize = size
+	}
+}
+
+func WithNodeNum(num int64) Option {
+	return func(opt *Options) {
+		opt.NodeNum = num
+	}
+}
+
+func WithSyncEnable(enable bool) Option {
+	return func(opt *Options) {
+		opt.SyncEnable = enable
+	}
+}
+
+func WithStartFileLoadingMode(rwMode RWMode) Option {
+	return func(opt *Options) {
+		opt.StartFileLoadingMode = rwMode
+	}
+}
+
+func WithMaxFdNumsInCache(num int) Option {
+	return func(opt *Options) {
+		opt.MaxFdNumsInCache = num
+	}
+}
+
+func WithCleanFdsCacheThreshold(threshold float64) Option {
+	return func(opt *Options) {
+		opt.CleanFdsCacheThreshold = threshold
+	}
+}

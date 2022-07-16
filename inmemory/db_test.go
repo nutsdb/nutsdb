@@ -21,9 +21,10 @@ import (
 )
 
 func initTestDB() {
-	opts := DefaultOptions
-	opts.ShardsCount = 1024
-	testDB, _ = Open(opts)
+	testDB, _ = Open(
+		DefaultOptions,
+		WithShardsCount(1024),
+	)
 }
 
 type TestKV struct {
