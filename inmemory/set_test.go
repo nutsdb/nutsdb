@@ -17,11 +17,18 @@ package inmemory
 import (
 	"bytes"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/xujiajun/nutsdb"
+	"github.com/xujiajun/nutsdb/ds/set"
 )
 
 var (
-	bucket = "bucket1"
-	key    = "key1"
+	assertions *assert.Assertions
+	bucket     = "bucket1"
+	key        = "key1"
+	neBucket   = "nonExistedBucket"
+	neKey      = "nonExistedKey"
 )
 
 func initSAddItems(t *testing.T) {
@@ -61,30 +68,34 @@ func TestDB_SAdd(t *testing.T) {
 	}
 }
 
-func TestDB_SHasKey(t *testing.T) {
+func TestDB_SRem(t *testing.T) {
 	initSAddItems(t)
-	isOk, err := testDB.SHasKey(bucket, key)
-	if err != nil {
-		t.Error(err)
+	tests := []struct {
+		bucket  string
+		key     string
+		item    []byte
+		wantErr error
+	}{
+		{neBucket, neKey, nil, nutsdb.ErrBucket},
+		{bucket, neKey, nil, set.ErrKeyNotFound},
+		{bucket, key, nil, set.ErrItemEmpty},
+		{bucket, key, []byte("fdsfsd"), nil},
 	}
-	if !isOk {
-		t.Errorf("err SHasKey bucket %s, key %s", bucket, key)
+	assertions := assert.New(t)
+	for _, tt := range tests {
+		err := testDB.SRem(tt.bucket, tt.key, tt.item)
+		assertions.Equal(err, tt.wantErr)
 	}
-}
-func TestDB_SIsMember(t *testing.T) {
-	initSAddItems(t)
-	val1 := []byte("val1_1_1")
-	isMember, err := testDB.SIsMember(bucket, key, val1)
-	if err != nil {
-		t.Error(err)
-	}
-	if !isMember {
-		t.Error("err SIsMember")
-	}
+	// one more test for empty items
+	err := testDB.SRem(bucket, key)
+	assertions.Equal(err, set.ErrItemEmpty)
 }
 
 func TestDB_SAreMembers(t *testing.T) {
 	initSAddItems(t)
+	assertions = assert.New(t)
+	_, er := testDB.SAreMembers(neBucket, neKey, nil)
+	assertions.Equal(er, nutsdb.ErrBucket)
 	val1 := []byte("val1_1_1")
 	val2 := []byte("val1_1_2")
 	areMembers, err := testDB.SAreMembers(bucket, key, val1, val2)
@@ -96,8 +107,26 @@ func TestDB_SAreMembers(t *testing.T) {
 	}
 }
 
+func TestDB_SIsMember(t *testing.T) {
+	initSAddItems(t)
+	assertions = assert.New(t)
+	_, er := testDB.SIsMember(neBucket, neKey, nil)
+	assertions.Equal(nutsdb.ErrBucket, er)
+	val1 := []byte("val1_1_1")
+	isMember, err := testDB.SIsMember(bucket, key, val1)
+	if err != nil {
+		t.Error(err)
+	}
+	if !isMember {
+		t.Error("err SIsMember")
+	}
+}
+
 func TestDB_SMembers(t *testing.T) {
 	initSAddItems(t)
+	assertions = assert.New(t)
+	_, er := testDB.SMembers(neBucket, neKey)
+	assertions.Equal(nutsdb.ErrBucket, er)
 	list, err := testDB.SMembers(bucket, key)
 	if err != nil {
 		t.Error(err)
@@ -113,8 +142,60 @@ func TestDB_SMembers(t *testing.T) {
 	}
 }
 
+func TestDB_SHasKey(t *testing.T) {
+	initSAddItems(t)
+	assertions = assert.New(t)
+	_, er := testDB.SHasKey(neBucket, neKey)
+	assertions.Equal(nutsdb.ErrBucket, er)
+	isOk, err := testDB.SHasKey(bucket, key)
+	if err != nil {
+		t.Error(err)
+	}
+	if !isOk {
+		t.Errorf("err SHasKey bucket %s, key %s", bucket, key)
+	}
+}
+
+func TestDB_SPop(t *testing.T) {
+	initTestDB()
+	assertions = assert.New(t)
+	_, er := testDB.SPop(neBucket, neKey)
+	assertions.Equal(nutsdb.ErrBucket, er)
+	key1 := "key1"
+	val1 := []byte("val1_1_1")
+	bucket1 := "bucket1"
+
+	err := testDB.SAdd(bucket1, key1, val1)
+	if err != nil {
+		t.Error(err)
+	}
+
+	_, err = testDB.SPop(bucket1, key1)
+	if err != nil {
+		t.Error(err)
+	}
+
+	list, err := testDB.SMembers(bucket1, key1)
+	if err != nil {
+		t.Error(err)
+	}
+	if len(list) != 0 {
+		t.Errorf("expect %d, but get %d", 0, len(list))
+	}
+}
+
+func TestDB_SCard(t *testing.T) {
+	initTestDB()
+	assertions = assert.New(t)
+	_, er := testDB.SCard(neBucket, neKey)
+	assertions.Equal(nutsdb.ErrBucket, er)
+}
+
 func TestDB_SDiffByOneBucket(t *testing.T) {
 	initTestDB()
+	assertions = assert.New(t)
+	_, er := testDB.SDiffByOneBucket(neBucket, neKey, neKey)
+	assertions.Equal(nutsdb.ErrBucket, er)
 	commonVal := []byte("val")
 	key1 := "key1"
 	key2 := "key2"
@@ -150,6 +231,13 @@ func TestDB_SDiffByTwoBuckets(t *testing.T) {
 
 	val := []byte("val2_2_1")
 	bucket2 := "bucket2"
+
+	assertions = assert.New(t)
+	_, er := testDB.SDiffByTwoBuckets(neBucket, neKey, neBucket, neKey)
+	assertions.Equal(nutsdb.ErrBucket, er)
+	_, er = testDB.SDiffByTwoBuckets(bucket, key, neBucket, neKey)
+	assertions.Equal(nutsdb.ErrBucket, er)
+
 	err = testDB.SAdd(bucket2, key, val, commonVal)
 	if err != nil {
 		t.Error(err)
@@ -168,6 +256,9 @@ func TestDB_SDiffByTwoBuckets(t *testing.T) {
 
 func TestDB_SMoveByOneBucket(t *testing.T) {
 	initTestDB()
+	assertions = assert.New(t)
+	_, er := testDB.SMoveByOneBucket(neBucket, neKey, neKey, nil)
+	assertions.Equal(nutsdb.ErrBucket, er)
 	key1 := "key1"
 	key2 := "key2"
 	val1 := []byte("val1_1_1")
@@ -225,6 +316,14 @@ func TestDB_SMoveByTwoBuckets(t *testing.T) {
 		t.Error(err)
 	}
 
+	assertions = assert.New(t)
+	_, er := testDB.SMoveByTwoBuckets(neBucket, neKey, neBucket, neKey, nil)
+	assertions.Error(er)
+	_, er = testDB.SMoveByTwoBuckets(bucket1, key1, bucket2, neKey, nil)
+	assertions.Error(er)
+	_, er = testDB.SMoveByTwoBuckets(bucket1, neKey, bucket2, key2, nil)
+	assertions.Error(er)
+
 	isOK, err := testDB.SMoveByTwoBuckets(bucket1, key1, bucket2, key2, val1)
 	if err != nil {
 		t.Error(err)
@@ -251,6 +350,9 @@ func TestDB_SMoveByTwoBuckets(t *testing.T) {
 
 func TestDB_SUnionByOneBucket(t *testing.T) {
 	initTestDB()
+	assertions = assert.New(t)
+	_, er := testDB.SUnionByOneBucket(neBucket, neKey, neKey)
+	assertions.Equal(nutsdb.ErrBucket, er)
 	key1 := "key1"
 	key2 := "key2"
 	val1 := []byte("val1_1_1")
@@ -293,36 +395,21 @@ func TestDB_SUnionByTwoBuckets(t *testing.T) {
 		t.Error(err)
 	}
 
+	assertions = assert.New(t)
+	_, er := testDB.SUnionByTwoBuckets(neBucket, neKey, bucket2, key2)
+	assertions.Equal(nutsdb.ErrBucket, er)
+	_, er = testDB.SUnionByTwoBuckets(bucket1, key1, neBucket, neKey)
+	assertions.Equal(nutsdb.ErrBucket, er)
+	_, er = testDB.SUnionByTwoBuckets(bucket1, key1, bucket2, neKey)
+	assertions.Error(er)
+	_, er = testDB.SUnionByTwoBuckets(bucket1, neKey, bucket2, key2)
+	assertions.Error(er)
+
 	list, err := testDB.SUnionByTwoBuckets(bucket1, key1, bucket2, key2)
 	if err != nil {
 		t.Error(err)
 	}
 	if len(list) != 2 {
 		t.Error("err num")
-	}
-}
-
-func TestDB_SPop(t *testing.T) {
-	initTestDB()
-	key1 := "key1"
-	val1 := []byte("val1_1_1")
-	bucket1 := "bucket1"
-
-	err := testDB.SAdd(bucket1, key1, val1)
-	if err != nil {
-		t.Error(err)
-	}
-
-	_, err = testDB.SPop(bucket1, key1)
-	if err != nil {
-		t.Error(err)
-	}
-
-	list, err := testDB.SMembers(bucket1, key1)
-	if err != nil {
-		t.Error(err)
-	}
-	if len(list) != 0 {
-		t.Errorf("expect %d, but get %d", 0, len(list))
 	}
 }
