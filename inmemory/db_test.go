@@ -144,7 +144,7 @@ func TestDB_Get_ERR(t *testing.T) {
 		key         []byte
 		wantedError error
 	}{
-		{"neBucket", []byte("key"), nutsdb.ErrKeyNotFound},
+		{"neBucket", []byte("key"), nutsdb.ErrKeyNotFound}, //this case should return ErrBucket
 		{"bucket", []byte("neKey"), nutsdb.ErrKeyNotFound},
 	}
 	for _, test := range tests {
