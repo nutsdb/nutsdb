@@ -79,6 +79,7 @@ func TestDB_SRem(t *testing.T) {
 		{neBucket, neKey, nil, nutsdb.ErrBucket},
 		{bucket, neKey, nil, set.ErrKeyNotFound},
 		{bucket, key, nil, set.ErrItemEmpty},
+		{bucket, key, []byte(""), set.ErrItemEmpty},
 		{bucket, key, []byte("fdsfsd"), nil},
 	}
 	assertions := assert.New(t)

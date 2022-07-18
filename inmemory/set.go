@@ -38,9 +38,6 @@ func (db *DB) SRem(bucket string, key string, items ...[]byte) error {
 		if _, ok := shardDB.SetIdx[bucket]; !ok {
 			return nutsdb.ErrBucket
 		}
-		if items == nil {
-			items = make([][]uint8, 1)
-		}
 		return shardDB.SetIdx[bucket].SRem(key, items...)
 	})
 	return err
