@@ -37,6 +37,8 @@ func (db *DB) Get(bucket string, key []byte) (*nutsdb.Entry, error) {
 			}
 
 			entry = r.E
+		} else if !ok {
+			return nutsdb.ErrBucket
 		}
 		return nil
 	})
