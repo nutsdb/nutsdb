@@ -138,6 +138,7 @@ func TestDB_Get_ERR(t *testing.T) {
 	initTestDB()
 	assertions := assert.New(t)
 	err := testDB.Put("bucket", []byte("key"), []byte("val"), 0)
+	err = testDB.Put("bucket1", []byte("key1"), nil, 0)
 	assertions.NoError(err)
 	tests := []struct {
 		bkt         string
@@ -146,6 +147,7 @@ func TestDB_Get_ERR(t *testing.T) {
 	}{
 		{"neBucket", []byte("key"), nutsdb.ErrBucket}, //this case should return ErrBucket
 		{"bucket", []byte("neKey"), nutsdb.ErrKeyNotFound},
+		{"bucket1", []byte("key1"), nil},
 	}
 	for _, test := range tests {
 		_, err := testDB.Get(test.bkt, test.key)

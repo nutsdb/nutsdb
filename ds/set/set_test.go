@@ -455,8 +455,6 @@ func TestSet_SRem(t *testing.T) {
 	assertions.False(mySet.SIsMember(key, []byte("b")), "TestSet_SRem err")
 
 	assertions.Error(mySet.SRem("key_fake", []byte("b")), "TestSet_SRem err")
-
-	assertions.Error(mySet.SRem(key, []byte("")), "TestSet_SRem err")
 }
 
 func TestSet_SUnion(t *testing.T) {

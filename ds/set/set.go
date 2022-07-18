@@ -60,7 +60,7 @@ func (s *Set) SRem(key string, items ...[]byte) error {
 		return ErrKeyNotFound
 	}
 
-	if items == nil || len(items[0]) == 0 {
+	if len(items) == 0 || items[0] == nil {
 		return ErrItemEmpty
 	}
 
