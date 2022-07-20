@@ -138,6 +138,7 @@ func TestDB_Get_ERR(t *testing.T) {
 	initTestDB()
 	assertions := assert.New(t)
 	err := testDB.Put("bucket", []byte("key"), []byte("val"), 0)
+	assertions.NoError(err)
 	err = testDB.Put("bucket1", []byte("key1"), nil, 0)
 	assertions.NoError(err)
 	tests := []struct {
