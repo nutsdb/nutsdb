@@ -34,9 +34,9 @@ func TestDB_RPush_RPop(t *testing.T) {
 	bucket := "bucket1"
 	key := "myList1"
 	assertions := assert.New(t)
-	_, er := testDB.RPop(bucket, key)
-	assertions.EqualError(er, list.ErrListNotFound.Error())
-	err := initRPushData(bucket, key)
+	_, err := testDB.RPop(bucket, key)
+	assertions.EqualError(err, list.ErrListNotFound.Error())
+	err = initRPushData(bucket, key)
 	if err != nil {
 		t.Error(err)
 	}
@@ -81,9 +81,9 @@ func TestDB_LPush_LPop(t *testing.T) {
 	bucket := "bucket1"
 	key := "myList1"
 	assertions := assert.New(t)
-	_, er := testDB.LPop(bucket, key)
-	assertions.EqualError(er, list.ErrListNotFound.Error())
-	err := initLPushData(bucket, key)
+	_, err := testDB.LPop(bucket, key)
+	assertions.EqualError(err, list.ErrListNotFound.Error())
+	err = initLPushData(bucket, key)
 	if err != nil {
 		t.Error(err)
 	}
@@ -109,9 +109,9 @@ func TestDB_LPeek(t *testing.T) {
 	bucket := "bucket1"
 	key := "myList1"
 	assertions := assert.New(t)
-	_, er := testDB.LPeek(bucket, key)
-	assertions.EqualError(er, list.ErrListNotFound.Error())
-	err := initLPushData(bucket, key)
+	_, err := testDB.LPeek(bucket, key)
+	assertions.EqualError(err, list.ErrListNotFound.Error())
+	err = initLPushData(bucket, key)
 	if err != nil {
 		t.Error(err)
 	}
@@ -130,9 +130,9 @@ func TestDB_LSize(t *testing.T) {
 	bucket := "bucket1"
 	key := "myList1"
 	assertions := assert.New(t)
-	_, er := testDB.LSize(bucket, key)
-	assertions.EqualError(er, nutsdb.ErrBucket.Error())
-	err := initLPushData(bucket, key)
+	_, err := testDB.LSize(bucket, key)
+	assertions.EqualError(err, nutsdb.ErrBucket.Error())
+	err = initLPushData(bucket, key)
 	if err != nil {
 		t.Error(err)
 	}
@@ -150,9 +150,9 @@ func TestDB_LRange(t *testing.T) {
 	bucket := "bucket1"
 	key := "myList1"
 	assertions := assert.New(t)
-	_, er := testDB.LRange(bucket, key, 1, 2)
-	assertions.EqualError(er, nutsdb.ErrBucket.Error())
-	err := initLPushData(bucket, key)
+	_, err := testDB.LRange(bucket, key, 1, 2)
+	assertions.EqualError(err, nutsdb.ErrBucket.Error())
+	err = initLPushData(bucket, key)
 	if err != nil {
 		t.Error(err)
 	}
@@ -180,18 +180,18 @@ func TestDB_LRem(t *testing.T) {
 	bucket := "bucket1"
 	key := "myList1"
 	assertions := assert.New(t)
-	_, er := testDB.LRem(bucket, key, -1, []byte("a"))
-	assertions.EqualError(er, nutsdb.ErrBucket.Error())
-	err := initLPushData(bucket, key)
+	_, err := testDB.LRem(bucket, key, -1, []byte("a"))
+	assertions.EqualError(err, nutsdb.ErrBucket.Error())
+	err = initLPushData(bucket, key)
 	if err != nil {
 		t.Error(err)
 	}
-	_, er = testDB.LRem(bucket, "nonExisted", -1, []byte("a"))
-	assertions.EqualError(er, list.ErrListNotFound.Error())
-	_, er = testDB.LRem(bucket, key, 1<<63-1, []byte("a"))
-	assertions.EqualError(er, list.ErrCount.Error())
-	_, er = testDB.LRem(bucket, key, -1<<63, []byte("a"))
-	assertions.EqualError(er, list.ErrCount.Error())
+	_, err = testDB.LRem(bucket, "nonExisted", -1, []byte("a"))
+	assertions.EqualError(err, list.ErrListNotFound.Error())
+	_, err = testDB.LRem(bucket, key, 1<<63-1, []byte("a"))
+	assertions.EqualError(err, list.ErrCount.Error())
+	_, err = testDB.LRem(bucket, key, -1<<63, []byte("a"))
+	assertions.EqualError(err, list.ErrCount.Error())
 	err = testDB.LPush(bucket, key, []byte("a"))
 	if err != nil {
 		t.Error(err)
@@ -225,19 +225,19 @@ func TestDB_LSet(t *testing.T) {
 	bucket := "bucket1"
 	key := "myList1"
 	assertions := assert.New(t)
-	er := testDB.LSet(bucket, key, 1, []byte("a"))
-	assertions.EqualError(er, nutsdb.ErrBucket.Error())
+	err := testDB.LSet(bucket, key, 1, []byte("a"))
+	assertions.EqualError(err, nutsdb.ErrBucket.Error())
 
-	err := initLPushData(bucket, key)
+	err = initLPushData(bucket, key)
 	if err != nil {
 		t.Error(err)
 	}
-	er = testDB.LSet(bucket, "nonExisted", 1, []byte("a"))
-	assertions.EqualError(er, nutsdb.ErrKeyNotFound.Error())
-	er = testDB.LSet(bucket, key, 1<<63-1, []byte("a"))
-	assertions.EqualError(er, list.ErrIndexOutOfRange.Error())
-	er = testDB.LSet(bucket, key, -1<<63, []byte("a"))
-	assertions.EqualError(er, list.ErrIndexOutOfRange.Error())
+	err = testDB.LSet(bucket, "nonExisted", 1, []byte("a"))
+	assertions.EqualError(err, nutsdb.ErrKeyNotFound.Error())
+	err = testDB.LSet(bucket, key, 1<<63-1, []byte("a"))
+	assertions.EqualError(err, list.ErrIndexOutOfRange.Error())
+	err = testDB.LSet(bucket, key, -1<<63, []byte("a"))
+	assertions.EqualError(err, list.ErrIndexOutOfRange.Error())
 
 	err = testDB.LSet(bucket, key, 1, []byte("d"))
 	if err != nil {
@@ -265,9 +265,9 @@ func TestDB_LTrim(t *testing.T) {
 	bucket := "bucket1"
 	key := "myList1"
 	assertions := assert.New(t)
-	er := testDB.LTrim(bucket, key, 1, 2)
-	assertions.EqualError(er, nutsdb.ErrBucket.Error())
-	err := initLPushData(bucket, key)
+	err := testDB.LTrim(bucket, key, 1, 2)
+	assertions.EqualError(err, nutsdb.ErrBucket.Error())
+	err = initLPushData(bucket, key)
 	if err != nil {
 		t.Error(err)
 	}
