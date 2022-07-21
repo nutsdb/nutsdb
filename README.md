@@ -617,6 +617,8 @@ fmt.Println("entry.Value", string(entry.Value)) // entry.Value val1
 
 ```
 
+In memory mode, there are some non-memory mode APIs that have not yet been implemented. If you need, you can submit an issue and explain your request.
+
 ### Using other data structures
 
 The syntax here is modeled after [Redis commands](https://redis.io/commands)
