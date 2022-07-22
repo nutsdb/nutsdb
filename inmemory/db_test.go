@@ -18,6 +18,9 @@ import (
 	"bytes"
 	"fmt"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/xujiajun/nutsdb"
 )
 
 func initTestDB() {
@@ -133,8 +136,22 @@ func TestDB_Delete(t *testing.T) {
 
 func TestDB_Get_ERR(t *testing.T) {
 	initTestDB()
-	entry, err := testDB.Get("bucket1", []byte("test1"))
-	if err == nil || entry != nil {
-		t.Error("err testDB Get")
+	assertions := assert.New(t)
+	err := testDB.Put("bucket", []byte("key"), []byte("val"), 0)
+	assertions.NoError(err)
+	err = testDB.Put("bucket1", []byte("key1"), nil, 0)
+	assertions.NoError(err)
+	tests := []struct {
+		bkt         string
+		key         []byte
+		wantedError error
+	}{
+		{"neBucket", []byte("key"), nutsdb.ErrBucket}, //this case should return ErrBucket
+		{"bucket", []byte("neKey"), nutsdb.ErrKeyNotFound},
+		{"bucket1", []byte("key1"), nil},
+	}
+	for _, test := range tests {
+		_, err := testDB.Get(test.bkt, test.key)
+		assertions.Equal(test.wantedError, err)
 	}
 }
