@@ -38,6 +38,10 @@ func newIterator(tx *Tx, bucket string) *Iterator {
 // Otherwise if the next item is not available it would return (false, nil)
 // If it faces error it would return (false, err)
 func (it *Iterator) SetNext() (bool, error) {
+	if it.tx.db.opt.EntryIdxMode == HintBPTSparseIdxMode {
+		return false, fmt.Errorf("%s mode is not supported in iterators", "HintBPTSparseIdxMode")
+	}
+
 	if err := it.tx.checkTxIsClosed(); err != nil {
 		return false, err
 	}
@@ -49,7 +53,10 @@ func (it *Iterator) SetNext() (bool, error) {
 	if it.current == nil && (it.tx.db.opt.EntryIdxMode == HintKeyAndRAMIdxMode ||
 		it.tx.db.opt.EntryIdxMode == HintKeyValAndRAMIdxMode) {
 		if index, ok := it.tx.db.BPTreeIdx[it.bucket]; ok {
-			it.Seek(index.FirstKey)
+			err := it.Seek(index.FirstKey)
+			if err != nil {
+				return false, err
+			}
 		}
 	}
 
@@ -103,7 +110,11 @@ func (it *Iterator) SetNext() (bool, error) {
 
 // Seek would seek to the key,
 // If the key is not available it would seek to the first smallest greater key than the input key.
-func (it *Iterator) Seek(key []byte) {
+func (it *Iterator) Seek(key []byte) error {
+	if it.tx.db.opt.EntryIdxMode == HintBPTSparseIdxMode {
+		return fmt.Errorf("%s mode is not supported in iterators", "HintBPTSparseIdxMode")
+	}
+
 	it.current = it.tx.db.BPTreeIdx[it.bucket].FindLeaf(key)
 	if it.current == nil {
 		it.i = -1
@@ -112,6 +123,8 @@ func (it *Iterator) Seek(key []byte) {
 	for it.i = 0; it.i < it.current.KeysNum && compare(it.current.Keys[it.i], key) < 0; {
 		it.i++
 	}
+
+	return nil
 }
 
 // Entry would return the current Entry item
