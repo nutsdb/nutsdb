@@ -20,9 +20,16 @@ func newIterator(tx *Tx, bucket string) *Iterator {
 	}
 }
 
+// SetNext would set the next Entry item, and would return (true, nil) if the next item is available
+// Otherwise if the next item is not available it would return (false, nil)
+// If it faces error it would return (false, err)
 func (it *Iterator) SetNext() (bool, error) {
 	if err := it.tx.checkTxIsClosed(); err != nil {
 		return false, err
+	}
+
+	if it.i == -1 {
+		return false, nil
 	}
 
 	if it.current == nil && (it.tx.db.opt.EntryIdxMode == HintKeyAndRAMIdxMode ||
@@ -80,14 +87,20 @@ func (it *Iterator) SetNext() (bool, error) {
 	return false, nil
 }
 
+// Seek would seek to the key,
+// If the key is not available it would seek to the first smallest greater key than the input key.
 func (it *Iterator) Seek(key []byte) {
 	it.current = it.tx.db.BPTreeIdx[it.bucket].FindLeaf(key)
+	if it.current == nil {
+		it.i = -1
+	}
 
 	for it.i = 0; it.i < it.current.KeysNum && compare(it.current.Keys[it.i], key) < 0; {
 		it.i++
 	}
 }
 
+// Entry would return the current Entry item
 func (it *Iterator) Entry() *Entry {
 	return it.entry
 }
