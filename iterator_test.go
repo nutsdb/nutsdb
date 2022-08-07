@@ -95,7 +95,6 @@ func TestIterator_Seek(t *testing.T) {
 		})
 	})
 	t.Run("seek_when_item_is_not_available_and_in_items_range", func(t *testing.T) {
-		fmt.Println("--------")
 		bucket := "bucket_for_iterator_seek2"
 		withDefaultDB(t, func(t *testing.T, db *DB) {
 			tx, err := db.Begin(true)
@@ -104,14 +103,18 @@ func TestIterator_Seek(t *testing.T) {
 			key := []byte("key_" + fmt.Sprintf("%07d", 0))
 			val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 0))
 			err = tx.Put(bucket, key, val, Persistent)
+			assert.NoError(t, err)
 
 			key = []byte("key_" + fmt.Sprintf("%07d", 1))
 			val = []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 1))
 			err = tx.Put(bucket, key, val, Persistent)
+			assert.NoError(t, err)
 
 			key = []byte("key_" + fmt.Sprintf("%07d", 3))
 			val = []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 3))
 			err = tx.Put(bucket, key, val, Persistent)
+			assert.NoError(t, err)
+
 			assert.NoError(t, tx.Commit())
 
 			tx, err = db.Begin(true)
@@ -141,7 +144,6 @@ func TestIterator_Seek(t *testing.T) {
 		})
 	})
 	t.Run("seek_when_item_is_not_available_and_greater_than_items_range", func(t *testing.T) {
-		fmt.Println("--------")
 		bucket := "bucket_for_iterator_seek2"
 		withDefaultDB(t, func(t *testing.T, db *DB) {
 			tx, err := db.Begin(true)
@@ -150,14 +152,18 @@ func TestIterator_Seek(t *testing.T) {
 			key := []byte("key_" + fmt.Sprintf("%07d", 0))
 			val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 0))
 			err = tx.Put(bucket, key, val, Persistent)
+			assert.NoError(t, err)
 
 			key = []byte("key_" + fmt.Sprintf("%07d", 1))
 			val = []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 1))
 			err = tx.Put(bucket, key, val, Persistent)
+			assert.NoError(t, err)
 
 			key = []byte("key_" + fmt.Sprintf("%07d", 3))
 			val = []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 3))
 			err = tx.Put(bucket, key, val, Persistent)
+			assert.NoError(t, err)
+
 			assert.NoError(t, tx.Commit())
 
 			tx, err = db.Begin(true)
