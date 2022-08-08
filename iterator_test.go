@@ -22,7 +22,7 @@ import (
 )
 
 func TestIterator_SetNext(t *testing.T) {
-	t.Run("setnext_happy", func(t *testing.T) {
+	t.Run("setnext_happy_path", func(t *testing.T) {
 		bucket := "bucket_for_iterator"
 		withDefaultDB(t, func(t *testing.T, db *DB) {
 			{
@@ -162,7 +162,7 @@ func TestIterator_Seek(t *testing.T) {
 		})
 	})
 	t.Run("seek_when_item_is_not_available_and_greater_than_items_range", func(t *testing.T) {
-		bucket := "bucket_for_iterator_seek2"
+		bucket := "bucket_for_iterator_seek3"
 		withDefaultDB(t, func(t *testing.T, db *DB) {
 			tx, err := db.Begin(true)
 			assert.NoError(t, err)
