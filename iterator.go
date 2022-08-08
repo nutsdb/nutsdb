@@ -127,7 +127,7 @@ func (it *Iterator) Seek(key []byte) error {
 	return nil
 }
 
-// Entry would return the current Entry item
+// Entry would return the current Entry item after calling SetNext
 func (it *Iterator) Entry() *Entry {
 	return it.entry
 }
