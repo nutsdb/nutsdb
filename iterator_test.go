@@ -40,7 +40,7 @@ func TestIterator_SetNext(t *testing.T) {
 				tx, err = db.Begin(true)
 				assert.NoError(t, err)
 
-				it := newIterator(tx, bucket)
+				it := NewIterator(tx, bucket)
 				i := 0
 				for i < 10 {
 					ok, err := it.SetNext()
@@ -84,7 +84,7 @@ func TestIterator_Seek(t *testing.T) {
 				tx, err = db.Begin(true)
 				assert.NoError(t, err)
 
-				it := newIterator(tx, bucket)
+				it := NewIterator(tx, bucket)
 				err = it.Seek([]byte("key_" + fmt.Sprintf("%07d", 5)))
 				assert.NoError(t, err)
 
@@ -136,7 +136,7 @@ func TestIterator_Seek(t *testing.T) {
 			tx, err = db.Begin(true)
 			assert.NoError(t, err)
 
-			it := newIterator(tx, bucket)
+			it := NewIterator(tx, bucket)
 			err = it.Seek([]byte("key_" + fmt.Sprintf("%07d", 2)))
 			assert.NoError(t, err)
 
@@ -187,7 +187,7 @@ func TestIterator_Seek(t *testing.T) {
 			tx, err = db.Begin(true)
 			assert.NoError(t, err)
 
-			it := newIterator(tx, bucket)
+			it := NewIterator(tx, bucket)
 			err = it.Seek([]byte("key_" + fmt.Sprintf("%07d", 4)))
 			assert.NoError(t, err)
 

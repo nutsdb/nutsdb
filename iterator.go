@@ -27,7 +27,7 @@ type Iterator struct {
 	entry *Entry
 }
 
-func newIterator(tx *Tx, bucket string) *Iterator {
+func NewIterator(tx *Tx, bucket string) *Iterator {
 	return &Iterator{
 		tx:     tx,
 		bucket: bucket,
