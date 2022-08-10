@@ -236,18 +236,18 @@ func (tx *Tx) RangeScan(bucket string, start, end []byte) (es Entries, err error
 				path := tx.db.getDataPath(r.H.FileID)
 				df, err := tx.db.fm.getDataFile(path, tx.db.opt.SegmentSize)
 				if err != nil {
-					err := df.rwManager.Release()
-					if err != nil {
-						return nil, err
+					releaseErr := df.rwManager.Release()
+					if releaseErr != nil {
+						return nil, releaseErr
 					}
 					return nil, err
 				}
 				if item, err := df.ReadAt(int(r.H.DataPos)); err == nil {
 					es = append(es, item)
 				} else {
-					err := df.rwManager.Release()
-					if err != nil {
-						return nil, err
+					releaseErr := df.rwManager.Release()
+					if releaseErr != nil {
+						return nil, releaseErr
 					}
 					return nil, fmt.Errorf("HintIdx r.Hi.dataPos %d, err %s", r.H.DataPos, err)
 				}
@@ -425,9 +425,9 @@ func (tx *Tx) getStartIndexForFindPrefix(fID int64, curr *BinaryNode, prefix []b
 		}
 
 		entry, err = df.ReadAt(int(curr.Keys[j]))
-		err = df.rwManager.Release()
-		if err != nil {
-			return 0, err
+		releaseErr := df.rwManager.Release()
+		if releaseErr != nil {
+			return 0, releaseErr
 		}
 		if err != nil {
 			return 0, err
@@ -692,9 +692,9 @@ func (tx *Tx) prefixScanByHintBPTSparseIdx(bucket string, prefix []byte, offsetN
 			path := tx.db.getDataPath(r.H.FileID)
 			df, err := tx.db.fm.getDataFile(path, tx.db.opt.SegmentSize)
 			if err != nil {
-				err = df.rwManager.Release()
-				if err != nil {
-					return nil, off, err
+				releaseErr := df.rwManager.Release()
+				if releaseErr != nil {
+					return nil, off, releaseErr
 				}
 				return nil, off, err
 			}
@@ -705,9 +705,9 @@ func (tx *Tx) prefixScanByHintBPTSparseIdx(bucket string, prefix []byte, offsetN
 					return es, off, nil
 				}
 			} else {
-				err := df.rwManager.Release()
-				if err != nil {
-					return nil, off, err
+				releaseErr := df.rwManager.Release()
+				if releaseErr != nil {
+					return nil, off, releaseErr
 				}
 				return nil, off, fmt.Errorf("HintIdx r.Hi.dataPos %d, err %s", r.H.DataPos, err)
 			}
@@ -745,9 +745,9 @@ func (tx *Tx) prefixSearchScanByHintBPTSparseIdx(bucket string, prefix []byte, r
 			path := tx.db.getDataPath(r.H.FileID)
 			df, err := tx.db.fm.getDataFile(path, tx.db.opt.SegmentSize)
 			if err != nil {
-				err := df.rwManager.Release()
-				if err != nil {
-					return nil, off, err
+				releaseErr := df.rwManager.Release()
+				if releaseErr != nil {
+					return nil, off, releaseErr
 				}
 				return nil, off, err
 			}
@@ -758,9 +758,9 @@ func (tx *Tx) prefixSearchScanByHintBPTSparseIdx(bucket string, prefix []byte, r
 					return es, off, nil
 				}
 			} else {
-				err := df.rwManager.Release()
-				if err != nil {
-					return nil, off, err
+				releaseErr := df.rwManager.Release()
+				if releaseErr != nil {
+					return nil, off, releaseErr
 				}
 				return nil, off, fmt.Errorf("HintIdx r.Hi.dataPos %d, err %s", r.H.DataPos, err)
 			}
@@ -889,9 +889,9 @@ func (tx *Tx) getHintIdxDataItemsWrapper(records Records, limitNum int, es Entri
 				if item, err := df.ReadAt(int(r.H.DataPos)); err == nil {
 					es = append(es, item)
 				} else {
-					err := df.rwManager.Release()
-					if err != nil {
-						return nil, err
+					releaseErr := df.rwManager.Release()
+					if releaseErr != nil {
+						return nil, releaseErr
 					}
 					return nil, fmt.Errorf("HintIdx r.Hi.dataPos %d, err %s", r.H.DataPos, err)
 				}
