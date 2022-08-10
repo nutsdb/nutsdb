@@ -92,9 +92,9 @@ func (it *Iterator) SetNext() (bool, error) {
 			it.entry = item
 			return true, nil
 		} else {
-			err2 := df.rwManager.Release()
-			if err2 != nil {
-				return false, err2
+			releaseErr := df.rwManager.Release()
+			if releaseErr != nil {
+				return false, releaseErr
 			}
 			return false, fmt.Errorf("HintIdx r.Hi.dataPos %d, err %s", record.H.DataPos, err)
 		}
