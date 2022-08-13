@@ -98,3 +98,14 @@
 * [Test] test:complete tx_zset tests with testify (#162) @bigdaronlee163
 * [Chore] remove unused member (#157) @xpzouying
 * [Style]  format code comments etc. (#140) @moyrne
+
+## v0.10.0（2022-08-13）
+* [Bug Fix]List data structure with count parameter negative, lack of boundary judgment (#183) @andrewhzy
+* [New Feature] add LRemByIndex (#174) @Nailcui
+* [New Feature] add LKeys SKeys ZKeys API (#175) @Nailcui
+* [New Feature] add Iterator API (HintKeyAndRAMIdxMode and HintKeyValAndRAMIdxMode)(#191) @zeina1i
+* [Refactor] graceful options parameters (#185) @Nailcui
+* [Test] Add rwmanager fileio test (#170) @zeina1i
+* [Test] Improve code coverage about list  (#183) @andrewhzy
+* [Test] Test coverage improvement for inmemory  (#187) @andrewhzy
+* [Docs] A few corrections in ReadME file (#171) @kwakubiney
