@@ -32,9 +32,11 @@ type (
 )
 
 // DefaultOptions default options
-var DefaultOptions = Options{
-	ShardsCount: 256,
-}
+var DefaultOptions = func() Options {
+	return Options{
+		ShardsCount: 256,
+	}
+}()
 
 func WithShardsCount(shardsCount uint64) Option {
 	return func(opt *Options) {

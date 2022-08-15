@@ -65,14 +65,16 @@ type Options struct {
 var defaultSegmentSize int64 = 256 * 1024 * 1024
 
 // DefaultOptions represents the default options.
-var DefaultOptions = Options{
-	EntryIdxMode:         HintKeyValAndRAMIdxMode,
-	SegmentSize:          defaultSegmentSize,
-	NodeNum:              1,
-	RWMode:               FileIO,
-	SyncEnable:           true,
-	StartFileLoadingMode: MMap,
-}
+var DefaultOptions = func() Options {
+	return Options{
+		EntryIdxMode:         HintKeyValAndRAMIdxMode,
+		SegmentSize:          defaultSegmentSize,
+		NodeNum:              1,
+		RWMode:               FileIO,
+		SyncEnable:           true,
+		StartFileLoadingMode: MMap,
+	}
+}()
 
 type Option func(*Options)
 
