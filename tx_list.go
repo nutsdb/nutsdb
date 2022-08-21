@@ -16,7 +16,6 @@ package nutsdb
 
 import (
 	"bytes"
-	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -287,12 +286,8 @@ func (tx *Tx) LKeys(bucket, pattern string, f func(key string) bool) error {
 		return ErrBucket
 	}
 	for key := range tx.db.ListIdx[bucket].Items {
-		match, err := filepath.Match(pattern, key)
-		if err != nil {
+		if end, err := MatchForRange(pattern, key, f); end || err != nil {
 			return err
-		}
-		if match && !f(key) {
-			return nil
 		}
 	}
 	return nil

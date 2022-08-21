@@ -296,14 +296,18 @@ Also, this bucket is related to the data structure you use. Different data index
 
 #### Iterate buckets
 
-IterateBuckets iterates over all the bucket. IterateBuckets function has two parameters: `ds` and function `f`.
+IterateBuckets iterates over all the buckets that match the pattern. IterateBuckets function has three parameters: `ds`, `pattern` and function `f`.
 
 The current version of the Iterate Buckets method supports the following EntryId Modes:
 
 * `HintKeyValAndRAMIdxMode`：represents ram index (key and value) mode.
 * `HintKeyAndRAMIdxMode`：represents ram index (only key) mode.
 
-The current version of `ds` (represents the data structure)：
+The `pattern` added in version `0.11.0` (represents the pattern to match):
+
+* `pattern` syntax refer to: `filepath.Match`
+
+The current version of `ds` (represents the data structure):
 
 * DataStructureSet
 * DataStructureSortedSet
@@ -313,8 +317,10 @@ The current version of `ds` (represents the data structure)：
 ```go
 if err := db.View(
     func(tx *nutsdb.Tx) error {
-        return tx.IterateBuckets(nutsdb.DataStructureBPTree, func(bucket string) {
+        return tx.IterateBuckets(nutsdb.DataStructureBPTree, "*", func(bucket string) bool {
             fmt.Println("bucket: ", bucket)
+            // true: continue, false: break
+            return true
         })
     }); err != nil {
     log.Fatal(err)

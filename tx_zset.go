@@ -17,7 +17,6 @@ package nutsdb
 import (
 	"bytes"
 	"errors"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -256,12 +255,8 @@ func (tx *Tx) ZKeys(bucket, pattern string, f func(key string) bool) error {
 		return ErrBucket
 	}
 	for key := range tx.db.SortedSetIdx[bucket].Dict {
-		match, err := filepath.Match(pattern, key)
-		if err != nil {
+		if end, err := MatchForRange(pattern, key, f); end || err != nil {
 			return err
-		}
-		if match && !f(key) {
-			return nil
 		}
 	}
 	return nil
