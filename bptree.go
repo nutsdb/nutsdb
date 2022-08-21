@@ -112,7 +112,10 @@ type (
 		Keys [order - 1]int64
 		// 1. not leaf node represents node address
 		// 2. leaf node represents data address
-		Pointers    [order]int64
+
+		// the last pointer would point to the previous node
+		// the next to last one pointer would point to the next node
+		Pointers    [order + 1]int64
 		IsLeaf      uint16
 		KeysNum     uint16
 		Address     int64
@@ -127,8 +130,10 @@ func getBinaryNodeSize() int64 {
 // newNode returns a newly initialized Node object that implements the Node.
 func (t *BPTree) newNode() *Node {
 	node := &Node{
-		Keys:     make([][]byte, order-1),
-		pointers: make([]interface{}, order),
+		Keys: make([][]byte, order-1),
+		// the last pointer would point to the previous node
+		// the next to last one pointer would point to the next node
+		pointers: make([]interface{}, order+1),
 		isLeaf:   false,
 		parent:   nil,
 		KeysNum:  0,
@@ -226,7 +231,9 @@ func (t *BPTree) ToBinary(n *Node) (result []byte, err error) {
 		}
 	}
 
-	var pointers [order]int64
+	// the last pointer would point to the previous node
+	// the next to last one pointer would point to the next node
+	var pointers [order + 1]int64
 
 	if !n.isLeaf {
 		for i = 0; i < n.KeysNum+1; i++ {
@@ -781,12 +788,12 @@ func (t *BPTree) splitLeaf(leaf *Node, key []byte, pointer *Record) error {
 		j++
 	}
 
-	// Set the last pointer of the new leaf node to point the last pointer of the leaf node.
+	// Set the next to last one pointer of the new leaf node to point the last pointer of the leaf node.
 	if leaf.pointers[order-1] != nil {
 		newLeaf.pointers[order-1] = leaf.pointers[order-1]
 	}
 
-	// Reset the last pointer of the leaf node.
+	// Reset the next to last one pointer of the leaf node.
 	leaf.pointers[order-1] = newLeaf
 	// Set the parent.
 	newLeaf.parent = leaf.parent
