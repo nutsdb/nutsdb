@@ -15,7 +15,6 @@
 package nutsdb
 
 import (
-	"path/filepath"
 	"time"
 
 	"github.com/pkg/errors"
@@ -310,12 +309,8 @@ func (tx *Tx) SKeys(bucket, pattern string, f func(key string) bool) error {
 		return ErrBucket
 	}
 	for key := range tx.db.SetIdx[bucket].M {
-		match, err := filepath.Match(pattern, key)
-		if err != nil {
+		if end, err := MatchForRange(pattern, key, f); end || err != nil {
 			return err
-		}
-		if match && !f(key) {
-			return nil
 		}
 	}
 	return nil

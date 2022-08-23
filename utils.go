@@ -20,6 +20,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"path/filepath"
 	"sort"
 )
 
@@ -69,4 +70,15 @@ func UnmarshalInts(data []byte) ([]int, error) {
 		ints = append(ints, int(i))
 	}
 	return ints, nil
+}
+
+func MatchForRange(pattern, key string, f func(key string) bool) (end bool, err error) {
+	match, err := filepath.Match(pattern, key)
+	if err != nil {
+		return true, err
+	}
+	if match && !f(key) {
+		return true, nil
+	}
+	return false, nil
 }

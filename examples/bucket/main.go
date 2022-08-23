@@ -51,8 +51,9 @@ func main() {
 func iterateBuckets() {
 	if err := db.View(
 		func(tx *nutsdb.Tx) error {
-			return tx.IterateBuckets(nutsdb.DataStructureBPTree, func(bucket string) {
+			return tx.IterateBuckets(nutsdb.DataStructureBPTree, "*", func(bucket string) bool {
 				fmt.Println("bucket: ", bucket)
+				return true
 			})
 		}); err != nil {
 		log.Fatal(err)

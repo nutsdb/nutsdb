@@ -78,27 +78,47 @@ func (suite *TxBucketTestSuite) TestA_IterateBuckets() {
 	tx, err := suite.Db.Begin(false)
 	assert.Nil(suite.T(), err)
 
-	err = tx.IterateBuckets(DataStructureSet, func(bucket string) {
+	err = tx.IterateBuckets(DataStructureSet, "*", func(bucket string) bool {
 		assert.Equal(suite.T(), "set_bucket", bucket)
+		return true
 	})
 	assert.Nil(suite.T(), err)
 
-	err = tx.IterateBuckets(DataStructureSortedSet, func(bucket string) {
+	err = tx.IterateBuckets(DataStructureSortedSet, "*", func(bucket string) bool {
 		assert.Equal(suite.T(), "zset_bucket", bucket)
+		return true
 	})
 	assert.Nil(suite.T(), err)
 
-	err = tx.IterateBuckets(DataStructureList, func(bucket string) {
+	err = tx.IterateBuckets(DataStructureList, "*", func(bucket string) bool {
 		assert.Equal(suite.T(), "list_bucket", bucket)
+		return true
 	})
 	assert.Nil(suite.T(), err)
 
-	err = tx.IterateBuckets(DataStructureBPTree, func(bucket string) {
+	err = tx.IterateBuckets(DataStructureBPTree, "*", func(bucket string) bool {
 		assert.Equal(suite.T(), "string_bucket", bucket)
+		return true
 	})
 	assert.Nil(suite.T(), err)
 
-	err = tx.IterateBuckets(DataStructureNone, func(bucket string) {})
+	matched := false
+	_ = tx.IterateBuckets(DataStructureBPTree, "str*", func(bucket string) bool {
+		matched = true
+		return true
+	})
+	assert.Equal(suite.T(), true, matched)
+
+	matched = false
+	_ = tx.IterateBuckets(DataStructureList, "str*", func(bucket string) bool {
+		matched = true
+		return true
+	})
+	assert.Equal(suite.T(), false, matched)
+
+	err = tx.IterateBuckets(DataStructureNone, "*", func(bucket string) bool {
+		return true
+	})
 	assert.Nil(suite.T(), err)
 
 	err = tx.Commit()
@@ -151,7 +171,9 @@ func (suite *TxBucketTestSuite) TestC_HintBPTSparseIdxMode() {
 	tx, err := suite.DbHBPT.Begin(false)
 	assert.Nil(suite.T(), err)
 
-	err = tx.IterateBuckets(DataStructureList, func(bucket string) {})
+	err = tx.IterateBuckets(DataStructureList, "*", func(bucket string) bool {
+		return true
+	})
 	assert.Error(suite.T(), err)
 
 	err = tx.DeleteBucket(DataStructureList, "")

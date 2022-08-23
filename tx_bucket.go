@@ -17,7 +17,7 @@ package nutsdb
 import "time"
 
 // IterateBuckets iterate over all the bucket depends on ds (represents the data structure)
-func (tx *Tx) IterateBuckets(ds uint16, f func(bucket string)) error {
+func (tx *Tx) IterateBuckets(ds uint16, pattern string, f func(key string) bool) error {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return err
 	}
@@ -26,22 +26,30 @@ func (tx *Tx) IterateBuckets(ds uint16, f func(bucket string)) error {
 	}
 	if ds == DataStructureSet {
 		for bucket := range tx.db.SetIdx {
-			f(bucket)
+			if end, err := MatchForRange(pattern, bucket, f); end || err != nil {
+				return err
+			}
 		}
 	}
 	if ds == DataStructureSortedSet {
 		for bucket := range tx.db.SortedSetIdx {
-			f(bucket)
+			if end, err := MatchForRange(pattern, bucket, f); end || err != nil {
+				return err
+			}
 		}
 	}
 	if ds == DataStructureList {
 		for bucket := range tx.db.ListIdx {
-			f(bucket)
+			if end, err := MatchForRange(pattern, bucket, f); end || err != nil {
+				return err
+			}
 		}
 	}
 	if ds == DataStructureBPTree {
 		for bucket := range tx.db.BPTreeIdx {
-			f(bucket)
+			if end, err := MatchForRange(pattern, bucket, f); end || err != nil {
+				return err
+			}
 		}
 	}
 	return nil

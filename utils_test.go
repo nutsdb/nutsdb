@@ -56,3 +56,24 @@ func TestMarshalInts(t *testing.T) {
 	assertions.Equal(1, ints[0], "TestMarshalInts")
 	assertions.Equal(3, ints[1], "TestMarshalInts")
 }
+
+func TestMatchForRange(t *testing.T) {
+	assertions := assert.New(t)
+
+	end, err := MatchForRange("*", "hello", func(key string) bool {
+		return true
+	})
+	assertions.NoError(err, "TestMatchForRange")
+	assertions.False(end, "TestMatchForRange")
+
+	_, err = MatchForRange("[", "hello", func(key string) bool {
+		return true
+	})
+	assertions.Error(err, "TestMatchForRange")
+
+	end, err = MatchForRange("*", "hello", func(key string) bool {
+		return false
+	})
+	assertions.NoError(err, "TestMatchForRange")
+	assertions.True(end, "TestMatchForRange")
+}

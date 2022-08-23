@@ -331,8 +331,10 @@ IterateBuckets支持迭代指定ds的迭代。
 
 if err := db.View(
     func(tx *nutsdb.Tx) error {
-        return tx.IterateBuckets(nutsdb.DataStructureBPTree, func(bucket string) {
+        return tx.IterateBuckets(nutsdb.DataStructureBPTree, "*", func(bucket string) bool {
             fmt.Println("bucket: ", bucket)
+            // true: continue, false: break
+            return true
         })
     }); err != nil {
     log.Fatal(err)
