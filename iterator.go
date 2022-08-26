@@ -17,7 +17,8 @@ package nutsdb
 import "fmt"
 
 type Iterator struct {
-	tx *Tx
+	tx      *Tx
+	options IteratorOptions
 
 	current *Node
 	i       int
@@ -27,10 +28,15 @@ type Iterator struct {
 	entry *Entry
 }
 
-func NewIterator(tx *Tx, bucket string) *Iterator {
+type IteratorOptions struct {
+	reverse bool
+}
+
+func NewIterator(tx *Tx, bucket string, options IteratorOptions) *Iterator {
 	return &Iterator{
-		tx:     tx,
-		bucket: bucket,
+		tx:      tx,
+		bucket:  bucket,
+		options: options,
 	}
 }
 
@@ -46,31 +52,53 @@ func (it *Iterator) SetNext() (bool, error) {
 		return false, err
 	}
 
-	if it.i == -1 {
+	if it.i == -2 {
 		return false, nil
 	}
 
 	if it.current == nil && (it.tx.db.opt.EntryIdxMode == HintKeyAndRAMIdxMode ||
 		it.tx.db.opt.EntryIdxMode == HintKeyValAndRAMIdxMode) {
 		if index, ok := it.tx.db.BPTreeIdx[it.bucket]; ok {
-			err := it.Seek(index.FirstKey)
-			if err != nil {
-				return false, err
+			if it.options.reverse {
+				err := it.Seek(index.LastKey)
+				if err != nil {
+					return false, err
+				}
+			} else {
+				err := it.Seek(index.FirstKey)
+				if err != nil {
+					return false, err
+				}
 			}
 		}
 	}
 
-	if it.i >= it.current.KeysNum {
-		it.current, _ = it.current.pointers[order-1].(*Node)
-		if it.current == nil {
-			return false, nil
+	if it.options.reverse {
+		if it.i < 0 {
+			it.current, _ = it.current.pointers[order].(*Node)
+			if it.current == nil {
+				return false, nil
+			}
+			it.i = it.current.KeysNum - 1
 		}
-		it.i = 0
+	} else {
+		if it.i >= it.current.KeysNum {
+			it.current, _ = it.current.pointers[order-1].(*Node)
+			if it.current == nil {
+				return false, nil
+			}
+			it.i = 0
+		}
 	}
 
 	pointer := it.current.pointers[it.i]
 	record := pointer.(*Record)
-	it.i++
+
+	if it.options.reverse {
+		it.i--
+	} else {
+		it.i++
+	}
 
 	if record.H.Meta.Flag == DataDeleteFlag || record.IsExpired() {
 		return it.SetNext()
@@ -117,7 +145,7 @@ func (it *Iterator) Seek(key []byte) error {
 
 	it.current = it.tx.db.BPTreeIdx[it.bucket].FindLeaf(key)
 	if it.current == nil {
-		it.i = -1
+		it.i = -2
 	}
 
 	for it.i = 0; it.i < it.current.KeysNum && compare(it.current.Keys[it.i], key) < 0; {
