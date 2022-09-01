@@ -62,7 +62,18 @@ type Options struct {
 	CleanFdsCacheThreshold float64
 }
 
-var defaultSegmentSize int64 = 256 * 1024 * 1024
+const (
+	B = 1
+
+	KB = 1024 * B
+
+	MB = 1024 * KB
+
+	GB = 1024 * MB
+)
+
+// defaultSegmentSize is default data file size.
+var defaultSegmentSize int64 = 256 * MB
 
 // DefaultOptions represents the default options.
 var DefaultOptions = func() Options {
