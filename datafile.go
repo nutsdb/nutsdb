@@ -58,15 +58,17 @@ func NewDataFile(path string, rwManager RWManager) *DataFile {
 	dataFile.pool = &sync.Pool{
 		New: func() interface{} {
 			buf := make([]byte, DataEntryHeaderSize)
-			return buf
+			return &buf
 		}}
 	return dataFile
 }
 
 // ReadAt returns entry at the given off(offset).
 func (df *DataFile) ReadAt(off int) (e *Entry, err error) {
-	buf := df.pool.Get().([]byte)
-	defer df.pool.Put(buf)
+	bufPointer := df.pool.Get().(*[]byte)
+	defer df.pool.Put(bufPointer)
+
+	buf := *bufPointer
 
 	if _, err := df.rwManager.ReadAt(buf, int64(off)); err != nil {
 		return nil, err
