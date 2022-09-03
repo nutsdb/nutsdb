@@ -17,7 +17,6 @@ package nutsdb
 import (
 	"encoding/binary"
 	"errors"
-	"sync"
 )
 
 var (
@@ -46,7 +45,6 @@ type DataFile struct {
 	writeOff   int64
 	ActualSize int64
 	rwManager  RWManager
-	pool       *sync.Pool
 }
 
 //NewDataFile will return a new DataFile Object.
@@ -55,20 +53,13 @@ func NewDataFile(path string, rwManager RWManager) *DataFile {
 		path:      path,
 		rwManager: rwManager,
 	}
-	dataFile.pool = &sync.Pool{
-		New: func() interface{} {
-			buf := make([]byte, DataEntryHeaderSize)
-			return &buf
-		}}
 	return dataFile
 }
 
 // ReadAt returns entry at the given off(offset).
 func (df *DataFile) ReadAt(off int) (e *Entry, err error) {
-	bufPointer := df.pool.Get().(*[]byte)
-	defer df.pool.Put(bufPointer)
 
-	buf := *bufPointer
+	buf := make([]byte, DataEntryHeaderSize)
 
 	if _, err := df.rwManager.ReadAt(buf, int64(off)); err != nil {
 		return nil, err
