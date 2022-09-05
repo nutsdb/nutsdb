@@ -431,7 +431,7 @@ func (t *BPTree) getAll() (numFound int, keys [][]byte, pointers []interface{}) 
 }
 
 // FindRange returns numFound,keys and pointers at the given start key and end key.
-func (t *BPTree) FindRange(start, end []byte, f func(key, value []byte) bool) (numFound int, keys [][]byte, pointers []interface{}) {
+func (t *BPTree) FindRange(start, end []byte, f func(key []byte, pointer interface{}) bool) (numFound int, keys [][]byte, pointers []interface{}) {
 	var (
 		n        *Node
 		i, j     int
@@ -454,7 +454,7 @@ func (t *BPTree) FindRange(start, end []byte, f func(key, value []byte) bool) (n
 				break
 			}
 			if f != nil {
-				if !f(n.pointers[i].(*Record).E.Key, n.pointers[i].(*Record).E.Value) {
+				if !f(n.pointers[i].(*Record).E.Key, n.pointers[i]) {
 					break
 				}
 			} else {
