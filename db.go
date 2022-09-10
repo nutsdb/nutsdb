@@ -584,7 +584,7 @@ func (db *DB) parseDataFiles(dataFileIds []int) (unconfirmedRecords []*Record, c
 				})
 
 				if db.opt.EntryIdxMode == HintBPTSparseIdxMode {
-					db.BPTreeKeyEntryPosMap[string(entry.Meta.Bucket)+string(entry.Key)] = off
+					db.BPTreeKeyEntryPosMap[string(getNewKey(string(entry.Meta.Bucket), entry.Key))] = off
 				}
 
 				off += entry.Size()

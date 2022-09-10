@@ -26,6 +26,9 @@ import (
 func getNewKey(bucket string, key []byte) []byte {
 	newKey := []byte(bucket)
 	newKey = append(newKey, key...)
+	//avoid dup
+	newKey = append(newKey, []byte(bucket)...)
+
 	return newKey
 }
 

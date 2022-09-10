@@ -194,7 +194,7 @@ func (tx *Tx) Commit() error {
 		offset := tx.db.ActiveFile.writeOff + int64(buff.Len())
 
 		if entry.Meta.Ds == DataStructureBPTree {
-			tx.db.BPTreeKeyEntryPosMap[string(entry.Meta.Bucket)+string(entry.Key)] = offset
+			tx.db.BPTreeKeyEntryPosMap[string(getNewKey(string(entry.Meta.Bucket), entry.Key))] = offset
 		}
 
 		if i == lastIndex {
@@ -391,8 +391,7 @@ func (tx *Tx) buildIdxes(writesLen int) {
 
 func (tx *Tx) buildBPTreeIdx(bucket string, entry, e *Entry, offset int64, countFlag bool) {
 	if tx.db.opt.EntryIdxMode == HintBPTSparseIdxMode {
-		newKey := []byte(bucket)
-		newKey = append(newKey, entry.Key...)
+		newKey := getNewKey(bucket, entry.Key)
 		_ = tx.db.ActiveBPTreeIdx.Insert(newKey, e, &Hint{
 			FileID:  tx.db.ActiveFile.fileID,
 			Key:     newKey,

@@ -121,6 +121,57 @@ func TestDB_Basic(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestDB_BPTSparse(t *testing.T) {
+	InitOpt("", true)
+	opt.EntryIdxMode = HintBPTSparseIdxMode
+	db, err = Open(opt)
+	defer db.Close()
+
+	bucket1 := "AA"
+	key1 := []byte("BB")
+	val1 := []byte("key1")
+
+	bucket2 := "AAB"
+	key2 := []byte("B")
+	val2 := []byte("key2")
+
+	//put
+	err = db.Update(
+		func(tx *Tx) error {
+			return tx.Put(bucket1, key1, val1, Persistent)
+		})
+	require.NoError(t, err)
+
+	//put
+	err = db.Update(
+		func(tx *Tx) error {
+			return tx.Put(bucket2, key2, val2, Persistent)
+		})
+	require.NoError(t, err)
+
+	//get
+	err = db.View(
+		func(tx *Tx) error {
+			e, err := tx.Get(bucket1, key1)
+			if assert.NoError(t, err) {
+				assert.EqualValuesf(t, val1, e.Value, "err Tx Get. got %s want %s", string(e.Value), string(val1))
+			}
+			return nil
+		})
+	require.NoError(t, err)
+	//get
+	err = db.View(
+		func(tx *Tx) error {
+			e, err := tx.Get(bucket2, key2)
+			if assert.NoError(t, err) {
+				assert.EqualValuesf(t, val2, e.Value, "err Tx Get. got %s want %s", string(e.Value), string(val2))
+			}
+			return nil
+		})
+	require.NoError(t, err)
+
+}
+
 func TestDB_Merge_For_string(t *testing.T) {
 	fileDir := "/tmp/nutsdb_test_str_for_merge"
 
