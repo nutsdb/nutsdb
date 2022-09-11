@@ -47,7 +47,7 @@ type DataFile struct {
 	rwManager  RWManager
 }
 
-//NewDataFile will return a new DataFile Object.
+// NewDataFile will return a new DataFile Object.
 func NewDataFile(path string, rwManager RWManager) *DataFile {
 	dataFile := &DataFile{
 		path:      path,
@@ -79,6 +79,12 @@ func (df *DataFile) ReadAt(off int) (e *Entry, err error) {
 	off += DataEntryHeaderSize
 	dataSize := meta.BucketSize + meta.KeySize + meta.ValueSize
 
+	dataBuf := make([]byte, dataSize)
+	_, err = df.rwManager.ReadAt(dataBuf, int64(off))
+	if err != nil {
+		return nil, err
+	}
+
 	bucketLowBound := 0
 	bucketHighBound := meta.BucketSize
 	keyLowBound := bucketHighBound
@@ -86,11 +92,6 @@ func (df *DataFile) ReadAt(off int) (e *Entry, err error) {
 	valueLowBound := keyHighBound
 	valueHighBound := dataSize
 
-	dataBuf := make([]byte, dataSize)
-	_, err = df.rwManager.ReadAt(dataBuf, int64(off))
-	if err != nil {
-		return nil, err
-	}
 	// parse bucket
 	e.Meta.Bucket = dataBuf[bucketLowBound:bucketHighBound]
 	// parse key

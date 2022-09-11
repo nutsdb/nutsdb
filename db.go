@@ -628,7 +628,7 @@ func (db *DB) buildBPTreeRootIdxes(dataFileIds []int) error {
 	for i := 0; i < len(dataFileIds[0:dataFileIdsSize-1]); i++ {
 		off = 0
 		path := db.getBPTRootPath(int64(dataFileIds[i]))
-		fd, err := os.OpenFile(filepath.Clean(path), os.O_RDWR, 0644)
+		fd, err := os.OpenFile(filepath.Clean(path), os.O_RDWR, os.ModePerm)
 		if err != nil {
 			return err
 		}
