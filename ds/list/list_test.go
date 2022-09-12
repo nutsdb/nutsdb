@@ -15,11 +15,11 @@
 package list
 
 import (
-	"math"
 	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/xujiajun/utils/math2"
 )
 
 func InitListData() (list *List, key string) {
@@ -374,7 +374,7 @@ func TestList_LRem7(t *testing.T) {
 	assertions.NoError(err, "TestList_LRem err")
 	assertions.Equal(3, size, "TestList_LRem err")
 
-	num, err = list.LRem(key, math.MinInt64, []byte("b"))
+	num, err = list.LRem(key, math2.MinInt, []byte("b"))
 	assertions.EqualError(err, ErrMinInt.Error())
 	assertions.Equal(0, num)
 }

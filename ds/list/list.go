@@ -17,7 +17,8 @@ package list
 import (
 	"bytes"
 	"errors"
-	"math"
+
+	"github.com/xujiajun/utils/math2"
 )
 
 var (
@@ -30,8 +31,8 @@ var (
 	// ErrCount is returned when count is error.
 	ErrCount = errors.New("err count")
 
-	// ErrMinInt is returned when count == math.MinInt.
-	ErrMinInt = errors.New("err math.MinInt")
+	// ErrMinInt is returned when count == math2.MinInt.
+	ErrMinInt = errors.New("err MinInt")
 )
 
 // List represents the list.
@@ -264,7 +265,7 @@ func (l *List) LRemNum(key string, count int, value []byte) (int, error) {
 	tempVal := l.Items[key]
 
 	if count < 0 {
-		if count == math.MinInt64 {
+		if count == math2.MinInt {
 			return 0, ErrMinInt
 		}
 		count = -count
