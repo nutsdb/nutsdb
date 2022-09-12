@@ -73,11 +73,33 @@ func (db *DB) Delete(bucket string, key []byte) (err error) {
 func (db *DB) Range(bucket string, start, end []byte, f func(key, value []byte) bool) (err error) {
 	err = db.Managed(bucket, false, func(shardDB *ShardDB) error {
 		if index, ok := shardDB.BPTreeIdx[bucket]; ok {
-			index.FindRange(start, end, f)
+			index.FindRange(start, end, func(key []byte, pointer interface{}) bool {
+				record := pointer.(*nutsdb.Record)
+				if record.E.Meta.Flag != nutsdb.DataDeleteFlag && !record.IsExpired() {
+					return f(key, record.E.Value)
+				}
+				return true
+			})
 		}
 		return nil
 	})
+	return
+}
 
+// AllKeys list all key of bucket.
+func (db *DB) AllKeys(bucket string) (keys [][]byte, err error) {
+	err = db.Managed(bucket, false, func(shardDB *ShardDB) error {
+		if index, ok := shardDB.BPTreeIdx[bucket]; ok {
+			index.FindRange(index.FirstKey, index.LastKey, func(key []byte, pointer interface{}) bool {
+				record := pointer.(*nutsdb.Record)
+				if record.E.Meta.Flag != nutsdb.DataDeleteFlag && !record.IsExpired() {
+					keys = append(keys, key)
+				}
+				return true
+			})
+		}
+		return nil
+	})
 	return
 }
 
