@@ -47,8 +47,18 @@ type DataFile struct {
 	rwManager  RWManager
 }
 
+// NewDataFile will return a new DataFile Object.
+func NewDataFile(path string, rwManager RWManager) *DataFile {
+	dataFile := &DataFile{
+		path:      path,
+		rwManager: rwManager,
+	}
+	return dataFile
+}
+
 // ReadAt returns entry at the given off(offset).
 func (df *DataFile) ReadAt(off int) (e *Entry, err error) {
+
 	buf := make([]byte, DataEntryHeaderSize)
 
 	if _, err := df.rwManager.ReadAt(buf, int64(off)); err != nil {
@@ -66,34 +76,28 @@ func (df *DataFile) ReadAt(off int) (e *Entry, err error) {
 		return nil, nil
 	}
 
-	// read bucket
 	off += DataEntryHeaderSize
-	bucketBuf := make([]byte, meta.BucketSize)
-	_, err = df.rwManager.ReadAt(bucketBuf, int64(off))
+	dataSize := meta.BucketSize + meta.KeySize + meta.ValueSize
+
+	dataBuf := make([]byte, dataSize)
+	_, err = df.rwManager.ReadAt(dataBuf, int64(off))
 	if err != nil {
 		return nil, err
 	}
 
-	e.Meta.Bucket = bucketBuf
+	bucketLowBound := 0
+	bucketHighBound := meta.BucketSize
+	keyLowBound := bucketHighBound
+	keyHighBound := meta.BucketSize + meta.KeySize
+	valueLowBound := keyHighBound
+	valueHighBound := dataSize
 
-	// read key
-	off += int(meta.BucketSize)
-	keyBuf := make([]byte, meta.KeySize)
-
-	_, err = df.rwManager.ReadAt(keyBuf, int64(off))
-	if err != nil {
-		return nil, err
-	}
-	e.Key = keyBuf
-
-	// read value
-	off += int(meta.KeySize)
-	valBuf := make([]byte, meta.ValueSize)
-	_, err = df.rwManager.ReadAt(valBuf, int64(off))
-	if err != nil {
-		return nil, err
-	}
-	e.Value = valBuf
+	// parse bucket
+	e.Meta.Bucket = dataBuf[bucketLowBound:bucketHighBound]
+	// parse key
+	e.Key = dataBuf[keyLowBound:keyHighBound]
+	// parse value
+	e.Value = dataBuf[valueLowBound:valueHighBound]
 
 	crc := e.GetCrc(buf)
 	if crc != e.crc {

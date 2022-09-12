@@ -72,7 +72,7 @@ func (bm *BucketMeta) Size() int64 {
 // ReadBucketMeta returns bucketMeta at given file path name.
 func ReadBucketMeta(name string) (bucketMeta *BucketMeta, err error) {
 	var off int64
-	fd, err := os.OpenFile(filepath.Clean(name), os.O_CREATE|os.O_RDWR, 0644)
+	fd, err := os.OpenFile(filepath.Clean(name), os.O_RDWR, os.ModePerm)
 	if err != nil {
 		return
 	}

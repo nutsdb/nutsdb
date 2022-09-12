@@ -318,7 +318,7 @@ func (db *DB) View(fn func(tx *Tx) error) error {
 // 4. At last remove the merged files.
 //
 // Caveat: Merge is Called means starting multiple write transactions, and it
-// will effect the other write request. so execute it at the appropriate time.
+// will affect the other write request. so execute it at the appropriate time.
 func (db *DB) Merge() error {
 	var (
 		off                 int64
@@ -504,7 +504,7 @@ func (db *DB) getMaxFileIDAndFileIDs() (maxFileID int64, dataFileIds []int) {
 	return
 }
 
-// getActiveFileWriteOff returns the write offset of activeFile.
+// getActiveFileWriteOff returns the write-offset of activeFile.
 func (db *DB) getActiveFileWriteOff() (off int64, err error) {
 	off = 0
 	for {
@@ -628,7 +628,7 @@ func (db *DB) buildBPTreeRootIdxes(dataFileIds []int) error {
 	for i := 0; i < len(dataFileIds[0:dataFileIdsSize-1]); i++ {
 		off = 0
 		path := db.getBPTRootPath(int64(dataFileIds[i]))
-		fd, err := os.OpenFile(filepath.Clean(path), os.O_CREATE|os.O_RDWR, 0644)
+		fd, err := os.OpenFile(filepath.Clean(path), os.O_RDWR, os.ModePerm)
 		if err != nil {
 			return err
 		}
