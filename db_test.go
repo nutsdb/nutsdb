@@ -125,6 +125,7 @@ func TestDB_BPTSparse(t *testing.T) {
 	InitOpt("", true)
 	opt.EntryIdxMode = HintBPTSparseIdxMode
 	db, err = Open(opt)
+	require.NoError(t, err)
 	defer db.Close()
 
 	bucket1 := "AA"
