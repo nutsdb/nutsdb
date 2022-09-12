@@ -58,7 +58,6 @@ func NewDataFile(path string, rwManager RWManager) *DataFile {
 
 // ReadAt returns entry at the given off(offset).
 func (df *DataFile) ReadAt(off int) (e *Entry, err error) {
-
 	buf := make([]byte, DataEntryHeaderSize)
 
 	if _, err := df.rwManager.ReadAt(buf, int64(off)); err != nil {
