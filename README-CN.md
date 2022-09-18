@@ -51,6 +51,7 @@ https://www.bilibili.com/video/BV1T34y1x7AS/
     - [前缀后的正则搜索扫描](#前缀后的正则扫描)    
     - [范围扫描](#范围扫描)
     - [获取全部的key和value](#获取全部的key和value)
+    - [迭代器](#迭代器)
   - [合并操作](#合并操作)
   - [数据库备份](#数据库备份)
 - [使用内存模式](#使用内存模式)
@@ -566,6 +567,54 @@ if err := db.View(
     log.Println(err)
 }
 ```
+
+### 迭代器
+
+主要是迭代器的选项参数`Reverse`的值来决定正向还是反向迭代器
+
+
+#### 正向的迭代器
+
+```go
+tx, err := db.Begin(false)
+iterator := nutsdb.NewIterator(tx, bucket, nutsdb.IteratorOptions{Reverse: false})
+i := 0
+for i < 10 {
+    ok, err := iterator.SetNext()
+    fmt.Println("ok, err", ok, err)
+    fmt.Println("Key: ", string(iterator.Entry().Key))
+    fmt.Println("Value: ", string(iterator.Entry().Value))
+    fmt.Println()
+    i++
+}
+err = tx.Commit()
+if err != nil {
+    panic(err)
+}
+```
+
+#### 反向的迭代器
+
+```go
+tx, err := db.Begin(false)
+iterator := nutsdb.NewIterator(tx, bucket, nutsdb.IteratorOptions{Reverse: true})
+i := 0
+for i < 10 {
+    ok, err := iterator.SetNext()
+    fmt.Println("ok, err", ok, err)
+    fmt.Println("Key: ", string(iterator.Entry().Key))
+    fmt.Println("Value: ", string(iterator.Entry().Value))
+    fmt.Println()
+    i++
+}
+err = tx.Commit()
+if err != nil {
+    panic(err)
+}
+```
+
+
+
 ### 合并操作
 
 nutsdb为了保持高性能写，同一个key会写多份，如果你的服务，有对同一个key多次的更新或者删除，你希望对同一个key做合并，可以使用NutsDB提供了`db.Merge()`方法。
