@@ -19,7 +19,6 @@ func init() {
 }
 
 func main() {
-
 	tx, err := db.Begin(true)
 	if err != nil {
 		panic(err)
