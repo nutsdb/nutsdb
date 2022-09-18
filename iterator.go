@@ -29,7 +29,7 @@ type Iterator struct {
 }
 
 type IteratorOptions struct {
-	reverse bool
+	Reverse bool
 }
 
 func NewIterator(tx *Tx, bucket string, options IteratorOptions) *Iterator {
@@ -59,7 +59,7 @@ func (it *Iterator) SetNext() (bool, error) {
 	if it.current == nil && (it.tx.db.opt.EntryIdxMode == HintKeyAndRAMIdxMode ||
 		it.tx.db.opt.EntryIdxMode == HintKeyValAndRAMIdxMode) {
 		if index, ok := it.tx.db.BPTreeIdx[it.bucket]; ok {
-			if it.options.reverse {
+			if it.options.Reverse {
 				err := it.Seek(index.LastKey)
 				if err != nil {
 					return false, err
@@ -73,7 +73,7 @@ func (it *Iterator) SetNext() (bool, error) {
 		}
 	}
 
-	if it.options.reverse {
+	if it.options.Reverse {
 		if it.i < 0 {
 			it.current, _ = it.current.pointers[order].(*Node)
 			if it.current == nil {
@@ -94,7 +94,7 @@ func (it *Iterator) SetNext() (bool, error) {
 	pointer := it.current.pointers[it.i]
 	record := pointer.(*Record)
 
-	if it.options.reverse {
+	if it.options.Reverse {
 		it.i--
 	} else {
 		it.i++
