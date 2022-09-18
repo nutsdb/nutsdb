@@ -557,7 +557,9 @@ if err := db.View(
 
 #### iterator
 
-#### positive iterator
+The option parameter 'Reverse' that determines whether the iterator is forward or Reverse. The current version does not support the iterator for HintBPTSparseIdxMode.
+
+#### forward iterator
 ```go
 tx, err := db.Begin(false)
 iterator := nutsdb.NewIterator(tx, bucket, nutsdb.IteratorOptions{Reverse: false})
@@ -577,6 +579,7 @@ if err != nil {
 ```
 
 #### reverse iterator
+
 
 ```go
 tx, err := db.Begin(false)
