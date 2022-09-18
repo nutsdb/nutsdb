@@ -43,6 +43,7 @@ It supports fully serializable transactions and many data structures such as lis
       - [Prefix search scans](#prefix-search-scans)
       - [Range scans](#range-scans)
       - [Get all](#get-all)
+      - [Iterator](#iterator)
     - [Merge Operation](#merge-operation)
     - [Database backup](#database-backup)
     - [Using in memory mode](#using-in-memory-mode)
@@ -553,6 +554,48 @@ if err := db.View(
     log.Println(err)
 }
 ```
+
+#### iterator
+
+#### positive iterator
+```go
+tx, err := db.Begin(false)
+iterator := nutsdb.NewIterator(tx, bucket, nutsdb.IteratorOptions{Reverse: false})
+i := 0
+for i < 10 {
+    ok, err := iterator.SetNext()
+    fmt.Println("ok, err", ok, err)
+    fmt.Println("Key: ", string(iterator.Entry().Key))
+    fmt.Println("Value: ", string(iterator.Entry().Value))
+    fmt.Println()
+    i++
+}
+err = tx.Commit()
+if err != nil {
+    panic(err)
+}
+```
+
+#### reverse iterator
+
+```go
+tx, err := db.Begin(false)
+iterator := nutsdb.NewIterator(tx, bucket, nutsdb.IteratorOptions{Reverse: true})
+i := 0
+for i < 10 {
+    ok, err := iterator.SetNext()
+    fmt.Println("ok, err", ok, err)
+    fmt.Println("Key: ", string(iterator.Entry().Key))
+    fmt.Println("Value: ", string(iterator.Entry().Value))
+    fmt.Println()
+    i++
+}
+err = tx.Commit()
+if err != nil {
+    panic(err)
+}
+    
+  ```
 ### Merge Operation
 
 In order to maintain high-performance writing, NutsDB will write multiple copies of the same key. If your service has multiple updates or deletions to the same key, and you want to merge the same key, you can use NutsDB to provide `db.Merge()`method. This method requires you to write a merge strategy according to the actual situation. Once executed, it will block normal write requests, so it is best to avoid peak periods, such as scheduled execution in the middle of the night.
