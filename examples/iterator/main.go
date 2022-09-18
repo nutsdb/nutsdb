@@ -37,14 +37,14 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	// positive iteration
-	positiveIteration()
+	// forward iteration
+	forwardIteration()
 	// reverse iterative
 	reverseIterative()
 }
 
-func positiveIteration() {
-	fmt.Println("--------begin positiveIteration--------")
+func forwardIteration() {
+	fmt.Println("--------begin forwardIteration--------")
 	tx, err := db.Begin(false)
 	iterator := nutsdb.NewIterator(tx, bucket, nutsdb.IteratorOptions{Reverse: false})
 	i := 0
@@ -60,7 +60,7 @@ func positiveIteration() {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("--------end positiveIteration--------")
+	fmt.Println("--------end forwardIteration--------")
 }
 
 func reverseIterative() {
