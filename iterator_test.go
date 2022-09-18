@@ -37,10 +37,10 @@ func TestIterator_SetNext(t *testing.T) {
 				}
 				assert.NoError(t, tx.Commit())
 
-				tx, err = db.Begin(true)
+				tx, err = db.Begin(false)
 				assert.NoError(t, err)
 
-				it := NewIterator(tx, bucket, IteratorOptions{reverse: false})
+				it := NewIterator(tx, bucket, IteratorOptions{Reverse: false})
 				i := 0
 				for i < 10 {
 					ok, err := it.SetNext()
@@ -78,10 +78,10 @@ func TestIterator_SetNext(t *testing.T) {
 				}
 				assert.NoError(t, tx.Commit())
 
-				tx, err = db.Begin(true)
+				tx, err = db.Begin(false)
 				assert.NoError(t, err)
 
-				it := NewIterator(tx, bucket, IteratorOptions{reverse: true})
+				it := NewIterator(tx, bucket, IteratorOptions{Reverse: true})
 				i := 9
 				for i >= 0 {
 					ok, err := it.SetNext()
@@ -90,7 +90,6 @@ func TestIterator_SetNext(t *testing.T) {
 
 					key := []byte("key_" + fmt.Sprintf("%07d", i))
 					val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", i))
-					fmt.Println(string(it.Entry().Value))
 					assert.Equal(t, it.Entry().Value, val)
 					assert.Equal(t, it.Entry().Key, key)
 
@@ -123,10 +122,10 @@ func TestIterator_Seek(t *testing.T) {
 				}
 				assert.NoError(t, tx.Commit())
 
-				tx, err = db.Begin(true)
+				tx, err = db.Begin(false)
 				assert.NoError(t, err)
 
-				it := NewIterator(tx, bucket, IteratorOptions{reverse: false})
+				it := NewIterator(tx, bucket, IteratorOptions{Reverse: false})
 				err = it.Seek([]byte("key_" + fmt.Sprintf("%07d", 5)))
 				assert.NoError(t, err)
 
@@ -175,10 +174,10 @@ func TestIterator_Seek(t *testing.T) {
 
 			assert.NoError(t, tx.Commit())
 
-			tx, err = db.Begin(true)
+			tx, err = db.Begin(false)
 			assert.NoError(t, err)
 
-			it := NewIterator(tx, bucket, IteratorOptions{reverse: false})
+			it := NewIterator(tx, bucket, IteratorOptions{Reverse: false})
 			err = it.Seek([]byte("key_" + fmt.Sprintf("%07d", 2)))
 			assert.NoError(t, err)
 
@@ -226,10 +225,10 @@ func TestIterator_Seek(t *testing.T) {
 
 			assert.NoError(t, tx.Commit())
 
-			tx, err = db.Begin(true)
+			tx, err = db.Begin(false)
 			assert.NoError(t, err)
 
-			it := NewIterator(tx, bucket, IteratorOptions{reverse: false})
+			it := NewIterator(tx, bucket, IteratorOptions{Reverse: false})
 			err = it.Seek([]byte("key_" + fmt.Sprintf("%07d", 4)))
 			assert.NoError(t, err)
 
