@@ -103,6 +103,32 @@ func (db *DB) AllKeys(bucket string) (keys [][]byte, err error) {
 	return
 }
 
+// PrefixScan iterates over a key prefix at given bucket, prefix and limitNum.
+// LimitNum will limit the number of entries return.
+func (db *DB) PrefixScan(bucket string, prefix []byte, offsetNum int, limitNum int) (es nutsdb.Entries, off int, err error) {
+	err = db.Managed(bucket, false, func(shardDB *ShardDB) error {
+		if idx, ok := shardDB.BPTreeIdx[bucket]; ok {
+			records, voff, err := idx.PrefixScan(prefix, offsetNum, limitNum)
+			if err != nil {
+				off = voff
+				return nutsdb.ErrPrefixScan
+			}
+			for _, r := range records {
+				if r.E.Meta.Flag == nutsdb.DataDeleteFlag || r.IsExpired() {
+					continue
+				}
+				es = append(es, r.E)
+			}
+			return nil
+		}
+		return nil
+	})
+	if len(es) == 0 {
+		return nil, off, nutsdb.ErrPrefixScan
+	}
+	return
+}
+
 func put(shardDB *ShardDB, bucket string, key, value []byte, ttl uint32, flag uint16) (err error) {
 	if _, ok := shardDB.BPTreeIdx[bucket]; !ok {
 		shardDB.BPTreeIdx[bucket] = nutsdb.NewTree()
