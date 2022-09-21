@@ -181,3 +181,47 @@ func TestDB_AllKeys(t *testing.T) {
 	assertions.NoError(err)
 	assertions.Equal(0, len(keys))
 }
+
+func TestDB_PrefixScan(t *testing.T) {
+	initTestDB()
+	assertions := assert.New(t)
+
+	bucket := "bucket-keys"
+	prefix1 := []byte("key-")
+	key1 := []byte("key-1")
+	value1 := []byte("val-1")
+
+	prefix2 := []byte("key-2")
+	key2a := []byte("key-2a")
+	key2b := []byte("key-2b")
+	value2a := []byte("val-2a")
+	value2b := []byte("val-2b")
+
+	_, _, err := testDB.PrefixScan(bucket, prefix1, 0, 5)
+	assertions.Error(err)
+
+	err = testDB.Put(bucket, key1, value1, 0)
+	assertions.NoError(err)
+	es, _, err := testDB.PrefixScan(bucket, prefix1, 0, 5)
+	assertions.NoError(err)
+	assertions.Equal(1, len(es))
+
+	err = testDB.Put(bucket, key2a, value2a, 0)
+	assertions.NoError(err)
+	err = testDB.Put(bucket, key2b, value2b, 0)
+	assertions.NoError(err)
+	es, _, err = testDB.PrefixScan(bucket, prefix2, 0, 5)
+	assertions.NoError(err)
+	assertions.Equal(2, len(es))
+	assertions.True(bytes.Equal(value2a, es[0].Value))
+	assertions.True(bytes.Equal(value2b, es[1].Value))
+
+	es, _, _ = testDB.PrefixScan(bucket, prefix2, 0, 1)
+	assertions.Equal(1, len(es))
+	assertions.True(bytes.Equal(value2a, es[0].Value))
+
+	_ = testDB.Delete(bucket, key2a)
+	es, _, _ = testDB.PrefixScan(bucket, prefix2, 0, -1)
+	assertions.Equal(1, len(es))
+	assertions.True(bytes.Equal(value2b, es[0].Value))
+}
