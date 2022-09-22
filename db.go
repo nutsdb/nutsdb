@@ -545,15 +545,15 @@ func (db *DB) parseDataFiles(dataFileIds []int) (unconfirmedRecords []*Record, c
 	}
 
 	for _, dataID := range dataFileIds {
-		off = 0
 		fID := int64(dataID)
-		f, err := db.fm.getDataFile(db.getDataPath(fID), db.opt.SegmentSize)
+		path := db.getDataPath(fID)
+		f, err := newFileRecovery(path)
 		if err != nil {
 			return nil, nil, err
 		}
 
 		for {
-			if entry, err := f.ReadAt(int(off)); err == nil {
+			if entry, err := f.readEntry(); err == nil {
 				if entry == nil {
 					break
 				}
@@ -599,7 +599,6 @@ func (db *DB) parseDataFiles(dataFileIds []int) (unconfirmedRecords []*Record, c
 				if off >= db.opt.SegmentSize {
 					break
 				}
-				err := f.rwManager.Release()
 				if err != nil {
 					return nil, nil, err
 				}
@@ -607,7 +606,6 @@ func (db *DB) parseDataFiles(dataFileIds []int) (unconfirmedRecords []*Record, c
 			}
 		}
 
-		err = f.rwManager.Release()
 		if err != nil {
 			return nil, nil, err
 		}
