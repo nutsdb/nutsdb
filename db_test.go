@@ -1172,17 +1172,3 @@ func withBPTSpareeIdxDB(t *testing.T, fn func(t *testing.T, db *DB)) {
 
 	withDBOption(t, opt, fn)
 }
-
-func BenchmarkRecovery(b *testing.B) {
-	b.ResetTimer()
-	b.StartTimer()
-	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
-		_, err = Open(DefaultOptions,
-			WithEntryIdxMode(HintKeyAndRAMIdxMode),
-			WithRWMode(FileIO),
-			WithDir("/Users/chenzichang/GolandProjects/go-learn/nutsdb/bench/nutsdb"),
-		)
-	}
-	b.StopTimer()
-}
