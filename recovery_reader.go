@@ -6,7 +6,7 @@ import (
 	"os"
 )
 
-//fileRecovery use bufio.Reader to read entry
+// fileRecovery use bufio.Reader to read entry
 type fileRecovery struct {
 	reader *bufio.Reader
 }
