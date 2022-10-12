@@ -696,6 +696,9 @@ func (db *DB) buildBucketMetaIdx() error {
 				name = strings.TrimSuffix(name, BucketMetaSuffix)
 
 				bucketMeta, err := ReadBucketMeta(db.getBucketMetaFilePath(name))
+				if err == io.EOF {
+					break
+				}
 				if err != nil {
 					return err
 				}
