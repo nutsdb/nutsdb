@@ -21,13 +21,12 @@ func newFileRecovery(path string) (fr *fileRecovery, err error) {
 	}, nil
 }
 
+// readEntry will read a Entry from disk.
 func (fr *fileRecovery) readEntry() (e *Entry, err error) {
-	buf := make([]byte, DataEntryHeaderSize)
-
-	if _, err := fr.reader.Read(buf); err != nil {
+	buf, err := fr.readData(DataEntryHeaderSize)
+	if err != nil {
 		return nil, err
 	}
-
 	meta := readMetaData(buf)
 
 	e = &Entry{
@@ -41,30 +40,32 @@ func (fr *fileRecovery) readEntry() (e *Entry, err error) {
 
 	dataSize := meta.BucketSize + meta.KeySize + meta.ValueSize
 
-	dataBuf := make([]byte, dataSize)
-	_, err = fr.reader.Read(dataBuf)
+	dataBuf, err := fr.readData(dataSize)
+	err = e.ParsePayload(dataBuf)
 	if err != nil {
 		return nil, err
 	}
-
-	bucketLowBound := 0
-	bucketHighBound := meta.BucketSize
-	keyLowBound := bucketHighBound
-	keyHighBound := meta.BucketSize + meta.KeySize
-	valueLowBound := keyHighBound
-	valueHighBound := dataSize
-
-	// parse bucket
-	e.Meta.Bucket = dataBuf[bucketLowBound:bucketHighBound]
-	// parse key
-	e.Key = dataBuf[keyLowBound:keyHighBound]
-	// parse value
-	e.Value = dataBuf[valueLowBound:valueHighBound]
 
 	crc := e.GetCrc(buf)
 	if crc != e.crc {
 		return nil, ErrCrc
 	}
 
-	return
+	return e, nil
+}
+
+// readData will read a byte array from disk by given size, and if the byte size less than given size in the first time it will read twice for the rest data.
+func (fr *fileRecovery) readData(size uint32) (data []byte, err error) {
+	data = make([]byte, size)
+	if n, err := fr.reader.Read(data); err != nil {
+		return nil, err
+	} else {
+		if uint32(n) < size {
+			_, err := fr.reader.Read(data[n:])
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+	return data, nil
 }
