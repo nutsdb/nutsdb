@@ -41,6 +41,9 @@ func (fr *fileRecovery) readEntry() (e *Entry, err error) {
 	dataSize := meta.BucketSize + meta.KeySize + meta.ValueSize
 
 	dataBuf, err := fr.readData(dataSize)
+	if err != nil {
+		return nil, err
+	}
 	err = e.ParsePayload(dataBuf)
 	if err != nil {
 		return nil, err
