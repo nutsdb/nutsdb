@@ -52,9 +52,6 @@ type Options struct {
 	// if SyncEnable is true, slower but persistent.
 	SyncEnable bool
 
-	// StartFileLoadingMode represents when open a database which RWMode to load files.
-	StartFileLoadingMode RWMode
-
 	// MaxFdNumsInCache represents the max numbers of fd in cache.
 	MaxFdNumsInCache int
 
@@ -78,12 +75,11 @@ var defaultSegmentSize int64 = 256 * MB
 // DefaultOptions represents the default options.
 var DefaultOptions = func() Options {
 	return Options{
-		EntryIdxMode:         HintKeyValAndRAMIdxMode,
-		SegmentSize:          defaultSegmentSize,
-		NodeNum:              1,
-		RWMode:               FileIO,
-		SyncEnable:           true,
-		StartFileLoadingMode: MMap,
+		EntryIdxMode: HintKeyValAndRAMIdxMode,
+		SegmentSize:  defaultSegmentSize,
+		NodeNum:      1,
+		RWMode:       FileIO,
+		SyncEnable:   true,
 	}
 }()
 
@@ -122,12 +118,6 @@ func WithNodeNum(num int64) Option {
 func WithSyncEnable(enable bool) Option {
 	return func(opt *Options) {
 		opt.SyncEnable = enable
-	}
-}
-
-func WithStartFileLoadingMode(rwMode RWMode) Option {
-	return func(opt *Options) {
-		opt.StartFileLoadingMode = rwMode
 	}
 }
 
