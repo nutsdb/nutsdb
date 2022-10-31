@@ -109,3 +109,18 @@
 * [Test] Improve code coverage about list  (#183) @andrewhzy
 * [Test] Test coverage improvement for inmemory  (#187) @andrewhzy
 * [Docs] A few corrections in ReadME file (#171) @kwakubiney
+
+## v0.11.0（2022-10-31）
+* [Bug Fix] In BPTSparse when combination of bucket and key is repeated (#207) @ShiMaRing
+* [Bug Fix] MInInt function compatible with 32-bit operating systems (#208) @xujiajun
+* [Bug Fix] Index EOF issue#213 (#214) @xujiajun
+* [Perf] Optimize concurrent read performance (#205) @elliotchenzichang
+* [Perf] Use biobuf optimaze startspeed (#212) @elliotchenzichang
+* [New Feature] Support reverse iterator (EntryIdxMode: HintKeyAndRAMIdxMode and HintKeyValAndRAMIdxMode) (#202) @zeina1i
+* [New Feature] Add support for IterateBuckets regularized matching (#198) @Nailcui
+* [New Feature] list all key of bucket in memory mode (#206) @Nailcui
+* [New Feature] Add PrefixScan in memory mode  (#211) @Nailcui
+* [Refactor] make default options to be created in a factory method (#196) @elliotchenzichang
+* [Refactor] use size constant value (#204) @elliotchenzichang
+* [Chore] add iterator example (#209) @xujiajun
+* [Chore] remove option StartFileLoadingMode (#218) @xujiajun
