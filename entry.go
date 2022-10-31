@@ -16,6 +16,7 @@ package nutsdb
 
 import (
 	"encoding/binary"
+	"errors"
 	"hash/crc32"
 )
 
@@ -116,4 +117,26 @@ func (e *Entry) GetCrc(buf []byte) uint32 {
 	crc = crc32.Update(crc, crc32.IEEETable, e.Value)
 
 	return crc
+}
+
+// ParsePayload means this function will parse a byte array to bucket, key, size of an entry
+func (e *Entry) ParsePayload(data []byte) error {
+	if e.Meta == nil || (e.Meta.BucketSize+e.Meta.KeySize+e.Meta.ValueSize != uint32(len(data))) {
+		return errors.New("data validation fail")
+	}
+	meta := e.Meta
+	bucketLowBound := 0
+	bucketHighBound := meta.BucketSize
+	keyLowBound := bucketHighBound
+	keyHighBound := meta.BucketSize + meta.KeySize
+	valueLowBound := keyHighBound
+	valueHighBound := meta.BucketSize + meta.KeySize + meta.ValueSize
+
+	// parse bucket
+	e.Meta.Bucket = data[bucketLowBound:bucketHighBound]
+	// parse key
+	e.Key = data[keyLowBound:keyHighBound]
+	// parse value
+	e.Value = data[valueLowBound:valueHighBound]
+	return nil
 }
