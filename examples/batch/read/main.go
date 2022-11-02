@@ -19,7 +19,6 @@ func init() {
 	db, _ = nutsdb.Open(
 		nutsdb.DefaultOptions,
 		nutsdb.WithDir("/tmp/nutsdbexample/example_batch"),
-		nutsdb.WithStartFileLoadingMode(nutsdb.MMap),
 		// nutsdb.WithRWMode(nutsdb.MMap),
 		// nutsdb.WithSyncEnable(false),
 	)
