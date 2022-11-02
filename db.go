@@ -548,7 +548,7 @@ func (db *DB) parseDataFiles(dataFileIds []int) (unconfirmedRecords []*Record, c
 		off = 0
 		fID := int64(dataID)
 		path := db.getDataPath(fID)
-		f, err := newFileRecovery(path)
+		f, err := newFileRecovery(path, db.opt.BufferSizeOfRecovery)
 		if err != nil {
 			return nil, nil, err
 		}
