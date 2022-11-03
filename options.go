@@ -58,7 +58,6 @@ var DefaultOptions = func() Options {
 		NodeNum:              1,
 		RWMode:               consts.FileIO,
 		SyncEnable:           true,
-		StartFileLoadingMode: consts.MMap,
 	}
 }()
 

@@ -67,19 +67,10 @@ func (df *DataFile) ReadAt(off int) (e *model.Entry, err error) {
 		return nil, err
 	}
 
-	bucketLowBound := 0
-	bucketHighBound := meta.BucketSize
-	keyLowBound := bucketHighBound
-	keyHighBound := meta.BucketSize + meta.KeySize
-	valueLowBound := keyHighBound
-	valueHighBound := dataSize
-
-	// parse bucket
-	e.Meta.Bucket = dataBuf[bucketLowBound:bucketHighBound]
-	// parse key
-	e.Key = dataBuf[keyLowBound:keyHighBound]
-	// parse value
-	e.Value = dataBuf[valueLowBound:valueHighBound]
+	err = e.ParsePayload(dataBuf)
+	if err != nil {
+		return nil, err
+	}
 
 	crc := e.GetCrc(buf)
 	if crc != e.Crc {
