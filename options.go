@@ -14,19 +14,7 @@
 
 package nutsdb
 
-// EntryIdxMode represents entry index mode.
-type EntryIdxMode int
-
-const (
-	// HintKeyValAndRAMIdxMode represents ram index (key and value) mode.
-	HintKeyValAndRAMIdxMode EntryIdxMode = iota
-
-	// HintKeyAndRAMIdxMode represents ram index (only key) mode.
-	HintKeyAndRAMIdxMode
-
-	// HintBPTSparseIdxMode represents b+ tree sparse index mode.
-	HintBPTSparseIdxMode
-)
+import "github.com/xujiajun/nutsdb/consts"
 
 // Options records params for creating DB object.
 type Options struct {
@@ -34,13 +22,13 @@ type Options struct {
 	Dir string
 
 	// EntryIdxMode represents using which mode to index the entries.
-	EntryIdxMode EntryIdxMode
+	EntryIdxMode consts.EntryIdxMode
 
 	// RWMode represents the read and write mode.
 	// RWMode includes two options: FileIO and MMap.
 	// FileIO represents the read and write mode using standard I/O.
 	// MMap represents the read and write mode using mmap.
-	RWMode      RWMode
+	RWMode      consts.RWMode
 	SegmentSize int64
 
 	// NodeNum represents the node number.
@@ -53,7 +41,7 @@ type Options struct {
 	SyncEnable bool
 
 	// StartFileLoadingMode represents when open a database which RWMode to load files.
-	StartFileLoadingMode RWMode
+	StartFileLoadingMode consts.RWMode
 
 	// MaxFdNumsInCache represents the max numbers of fd in cache.
 	MaxFdNumsInCache int
@@ -62,28 +50,15 @@ type Options struct {
 	CleanFdsCacheThreshold float64
 }
 
-const (
-	B = 1
-
-	KB = 1024 * B
-
-	MB = 1024 * KB
-
-	GB = 1024 * MB
-)
-
-// defaultSegmentSize is default data file size.
-var defaultSegmentSize int64 = 256 * MB
-
 // DefaultOptions represents the default options.
 var DefaultOptions = func() Options {
 	return Options{
-		EntryIdxMode:         HintKeyValAndRAMIdxMode,
-		SegmentSize:          defaultSegmentSize,
+		EntryIdxMode:         consts.HintKeyValAndRAMIdxMode,
+		SegmentSize:          consts.DefaultSegmentSize,
 		NodeNum:              1,
-		RWMode:               FileIO,
+		RWMode:               consts.FileIO,
 		SyncEnable:           true,
-		StartFileLoadingMode: MMap,
+		StartFileLoadingMode: consts.MMap,
 	}
 }()
 
@@ -95,13 +70,13 @@ func WithDir(dir string) Option {
 	}
 }
 
-func WithEntryIdxMode(entryIdxMode EntryIdxMode) Option {
+func WithEntryIdxMode(entryIdxMode consts.EntryIdxMode) Option {
 	return func(opt *Options) {
 		opt.EntryIdxMode = entryIdxMode
 	}
 }
 
-func WithRWMode(rwMode RWMode) Option {
+func WithRWMode(rwMode consts.RWMode) Option {
 	return func(opt *Options) {
 		opt.RWMode = rwMode
 	}
@@ -125,7 +100,7 @@ func WithSyncEnable(enable bool) Option {
 	}
 }
 
-func WithStartFileLoadingMode(rwMode RWMode) Option {
+func WithStartFileLoadingMode(rwMode consts.RWMode) Option {
 	return func(opt *Options) {
 		opt.StartFileLoadingMode = rwMode
 	}

@@ -12,10 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package nutsdb
+package model
 
 import (
 	"encoding/binary"
+	"github.com/xujiajun/nutsdb/consts"
 	"hash/crc32"
 )
 
@@ -25,8 +26,8 @@ type (
 		Key      []byte
 		Value    []byte
 		Meta     *MetaData
-		crc      uint32
-		position uint64
+		Crc      uint32
+		Position uint64
 	}
 
 	// Hint represents the index of the key
@@ -43,18 +44,18 @@ type (
 		ValueSize  uint32
 		Timestamp  uint64
 		TTL        uint32
-		Flag       uint16 // delete / set
+		Flag       consts.DataFlag // delete / set
 		Bucket     []byte
 		BucketSize uint32
 		TxID       uint64
-		Status     uint16 // committed / uncommitted
-		Ds         uint16 // data structure
+		Status     consts.DataStatus // committed / uncommitted
+		Ds         consts.DataStruct // data structure
 	}
 )
 
 // Size returns the size of the entry.
 func (e *Entry) Size() int64 {
-	return int64(DataEntryHeaderSize + e.Meta.KeySize + e.Meta.ValueSize + e.Meta.BucketSize)
+	return int64(consts.DataEntryHeaderSize + e.Meta.KeySize + e.Meta.ValueSize + e.Meta.BucketSize)
 }
 
 // Encode returns the slice after the entry be encoded.
@@ -73,11 +74,11 @@ func (e *Entry) Encode() []byte {
 
 	// set DataItemHeader buf
 	buf := make([]byte, e.Size())
-	buf = e.setEntryHeaderBuf(buf)
+	buf = e.DecodeHeader(buf)
 	// set bucket\key\value
-	copy(buf[DataEntryHeaderSize:(DataEntryHeaderSize+bucketSize)], e.Meta.Bucket)
-	copy(buf[(DataEntryHeaderSize+bucketSize):(DataEntryHeaderSize+bucketSize+keySize)], e.Key)
-	copy(buf[(DataEntryHeaderSize+bucketSize+keySize):(DataEntryHeaderSize+bucketSize+keySize+valueSize)], e.Value)
+	copy(buf[consts.DataEntryHeaderSize:(consts.DataEntryHeaderSize+bucketSize)], e.Meta.Bucket)
+	copy(buf[(consts.DataEntryHeaderSize+bucketSize):(consts.DataEntryHeaderSize+bucketSize+keySize)], e.Key)
+	copy(buf[(consts.DataEntryHeaderSize+bucketSize+keySize):(consts.DataEntryHeaderSize+bucketSize+keySize+valueSize)], e.Value)
 
 	c32 := crc32.ChecksumIEEE(buf[4:])
 	binary.LittleEndian.PutUint32(buf[0:4], c32)
@@ -85,16 +86,16 @@ func (e *Entry) Encode() []byte {
 	return buf
 }
 
-// setEntryHeaderBuf sets the entry header buff.
-func (e *Entry) setEntryHeaderBuf(buf []byte) []byte {
+// DecodeHeader sets the entry header buff.
+func (e *Entry) DecodeHeader(buf []byte) []byte {
 	binary.LittleEndian.PutUint64(buf[4:12], e.Meta.Timestamp)
 	binary.LittleEndian.PutUint32(buf[12:16], e.Meta.KeySize)
 	binary.LittleEndian.PutUint32(buf[16:20], e.Meta.ValueSize)
-	binary.LittleEndian.PutUint16(buf[20:22], e.Meta.Flag)
+	binary.LittleEndian.PutUint16(buf[20:22], uint16(e.Meta.Flag))
 	binary.LittleEndian.PutUint32(buf[22:26], e.Meta.TTL)
 	binary.LittleEndian.PutUint32(buf[26:30], e.Meta.BucketSize)
-	binary.LittleEndian.PutUint16(buf[30:32], e.Meta.Status)
-	binary.LittleEndian.PutUint16(buf[32:34], e.Meta.Ds)
+	binary.LittleEndian.PutUint16(buf[30:32], uint16(e.Meta.Status))
+	binary.LittleEndian.PutUint16(buf[32:34], uint16(e.Meta.Ds))
 	binary.LittleEndian.PutUint64(buf[34:42], e.Meta.TxID)
 
 	return buf
@@ -102,7 +103,7 @@ func (e *Entry) setEntryHeaderBuf(buf []byte) []byte {
 
 // IsZero checks if the entry is zero or not.
 func (e *Entry) IsZero() bool {
-	if e.crc == 0 && e.Meta.KeySize == 0 && e.Meta.ValueSize == 0 && e.Meta.Timestamp == 0 {
+	if e.Crc == 0 && e.Meta.KeySize == 0 && e.Meta.ValueSize == 0 && e.Meta.Timestamp == 0 {
 		return true
 	}
 	return false

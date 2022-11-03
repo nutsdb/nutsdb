@@ -14,7 +14,11 @@
 
 package nutsdb
 
-import "fmt"
+import (
+	"fmt"
+	"github.com/xujiajun/nutsdb/consts"
+	"github.com/xujiajun/nutsdb/model"
+)
 
 type Iterator struct {
 	tx      *Tx
@@ -25,7 +29,7 @@ type Iterator struct {
 
 	bucket string
 
-	entry *Entry
+	entry *model.Entry
 }
 
 type IteratorOptions struct {
@@ -44,7 +48,7 @@ func NewIterator(tx *Tx, bucket string, options IteratorOptions) *Iterator {
 // Otherwise if the next item is not available it would return (false, nil)
 // If it faces error it would return (false, err)
 func (it *Iterator) SetNext() (bool, error) {
-	if it.tx.db.opt.EntryIdxMode == HintBPTSparseIdxMode {
+	if it.tx.db.opt.EntryIdxMode.Is(consts.HintBPTSparseIdxMode) {
 		return false, fmt.Errorf("%s mode is not supported in iterators", "HintBPTSparseIdxMode")
 	}
 
@@ -56,8 +60,7 @@ func (it *Iterator) SetNext() (bool, error) {
 		return false, nil
 	}
 
-	if it.current == nil && (it.tx.db.opt.EntryIdxMode == HintKeyAndRAMIdxMode ||
-		it.tx.db.opt.EntryIdxMode == HintKeyValAndRAMIdxMode) {
+	if it.current == nil && it.tx.db.opt.EntryIdxMode.OneOf([]consts.EntryIdxMode{consts.HintKeyAndRAMIdxMode, consts.HintKeyValAndRAMIdxMode}) {
 		if index, ok := it.tx.db.BPTreeIdx[it.bucket]; ok {
 			if it.options.Reverse {
 				err := it.Seek(index.LastKey)
@@ -75,7 +78,7 @@ func (it *Iterator) SetNext() (bool, error) {
 
 	if it.options.Reverse {
 		if it.i < 0 {
-			it.current, _ = it.current.pointers[order].(*Node)
+			it.current, _ = it.current.pointers[consts.Order].(*Node)
 			if it.current == nil {
 				return false, nil
 			}
@@ -83,7 +86,7 @@ func (it *Iterator) SetNext() (bool, error) {
 		}
 	} else {
 		if it.i >= it.current.KeysNum {
-			it.current, _ = it.current.pointers[order-1].(*Node)
+			it.current, _ = it.current.pointers[consts.Order-1].(*Node)
 			if it.current == nil {
 				return false, nil
 			}
@@ -92,7 +95,7 @@ func (it *Iterator) SetNext() (bool, error) {
 	}
 
 	pointer := it.current.pointers[it.i]
-	record := pointer.(*Record)
+	record := pointer.(*model.Record)
 
 	if it.options.Reverse {
 		it.i--
@@ -100,11 +103,11 @@ func (it *Iterator) SetNext() (bool, error) {
 		it.i++
 	}
 
-	if record.H.Meta.Flag == DataDeleteFlag || record.IsExpired() {
+	if record.H.Meta.Flag == consts.DataDeleteFlag || record.IsExpired() {
 		return it.SetNext()
 	}
 
-	if it.tx.db.opt.EntryIdxMode == HintKeyAndRAMIdxMode {
+	if it.tx.db.opt.EntryIdxMode.Is(consts.HintKeyAndRAMIdxMode) {
 		path := it.tx.db.getDataPath(record.H.FileID)
 		df, err := it.tx.db.fm.getDataFile(path, it.tx.db.opt.SegmentSize)
 		if err != nil {
@@ -128,7 +131,7 @@ func (it *Iterator) SetNext() (bool, error) {
 		}
 	}
 
-	if it.tx.db.opt.EntryIdxMode == HintKeyValAndRAMIdxMode {
+	if it.tx.db.opt.EntryIdxMode.Is(consts.HintKeyValAndRAMIdxMode) {
 		it.entry = record.E
 		return true, nil
 	}
@@ -139,7 +142,7 @@ func (it *Iterator) SetNext() (bool, error) {
 // Seek would seek to the key,
 // If the key is not available it would seek to the first smallest greater key than the input key.
 func (it *Iterator) Seek(key []byte) error {
-	if it.tx.db.opt.EntryIdxMode == HintBPTSparseIdxMode {
+	if it.tx.db.opt.EntryIdxMode.Is(consts.HintBPTSparseIdxMode) {
 		return fmt.Errorf("%s mode is not supported in iterators", "HintBPTSparseIdxMode")
 	}
 
@@ -156,6 +159,6 @@ func (it *Iterator) Seek(key []byte) error {
 }
 
 // Entry would return the current Entry item after calling SetNext
-func (it *Iterator) Entry() *Entry {
+func (it *Iterator) Entry() *model.Entry {
 	return it.entry
 }

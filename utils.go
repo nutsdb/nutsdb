@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"github.com/xujiajun/nutsdb/model"
 	"io"
 	"os"
 	"path/filepath"
@@ -25,7 +26,7 @@ import (
 )
 
 // SortedEntryKeys returns sorted entries.
-func SortedEntryKeys(m map[string]*Entry) (keys []string, es map[string]*Entry) {
+func SortedEntryKeys(m map[string]*model.Entry) (keys []string, es map[string]*model.Entry) {
 	for k := range m {
 		keys = append(keys, k)
 	}

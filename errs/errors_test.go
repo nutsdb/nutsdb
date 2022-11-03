@@ -1,4 +1,4 @@
-package nutsdb
+package errs
 
 import (
 	"testing"
@@ -8,7 +8,6 @@ import (
 )
 
 func TestIsKeyNotFound(t *testing.T) {
-
 	ts := []struct {
 		err error
 

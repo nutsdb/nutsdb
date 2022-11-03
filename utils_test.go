@@ -15,6 +15,7 @@
 package nutsdb
 
 import (
+	"github.com/xujiajun/nutsdb/model"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -22,10 +23,10 @@ import (
 )
 
 func TestPrintSortedMap(t *testing.T) {
-	entries := make(map[string]*Entry, 10)
+	entries := make(map[string]*model.Entry, 10)
 	for i := 0; i < 10; i++ {
 		k := strconv2.IntToStr(i)
-		entries[k] = &Entry{Key: []byte(k)}
+		entries[k] = &model.Entry{Key: []byte(k)}
 	}
 
 	keys, _ := SortedEntryKeys(entries)

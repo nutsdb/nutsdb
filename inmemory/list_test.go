@@ -15,10 +15,10 @@
 package inmemory
 
 import (
+	"github.com/xujiajun/nutsdb/errs"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/xujiajun/nutsdb"
 	"github.com/xujiajun/nutsdb/ds/list"
 )
 
@@ -131,7 +131,7 @@ func TestDB_LSize(t *testing.T) {
 	key := "myList1"
 	assertions := assert.New(t)
 	_, err := testDB.LSize(bucket, key)
-	assertions.EqualError(err, nutsdb.ErrBucket.Error())
+	assertions.EqualError(err, errs.ErrBucket.Error())
 	err = initLPushData(bucket, key)
 	if err != nil {
 		t.Error(err)
@@ -151,7 +151,7 @@ func TestDB_LRange(t *testing.T) {
 	key := "myList1"
 	assertions := assert.New(t)
 	_, err := testDB.LRange(bucket, key, 1, 2)
-	assertions.EqualError(err, nutsdb.ErrBucket.Error())
+	assertions.EqualError(err, errs.ErrBucket.Error())
 	err = initLPushData(bucket, key)
 	if err != nil {
 		t.Error(err)
@@ -181,7 +181,7 @@ func TestDB_LRem(t *testing.T) {
 	key := "myList1"
 	assertions := assert.New(t)
 	_, err := testDB.LRem(bucket, key, -1, []byte("a"))
-	assertions.EqualError(err, nutsdb.ErrBucket.Error())
+	assertions.EqualError(err, errs.ErrBucket.Error())
 	err = initLPushData(bucket, key)
 	if err != nil {
 		t.Error(err)
@@ -226,14 +226,14 @@ func TestDB_LSet(t *testing.T) {
 	key := "myList1"
 	assertions := assert.New(t)
 	err := testDB.LSet(bucket, key, 1, []byte("a"))
-	assertions.EqualError(err, nutsdb.ErrBucket.Error())
+	assertions.EqualError(err, errs.ErrBucket.Error())
 
 	err = initLPushData(bucket, key)
 	if err != nil {
 		t.Error(err)
 	}
 	err = testDB.LSet(bucket, "nonExisted", 1, []byte("a"))
-	assertions.EqualError(err, nutsdb.ErrKeyNotFound.Error())
+	assertions.EqualError(err, errs.ErrKeyNotFound.Error())
 	err = testDB.LSet(bucket, key, 1<<63-1, []byte("a"))
 	assertions.EqualError(err, list.ErrIndexOutOfRange.Error())
 	err = testDB.LSet(bucket, key, -1<<63, []byte("a"))
@@ -266,7 +266,7 @@ func TestDB_LTrim(t *testing.T) {
 	key := "myList1"
 	assertions := assert.New(t)
 	err := testDB.LTrim(bucket, key, 1, 2)
-	assertions.EqualError(err, nutsdb.ErrBucket.Error())
+	assertions.EqualError(err, errs.ErrBucket.Error())
 	err = initLPushData(bucket, key)
 	if err != nil {
 		t.Error(err)

@@ -17,6 +17,9 @@ package nutsdb
 import (
 	"errors"
 	"fmt"
+	"github.com/xujiajun/nutsdb/consts"
+	"github.com/xujiajun/nutsdb/errs"
+	"github.com/xujiajun/nutsdb/model"
 	"io"
 	"io/ioutil"
 	"os"
@@ -31,116 +34,6 @@ import (
 	"github.com/xujiajun/nutsdb/ds/zset"
 	"github.com/xujiajun/utils/filesystem"
 	"github.com/xujiajun/utils/strconv2"
-)
-
-var (
-	// ErrDBClosed is returned when db is closed.
-	ErrDBClosed = errors.New("db is closed")
-
-	// ErrBucket is returned when bucket is not in the HintIdx.
-	ErrBucket = errors.New("err bucket")
-
-	// ErrEntryIdxModeOpt is returned when set db EntryIdxMode option is wrong.
-	ErrEntryIdxModeOpt = errors.New("err EntryIdxMode option set")
-
-	// ErrFn is returned when fn is nil.
-	ErrFn = errors.New("err fn")
-
-	// ErrBucketNotFound is returned when looking for bucket that does not exist
-	ErrBucketNotFound = errors.New("bucket not found")
-
-	// ErrNotSupportHintBPTSparseIdxMode is returned not support mode `HintBPTSparseIdxMode`
-	ErrNotSupportHintBPTSparseIdxMode = errors.New("not support mode `HintBPTSparseIdxMode`")
-)
-
-const (
-	// DataDeleteFlag represents the data delete flag
-	DataDeleteFlag uint16 = iota
-
-	// DataSetFlag represents the data set flag
-	DataSetFlag
-
-	// DataLPushFlag represents the data LPush flag
-	DataLPushFlag
-
-	// DataRPushFlag represents the data RPush flag
-	DataRPushFlag
-
-	// DataLRemFlag represents the data LRem flag
-	DataLRemFlag
-
-	// DataLPopFlag represents the data LPop flag
-	DataLPopFlag
-
-	// DataRPopFlag represents the data RPop flag
-	DataRPopFlag
-
-	// DataLSetFlag represents the data LSet flag
-	DataLSetFlag
-
-	// DataLTrimFlag represents the data LTrim flag
-	DataLTrimFlag
-
-	// DataZAddFlag represents the data ZAdd flag
-	DataZAddFlag
-
-	// DataZRemFlag represents the data ZRem flag
-	DataZRemFlag
-
-	// DataZRemRangeByRankFlag represents the data ZRemRangeByRank flag
-	DataZRemRangeByRankFlag
-
-	// DataZPopMaxFlag represents the data ZPopMax flag
-	DataZPopMaxFlag
-
-	// DataZPopMinFlag represents the data aZPopMin flag
-	DataZPopMinFlag
-
-	// DataSetBucketDeleteFlag represents the delete Set bucket flag
-	DataSetBucketDeleteFlag
-
-	// DataSortedSetBucketDeleteFlag represents the delete Sorted Set bucket flag
-	DataSortedSetBucketDeleteFlag
-
-	// DataBPTreeBucketDeleteFlag represents the delete BPTree bucket flag
-	DataBPTreeBucketDeleteFlag
-
-	// DataListBucketDeleteFlag represents the delete List bucket flag
-	DataListBucketDeleteFlag
-
-	// LRemByIndex represents the data LRemByIndex flag
-	DataLRemByIndex
-)
-
-const (
-	// UnCommitted represents the tx unCommitted status
-	UnCommitted uint16 = 0
-
-	// Committed represents the tx committed status
-	Committed uint16 = 1
-
-	// Persistent represents the data persistent flag
-	Persistent uint32 = 0
-
-	// ScanNoLimit represents the data scan no limit flag
-	ScanNoLimit int = -1
-)
-
-const (
-	// DataStructureSet represents the data structure set flag
-	DataStructureSet uint16 = iota
-
-	// DataStructureSortedSet represents the data structure sorted set flag
-	DataStructureSortedSet
-
-	// DataStructureBPTree represents the data structure b+ tree flag
-	DataStructureBPTree
-
-	// DataStructureList represents the data structure list flag
-	DataStructureList
-
-	// DataStructureNone represents not the data structure
-	DataStructureNone
 )
 
 type (
@@ -179,10 +72,10 @@ type (
 	ListIdx map[string]*list.List
 
 	// Entries represents entries
-	Entries []*Entry
+	Entries []*model.Entry
 
 	// BucketMetasIdx represents the index of the bucket's meta-information
-	BucketMetasIdx map[string]*BucketMeta
+	BucketMetasIdx map[string]*model.BucketMeta
 )
 
 // open returns a newly initialized DB object.
@@ -199,7 +92,7 @@ func open(opt Options) (*DB, error) {
 		closed:                  false,
 		committedTxIds:          make(map[uint64]struct{}),
 		BPTreeKeyEntryPosMap:    make(map[string]int64),
-		bucketMetas:             make(map[string]*BucketMeta),
+		bucketMetas:             make(map[string]*model.BucketMeta),
 		ActiveCommittedTxIdsIdx: NewTree(),
 		fm:                      newFileManager(opt.RWMode, opt.MaxFdNumsInCache, opt.CleanFdsCacheThreshold),
 	}
@@ -214,7 +107,7 @@ func open(opt Options) (*DB, error) {
 		return nil, err
 	}
 
-	if opt.EntryIdxMode == HintBPTSparseIdxMode {
+	if opt.EntryIdxMode.Is(consts.HintBPTSparseIdxMode) {
 		bptRootIdxDir := db.opt.Dir + "/" + bptDir + "/root"
 		if ok := filesystem.PathIsExist(bptRootIdxDir); !ok {
 			if err := os.MkdirAll(bptRootIdxDir, os.ModePerm); err != nil {
@@ -266,7 +159,7 @@ func (db *DB) checkEntryIdxMode() error {
 		id := f.Name()
 
 		fileSuffix := path.Ext(path.Base(id))
-		if fileSuffix == DataSuffix {
+		if fileSuffix == consts.DataSuffix {
 			hasDataFlag = true
 			if hasBptDirFlag {
 				break
@@ -278,11 +171,11 @@ func (db *DB) checkEntryIdxMode() error {
 		}
 	}
 
-	if db.opt.EntryIdxMode != HintBPTSparseIdxMode && hasDataFlag && hasBptDirFlag {
+	if db.opt.EntryIdxMode.Not(consts.HintBPTSparseIdxMode) && hasDataFlag && hasBptDirFlag {
 		return errors.New("not support HintBPTSparseIdxMode switch to the other EntryIdxMode")
 	}
 
-	if db.opt.EntryIdxMode == HintBPTSparseIdxMode && !hasBptDirFlag && hasDataFlag {
+	if db.opt.EntryIdxMode.Is(consts.HintBPTSparseIdxMode) && !hasBptDirFlag && hasDataFlag {
 		return errors.New("not support the other EntryIdxMode switch to HintBPTSparseIdxMode")
 	}
 
@@ -292,7 +185,7 @@ func (db *DB) checkEntryIdxMode() error {
 // Update executes a function within a managed read/write transaction.
 func (db *DB) Update(fn func(tx *Tx) error) error {
 	if fn == nil {
-		return ErrFn
+		return errs.ErrFn
 	}
 
 	return db.managed(true, fn)
@@ -301,7 +194,7 @@ func (db *DB) Update(fn func(tx *Tx) error) error {
 // View executes a function within a managed read-only transaction.
 func (db *DB) View(fn func(tx *Tx) error) error {
 	if fn == nil {
-		return ErrFn
+		return errs.ErrFn
 	}
 
 	return db.managed(false, fn)
@@ -323,11 +216,11 @@ func (db *DB) Merge() error {
 	var (
 		off                 int64
 		pendingMergeFIds    []int
-		pendingMergeEntries []*Entry
+		pendingMergeEntries []*model.Entry
 	)
 
-	if db.opt.EntryIdxMode == HintBPTSparseIdxMode {
-		return ErrNotSupportHintBPTSparseIdxMode
+	if db.opt.EntryIdxMode.Is(consts.HintBPTSparseIdxMode) {
+		return errs.ErrNotSupportHintBPTSparseIdxMode
 	}
 
 	db.isMerging = true
@@ -347,7 +240,7 @@ func (db *DB) Merge() error {
 			return err
 		}
 
-		pendingMergeEntries = []*Entry{}
+		pendingMergeEntries = []*model.Entry{}
 
 		for {
 			if entry, err := f.ReadAt(int(off)); err == nil {
@@ -437,7 +330,7 @@ func (db *DB) Close() error {
 	defer db.mu.Unlock()
 
 	if db.closed {
-		return ErrDBClosed
+		return errs.ErrDBClosed
 	}
 
 	db.closed = true
@@ -485,11 +378,11 @@ func (db *DB) getMaxFileIDAndFileIDs() (maxFileID int64, dataFileIds []int) {
 	for _, f := range files {
 		id := f.Name()
 		fileSuffix := path.Ext(path.Base(id))
-		if fileSuffix != DataSuffix {
+		if fileSuffix != consts.DataSuffix {
 			continue
 		}
 
-		id = strings.TrimSuffix(id, DataSuffix)
+		id = strings.TrimSuffix(id, consts.DataSuffix)
 		idVal, _ := strconv2.StrToInt(id)
 		dataFileIds = append(dataFileIds, idVal)
 	}
@@ -532,15 +425,15 @@ func (db *DB) getActiveFileWriteOff() (off int64, err error) {
 	return
 }
 
-func (db *DB) parseDataFiles(dataFileIds []int) (unconfirmedRecords []*Record, committedTxIds map[uint64]struct{}, err error) {
+func (db *DB) parseDataFiles(dataFileIds []int) (unconfirmedRecords []*model.Record, committedTxIds map[uint64]struct{}, err error) {
 	var (
 		off int64
-		e   *Entry
+		e   *model.Entry
 	)
 
 	committedTxIds = make(map[uint64]struct{})
 
-	if db.opt.EntryIdxMode == HintBPTSparseIdxMode {
+	if db.opt.EntryIdxMode.Is(consts.HintBPTSparseIdxMode) {
 		dataFileIds = dataFileIds[len(dataFileIds)-1:]
 	}
 
@@ -559,22 +452,22 @@ func (db *DB) parseDataFiles(dataFileIds []int) (unconfirmedRecords []*Record, c
 				}
 
 				e = nil
-				if db.opt.EntryIdxMode == HintKeyValAndRAMIdxMode {
-					e = &Entry{
+				if db.opt.EntryIdxMode.Is(consts.HintKeyValAndRAMIdxMode) {
+					e = &model.Entry{
 						Key:   entry.Key,
 						Value: entry.Value,
 						Meta:  entry.Meta,
 					}
 				}
 
-				if entry.Meta.Status == Committed {
+				if entry.Meta.Status.Is(consts.Committed) {
 					committedTxIds[entry.Meta.TxID] = struct{}{}
 					db.ActiveCommittedTxIdsIdx.Insert([]byte(strconv2.Int64ToStr(int64(entry.Meta.TxID))), nil,
-						&Hint{Meta: &MetaData{Flag: DataSetFlag}}, CountFlagEnabled)
+						&model.Hint{Meta: &model.MetaData{Flag: consts.DataSetFlag}}, consts.CountFlagEnabled)
 				}
 
-				unconfirmedRecords = append(unconfirmedRecords, &Record{
-					H: &Hint{
+				unconfirmedRecords = append(unconfirmedRecords, &model.Record{
+					H: &model.Hint{
 						Key:     entry.Key,
 						FileID:  fID,
 						Meta:    entry.Meta,
@@ -583,7 +476,7 @@ func (db *DB) parseDataFiles(dataFileIds []int) (unconfirmedRecords []*Record, c
 					E: e,
 				})
 
-				if db.opt.EntryIdxMode == HintBPTSparseIdxMode {
+				if db.opt.EntryIdxMode.Is(consts.HintBPTSparseIdxMode) {
 					db.BPTreeKeyEntryPosMap[string(getNewKey(string(entry.Meta.Bucket), entry.Key))] = off
 				}
 
@@ -657,21 +550,21 @@ func (db *DB) buildBPTreeRootIdxes(dataFileIds []int) error {
 	return nil
 }
 
-func (db *DB) buildBPTreeIdx(bucket string, r *Record) error {
+func (db *DB) buildBPTreeIdx(bucket string, r *model.Record) error {
 	if _, ok := db.BPTreeIdx[bucket]; !ok {
 		db.BPTreeIdx[bucket] = NewTree()
 	}
 
-	if err := db.BPTreeIdx[bucket].Insert(r.H.Key, r.E, r.H, CountFlagEnabled); err != nil {
+	if err := db.BPTreeIdx[bucket].Insert(r.H.Key, r.E, r.H, consts.CountFlagEnabled); err != nil {
 		return fmt.Errorf("when build BPTreeIdx insert index err: %s", err)
 	}
 
 	return nil
 }
 
-func (db *DB) buildActiveBPTreeIdx(r *Record) error {
+func (db *DB) buildActiveBPTreeIdx(r *model.Record) error {
 	newKey := getNewKey(string(r.H.Meta.Bucket), r.H.Key)
-	if err := db.ActiveBPTreeIdx.Insert(newKey, r.E, r.H, CountFlagEnabled); err != nil {
+	if err := db.ActiveBPTreeIdx.Insert(newKey, r.E, r.H, consts.CountFlagEnabled); err != nil {
 		return fmt.Errorf("when build BPTreeIdx insert index err: %s", err)
 	}
 
@@ -679,7 +572,7 @@ func (db *DB) buildActiveBPTreeIdx(r *Record) error {
 }
 
 func (db *DB) buildBucketMetaIdx() error {
-	if db.opt.EntryIdxMode == HintBPTSparseIdxMode {
+	if db.opt.EntryIdxMode.Is(consts.HintBPTSparseIdxMode) {
 		files, err := ioutil.ReadDir(db.getBucketMetaPath())
 		if err != nil {
 			return err
@@ -689,13 +582,13 @@ func (db *DB) buildBucketMetaIdx() error {
 			for _, f := range files {
 				name := f.Name()
 				fileSuffix := path.Ext(path.Base(name))
-				if fileSuffix != BucketMetaSuffix {
+				if fileSuffix != consts.BucketMetaSuffix {
 					continue
 				}
 
-				name = strings.TrimSuffix(name, BucketMetaSuffix)
+				name = strings.TrimSuffix(name, consts.BucketMetaSuffix)
 
-				bucketMeta, err := ReadBucketMeta(db.getBucketMetaFilePath(name))
+				bucketMeta, err := model.ReadBucketMeta(db.getBucketMetaFilePath(name))
 				if err == io.EOF {
 					break
 				}
@@ -711,20 +604,20 @@ func (db *DB) buildBucketMetaIdx() error {
 	return nil
 }
 
-func (db *DB) buildOtherIdxes(bucket string, r *Record) error {
-	if r.H.Meta.Ds == DataStructureSet {
+func (db *DB) buildOtherIdxes(bucket string, r *model.Record) error {
+	if r.H.Meta.Ds.Is(consts.DataStructureSet) {
 		if err := db.buildSetIdx(bucket, r); err != nil {
 			return err
 		}
 	}
 
-	if r.H.Meta.Ds == DataStructureSortedSet {
+	if r.H.Meta.Ds.Is(consts.DataStructureSortedSet) {
 		if err := db.buildSortedSetIdx(bucket, r); err != nil {
 			return err
 		}
 	}
 
-	if r.H.Meta.Ds == DataStructureList {
+	if r.H.Meta.Ds.Is(consts.DataStructureList) {
 		if err := db.buildListIdx(bucket, r); err != nil {
 			return err
 		}
@@ -750,10 +643,10 @@ func (db *DB) buildHintIdx(dataFileIds []int) error {
 		if _, ok := db.committedTxIds[r.H.Meta.TxID]; ok {
 			bucket := string(r.H.Meta.Bucket)
 
-			if r.H.Meta.Ds == DataStructureBPTree {
-				r.H.Meta.Status = Committed
+			if r.H.Meta.Ds.Is(consts.DataStructureBPTree) {
+				r.H.Meta.Status.Is(consts.Committed)
 
-				if db.opt.EntryIdxMode == HintBPTSparseIdxMode {
+				if db.opt.EntryIdxMode.Is(consts.HintBPTSparseIdxMode) {
 					if err = db.buildActiveBPTreeIdx(r); err != nil {
 						return err
 					}
@@ -768,7 +661,7 @@ func (db *DB) buildHintIdx(dataFileIds []int) error {
 				return err
 			}
 
-			if r.H.Meta.Ds == DataStructureNone {
+			if r.H.Meta.Ds.Is(consts.DataStructureNone) {
 				db.buildNotDSIdxes(bucket, r)
 			}
 
@@ -776,7 +669,7 @@ func (db *DB) buildHintIdx(dataFileIds []int) error {
 		}
 	}
 
-	if HintBPTSparseIdxMode == db.opt.EntryIdxMode {
+	if consts.HintBPTSparseIdxMode.Is(db.opt.EntryIdxMode) {
 		if err = db.buildBPTreeRootIdxes(dataFileIds); err != nil {
 			return err
 		}
@@ -785,53 +678,55 @@ func (db *DB) buildHintIdx(dataFileIds []int) error {
 	return nil
 }
 
-func (db *DB) buildNotDSIdxes(bucket string, r *Record) {
-	if r.H.Meta.Flag == DataSetBucketDeleteFlag {
-		db.deleteBucket(DataStructureSet, bucket)
+func (db *DB) buildNotDSIdxes(bucket string, r *model.Record) {
+	if r.H.Meta.Flag.Is(consts.DataSetBucketDeleteFlag) {
+		db.deleteBucket(consts.DataStructureSet, bucket)
 	}
-	if r.H.Meta.Flag == DataSortedSetBucketDeleteFlag {
-		db.deleteBucket(DataStructureSortedSet, bucket)
+	if r.H.Meta.Flag.Is(consts.DataSortedSetBucketDeleteFlag) {
+		db.deleteBucket(consts.DataStructureSortedSet, bucket)
 	}
-	if r.H.Meta.Flag == DataBPTreeBucketDeleteFlag {
-		db.deleteBucket(DataStructureBPTree, bucket)
+	if r.H.Meta.Flag.Is(consts.DataBPTreeBucketDeleteFlag) {
+		db.deleteBucket(consts.DataStructureBPTree, bucket)
 	}
-	if r.H.Meta.Flag == DataListBucketDeleteFlag {
-		db.deleteBucket(DataStructureList, bucket)
+	if r.H.Meta.Flag.Is(consts.DataListBucketDeleteFlag) {
+		db.deleteBucket(consts.DataStructureList, bucket)
 	}
 }
 
-func (db *DB) deleteBucket(ds uint16, bucket string) {
-	if ds == DataStructureSet {
+func (db *DB) deleteBucket(ds consts.DataStruct, bucket string) {
+	if ds.Is(consts.DataStructureSet) {
 		delete(db.SetIdx, bucket)
 	}
-	if ds == DataStructureSortedSet {
+	if ds.Is(consts.DataStructureSortedSet) {
 		delete(db.SortedSetIdx, bucket)
 	}
-	if ds == DataStructureBPTree {
+	if ds.Is(consts.DataStructureBPTree) {
 		delete(db.BPTreeIdx, bucket)
 	}
-	if ds == DataStructureList {
+	if ds.Is(consts.DataStructureList) {
 		delete(db.ListIdx, bucket)
 	}
 }
 
 // buildSetIdx builds set index when opening the DB.
-func (db *DB) buildSetIdx(bucket string, r *Record) error {
+func (db *DB) buildSetIdx(bucket string, r *model.Record) error {
 	if _, ok := db.SetIdx[bucket]; !ok {
 		db.SetIdx[bucket] = set.New()
 	}
 
 	if r.E == nil {
-		return ErrEntryIdxModeOpt
+		return errs.ErrEntryIdxModeOpt
 	}
 
-	if r.H.Meta.Flag == DataSetFlag {
+	flag := r.H.Meta.Flag
+
+	if flag.Is(consts.DataSetFlag) {
 		if err := db.SetIdx[bucket].SAdd(string(r.E.Key), r.E.Value); err != nil {
 			return fmt.Errorf("when build SetIdx SAdd index err: %s", err)
 		}
 	}
 
-	if r.H.Meta.Flag == DataDeleteFlag {
+	if flag.Is(consts.DataDeleteFlag) {
 		if err := db.SetIdx[bucket].SRem(string(r.E.Key), r.E.Value); err != nil {
 			return fmt.Errorf("when build SetIdx SRem index err: %s", err)
 		}
@@ -841,34 +736,31 @@ func (db *DB) buildSetIdx(bucket string, r *Record) error {
 }
 
 // buildSortedSetIdx builds sorted set index when opening the DB.
-func (db *DB) buildSortedSetIdx(bucket string, r *Record) error {
+func (db *DB) buildSortedSetIdx(bucket string, r *model.Record) error {
 	if _, ok := db.SortedSetIdx[bucket]; !ok {
 		db.SortedSetIdx[bucket] = zset.New()
 	}
-
-	if r.H.Meta.Flag == DataZAddFlag {
-		keyAndScore := strings.Split(string(r.E.Key), SeparatorForZSetKey)
+	flag := r.H.Meta.Flag
+	switch flag {
+	case consts.DataZAddFlag:
+		keyAndScore := strings.Split(string(r.E.Key), consts.SeparatorForZSetKey)
 		if len(keyAndScore) == 2 {
 			key := keyAndScore[0]
 			score, _ := strconv2.StrToFloat64(keyAndScore[1])
 			if r.E == nil {
-				return ErrEntryIdxModeOpt
+				return errs.ErrEntryIdxModeOpt
 			}
 			_ = db.SortedSetIdx[bucket].Put(key, zset.SCORE(score), r.E.Value)
 		}
-	}
-	if r.H.Meta.Flag == DataZRemFlag {
+	case consts.DataZRemFlag:
 		_ = db.SortedSetIdx[bucket].Remove(string(r.E.Key))
-	}
-	if r.H.Meta.Flag == DataZRemRangeByRankFlag {
+	case consts.DataZRemRangeByRankFlag:
 		start, _ := strconv2.StrToInt(string(r.E.Key))
 		end, _ := strconv2.StrToInt(string(r.E.Value))
 		_ = db.SortedSetIdx[bucket].GetByRankRange(start, end, true)
-	}
-	if r.H.Meta.Flag == DataZPopMaxFlag {
+	case consts.DataZPopMaxFlag:
 		_ = db.SortedSetIdx[bucket].PopMax()
-	}
-	if r.H.Meta.Flag == DataZPopMinFlag {
+	case consts.DataZPopMinFlag:
 		_ = db.SortedSetIdx[bucket].PopMin()
 	}
 
@@ -876,52 +768,52 @@ func (db *DB) buildSortedSetIdx(bucket string, r *Record) error {
 }
 
 // buildListIdx builds List index when opening the DB.
-func (db *DB) buildListIdx(bucket string, r *Record) error {
+func (db *DB) buildListIdx(bucket string, r *model.Record) error {
 	if _, ok := db.ListIdx[bucket]; !ok {
 		db.ListIdx[bucket] = list.New()
 	}
 
 	if r.E == nil {
-		return ErrEntryIdxModeOpt
+		return errs.ErrEntryIdxModeOpt
 	}
 
 	switch r.H.Meta.Flag {
-	case DataLPushFlag:
+	case consts.DataLPushFlag:
 		_, _ = db.ListIdx[bucket].LPush(string(r.E.Key), r.E.Value)
-	case DataRPushFlag:
+	case consts.DataRPushFlag:
 		_, _ = db.ListIdx[bucket].RPush(string(r.E.Key), r.E.Value)
-	case DataLRemFlag:
-		countAndValueIndex := strings.Split(string(r.E.Value), SeparatorForListKey)
+	case consts.DataLRemFlag:
+		countAndValueIndex := strings.Split(string(r.E.Value), consts.SeparatorForListKey)
 		count, _ := strconv2.StrToInt(countAndValueIndex[0])
 		value := []byte(countAndValueIndex[1])
 
 		if _, err := db.ListIdx[bucket].LRem(string(r.E.Key), count, value); err != nil {
 			return ErrWhenBuildListIdx(err)
 		}
-	case DataLPopFlag:
+	case consts.DataLPopFlag:
 		if _, err := db.ListIdx[bucket].LPop(string(r.E.Key)); err != nil {
 			return ErrWhenBuildListIdx(err)
 		}
-	case DataRPopFlag:
+	case consts.DataRPopFlag:
 		if _, err := db.ListIdx[bucket].RPop(string(r.E.Key)); err != nil {
 			return ErrWhenBuildListIdx(err)
 		}
-	case DataLSetFlag:
-		keyAndIndex := strings.Split(string(r.E.Key), SeparatorForListKey)
+	case consts.DataLSetFlag:
+		keyAndIndex := strings.Split(string(r.E.Key), consts.SeparatorForListKey)
 		newKey := keyAndIndex[0]
 		index, _ := strconv2.StrToInt(keyAndIndex[1])
 		if err := db.ListIdx[bucket].LSet(newKey, index, r.E.Value); err != nil {
 			return ErrWhenBuildListIdx(err)
 		}
-	case DataLTrimFlag:
-		keyAndStartIndex := strings.Split(string(r.E.Key), SeparatorForListKey)
+	case consts.DataLTrimFlag:
+		keyAndStartIndex := strings.Split(string(r.E.Key), consts.SeparatorForListKey)
 		newKey := keyAndStartIndex[0]
 		start, _ := strconv2.StrToInt(keyAndStartIndex[1])
 		end, _ := strconv2.StrToInt(string(r.E.Value))
 		if err := db.ListIdx[bucket].Ltrim(newKey, start, end); err != nil {
 			return ErrWhenBuildListIdx(err)
 		}
-	case DataLRemByIndex:
+	case consts.DataLRemByIndex:
 		indexes, err := UnmarshalInts(r.E.Value)
 		if err != nil {
 			return err
@@ -1004,7 +896,7 @@ const bptDir = "bpt"
 // getDataPath returns the data path at given fid.
 func (db *DB) getDataPath(fID int64) string {
 	separator := string(filepath.Separator)
-	return db.opt.Dir + separator + strconv2.Int64ToStr(fID) + DataSuffix
+	return db.opt.Dir + separator + strconv2.Int64ToStr(fID) + consts.DataSuffix
 }
 
 func (db *DB) getMetaPath() string {
@@ -1019,7 +911,7 @@ func (db *DB) getBucketMetaPath() string {
 
 func (db *DB) getBucketMetaFilePath(name string) string {
 	separator := string(filepath.Separator)
-	return db.getBucketMetaPath() + separator + name + BucketMetaSuffix
+	return db.getBucketMetaPath() + separator + name + consts.BucketMetaSuffix
 }
 
 func (db *DB) getBPTDir() string {
@@ -1029,36 +921,36 @@ func (db *DB) getBPTDir() string {
 
 func (db *DB) getBPTPath(fID int64) string {
 	separator := string(filepath.Separator)
-	return db.getBPTDir() + separator + strconv2.Int64ToStr(fID) + BPTIndexSuffix
+	return db.getBPTDir() + separator + strconv2.Int64ToStr(fID) + consts.BPTIndexSuffix
 }
 
 func (db *DB) getBPTRootPath(fID int64) string {
 	separator := string(filepath.Separator)
-	return db.getBPTDir() + separator + "root" + separator + strconv2.Int64ToStr(fID) + BPTRootIndexSuffix
+	return db.getBPTDir() + separator + "root" + separator + strconv2.Int64ToStr(fID) + consts.BPTRootIndexSuffix
 }
 
 func (db *DB) getBPTTxIDPath(fID int64) string {
 	separator := string(filepath.Separator)
-	return db.getBPTDir() + separator + "txid" + separator + strconv2.Int64ToStr(fID) + BPTTxIDIndexSuffix
+	return db.getBPTDir() + separator + "txid" + separator + strconv2.Int64ToStr(fID) + consts.BPTTxIDIndexSuffix
 }
 
 func (db *DB) getBPTRootTxIDPath(fID int64) string {
 	separator := string(filepath.Separator)
-	return db.getBPTDir() + separator + "txid" + separator + strconv2.Int64ToStr(fID) + BPTRootTxIDIndexSuffix
+	return db.getBPTDir() + separator + "txid" + separator + strconv2.Int64ToStr(fID) + consts.BPTRootTxIDIndexSuffix
 }
 
-func (db *DB) getPendingMergeEntries(entry *Entry, pendingMergeEntries []*Entry) []*Entry {
-	if entry.Meta.Ds == DataStructureBPTree {
+func (db *DB) getPendingMergeEntries(entry *model.Entry, pendingMergeEntries []*model.Entry) []*model.Entry {
+	if entry.Meta.Ds.Is(consts.DataStructureBPTree) {
 		bptIdx, exist := db.BPTreeIdx[string(entry.Meta.Bucket)]
 		if exist {
 			r, err := bptIdx.Find(entry.Key)
-			if err == nil && r.H.Meta.Flag == DataSetFlag {
+			if err == nil && r.H.Meta.Flag.Is(consts.DataSetFlag) {
 				pendingMergeEntries = append(pendingMergeEntries, entry)
 			}
 		}
 	}
 
-	if entry.Meta.Ds == DataStructureSet {
+	if entry.Meta.Ds.Is(consts.DataStructureSet) {
 		setIdx, exist := db.SetIdx[string(entry.Meta.Bucket)]
 		if exist {
 			if setIdx.SIsMember(string(entry.Key), entry.Value) {
@@ -1067,8 +959,8 @@ func (db *DB) getPendingMergeEntries(entry *Entry, pendingMergeEntries []*Entry)
 		}
 	}
 
-	if entry.Meta.Ds == DataStructureSortedSet {
-		keyAndScore := strings.Split(string(entry.Key), SeparatorForZSetKey)
+	if entry.Meta.Ds.Is(consts.DataStructureSortedSet) {
+		keyAndScore := strings.Split(string(entry.Key), consts.SeparatorForZSetKey)
 		if len(keyAndScore) == 2 {
 			key := keyAndScore[0]
 			sortedSetIdx, exist := db.SortedSetIdx[string(entry.Meta.Bucket)]
@@ -1081,12 +973,12 @@ func (db *DB) getPendingMergeEntries(entry *Entry, pendingMergeEntries []*Entry)
 		}
 	}
 
-	if entry.Meta.Ds == DataStructureList {
+	if entry.Meta.Ds.Is(consts.DataStructureList) {
 		listIdx, exist := db.ListIdx[string(entry.Meta.Bucket)]
 		if exist {
 			items, _ := listIdx.LRange(string(entry.Key), 0, -1)
 			ok := false
-			if entry.Meta.Flag == DataRPushFlag || entry.Meta.Flag == DataLPushFlag {
+			if entry.Meta.Flag.OneOf([]consts.DataFlag{consts.DataRPushFlag, consts.DataLPushFlag}) {
 				for _, item := range items {
 					if string(entry.Value) == string(item) {
 						ok = true
@@ -1103,7 +995,7 @@ func (db *DB) getPendingMergeEntries(entry *Entry, pendingMergeEntries []*Entry)
 	return pendingMergeEntries
 }
 
-func (db *DB) reWriteData(pendingMergeEntries []*Entry) error {
+func (db *DB) reWriteData(pendingMergeEntries []*model.Entry) error {
 	if len(pendingMergeEntries) == 0 {
 		return nil
 	}
@@ -1133,13 +1025,11 @@ func (db *DB) reWriteData(pendingMergeEntries []*Entry) error {
 	return nil
 }
 
-func (db *DB) isFilterEntry(entry *Entry) bool {
-	if entry.Meta.Flag == DataDeleteFlag || entry.Meta.Flag == DataRPopFlag ||
-		entry.Meta.Flag == DataLPopFlag || entry.Meta.Flag == DataLRemFlag ||
-		entry.Meta.Flag == DataLTrimFlag || entry.Meta.Flag == DataZRemFlag ||
-		entry.Meta.Flag == DataZRemRangeByRankFlag || entry.Meta.Flag == DataZPopMaxFlag ||
-		entry.Meta.Flag == DataZPopMinFlag || entry.Meta.Flag == DataLRemByIndex ||
-		IsExpired(entry.Meta.TTL, entry.Meta.Timestamp) {
+func (db *DB) isFilterEntry(entry *model.Entry) bool {
+	filterFlags := []consts.DataFlag{consts.DataDeleteFlag, consts.DataRPopFlag, consts.DataLPopFlag, consts.DataLRemFlag, consts.DataLTrimFlag,
+		consts.DataZRemFlag, consts.DataZRemRangeByRankFlag, consts.DataZPopMaxFlag, consts.DataZPopMinFlag, consts.DataLRemByIndex,
+	}
+	if entry.Meta.Flag.OneOf(filterFlags) || model.IsExpired(entry.Meta.TTL, entry.Meta.Timestamp) {
 		return true
 	}
 
@@ -1147,15 +1037,15 @@ func (db *DB) isFilterEntry(entry *Entry) bool {
 }
 
 // getRecordFromKey fetches Record for given key and bucket
-// this is a helper function used in Merge so it does not work if index mode is HintBPTSparseIdxMode
-func (db *DB) getRecordFromKey(bucket, key []byte) (record *Record, err error) {
+// this is a helper function used in Merge, so it does not work if index mode is HintBPTSparseIdxMode
+func (db *DB) getRecordFromKey(bucket, key []byte) (record *model.Record, err error) {
 	idxMode := db.opt.EntryIdxMode
-	if !(idxMode == HintKeyValAndRAMIdxMode || idxMode == HintKeyAndRAMIdxMode) {
+	if idxMode.NoneOf([]consts.EntryIdxMode{consts.HintKeyValAndRAMIdxMode, consts.HintKeyAndRAMIdxMode}) {
 		return nil, errors.New("not implemented")
 	}
 	idx, ok := db.BPTreeIdx[string(bucket)]
 	if !ok {
-		return nil, ErrBucketNotFound
+		return nil, errs.ErrBucketNotFound
 	}
 	return idx.Find(key)
 }

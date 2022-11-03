@@ -16,6 +16,8 @@ package nutsdb
 
 import (
 	"fmt"
+	"github.com/xujiajun/nutsdb/consts"
+	"github.com/xujiajun/nutsdb/errs"
 	"io/ioutil"
 	"os"
 	"reflect"
@@ -70,7 +72,7 @@ func TestDB_Basic(t *testing.T) {
 	//put
 	err = db.Update(
 		func(tx *Tx) error {
-			return tx.Put(bucket, key, val, Persistent)
+			return tx.Put(bucket, key, val, consts.Persistent)
 		})
 	require.NoError(t, err)
 
@@ -106,7 +108,7 @@ func TestDB_Basic(t *testing.T) {
 	val = []byte("val001")
 	err = db.Update(
 		func(tx *Tx) error {
-			return tx.Put(bucket, key, val, Persistent)
+			return tx.Put(bucket, key, val, consts.Persistent)
 		})
 	require.NoError(t, err)
 
@@ -123,7 +125,7 @@ func TestDB_Basic(t *testing.T) {
 
 func TestDB_BPTSparse(t *testing.T) {
 	InitOpt("", true)
-	opt.EntryIdxMode = HintBPTSparseIdxMode
+	opt.EntryIdxMode = consts.HintBPTSparseIdxMode
 	db, err = Open(opt)
 	require.NoError(t, err)
 	defer db.Close()
@@ -139,14 +141,14 @@ func TestDB_BPTSparse(t *testing.T) {
 	//put
 	err = db.Update(
 		func(tx *Tx) error {
-			return tx.Put(bucket1, key1, val1, Persistent)
+			return tx.Put(bucket1, key1, val1, consts.Persistent)
 		})
 	require.NoError(t, err)
 
 	//put
 	err = db.Update(
 		func(tx *Tx) error {
-			return tx.Put(bucket2, key2, val2, Persistent)
+			return tx.Put(bucket2, key2, val2, consts.Persistent)
 		})
 	require.NoError(t, err)
 
@@ -201,7 +203,7 @@ func TestDB_Merge_For_string(t *testing.T) {
 	value1 := []byte("value1value1value1value1value1")
 	err = db2.Update(
 		func(tx *Tx) error {
-			return tx.Put(bucketForString, key1, value1, Persistent)
+			return tx.Put(bucketForString, key1, value1, consts.Persistent)
 		})
 	assert.NoError(t, err, "initStringDataAndDel,err batch put")
 
@@ -209,7 +211,7 @@ func TestDB_Merge_For_string(t *testing.T) {
 	value2 := []byte("value2value2value2value2value2")
 	err = db2.Update(
 		func(tx *Tx) error {
-			return tx.Put(bucketForString, key2, value2, Persistent)
+			return tx.Put(bucketForString, key2, value2, consts.Persistent)
 		})
 	assert.NoError(t, err, "initStringDataAndDel,err batch put")
 
@@ -246,7 +248,7 @@ func Test_MergeRepeated(t *testing.T) {
 	}
 	for i := 0; i < 20; i++ {
 		err = db.Update(func(tx *Tx) error {
-			if err := tx.Put("bucket", []byte("hello"), []byte("world"), Persistent); err != nil {
+			if err := tx.Put("bucket", []byte("hello"), []byte("world"), consts.Persistent); err != nil {
 				return err
 			}
 			return nil
@@ -755,7 +757,7 @@ func TestTx_Get_NotFound(t *testing.T) {
 func opStrDataForTestOpen(t *testing.T) {
 	strBucket := "myStringBucket"
 	if err := db.Update(func(tx *Tx) error {
-		err := tx.Put(strBucket, []byte("key"), []byte("val"), Persistent)
+		err := tx.Put(strBucket, []byte("key"), []byte("val"), consts.Persistent)
 		if err != nil {
 			return err
 		}
@@ -1100,18 +1102,18 @@ func Test_getRecordFromKey(t *testing.T) {
 	InitOpt("", true)
 	db, err = Open(opt,
 		WithSegmentSize(120),
-		WithEntryIdxMode(HintKeyAndRAMIdxMode),
+		WithEntryIdxMode(consts.HintKeyAndRAMIdxMode),
 	)
 	if err != nil {
 		t.Errorf("wanted nil, got %v", err)
 	}
 	_, err = db.getRecordFromKey([]byte("bucket"), []byte("hello"))
-	if err != ErrBucketNotFound {
+	if err != errs.ErrBucketNotFound {
 		t.Errorf("wanted ErrBucketNotFound, got %v", err)
 	}
 	for i := 0; i < 10; i++ {
 		err = db.Update(func(tx *Tx) error {
-			if err := tx.Put("bucket", []byte("hello"), []byte("world"), Persistent); err != nil {
+			if err := tx.Put("bucket", []byte("hello"), []byte("world"), consts.Persistent); err != nil {
 				return err
 			}
 			return nil
@@ -1159,7 +1161,7 @@ func withRAMIdxDB(t *testing.T, fn func(t *testing.T, db *DB)) {
 	tmpdir, _ := ioutil.TempDir("", "nutsdb")
 	opt := DefaultOptions
 	opt.Dir = tmpdir
-	opt.EntryIdxMode = HintKeyAndRAMIdxMode
+	opt.EntryIdxMode = consts.HintKeyAndRAMIdxMode
 
 	withDBOption(t, opt, fn)
 }
@@ -1168,7 +1170,7 @@ func withBPTSpareeIdxDB(t *testing.T, fn func(t *testing.T, db *DB)) {
 	tmpdir, _ := ioutil.TempDir("", "nutsdb")
 	opt := DefaultOptions
 	opt.Dir = tmpdir
-	opt.EntryIdxMode = HintKeyAndRAMIdxMode
+	opt.EntryIdxMode = consts.HintKeyAndRAMIdxMode
 
 	withDBOption(t, opt, fn)
 }

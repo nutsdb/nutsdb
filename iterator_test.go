@@ -16,6 +16,7 @@ package nutsdb
 
 import (
 	"fmt"
+	"github.com/xujiajun/nutsdb/consts"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -32,7 +33,7 @@ func TestIterator_SetNext(t *testing.T) {
 				for i := 0; i < 10; i++ {
 					key := []byte("key_" + fmt.Sprintf("%07d", i))
 					val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", i))
-					err = tx.Put(bucket, key, val, Persistent)
+					err = tx.Put(bucket, key, val, consts.Persistent)
 					assert.NoError(t, err)
 				}
 				assert.NoError(t, tx.Commit())
@@ -73,7 +74,7 @@ func TestIterator_SetNext(t *testing.T) {
 				for i := 0; i < 10; i++ {
 					key := []byte("key_" + fmt.Sprintf("%07d", i))
 					val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", i))
-					err = tx.Put(bucket, key, val, Persistent)
+					err = tx.Put(bucket, key, val, consts.Persistent)
 					assert.NoError(t, err)
 				}
 				assert.NoError(t, tx.Commit())
@@ -117,7 +118,7 @@ func TestIterator_Seek(t *testing.T) {
 				for i := 0; i < 10; i++ {
 					key := []byte("key_" + fmt.Sprintf("%07d", i))
 					val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", i))
-					err = tx.Put(bucket, key, val, Persistent)
+					err = tx.Put(bucket, key, val, consts.Persistent)
 					assert.NoError(t, err)
 				}
 				assert.NoError(t, tx.Commit())
@@ -159,17 +160,17 @@ func TestIterator_Seek(t *testing.T) {
 
 			key := []byte("key_" + fmt.Sprintf("%07d", 0))
 			val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 0))
-			err = tx.Put(bucket, key, val, Persistent)
+			err = tx.Put(bucket, key, val, consts.Persistent)
 			assert.NoError(t, err)
 
 			key = []byte("key_" + fmt.Sprintf("%07d", 1))
 			val = []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 1))
-			err = tx.Put(bucket, key, val, Persistent)
+			err = tx.Put(bucket, key, val, consts.Persistent)
 			assert.NoError(t, err)
 
 			key = []byte("key_" + fmt.Sprintf("%07d", 3))
 			val = []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 3))
-			err = tx.Put(bucket, key, val, Persistent)
+			err = tx.Put(bucket, key, val, consts.Persistent)
 			assert.NoError(t, err)
 
 			assert.NoError(t, tx.Commit())
@@ -210,17 +211,17 @@ func TestIterator_Seek(t *testing.T) {
 
 			key := []byte("key_" + fmt.Sprintf("%07d", 0))
 			val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 0))
-			err = tx.Put(bucket, key, val, Persistent)
+			err = tx.Put(bucket, key, val, consts.Persistent)
 			assert.NoError(t, err)
 
 			key = []byte("key_" + fmt.Sprintf("%07d", 1))
 			val = []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 1))
-			err = tx.Put(bucket, key, val, Persistent)
+			err = tx.Put(bucket, key, val, consts.Persistent)
 			assert.NoError(t, err)
 
 			key = []byte("key_" + fmt.Sprintf("%07d", 3))
 			val = []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 3))
-			err = tx.Put(bucket, key, val, Persistent)
+			err = tx.Put(bucket, key, val, consts.Persistent)
 			assert.NoError(t, err)
 
 			assert.NoError(t, tx.Commit())

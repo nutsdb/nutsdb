@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package nutsdb
+package model
 
 import (
 	"os"
@@ -33,10 +33,10 @@ type BucketTestSuite struct {
 
 func (suite *BucketTestSuite) SetupSuite() {
 	suite.bucketMeat = &BucketMeta{
-		start:     []byte("key100"),
-		end:       []byte("key999"),
-		startSize: 6,
-		endSize:   6,
+		Start:     []byte("key100"),
+		End:       []byte("key999"),
+		StartSize: 6,
+		EndSize:   6,
 	}
 	suite.expectedEncode = []byte{51, 34, 113, 225, 6, 0, 0, 0, 6, 0, 0, 0, 107, 101, 121, 49, 48, 48, 107, 101, 121, 57, 57, 57}
 	suite.tempFile = "/tmp/metadata.meta"

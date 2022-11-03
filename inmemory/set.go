@@ -15,8 +15,8 @@
 package inmemory
 
 import (
-	"github.com/xujiajun/nutsdb"
 	"github.com/xujiajun/nutsdb/ds/set"
+	"github.com/xujiajun/nutsdb/errs"
 
 	"github.com/pkg/errors"
 )
@@ -36,7 +36,7 @@ func (db *DB) SAdd(bucket string, key string, items ...[]byte) error {
 func (db *DB) SRem(bucket string, key string, items ...[]byte) error {
 	err := db.Managed(bucket, true, func(shardDB *ShardDB) error {
 		if _, ok := shardDB.SetIdx[bucket]; !ok {
-			return nutsdb.ErrBucket
+			return errs.ErrBucket
 		}
 		return shardDB.SetIdx[bucket].SRem(key, items...)
 	})
@@ -47,7 +47,7 @@ func (db *DB) SRem(bucket string, key string, items ...[]byte) error {
 func (db *DB) SAreMembers(bucket string, key string, items ...[]byte) (areMembers bool, err error) {
 	err = db.Managed(bucket, false, func(shardDB *ShardDB) error {
 		if _, ok := shardDB.SetIdx[bucket]; !ok {
-			return nutsdb.ErrBucket
+			return errs.ErrBucket
 		}
 		areMembers, err = shardDB.SetIdx[bucket].SAreMembers(key, items...)
 		return err
@@ -59,7 +59,7 @@ func (db *DB) SAreMembers(bucket string, key string, items ...[]byte) (areMember
 func (db *DB) SIsMember(bucket string, key string, item []byte) (isMember bool, err error) {
 	err = db.Managed(bucket, false, func(shardDB *ShardDB) error {
 		if _, ok := shardDB.SetIdx[bucket]; !ok {
-			return nutsdb.ErrBucket
+			return errs.ErrBucket
 		}
 		isMember = shardDB.SetIdx[bucket].SIsMember(key, item)
 		return nil
@@ -71,7 +71,7 @@ func (db *DB) SIsMember(bucket string, key string, item []byte) (isMember bool, 
 func (db *DB) SMembers(bucket string, key string) (list [][]byte, err error) {
 	err = db.Managed(bucket, false, func(shardDB *ShardDB) error {
 		if _, ok := shardDB.SetIdx[bucket]; !ok {
-			return nutsdb.ErrBucket
+			return errs.ErrBucket
 		}
 		list, err = shardDB.SetIdx[bucket].SMembers(key)
 		return err
@@ -83,7 +83,7 @@ func (db *DB) SMembers(bucket string, key string) (list [][]byte, err error) {
 func (db *DB) SHasKey(bucket string, key string) (hasKey bool, err error) {
 	err = db.Managed(bucket, false, func(shardDB *ShardDB) error {
 		if _, ok := shardDB.SetIdx[bucket]; !ok {
-			return nutsdb.ErrBucket
+			return errs.ErrBucket
 		}
 		hasKey = shardDB.SetIdx[bucket].SHasKey(key)
 		return nil
@@ -95,7 +95,7 @@ func (db *DB) SHasKey(bucket string, key string) (hasKey bool, err error) {
 func (db *DB) SPop(bucket string, key string) (item []byte, err error) {
 	err = db.Managed(bucket, true, func(shardDB *ShardDB) error {
 		if _, ok := shardDB.SetIdx[bucket]; !ok {
-			return nutsdb.ErrBucket
+			return errs.ErrBucket
 		}
 		item = shardDB.SetIdx[bucket].SPop(key)
 		return nil
@@ -107,7 +107,7 @@ func (db *DB) SPop(bucket string, key string) (item []byte, err error) {
 func (db *DB) SCard(bucket string, key string) (itemNumber int, err error) {
 	err = db.Managed(bucket, false, func(shardDB *ShardDB) error {
 		if _, ok := shardDB.SetIdx[bucket]; !ok {
-			return nutsdb.ErrBucket
+			return errs.ErrBucket
 		}
 		itemNumber = shardDB.SetIdx[bucket].SCard(key)
 		return nil
@@ -120,7 +120,7 @@ func (db *DB) SCard(bucket string, key string) (itemNumber int, err error) {
 func (db *DB) SDiffByOneBucket(bucket string, key1, key2 string) (list [][]byte, err error) {
 	err = db.Managed(bucket, false, func(shardDB *ShardDB) error {
 		if _, ok := shardDB.SetIdx[bucket]; !ok {
-			return nutsdb.ErrBucket
+			return errs.ErrBucket
 		}
 		list, err = shardDB.SetIdx[bucket].SDiff(key1, key2)
 		return nil
@@ -135,7 +135,7 @@ func (db *DB) SDiffByTwoBuckets(bucket1 string, key1 string, bucket2 string, key
 
 	err = db.Managed(bucket1, false, func(shardDB *ShardDB) error {
 		if _, ok := shardDB.SetIdx[bucket1]; !ok {
-			return nutsdb.ErrBucket
+			return errs.ErrBucket
 		}
 		set1 = shardDB.SetIdx[bucket1]
 		return nil
@@ -145,7 +145,7 @@ func (db *DB) SDiffByTwoBuckets(bucket1 string, key1 string, bucket2 string, key
 	}
 	err = db.Managed(bucket2, false, func(shardDB *ShardDB) error {
 		if _, ok := shardDB.SetIdx[bucket2]; !ok {
-			return nutsdb.ErrBucket
+			return errs.ErrBucket
 		}
 		set2 = shardDB.SetIdx[bucket2]
 		return nil
@@ -165,7 +165,7 @@ func (db *DB) SDiffByTwoBuckets(bucket1 string, key1 string, bucket2 string, key
 func (db *DB) SMoveByOneBucket(bucket, key1, key2 string, item []byte) (isOk bool, err error) {
 	err = db.Managed(bucket, true, func(shardDB *ShardDB) error {
 		if _, ok := shardDB.SetIdx[bucket]; !ok {
-			return nutsdb.ErrBucket
+			return errs.ErrBucket
 		}
 		isOk, err = shardDB.SetIdx[bucket].SMove(key1, key2, item)
 		return err
@@ -198,7 +198,7 @@ func (db *DB) SMoveByTwoBuckets(bucket1 string, key1 string, bucket2 string, key
 func (db *DB) SUnionByOneBucket(bucket string, key1, key2 string) (list [][]byte, err error) {
 	err = db.Managed(bucket, true, func(shardDB *ShardDB) error {
 		if _, ok := shardDB.SetIdx[bucket]; !ok {
-			return nutsdb.ErrBucket
+			return errs.ErrBucket
 		}
 		list, err = shardDB.SetIdx[bucket].SUnion(key1, key2)
 		return err
@@ -231,11 +231,11 @@ func (db *DB) SUnionByTwoBuckets(bucket1 string, key1 string, bucket2 string, ke
 
 func (db *DB) checkTwoSets(set1, set2 *set.Set, key1, key2 string, bucket1, bucket2 string) error {
 	if !set1.SHasKey(key1) {
-		return errors.Wrapf(nutsdb.ErrKeyNotFound, "key %s is not in the bucket %s", key1, bucket1)
+		return errors.Wrapf(errs.ErrKeyNotFound, "key %s is not in the bucket %s", key1, bucket1)
 	}
 
 	if !set2.SHasKey(key2) {
-		return errors.Wrapf(nutsdb.ErrKeyNotFound, "key %s is not in the bucket %s", key2, bucket2)
+		return errors.Wrapf(errs.ErrKeyNotFound, "key %s is not in the bucket %s", key2, bucket2)
 	}
 	return nil
 }
@@ -243,7 +243,7 @@ func (db *DB) checkTwoSets(set1, set2 *set.Set, key1, key2 string, bucket1, buck
 func (db *DB) getTwoSetsByBuckets(bucket1, bucket2 string) (set1 *set.Set, set2 *set.Set, err error) {
 	err = db.Managed(bucket1, false, func(shardDB *ShardDB) error {
 		if _, ok := shardDB.SetIdx[bucket1]; !ok {
-			return nutsdb.ErrBucket
+			return errs.ErrBucket
 		}
 		set1 = shardDB.SetIdx[bucket1]
 		return nil
@@ -253,7 +253,7 @@ func (db *DB) getTwoSetsByBuckets(bucket1, bucket2 string) (set1 *set.Set, set2 
 	}
 	err = db.Managed(bucket2, false, func(shardDB *ShardDB) error {
 		if _, ok := shardDB.SetIdx[bucket2]; !ok {
-			return nutsdb.ErrBucket
+			return errs.ErrBucket
 		}
 		set2 = shardDB.SetIdx[bucket2]
 		return nil

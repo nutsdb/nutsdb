@@ -14,38 +14,42 @@
 
 package nutsdb
 
-import "time"
+import (
+	"github.com/xujiajun/nutsdb/consts"
+	"github.com/xujiajun/nutsdb/errs"
+	"time"
+)
 
 // IterateBuckets iterate over all the bucket depends on ds (represents the data structure)
-func (tx *Tx) IterateBuckets(ds uint16, pattern string, f func(key string) bool) error {
+func (tx *Tx) IterateBuckets(ds consts.DataStruct, pattern string, f func(key string) bool) error {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return err
 	}
-	if tx.db.opt.EntryIdxMode == HintBPTSparseIdxMode {
-		return ErrNotSupportHintBPTSparseIdxMode
+	if tx.db.opt.EntryIdxMode.Is(consts.HintBPTSparseIdxMode) {
+		return errs.ErrNotSupportHintBPTSparseIdxMode
 	}
-	if ds == DataStructureSet {
+	if ds.Is(consts.DataStructureSet) {
 		for bucket := range tx.db.SetIdx {
 			if end, err := MatchForRange(pattern, bucket, f); end || err != nil {
 				return err
 			}
 		}
 	}
-	if ds == DataStructureSortedSet {
+	if ds.Is(consts.DataStructureSortedSet) {
 		for bucket := range tx.db.SortedSetIdx {
 			if end, err := MatchForRange(pattern, bucket, f); end || err != nil {
 				return err
 			}
 		}
 	}
-	if ds == DataStructureList {
+	if ds.Is(consts.DataStructureList) {
 		for bucket := range tx.db.ListIdx {
 			if end, err := MatchForRange(pattern, bucket, f); end || err != nil {
 				return err
 			}
 		}
 	}
-	if ds == DataStructureBPTree {
+	if ds.Is(consts.DataStructureBPTree) {
 		for bucket := range tx.db.BPTreeIdx {
 			if end, err := MatchForRange(pattern, bucket, f); end || err != nil {
 				return err
@@ -56,24 +60,24 @@ func (tx *Tx) IterateBuckets(ds uint16, pattern string, f func(key string) bool)
 }
 
 // DeleteBucket delete bucket depends on ds (represents the data structure)
-func (tx *Tx) DeleteBucket(ds uint16, bucket string) error {
+func (tx *Tx) DeleteBucket(ds consts.DataStruct, bucket string) error {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return err
 	}
-	if tx.db.opt.EntryIdxMode == HintBPTSparseIdxMode {
-		return ErrNotSupportHintBPTSparseIdxMode
+	if tx.db.opt.EntryIdxMode.Is(consts.HintBPTSparseIdxMode) {
+		return errs.ErrNotSupportHintBPTSparseIdxMode
 	}
-	if ds == DataStructureSet {
-		return tx.put(bucket, []byte("0"), nil, Persistent, DataSetBucketDeleteFlag, uint64(time.Now().Unix()), DataStructureNone)
+	if ds.Is(consts.DataStructureSet) {
+		return tx.put(bucket, []byte("0"), nil, consts.Persistent, consts.DataSetBucketDeleteFlag, uint64(time.Now().Unix()), consts.DataStructureNone)
 	}
-	if ds == DataStructureSortedSet {
-		return tx.put(bucket, []byte("1"), nil, Persistent, DataSortedSetBucketDeleteFlag, uint64(time.Now().Unix()), DataStructureNone)
+	if ds.Is(consts.DataStructureSortedSet) {
+		return tx.put(bucket, []byte("1"), nil, consts.Persistent, consts.DataSortedSetBucketDeleteFlag, uint64(time.Now().Unix()), consts.DataStructureNone)
 	}
-	if ds == DataStructureBPTree {
-		return tx.put(bucket, []byte("2"), nil, Persistent, DataBPTreeBucketDeleteFlag, uint64(time.Now().Unix()), DataStructureNone)
+	if ds.Is(consts.DataStructureBPTree) {
+		return tx.put(bucket, []byte("2"), nil, consts.Persistent, consts.DataBPTreeBucketDeleteFlag, uint64(time.Now().Unix()), consts.DataStructureNone)
 	}
-	if ds == DataStructureList {
-		return tx.put(bucket, []byte("3"), nil, Persistent, DataListBucketDeleteFlag, uint64(time.Now().Unix()), DataStructureNone)
+	if ds == consts.DataStructureList {
+		return tx.put(bucket, []byte("3"), nil, consts.Persistent, consts.DataListBucketDeleteFlag, uint64(time.Now().Unix()), consts.DataStructureNone)
 	}
 	return nil
 }

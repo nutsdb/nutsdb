@@ -2,16 +2,18 @@ package nutsdb
 
 import (
 	"github.com/xujiajun/mmap-go"
+	"github.com/xujiajun/nutsdb/consts"
+	"github.com/xujiajun/nutsdb/errs"
 )
 
 // fileManager holds the fd cache and file-related operations go through the manager to obtain the file processing object
 type fileManager struct {
-	rwMode RWMode
+	rwMode consts.RWMode
 	fdm    *fdManager
 }
 
 // newFileManager will create a newFileManager object
-func newFileManager(rwMode RWMode, maxFdNums int, cleanThreshold float64) (fm *fileManager) {
+func newFileManager(rwMode consts.RWMode, maxFdNums int, cleanThreshold float64) (fm *fileManager) {
 	fm = &fileManager{
 		rwMode: rwMode,
 		fdm:    newFdm(maxFdNums, cleanThreshold),
@@ -22,19 +24,19 @@ func newFileManager(rwMode RWMode, maxFdNums int, cleanThreshold float64) (fm *f
 // getDataFile will return a DataFile Object
 func (fm *fileManager) getDataFile(path string, capacity int64) (datafile *DataFile, err error) {
 	if capacity <= 0 {
-		return nil, ErrCapacity
+		return nil, errs.ErrCapacity
 	}
 
 	var rwManager RWManager
 
-	if fm.rwMode == FileIO {
+	if fm.rwMode.IsFileIO() {
 		rwManager, err = fm.getFileRWManager(path, capacity)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	if fm.rwMode == MMap {
+	if fm.rwMode.IsMMap() {
 		rwManager, err = fm.getMMapRWManager(path, capacity)
 		if err != nil {
 			return nil, err

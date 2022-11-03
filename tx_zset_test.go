@@ -16,6 +16,7 @@ package nutsdb
 
 import (
 	"fmt"
+	"github.com/xujiajun/nutsdb/consts"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -63,7 +64,7 @@ func TestTx_ZAdd(t *testing.T) {
 		assert.NoError(t, tx.Rollback())
 		t.Fatal(err)
 	} else {
-		err := tx.ZAdd(bucket, []byte("key1"+SeparatorForZSetKey), 100, []byte("val1"))
+		err := tx.ZAdd(bucket, []byte("key1"+consts.SeparatorForZSetKey), 100, []byte("val1"))
 		if err == nil {
 			assert.NoError(t, tx.Rollback())
 			t.Fatal("TestTx_ZAdd err")

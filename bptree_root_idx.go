@@ -16,14 +16,13 @@ package nutsdb
 
 import (
 	"encoding/binary"
+	"github.com/xujiajun/nutsdb/consts"
+	"github.com/xujiajun/nutsdb/errs"
 	"hash/crc32"
 	"os"
 	"path/filepath"
 	"sort"
 )
-
-// BPTreeRootIdxHeaderSize returns the header size of the root index.
-const BPTreeRootIdxHeaderSize = 28
 
 // BPTreeRootIdx represents the b+ tree root index.
 type BPTreeRootIdx struct {
@@ -44,7 +43,7 @@ func (bri *BPTreeRootIdx) Encode() []byte {
 	binary.LittleEndian.PutUint32(buf[20:24], bri.startSize)
 	binary.LittleEndian.PutUint32(buf[24:28], bri.endSize)
 
-	startOff := BPTreeRootIdxHeaderSize
+	startOff := consts.BPTreeRootIdxHeaderSize
 	endOff := startOff + int(bri.startSize)
 	copy(buf[startOff:endOff], bri.start)
 
@@ -69,7 +68,7 @@ func (bri *BPTreeRootIdx) GetCrc(buf []byte) uint32 {
 
 // Size returns the size of the BPTreeRootIdx entry.
 func (bri *BPTreeRootIdx) Size() int64 {
-	return BPTreeRootIdxHeaderSize + int64(bri.startSize) + int64(bri.endSize)
+	return consts.BPTreeRootIdxHeaderSize + int64(bri.startSize) + int64(bri.endSize)
 }
 
 // IsZero checks if the BPTreeRootIdx entry is zero or not.
@@ -82,7 +81,7 @@ func (bri *BPTreeRootIdx) IsZero() bool {
 
 // ReadBPTreeRootIdxAt reads BPTreeRootIdx entry from the File starting at byte offset off.
 func ReadBPTreeRootIdxAt(fd *os.File, off int64) (*BPTreeRootIdx, error) {
-	buf := make([]byte, BPTreeRootIdxHeaderSize)
+	buf := make([]byte, consts.BPTreeRootIdxHeaderSize)
 	_, err := fd.ReadAt(buf, off)
 	if err != nil {
 		return nil, err
@@ -97,7 +96,7 @@ func ReadBPTreeRootIdxAt(fd *os.File, off int64) (*BPTreeRootIdx, error) {
 		return nil, nil
 	}
 
-	off += BPTreeRootIdxHeaderSize
+	off += consts.BPTreeRootIdxHeaderSize
 	startBuf := make([]byte, bri.startSize)
 	_, err = fd.ReadAt(startBuf, off)
 	if err != nil {
@@ -115,7 +114,7 @@ func ReadBPTreeRootIdxAt(fd *os.File, off int64) (*BPTreeRootIdx, error) {
 
 	bri.crc = binary.LittleEndian.Uint32(buf[0:4])
 	if bri.GetCrc(buf) != bri.crc {
-		return nil, ErrCrc
+		return nil, errs.ErrCrc
 	}
 
 	return bri, nil

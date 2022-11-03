@@ -15,8 +15,8 @@
 package inmemory
 
 import (
-	"github.com/xujiajun/nutsdb"
 	"github.com/xujiajun/nutsdb/ds/zset"
+	"github.com/xujiajun/nutsdb/errs"
 )
 
 // ZAdd adds the specified member key with the specified score and specified val to the sorted set stored at bucket.
@@ -34,7 +34,7 @@ func (db *DB) ZAdd(bucket string, key string, score float64, val []byte) error {
 func (db *DB) ZMembers(bucket string) (dict map[string]*zset.SortedSetNode, err error) {
 	err = db.Managed(bucket, false, func(shardDB *ShardDB) error {
 		if _, ok := shardDB.SortedSetIdx[bucket]; !ok {
-			return nutsdb.ErrBucket
+			return errs.ErrBucket
 		}
 		dict = shardDB.SortedSetIdx[bucket].Dict
 		return nil
@@ -70,7 +70,7 @@ func (db *DB) ZCount(bucket string, start, end float64, opts *zset.GetByScoreRan
 func (db *DB) ZRangeByScore(bucket string, start, end float64, opts *zset.GetByScoreRangeOptions) (nodes []*zset.SortedSetNode, err error) {
 	err = db.Managed(bucket, false, func(shardDB *ShardDB) error {
 		if _, ok := shardDB.SortedSetIdx[bucket]; !ok {
-			return nutsdb.ErrBucket
+			return errs.ErrBucket
 		}
 		nodes = shardDB.SortedSetIdx[bucket].GetByScoreRange(zset.SCORE(start), zset.SCORE(end), opts)
 		return nil
@@ -83,7 +83,7 @@ func (db *DB) ZRangeByScore(bucket string, start, end float64, opts *zset.GetByS
 func (db *DB) ZRangeByRank(bucket string, start, end int) (nodes []*zset.SortedSetNode, err error) {
 	err = db.Managed(bucket, false, func(shardDB *ShardDB) error {
 		if _, ok := shardDB.SortedSetIdx[bucket]; !ok {
-			return nutsdb.ErrBucket
+			return errs.ErrBucket
 		}
 		nodes = shardDB.SortedSetIdx[bucket].GetByRankRange(start, end, false)
 		return nil
@@ -95,7 +95,7 @@ func (db *DB) ZRangeByRank(bucket string, start, end int) (nodes []*zset.SortedS
 func (db *DB) ZRem(bucket, key string) error {
 	err := db.Managed(bucket, true, func(shardDB *ShardDB) error {
 		if _, ok := shardDB.SortedSetIdx[bucket]; !ok {
-			return nutsdb.ErrBucket
+			return errs.ErrBucket
 		}
 		_ = shardDB.SortedSetIdx[bucket].Remove(key)
 		return nil
@@ -108,7 +108,7 @@ func (db *DB) ZRem(bucket, key string) error {
 func (db *DB) ZRemRangeByRank(bucket string, start, end int) error {
 	err := db.Managed(bucket, true, func(shardDB *ShardDB) error {
 		if _, ok := shardDB.SortedSetIdx[bucket]; !ok {
-			return nutsdb.ErrBucket
+			return errs.ErrBucket
 		}
 
 		_ = shardDB.SortedSetIdx[bucket].GetByRankRange(start, end, true)
@@ -122,7 +122,7 @@ func (db *DB) ZRemRangeByRank(bucket string, start, end int) error {
 func (db *DB) ZRank(bucket string, key string) (rank int, err error) {
 	err = db.Managed(bucket, false, func(shardDB *ShardDB) error {
 		if _, ok := shardDB.SortedSetIdx[bucket]; !ok {
-			return nutsdb.ErrBucket
+			return errs.ErrBucket
 		}
 
 		rank = shardDB.SortedSetIdx[bucket].FindRank(key)
@@ -136,7 +136,7 @@ func (db *DB) ZRank(bucket string, key string) (rank int, err error) {
 func (db *DB) ZRevRank(bucket string, key string) (rank int, err error) {
 	err = db.Managed(bucket, false, func(shardDB *ShardDB) error {
 		if _, ok := shardDB.SortedSetIdx[bucket]; !ok {
-			return nutsdb.ErrBucket
+			return errs.ErrBucket
 		}
 
 		rank = shardDB.SortedSetIdx[bucket].FindRevRank(key)
@@ -149,7 +149,7 @@ func (db *DB) ZRevRank(bucket string, key string) (rank int, err error) {
 func (db *DB) ZScore(bucket string, key string) (score float64, err error) {
 	err = db.Managed(bucket, false, func(shardDB *ShardDB) error {
 		if _, ok := shardDB.SortedSetIdx[bucket]; !ok {
-			return nutsdb.ErrBucket
+			return errs.ErrBucket
 		}
 
 		score = float64(shardDB.SortedSetIdx[bucket].GetByKey(key).Score())
@@ -162,7 +162,7 @@ func (db *DB) ZScore(bucket string, key string) (score float64, err error) {
 func (db *DB) ZGetByKey(bucket string, key string) (node *zset.SortedSetNode, err error) {
 	err = db.Managed(bucket, false, func(shardDB *ShardDB) error {
 		if _, ok := shardDB.SortedSetIdx[bucket]; !ok {
-			return nutsdb.ErrBucket
+			return errs.ErrBucket
 		}
 
 		node = shardDB.SortedSetIdx[bucket].GetByKey(key)

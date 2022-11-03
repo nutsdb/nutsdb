@@ -16,22 +16,15 @@ package nutsdb
 
 import (
 	"bytes"
+	"github.com/xujiajun/nutsdb/consts"
+	"github.com/xujiajun/nutsdb/errs"
 	"sort"
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/xujiajun/nutsdb/ds/list"
 	"github.com/xujiajun/utils/strconv2"
 )
-
-var (
-	// ErrSeparatorForListKey returns when list key contains the SeparatorForListKey.
-	ErrSeparatorForListKey = errors.Errorf("contain separator (%s) for List key", SeparatorForListKey)
-)
-
-// SeparatorForListKey represents separator for listKey
-const SeparatorForListKey = "|"
 
 // RPop removes and returns the last element of the list stored in the bucket at given bucket and key.
 func (tx *Tx) RPop(bucket string, key []byte) (item []byte, err error) {
@@ -40,7 +33,7 @@ func (tx *Tx) RPop(bucket string, key []byte) (item []byte, err error) {
 		return
 	}
 
-	return item, tx.push(bucket, key, DataRPopFlag, item)
+	return item, tx.push(bucket, key, consts.DataRPopFlag, item)
 }
 
 // RPeek returns the last element of the list stored in the bucket at given bucket and key.
@@ -50,7 +43,7 @@ func (tx *Tx) RPeek(bucket string, key []byte) (item []byte, err error) {
 	}
 
 	if _, ok := tx.db.ListIdx[bucket]; !ok {
-		return nil, ErrBucket
+		return nil, errs.ErrBucket
 	}
 
 	item, _, err = tx.db.ListIdx[bucket].RPeek(string(key))
@@ -59,9 +52,9 @@ func (tx *Tx) RPeek(bucket string, key []byte) (item []byte, err error) {
 }
 
 // push sets values for list stored in the bucket at given bucket, key, flag and values.
-func (tx *Tx) push(bucket string, key []byte, flag uint16, values ...[]byte) error {
+func (tx *Tx) push(bucket string, key []byte, flag consts.DataFlag, values ...[]byte) error {
 	for _, value := range values {
-		err := tx.put(bucket, key, value, Persistent, flag, uint64(time.Now().Unix()), DataStructureList)
+		err := tx.put(bucket, key, value, consts.Persistent, flag, uint64(time.Now().Unix()), consts.DataStructureList)
 		if err != nil {
 			return err
 		}
@@ -76,11 +69,11 @@ func (tx *Tx) RPush(bucket string, key []byte, values ...[]byte) error {
 		return err
 	}
 
-	if strings.Contains(string(key), SeparatorForListKey) {
-		return ErrSeparatorForListKey
+	if strings.Contains(string(key), consts.SeparatorForListKey) {
+		return errs.ErrSeparatorForListKey
 	}
 
-	return tx.push(bucket, key, DataRPushFlag, values...)
+	return tx.push(bucket, key, consts.DataRPushFlag, values...)
 }
 
 // LPush inserts the values at the head of the list stored in the bucket at given bucket,key and values.
@@ -89,11 +82,11 @@ func (tx *Tx) LPush(bucket string, key []byte, values ...[]byte) error {
 		return err
 	}
 
-	if strings.Contains(string(key), SeparatorForListKey) {
-		return ErrSeparatorForListKey
+	if strings.Contains(string(key), consts.SeparatorForListKey) {
+		return errs.ErrSeparatorForListKey
 	}
 
-	return tx.push(bucket, key, DataLPushFlag, values...)
+	return tx.push(bucket, key, consts.DataLPushFlag, values...)
 }
 
 // LPop removes and returns the first element of the list stored in the bucket at given bucket and key.
@@ -103,7 +96,7 @@ func (tx *Tx) LPop(bucket string, key []byte) (item []byte, err error) {
 		return
 	}
 
-	return item, tx.push(bucket, key, DataLPopFlag, item)
+	return item, tx.push(bucket, key, consts.DataLPopFlag, item)
 }
 
 // LPeek returns the first element of the list stored in the bucket at given bucket and key.
@@ -113,7 +106,7 @@ func (tx *Tx) LPeek(bucket string, key []byte) (item []byte, err error) {
 	}
 
 	if _, ok := tx.db.ListIdx[bucket]; !ok {
-		return nil, ErrBucket
+		return nil, errs.ErrBucket
 	}
 
 	item, err = tx.db.ListIdx[bucket].LPeek(string(key))
@@ -128,7 +121,7 @@ func (tx *Tx) LSize(bucket string, key []byte) (int, error) {
 	}
 
 	if _, ok := tx.db.ListIdx[bucket]; !ok {
-		return 0, ErrBucket
+		return 0, errs.ErrBucket
 	}
 
 	return tx.db.ListIdx[bucket].Size(string(key))
@@ -145,7 +138,7 @@ func (tx *Tx) LRange(bucket string, key []byte, start, end int) (list [][]byte, 
 	}
 
 	if _, ok := tx.db.ListIdx[bucket]; !ok {
-		return nil, ErrBucket
+		return nil, errs.ErrBucket
 	}
 
 	return tx.db.ListIdx[bucket].LRange(string(key), start, end)
@@ -171,11 +164,11 @@ func (tx *Tx) LRem(bucket string, key []byte, count int, value []byte) (removedN
 	}
 
 	buffer.Write([]byte(strconv2.IntToStr(count)))
-	buffer.Write([]byte(SeparatorForListKey))
+	buffer.Write([]byte(consts.SeparatorForListKey))
 	buffer.Write(value)
 	newValue := buffer.Bytes()
 
-	err = tx.push(bucket, key, DataLRemFlag, newValue)
+	err = tx.push(bucket, key, consts.DataLRemFlag, newValue)
 	if err != nil {
 		return 0, err
 	}
@@ -196,11 +189,11 @@ func (tx *Tx) LSet(bucket string, key []byte, index int, value []byte) error {
 	}
 
 	if _, ok := tx.db.ListIdx[bucket]; !ok {
-		return ErrBucket
+		return errs.ErrBucket
 	}
 
 	if _, ok := tx.db.ListIdx[bucket].Items[string(key)]; !ok {
-		return ErrKeyNotFound
+		return errs.ErrKeyNotFound
 	}
 
 	size, _ := tx.LSize(bucket, key)
@@ -209,12 +202,12 @@ func (tx *Tx) LSet(bucket string, key []byte, index int, value []byte) error {
 	}
 
 	buffer.Write(key)
-	buffer.Write([]byte(SeparatorForListKey))
+	buffer.Write([]byte(consts.SeparatorForListKey))
 	indexBytes := []byte(strconv2.IntToStr(index))
 	buffer.Write(indexBytes)
 	newKey := buffer.Bytes()
 
-	return tx.push(bucket, newKey, DataLSetFlag, value)
+	return tx.push(bucket, newKey, consts.DataLSetFlag, value)
 }
 
 // LTrim trims an existing list so that it will contain only the specified range of elements specified.
@@ -233,11 +226,11 @@ func (tx *Tx) LTrim(bucket string, key []byte, start, end int) error {
 	}
 
 	if _, ok := tx.db.ListIdx[bucket]; !ok {
-		return ErrBucket
+		return errs.ErrBucket
 	}
 
 	if _, ok := tx.db.ListIdx[bucket].Items[string(key)]; !ok {
-		return ErrKeyNotFound
+		return errs.ErrKeyNotFound
 	}
 
 	if _, err := tx.LRange(bucket, key, start, end); err != nil {
@@ -245,11 +238,11 @@ func (tx *Tx) LTrim(bucket string, key []byte, start, end int) error {
 	}
 
 	buffer.Write(key)
-	buffer.Write([]byte(SeparatorForListKey))
+	buffer.Write([]byte(consts.SeparatorForListKey))
 	buffer.Write([]byte(strconv2.IntToStr(start)))
 	newKey := buffer.Bytes()
 
-	return tx.push(bucket, newKey, DataLTrimFlag, []byte(strconv2.IntToStr(end)))
+	return tx.push(bucket, newKey, consts.DataLTrimFlag, []byte(strconv2.IntToStr(end)))
 }
 
 // LRemByIndex remove the list element at specified index
@@ -259,7 +252,7 @@ func (tx *Tx) LRemByIndex(bucket string, key []byte, indexes ...int) (removedNum
 	}
 
 	if _, ok := tx.db.ListIdx[bucket]; !ok {
-		return 0, ErrBucket
+		return 0, errs.ErrBucket
 	}
 	sort.Ints(indexes)
 	removedNum, err = tx.db.ListIdx[bucket].LRemByIndexPreCheck(string(key), indexes)
@@ -270,7 +263,7 @@ func (tx *Tx) LRemByIndex(bucket string, key []byte, indexes ...int) (removedNum
 	if err != nil {
 		return 0, err
 	}
-	err = tx.push(bucket, key, DataLRemByIndex, data)
+	err = tx.push(bucket, key, consts.DataLRemByIndex, data)
 	if err != nil {
 		return 0, err
 	}
@@ -283,7 +276,7 @@ func (tx *Tx) LKeys(bucket, pattern string, f func(key string) bool) error {
 		return err
 	}
 	if _, ok := tx.db.ListIdx[bucket]; !ok {
-		return ErrBucket
+		return errs.ErrBucket
 	}
 	for key := range tx.db.ListIdx[bucket].Items {
 		if end, err := MatchForRange(pattern, key, f); end || err != nil {

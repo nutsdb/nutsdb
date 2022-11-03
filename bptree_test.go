@@ -16,6 +16,8 @@ package nutsdb
 
 import (
 	"fmt"
+	"github.com/xujiajun/nutsdb/consts"
+	"github.com/xujiajun/nutsdb/model"
 	"regexp"
 	"testing"
 	"time"
@@ -39,9 +41,9 @@ func withBPTree(t *testing.T, fn func(t *testing.T, tree *BPTree)) {
 		val := []byte(fmt.Sprintf(valFormat, i))
 
 		err := tree.Insert(key,
-			&Entry{Key: key, Value: val},
-			&Hint{Key: key, Meta: &MetaData{Flag: DataSetFlag}},
-			CountFlagEnabled)
+			&model.Entry{Key: key, Value: val},
+			&model.Hint{Key: key, Meta: &model.MetaData{Flag: consts.DataSetFlag}},
+			consts.CountFlagEnabled)
 		require.NoError(t, err)
 	}
 
@@ -53,9 +55,9 @@ func setup(t *testing.T, limit int) {
 	for i := 0; i < 100; i++ {
 		key := []byte("key_" + fmt.Sprintf("%03d", i))
 		val := []byte("val_" + fmt.Sprintf("%03d", i))
-		err := tree.Insert(key, &Entry{Key: key, Value: val}, &Hint{Key: key, Meta: &MetaData{
-			Flag: DataSetFlag,
-		}}, CountFlagEnabled)
+		err := tree.Insert(key, &model.Entry{Key: key, Value: val}, &model.Hint{Key: key, Meta: &model.MetaData{
+			Flag: consts.DataSetFlag,
+		}}, consts.CountFlagEnabled)
 		require.NoError(t, err)
 	}
 
@@ -64,8 +66,8 @@ func setup(t *testing.T, limit int) {
 		key := []byte("key_" + fmt.Sprintf("%03d", i))
 		val := []byte("val_" + fmt.Sprintf("%03d", i))
 
-		expected = append(expected, &Record{E: &Entry{Key: key, Value: val}, H: &Hint{Key: key, Meta: &MetaData{
-			Flag: DataSetFlag,
+		expected = append(expected, &model.Record{E: &model.Entry{Key: key, Value: val}, H: &model.Hint{Key: key, Meta: &model.MetaData{
+			Flag: consts.DataSetFlag,
 		}}})
 	}
 }
@@ -162,9 +164,9 @@ func TestBPTree_PrefixScan(t *testing.T) {
 			for i := 0; i <= 100; i++ {
 				key := []byte("name_" + fmt.Sprintf("%03d", i))
 				val := []byte("val_" + fmt.Sprintf("%03d", i))
-				err := tree.Insert(key, &Entry{Key: key, Value: val}, &Hint{Key: key, Meta: &MetaData{
-					Flag: DataSetFlag,
-				}}, CountFlagEnabled)
+				err := tree.Insert(key, &model.Entry{Key: key, Value: val}, &model.Hint{Key: key, Meta: &model.MetaData{
+					Flag: consts.DataSetFlag,
+				}}, consts.CountFlagEnabled)
 				require.NoError(t, err)
 			}
 
@@ -254,9 +256,9 @@ func TestBPTree_PrefixSearchScan(t *testing.T) {
 	for i := 0; i <= 100; i++ {
 		key := []byte("name_" + fmt.Sprintf("%03d", i))
 		val := []byte("val_" + fmt.Sprintf("%03d", i))
-		err := tree.Insert(key, &Entry{Key: key, Value: val}, &Hint{Key: key, Meta: &MetaData{
-			Flag: DataSetFlag,
-		}}, CountFlagEnabled)
+		err := tree.Insert(key, &model.Entry{Key: key, Value: val}, &model.Hint{Key: key, Meta: &model.MetaData{
+			Flag: consts.DataSetFlag,
+		}}, consts.CountFlagEnabled)
 		require.NoError(t, err)
 	}
 
@@ -314,9 +316,9 @@ func TestRecordExpired(t *testing.T) {
 
 	t.Run("test expired record", func(t *testing.T) {
 
-		record := &Record{
-			H: &Hint{
-				Meta: &MetaData{
+		record := &model.Record{
+			H: &model.Hint{
+				Meta: &model.MetaData{
 					Timestamp: expiredTime,
 					TTL:       10,
 				},
@@ -328,11 +330,11 @@ func TestRecordExpired(t *testing.T) {
 	})
 
 	t.Run("test persistent record", func(t *testing.T) {
-		record := &Record{
-			H: &Hint{
-				Meta: &MetaData{
+		record := &model.Record{
+			H: &model.Hint{
+				Meta: &model.MetaData{
 					Timestamp: expiredTime,
-					TTL:       Persistent,
+					TTL:       consts.Persistent,
 				},
 			},
 			E: nil,
@@ -349,9 +351,9 @@ func TestBPTree_Update(t *testing.T) {
 	for i := 0; i <= 100; i++ {
 		key := []byte("key_" + fmt.Sprintf("%03d", i))
 		val := []byte("val_modify" + fmt.Sprintf("%03d", i))
-		err := tree.Insert(key, &Entry{Key: key, Value: val}, &Hint{Key: key, Meta: &MetaData{
-			Flag: DataSetFlag,
-		}}, CountFlagEnabled)
+		err := tree.Insert(key, &model.Entry{Key: key, Value: val}, &model.Hint{Key: key, Meta: &model.MetaData{
+			Flag: consts.DataSetFlag,
+		}}, consts.CountFlagEnabled)
 
 		require.NoError(t, err)
 	}
@@ -361,8 +363,8 @@ func TestBPTree_Update(t *testing.T) {
 		key := []byte("key_" + fmt.Sprintf("%03d", i))
 		val := []byte("val_modify" + fmt.Sprintf("%03d", i))
 
-		expected = append(expected, &Record{E: &Entry{Key: key, Value: val}, H: &Hint{Key: key, Meta: &MetaData{
-			Flag: DataSetFlag}},
+		expected = append(expected, &model.Record{E: &model.Entry{Key: key, Value: val}, H: &model.Hint{Key: key, Meta: &model.MetaData{
+			Flag: consts.DataSetFlag}},
 		})
 	}
 
@@ -376,9 +378,9 @@ func TestBPTree_Update(t *testing.T) {
 	// delete
 	for i := 1; i <= limit; i++ {
 		key := []byte("key_" + fmt.Sprintf("%03d", i))
-		err := tree.Insert(key, &Entry{Key: key, Value: nil}, &Hint{Key: key, Meta: &MetaData{
-			Flag: DataDeleteFlag,
-		}}, CountFlagEnabled)
+		err := tree.Insert(key, &model.Entry{Key: key, Value: nil}, &model.Hint{Key: key, Meta: &model.MetaData{
+			Flag: consts.DataDeleteFlag,
+		}}, consts.CountFlagEnabled)
 
 		assert.NoError(t, err)
 	}
@@ -387,16 +389,16 @@ func TestBPTree_Update(t *testing.T) {
 	assert.NoError(t, err)
 
 	for _, v := range rs {
-		assert.Equal(t, DataDeleteFlag, v.H.Meta.Flag)
+		assert.Equal(t, consts.DataDeleteFlag, v.H.Meta.Flag)
 	}
 
 	key := []byte("key_001")
-	err = tree.Insert(key, &Entry{Key: key, Value: nil}, &Hint{Key: key, Meta: &MetaData{
-		Flag: DataSetFlag,
-	}}, CountFlagEnabled)
+	err = tree.Insert(key, &model.Entry{Key: key, Value: nil}, &model.Hint{Key: key, Meta: &model.MetaData{
+		Flag: consts.DataSetFlag,
+	}}, consts.CountFlagEnabled)
 	assert.NoError(t, err)
 
 	r, err := tree.Find(key)
 	assert.NoError(t, err)
-	assert.Equal(t, DataSetFlag, r.H.Meta.Flag)
+	assert.Equal(t, consts.DataSetFlag, r.H.Meta.Flag)
 }

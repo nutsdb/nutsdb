@@ -15,8 +15,8 @@
 package inmemory
 
 import (
-	"github.com/xujiajun/nutsdb"
 	"github.com/xujiajun/nutsdb/ds/list"
+	"github.com/xujiajun/nutsdb/errs"
 )
 
 // RPop removes and returns the last element of the list stored in the bucket at given bucket and key.
@@ -101,7 +101,7 @@ func (db *DB) LPeek(bucket string, key string) (item []byte, err error) {
 func (db *DB) LSize(bucket, key string) (size int, err error) {
 	err = db.Managed(bucket, false, func(shardDB *ShardDB) error {
 		if _, ok := shardDB.ListIdx[bucket]; !ok {
-			return nutsdb.ErrBucket
+			return errs.ErrBucket
 		}
 		size, err = shardDB.ListIdx[bucket].Size(key)
 		return err
@@ -118,7 +118,7 @@ func (db *DB) LSize(bucket, key string) (size int, err error) {
 func (db *DB) LRange(bucket string, key string, start, end int) (list [][]byte, err error) {
 	err = db.Managed(bucket, false, func(shardDB *ShardDB) error {
 		if _, ok := shardDB.ListIdx[bucket]; !ok {
-			return nutsdb.ErrBucket
+			return errs.ErrBucket
 		}
 		list, err = shardDB.ListIdx[bucket].LRange(key, start, end)
 		return err
@@ -134,7 +134,7 @@ func (db *DB) LRange(bucket string, key string, start, end int) (list [][]byte, 
 func (db *DB) LRem(bucket string, key string, count int, value []byte) (removedNum int, err error) {
 	err = db.Managed(bucket, true, func(shardDB *ShardDB) error {
 		if _, ok := shardDB.ListIdx[bucket]; !ok {
-			return nutsdb.ErrBucket
+			return errs.ErrBucket
 		}
 		var size int
 		size, err = shardDB.ListIdx[bucket].Size(key)
@@ -156,10 +156,10 @@ func (db *DB) LRem(bucket string, key string, count int, value []byte) (removedN
 func (db *DB) LSet(bucket string, key string, index int, value []byte) error {
 	err := db.Managed(bucket, true, func(shardDB *ShardDB) error {
 		if _, ok := shardDB.ListIdx[bucket]; !ok {
-			return nutsdb.ErrBucket
+			return errs.ErrBucket
 		}
 		if _, ok := shardDB.ListIdx[bucket].Items[key]; !ok {
-			return nutsdb.ErrKeyNotFound
+			return errs.ErrKeyNotFound
 		}
 		size, _ := shardDB.ListIdx[bucket].Size(key)
 		if index < 0 || index >= size {
@@ -179,7 +179,7 @@ func (db *DB) LSet(bucket string, key string, index int, value []byte) error {
 func (db *DB) LTrim(bucket string, key string, start, end int) error {
 	err := db.Managed(bucket, true, func(shardDB *ShardDB) error {
 		if _, ok := shardDB.ListIdx[bucket]; !ok {
-			return nutsdb.ErrBucket
+			return errs.ErrBucket
 		}
 
 		err := shardDB.ListIdx[bucket].Ltrim(key, start, end)

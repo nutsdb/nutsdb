@@ -12,9 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package nutsdb
+package model
 
-import "time"
+import (
+	"github.com/xujiajun/nutsdb/consts"
+	"time"
+)
 
 // Record records entry and hint.
 type Record struct {
@@ -30,7 +33,7 @@ func (r *Record) IsExpired() bool {
 // IsExpired checks the ttl if expired or not.
 func IsExpired(ttl uint32, timestamp uint64) bool {
 	now := time.Now().Unix()
-	if ttl > 0 && uint64(ttl)+timestamp > uint64(now) || ttl == Persistent {
+	if ttl > 0 && uint64(ttl)+timestamp > uint64(now) || ttl == consts.Persistent {
 		return false
 	}
 

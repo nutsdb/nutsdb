@@ -15,6 +15,8 @@
 package nutsdb
 
 import (
+	"github.com/xujiajun/nutsdb/consts"
+	"github.com/xujiajun/nutsdb/model"
 	"os"
 	"testing"
 
@@ -23,29 +25,29 @@ import (
 
 var (
 	filePath string
-	entry    Entry
+	entry    model.Entry
 )
 
 func init() {
 	filePath = "/tmp/foo"
-	entry = Entry{
+	entry = model.Entry{
 		Key:   []byte("key_0001"),
 		Value: []byte("val_0001"),
-		Meta: &MetaData{
+		Meta: &model.MetaData{
 			KeySize:    uint32(len("key_0001")),
 			ValueSize:  uint32(len("val_0001")),
 			Timestamp:  1547707905,
-			TTL:        Persistent,
+			TTL:        consts.Persistent,
 			Bucket:     []byte("test_DataFile"),
 			BucketSize: uint32(len("test_datafile")),
-			Flag:       DataSetFlag,
+			Flag:       consts.DataSetFlag,
 		},
-		position: 0,
+		Position: 0,
 	}
 }
 
 func TestDataFile_Err(t *testing.T) {
-	fm := newFileManager(MMap, 1024, 0.5)
+	fm := newFileManager(consts.MMap, 1024, 0.5)
 	defer fm.close()
 	_, err := fm.getDataFile(filePath, -1)
 	defer func() {
@@ -56,7 +58,7 @@ func TestDataFile_Err(t *testing.T) {
 }
 
 func TestDataFile1(t *testing.T) {
-	fm := newFileManager(MMap, 1024, 0.5)
+	fm := newFileManager(consts.MMap, 1024, 0.5)
 	defer fm.close()
 	df, err := fm.getDataFile(filePath, 1024)
 	defer os.Remove(filePath)
@@ -86,13 +88,13 @@ func TestDataFile1(t *testing.T) {
 }
 
 func TestDataFile2(t *testing.T) {
-	fm := newFileManager(FileIO, 1024, 0.5)
+	fm := newFileManager(consts.FileIO, 1024, 0.5)
 
 	filePath2 := "/tmp/foo2"
 	df, err := fm.getDataFile(filePath2, 64)
 	assert.Nil(t, err)
 	defer os.Remove(filePath2)
-	content := entry.Encode()[0 : DataEntryHeaderSize-1]
+	content := entry.Encode()[0 : consts.DataEntryHeaderSize-1]
 	_, err = df.WriteAt(content, 0)
 	if err != nil {
 		t.Error("err TestDataFile_All WriteAt")
@@ -109,7 +111,7 @@ func TestDataFile2(t *testing.T) {
 	defer os.Remove(filePath3)
 	assert.Nil(t, err)
 
-	content = entry.Encode()[0 : DataEntryHeaderSize+1]
+	content = entry.Encode()[0 : consts.DataEntryHeaderSize+1]
 	_, err = df2.WriteAt(content, 0)
 	assert.Nil(t, err)
 
@@ -127,7 +129,7 @@ func TestDataFile2(t *testing.T) {
 }
 
 func TestDataFile_ReadAt(t *testing.T) {
-	fm := newFileManager(FileIO, 1024, 0.5)
+	fm := newFileManager(consts.FileIO, 1024, 0.5)
 	filePath4 := "/tmp/foo4"
 	df, err := fm.getDataFile(filePath4, 1024)
 	defer func() {
@@ -153,7 +155,7 @@ func TestDataFile_ReadAt(t *testing.T) {
 }
 
 func TestDataFile_Err_Path(t *testing.T) {
-	fm := newFileManager(FileIO, 1024, 0.5)
+	fm := newFileManager(consts.FileIO, 1024, 0.5)
 	defer fm.close()
 	filePath5 := ":/tmp/foo5"
 	df, err := fm.getDataFile(filePath5, entry.Size())
@@ -163,7 +165,7 @@ func TestDataFile_Err_Path(t *testing.T) {
 }
 
 func TestDataFile_Crc_Err(t *testing.T) {
-	fm := newFileManager(FileIO, 1024, 0.5)
+	fm := newFileManager(consts.FileIO, 1024, 0.5)
 	filePath4 := "/tmp/foo6"
 
 	df, err := fm.getDataFile(filePath4, entry.Size())
@@ -192,7 +194,7 @@ func TestDataFile_Crc_Err(t *testing.T) {
 }
 
 func TestFileManager1(t *testing.T) {
-	fm := newFileManager(FileIO, 1024, 0.5)
+	fm := newFileManager(consts.FileIO, 1024, 0.5)
 	filePath4 := "/tmp/foo6"
 	df, err := fm.getDataFile(filePath4, entry.Size())
 	assert.Nil(t, err)

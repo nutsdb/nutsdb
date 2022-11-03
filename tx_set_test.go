@@ -16,6 +16,7 @@ package nutsdb
 
 import (
 	"errors"
+	"github.com/xujiajun/nutsdb/errs"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -1018,7 +1019,7 @@ func TestErrBucketAndKey(t *testing.T) {
 	got := ErrBucketAndKey("foo", []byte("bar"))
 
 	assert.True(t,
-		errors.Is(got, ErrBucketNotFound))
+		errors.Is(got, errs.ErrBucketNotFound))
 }
 
 func TestErrNotFoundKeyInBucket(t *testing.T) {
@@ -1026,5 +1027,5 @@ func TestErrNotFoundKeyInBucket(t *testing.T) {
 	got := ErrNotFoundKeyInBucket("foo", []byte("bar"))
 
 	assert.True(t,
-		errors.Is(got, ErrKeyNotFound))
+		errors.Is(got, errs.ErrKeyNotFound))
 }

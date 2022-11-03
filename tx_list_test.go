@@ -16,6 +16,7 @@ package nutsdb
 
 import (
 	"github.com/stretchr/testify/assert"
+	"github.com/xujiajun/nutsdb/consts"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -55,7 +56,7 @@ func TestTx_RPush(t *testing.T) {
 	bucket := "myBucket"
 	key := []byte("myList")
 
-	if err := tx.RPush(bucket, []byte("myList"+SeparatorForListKey), []byte("a"), []byte("b"), []byte("c"), []byte("d")); err == nil {
+	if err := tx.RPush(bucket, []byte("myList"+consts.SeparatorForListKey), []byte("a"), []byte("b"), []byte("c"), []byte("d")); err == nil {
 		tx.Rollback()
 		t.Fatal("TestTx_RPush err")
 	}
@@ -94,7 +95,7 @@ func TestTx_LPush(t *testing.T) {
 
 	bucket := "myBucket"
 	key := []byte("myList")
-	if err := tx.LPush(bucket, []byte("myList"+SeparatorForListKey), []byte("d"), []byte("c"), []byte("b"), []byte("a")); err == nil {
+	if err := tx.LPush(bucket, []byte("myList"+consts.SeparatorForListKey), []byte("d"), []byte("c"), []byte("b"), []byte("a")); err == nil {
 		t.Error("TestTx_LPush err")
 	}
 

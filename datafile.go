@@ -16,26 +16,9 @@ package nutsdb
 
 import (
 	"encoding/binary"
-	"errors"
-)
-
-var (
-	// ErrCrcZero is returned when crc is 0
-	ErrCrcZero = errors.New("error crc is 0")
-
-	// ErrCrc is returned when crc is error
-	ErrCrc = errors.New("crc error")
-
-	// ErrCapacity is returned when capacity is error.
-	ErrCapacity = errors.New("capacity error")
-)
-
-const (
-	// DataSuffix returns the data suffix
-	DataSuffix = ".dat"
-
-	// DataEntryHeaderSize returns the entry header size
-	DataEntryHeaderSize = 42
+	"github.com/xujiajun/nutsdb/consts"
+	"github.com/xujiajun/nutsdb/errs"
+	"github.com/xujiajun/nutsdb/model"
 )
 
 // DataFile records about data file information.
@@ -57,8 +40,8 @@ func NewDataFile(path string, rwManager RWManager) *DataFile {
 }
 
 // ReadAt returns entry at the given off(offset).
-func (df *DataFile) ReadAt(off int) (e *Entry, err error) {
-	buf := make([]byte, DataEntryHeaderSize)
+func (df *DataFile) ReadAt(off int) (e *model.Entry, err error) {
+	buf := make([]byte, consts.DataEntryHeaderSize)
 
 	if _, err := df.rwManager.ReadAt(buf, int64(off)); err != nil {
 		return nil, err
@@ -66,8 +49,8 @@ func (df *DataFile) ReadAt(off int) (e *Entry, err error) {
 
 	meta := readMetaData(buf)
 
-	e = &Entry{
-		crc:  binary.LittleEndian.Uint32(buf[0:4]),
+	e = &model.Entry{
+		Crc:  binary.LittleEndian.Uint32(buf[0:4]),
 		Meta: meta,
 	}
 
@@ -75,7 +58,7 @@ func (df *DataFile) ReadAt(off int) (e *Entry, err error) {
 		return nil, nil
 	}
 
-	off += DataEntryHeaderSize
+	off += consts.DataEntryHeaderSize
 	dataSize := meta.BucketSize + meta.KeySize + meta.ValueSize
 
 	dataBuf := make([]byte, dataSize)
@@ -99,8 +82,8 @@ func (df *DataFile) ReadAt(off int) (e *Entry, err error) {
 	e.Value = dataBuf[valueLowBound:valueHighBound]
 
 	crc := e.GetCrc(buf)
-	if crc != e.crc {
-		return nil, ErrCrc
+	if crc != e.Crc {
+		return nil, errs.ErrCrc
 	}
 
 	return
@@ -133,16 +116,16 @@ func (df *DataFile) Release() (err error) {
 }
 
 // readMetaData returns MetaData at given buf slice.
-func readMetaData(buf []byte) *MetaData {
-	return &MetaData{
+func readMetaData(buf []byte) *model.MetaData {
+	return &model.MetaData{
 		Timestamp:  binary.LittleEndian.Uint64(buf[4:12]),
 		KeySize:    binary.LittleEndian.Uint32(buf[12:16]),
 		ValueSize:  binary.LittleEndian.Uint32(buf[16:20]),
-		Flag:       binary.LittleEndian.Uint16(buf[20:22]),
+		Flag:       consts.DataFlag(binary.LittleEndian.Uint16(buf[20:22])),
 		TTL:        binary.LittleEndian.Uint32(buf[22:26]),
 		BucketSize: binary.LittleEndian.Uint32(buf[26:30]),
-		Status:     binary.LittleEndian.Uint16(buf[30:32]),
-		Ds:         binary.LittleEndian.Uint16(buf[32:34]),
+		Status:     consts.DataStatus(binary.LittleEndian.Uint16(buf[30:32])),
+		Ds:         consts.DataStruct(binary.LittleEndian.Uint16(buf[32:34])),
 		TxID:       binary.LittleEndian.Uint64(buf[34:42]),
 	}
 }

@@ -16,10 +16,10 @@ package inmemory
 
 import (
 	"errors"
+	"github.com/xujiajun/nutsdb/errs"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/xujiajun/nutsdb"
 	"github.com/xujiajun/nutsdb/ds/zset"
 )
 
@@ -55,7 +55,7 @@ func initZAddItems() (bucket, key1, key2, key3 string) {
 func TestDB_ZMembers(t *testing.T) {
 	bucket, key1, key2, key3 := initZAddItems()
 	_, err := testDB.ZMembers("neBucket")
-	assert.New(t).Equal(nutsdb.ErrBucket, err)
+	assert.New(t).Equal(errs.ErrBucket, err)
 	nodes, err := testDB.ZMembers(bucket)
 	if err != nil {
 		t.Error(err)
@@ -82,7 +82,7 @@ func TestDB_ZCard(t *testing.T) {
 		err error
 	}{
 		{bucket, 3, nil},
-		{"neBucket", 0, nutsdb.ErrBucket},
+		{"neBucket", 0, errs.ErrBucket},
 	}
 	assertions := assert.New(t)
 	for _, test := range tests {
@@ -95,7 +95,7 @@ func TestDB_ZCard(t *testing.T) {
 func TestDB_ZCount(t *testing.T) {
 	bucket, _, _, _ := initZAddItems()
 	_, err := testDB.ZCount("neBucket", 11, 12, nil)
-	assert.New(t).Equal(nutsdb.ErrBucket, err)
+	assert.New(t).Equal(errs.ErrBucket, err)
 	num, err := testDB.ZCount(bucket, 11, 12, nil)
 	if err != nil {
 		t.Error(err)
@@ -124,7 +124,7 @@ func TestDB_ZRangeByScore(t *testing.T) {
 func TestDB_ZRangByRank(t *testing.T) {
 	bucket, _, _, _ := initZAddItems()
 	_, err := testDB.ZRangeByRank("neBucket", 1, 2)
-	assert.New(t).Equal(nutsdb.ErrBucket, err)
+	assert.New(t).Equal(errs.ErrBucket, err)
 	nodes, err := testDB.ZRangeByRank(bucket, 1, 2)
 	if err != nil {
 		t.Error(err)
@@ -141,7 +141,7 @@ func TestDB_ZRangByRank(t *testing.T) {
 func TestDB_ZRem(t *testing.T) {
 	bucket, key1, _, _ := initZAddItems()
 	err := testDB.ZRem("neBucket", key1)
-	assert.New(t).Equal(nutsdb.ErrBucket, err)
+	assert.New(t).Equal(errs.ErrBucket, err)
 	err = testDB.ZRem(bucket, key1)
 	if err != nil {
 		t.Error(err)
@@ -159,7 +159,7 @@ func TestDB_ZRem(t *testing.T) {
 func TestDB_ZRemRangeByRank(t *testing.T) {
 	bucket, _, _, _ := initZAddItems()
 	err := testDB.ZRemRangeByRank("neBucket", 1, 2)
-	assert.New(t).Equal(nutsdb.ErrBucket, err)
+	assert.New(t).Equal(errs.ErrBucket, err)
 	err = testDB.ZRemRangeByRank(bucket, 1, 2)
 	if err != nil {
 		t.Error(err)
@@ -176,7 +176,7 @@ func TestDB_ZRemRangeByRank(t *testing.T) {
 func TestDB_ZRank(t *testing.T) {
 	bucket, key1, _, _ := initZAddItems()
 	_, err := testDB.ZRank("neBucket", key1)
-	assert.New(t).Equal(nutsdb.ErrBucket, err)
+	assert.New(t).Equal(errs.ErrBucket, err)
 	rank, err := testDB.ZRank(bucket, key1)
 	if err != nil {
 		t.Error(err)
@@ -189,7 +189,7 @@ func TestDB_ZRank(t *testing.T) {
 func TestDB_ZRevRank(t *testing.T) {
 	bucket, key1, _, _ := initZAddItems()
 	_, err := testDB.ZRevRank("neBucket", key1)
-	assert.New(t).Equal(nutsdb.ErrBucket, err)
+	assert.New(t).Equal(errs.ErrBucket, err)
 	rank, err := testDB.ZRevRank(bucket, key1)
 	if err != nil {
 		t.Error(err)
@@ -202,7 +202,7 @@ func TestDB_ZRevRank(t *testing.T) {
 func TestDB_ZScore(t *testing.T) {
 	bucket, key1, _, _ := initZAddItems()
 	_, err := testDB.ZScore("neBucket", key1)
-	assert.New(t).Equal(nutsdb.ErrBucket, err)
+	assert.New(t).Equal(errs.ErrBucket, err)
 	score, err := testDB.ZScore(bucket, key1)
 	if err != nil {
 		t.Error(err)
@@ -215,7 +215,7 @@ func TestDB_ZScore(t *testing.T) {
 func TestDB_ZGetByKey(t *testing.T) {
 	bucket, key1, _, _ := initZAddItems()
 	_, err := testDB.ZGetByKey("neBucket", key1)
-	assert.New(t).Equal(nutsdb.ErrBucket, err)
+	assert.New(t).Equal(errs.ErrBucket, err)
 	node, err := testDB.ZGetByKey(bucket, key1)
 	if err != nil {
 		t.Error(err)

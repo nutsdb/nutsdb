@@ -19,64 +19,15 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/xujiajun/nutsdb/consts"
+	"github.com/xujiajun/nutsdb/errs"
+	"github.com/xujiajun/nutsdb/model"
 	"os"
 	"path/filepath"
 	"regexp"
 	"unsafe"
 
 	"github.com/xujiajun/utils/strconv2"
-)
-
-var (
-	// ErrStartKey is returned when Range is called by a error start key.
-	ErrStartKey = errors.New("err start key")
-
-	// ErrScansNoResult is returned when Range or prefixScan or prefixSearchScan are called no result to found.
-	ErrScansNoResult = errors.New("range scans or prefix or prefix and search scans no result")
-
-	// ErrPrefixSearchScansNoResult is returned when prefixSearchScan is called no result to found.
-	ErrPrefixSearchScansNoResult = errors.New("prefix and search scans no result")
-
-	// ErrKeyNotFound is returned when the key is not in the b+ tree.
-	ErrKeyNotFound = errors.New("key not found")
-
-	// ErrBadRegexp is returned when bad regular expression given.
-	ErrBadRegexp = errors.New("bad regular expression")
-)
-
-const (
-	// Default number of b+ tree orders.
-	order = 8
-
-	// DefaultInvalidAddress returns default invalid node address.
-	DefaultInvalidAddress = -1
-
-	// RangeScan returns range scanMode flag.
-	RangeScan = "RangeScan"
-
-	// PrefixScan returns prefix scanMode flag.
-	PrefixScan = "PrefixScan"
-
-	// PrefixSearchScan returns prefix and search scanMode flag.
-	PrefixSearchScan = "PrefixSearchScan"
-
-	// CountFlagEnabled returns enabled CountFlag.
-	CountFlagEnabled = true
-
-	// CountFlagDisabled returns disabled CountFlag.
-	CountFlagDisabled = false
-
-	// BPTIndexSuffix returns b+ tree index suffix.
-	BPTIndexSuffix = ".bptidx"
-
-	// BPTRootIndexSuffix returns b+ tree root index suffix.
-	BPTRootIndexSuffix = ".bptridx"
-
-	// BPTTxIDIndexSuffix returns b+ tree tx ID index suffix.
-	BPTTxIDIndexSuffix = ".bpttxid"
-
-	// BPTRootTxIDIndexSuffix returns b+ tree root tx ID index suffix.
-	BPTRootTxIDIndexSuffix = ".bptrtxid"
 )
 
 type (
@@ -93,7 +44,7 @@ type (
 	}
 
 	// Records records multi-records as result when is called Range or PrefixScan.
-	Records []*Record
+	Records []*model.Record
 
 	// Node records keys and pointers and parent node.
 	Node struct {
@@ -109,13 +60,13 @@ type (
 	// BinaryNode represents binary node.
 	BinaryNode struct {
 		// hint offset
-		Keys [order - 1]int64
+		Keys [consts.Order - 1]int64
 		// 1. not leaf node represents node address
 		// 2. leaf node represents data address
 
 		// the last pointer would point to the previous node
 		// the next to last one pointer would point to the next node
-		Pointers    [order + 1]int64
+		Pointers    [consts.Order + 1]int64
 		IsLeaf      uint16
 		KeysNum     uint16
 		Address     int64
@@ -130,10 +81,10 @@ func getBinaryNodeSize() int64 {
 // newNode returns a newly initialized Node object that implements the Node.
 func (t *BPTree) newNode() *Node {
 	node := &Node{
-		Keys: make([][]byte, order-1),
+		Keys: make([][]byte, consts.Order-1),
 		// the last pointer would point to the previous node
 		// the next to last one pointer would point to the next node
-		pointers: make([]interface{}, order+1),
+		pointers: make([]interface{}, consts.Order+1),
 		isLeaf:   false,
 		parent:   nil,
 		KeysNum:  0,
@@ -216,7 +167,7 @@ func (t *BPTree) SetKeyPosMap(keyPosMap map[string]int64) {
 // ToBinary represents convert to a binary node.
 func (t *BPTree) ToBinary(n *Node) (result []byte, err error) {
 	var i int
-	var keys [order - 1]int64
+	var keys [consts.Order - 1]int64
 
 	for i = 0; i < n.KeysNum; i++ {
 		if t.enabledKeyPosMap {
@@ -233,7 +184,7 @@ func (t *BPTree) ToBinary(n *Node) (result []byte, err error) {
 
 	// the last pointer would point to the previous node
 	// the next to last one pointer would point to the next node
-	var pointers [order + 1]int64
+	var pointers [consts.Order + 1]int64
 
 	if !n.isLeaf {
 		for i = 0; i < n.KeysNum+1; i++ {
@@ -241,8 +192,8 @@ func (t *BPTree) ToBinary(n *Node) (result []byte, err error) {
 		}
 	} else {
 		for i = 0; i < n.KeysNum; i++ {
-			if n.pointers[i].(*Record).H != nil {
-				dataPos := n.pointers[i].(*Record).H.DataPos
+			if n.pointers[i].(*model.Record).H != nil {
+				dataPos := n.pointers[i].(*model.Record).H.DataPos
 				pointers[i] = int64(dataPos)
 			} else {
 				pointers[i] = 0
@@ -251,7 +202,7 @@ func (t *BPTree) ToBinary(n *Node) (result []byte, err error) {
 	}
 
 	var nextAddress int64
-	nextAddress = DefaultInvalidAddress
+	nextAddress = consts.DefaultInvalidAddress
 
 	if n.Next != nil {
 		nextAddress = n.Next.Address
@@ -314,7 +265,7 @@ func (t *BPTree) WriteNode(n *Node, off int64, syncEnable bool, fd *os.File) (nu
 }
 
 // WriteNodes writes all nodes in the b+ tree to the File starting at byte offset off.
-func (t *BPTree) WriteNodes(rwMode RWMode, syncEnable bool, flag int) error {
+func (t *BPTree) WriteNodes(rwMode consts.RWMode, syncEnable bool, flag int) error {
 	var (
 		n   *Node
 		i   int
@@ -422,7 +373,7 @@ func (t *BPTree) getAll() (numFound int, keys [][]byte, pointers []interface{}) 
 			numFound++
 		}
 
-		n, _ = n.pointers[order-1].(*Node)
+		n, _ = n.pointers[consts.Order-1].(*Node)
 
 		j = 0
 	}
@@ -454,7 +405,7 @@ func (t *BPTree) FindRange(start, end []byte, f func(key []byte, pointer interfa
 				break
 			}
 			if f != nil {
-				if !f(n.pointers[i].(*Record).E.Key, n.pointers[i]) {
+				if !f(n.pointers[i].(*model.Record).E.Key, n.pointers[i]) {
 					break
 				}
 			} else {
@@ -464,7 +415,7 @@ func (t *BPTree) FindRange(start, end []byte, f func(key []byte, pointer interfa
 			}
 		}
 
-		n, _ = n.pointers[order-1].(*Node)
+		n, _ = n.pointers[consts.Order-1].(*Node)
 
 		j = 0
 	}
@@ -480,7 +431,7 @@ func (t *BPTree) All() (records Records, err error) {
 // Range returns records at the given start key and end key.
 func (t *BPTree) Range(start, end []byte) (records Records, err error) {
 	if compare(start, end) > 0 {
-		return nil, ErrStartKey
+		return nil, errs.ErrStartKey
 	}
 
 	return getRecordWrapper(t.FindRange(start, end, nil))
@@ -489,12 +440,12 @@ func (t *BPTree) Range(start, end []byte) (records Records, err error) {
 // getRecordWrapper returns a wrapper of records when Range or PrefixScan are called.
 func getRecordWrapper(numFound int, keys [][]byte, pointers []interface{}) (records Records, err error) {
 	if numFound == 0 {
-		return nil, ErrScansNoResult
+		return nil, errs.ErrScansNoResult
 	}
 
 	records = Records{}
 	for i := 0; i < numFound; i++ {
-		records = append(records, pointers[i].(*Record))
+		records = append(records, pointers[i].(*model.Record))
 	}
 
 	return records, nil
@@ -514,7 +465,7 @@ func (t *BPTree) PrefixScan(prefix []byte, offsetNum int, limitNum int) (records
 	n = t.FindLeaf(prefix)
 
 	if n == nil {
-		return nil, off, ErrPrefixScan
+		return nil, off, errs.ErrPrefixScan
 	}
 
 	for j = 0; j < n.KeysNum && compare(n.Keys[j], prefix) < 0; {
@@ -549,7 +500,7 @@ func (t *BPTree) PrefixScan(prefix []byte, offsetNum int, limitNum int) (records
 			}
 		}
 
-		n, _ = n.pointers[order-1].(*Node)
+		n, _ = n.pointers[consts.Order-1].(*Node)
 		j = 0
 	}
 
@@ -572,13 +523,13 @@ func (t *BPTree) PrefixSearchScan(prefix []byte, reg string, offsetNum int, limi
 
 	rgx, err := regexp.Compile(reg)
 	if err != nil {
-		return nil, off, ErrBadRegexp
+		return nil, off, errs.ErrBadRegexp
 	}
 
 	n = t.FindLeaf(prefix)
 
 	if n == nil {
-		return nil, off, ErrPrefixSearchScansNoResult
+		return nil, off, errs.ErrPrefixSearchScansNoResult
 	}
 
 	for j = 0; j < n.KeysNum && compare(n.Keys[j], prefix) < 0; {
@@ -617,7 +568,7 @@ func (t *BPTree) PrefixSearchScan(prefix []byte, reg string, offsetNum int, limi
 			}
 		}
 
-		n, _ = n.pointers[order-1].(*Node)
+		n, _ = n.pointers[consts.Order-1].(*Node)
 		j = 0
 	}
 
@@ -628,7 +579,7 @@ func (t *BPTree) PrefixSearchScan(prefix []byte, reg string, offsetNum int, limi
 }
 
 // Find retrieves record at the given key.
-func (t *BPTree) Find(key []byte) (*Record, error) {
+func (t *BPTree) Find(key []byte) (*model.Record, error) {
 	var (
 		leaf *Node
 		i    int
@@ -638,7 +589,7 @@ func (t *BPTree) Find(key []byte) (*Record, error) {
 	leaf = t.FindLeaf(key)
 
 	if leaf == nil {
-		return nil, ErrKeyNotFound
+		return nil, errs.ErrKeyNotFound
 	}
 
 	for i = 0; i < leaf.KeysNum; i++ {
@@ -648,14 +599,14 @@ func (t *BPTree) Find(key []byte) (*Record, error) {
 	}
 
 	if i == leaf.KeysNum {
-		return nil, ErrKeyNotFound
+		return nil, errs.ErrKeyNotFound
 	}
 
-	return leaf.pointers[i].(*Record), nil
+	return leaf.pointers[i].(*model.Record), nil
 }
 
 // startNewTree returns a start new tree.
-func (t *BPTree) startNewTree(key []byte, pointer *Record) error {
+func (t *BPTree) startNewTree(key []byte, pointer *model.Record) error {
 	t.root = t.newLeaf()
 	t.root.Keys[0] = key
 	t.root.pointers[0] = pointer
@@ -664,7 +615,7 @@ func (t *BPTree) startNewTree(key []byte, pointer *Record) error {
 	return nil
 }
 
-func (t *BPTree) checkAndSetFirstKey(key []byte, h *Hint) {
+func (t *BPTree) checkAndSetFirstKey(key []byte, h *model.Hint) {
 	if len(t.FirstKey) == 0 {
 		t.FirstKey = key
 	} else {
@@ -674,7 +625,7 @@ func (t *BPTree) checkAndSetFirstKey(key []byte, h *Hint) {
 	}
 }
 
-func (t *BPTree) checkAndSetLastKey(key []byte, h *Hint) {
+func (t *BPTree) checkAndSetLastKey(key []byte, h *model.Hint) {
 	if compare(key, t.LastKey) > 0 {
 		t.LastKey = key
 	}
@@ -682,17 +633,17 @@ func (t *BPTree) checkAndSetLastKey(key []byte, h *Hint) {
 
 // Insert inserts record to the b+ tree,
 // and if the key exists, update the record and the counter(if countFlag set true,it will start count).
-func (t *BPTree) Insert(key []byte, e *Entry, h *Hint, countFlag bool) error {
+func (t *BPTree) Insert(key []byte, e *model.Entry, h *model.Hint, countFlag bool) error {
 	t.checkAndSetFirstKey(key, h)
 
 	t.checkAndSetLastKey(key, h)
 
 	if r, err := t.Find(key); err == nil && r != nil {
-		if countFlag && h.Meta.Flag == DataDeleteFlag && r.H.Meta.Flag != DataDeleteFlag && t.ValidKeyCount > 0 {
+		if countFlag && h.Meta.Flag.Is(consts.DataDeleteFlag) && r.H.Meta.Flag.Not(consts.DataDeleteFlag) && t.ValidKeyCount > 0 {
 			t.ValidKeyCount--
 		}
 
-		if countFlag && h.Meta.Flag != DataDeleteFlag && r.H.Meta.Flag == DataDeleteFlag {
+		if countFlag && h.Meta.Flag.Not(consts.DataDeleteFlag) && r.H.Meta.Flag.Is(consts.DataDeleteFlag) {
 			t.ValidKeyCount++
 		}
 
@@ -700,7 +651,7 @@ func (t *BPTree) Insert(key []byte, e *Entry, h *Hint, countFlag bool) error {
 	}
 
 	// Initialize the Record object When key does not exist.
-	pointer := &Record{H: h, E: e}
+	pointer := &model.Record{H: h, E: e}
 
 	// Update the validKeyCount number
 	t.ValidKeyCount++
@@ -716,7 +667,7 @@ func (t *BPTree) Insert(key []byte, e *Entry, h *Hint, countFlag bool) error {
 
 	// Check if the leaf node is full or not
 	// if not full insert into the leaf node.
-	if leaf.KeysNum < order-1 {
+	if leaf.KeysNum < consts.Order-1 {
 		insertIntoLeaf(leaf, key, pointer)
 		return nil
 	}
@@ -735,14 +686,14 @@ func getSplitIndex(length int) int {
 }
 
 // splitLeaf splits leaf and insert the parent node when the leaf is full.
-func (t *BPTree) splitLeaf(leaf *Node, key []byte, pointer *Record) error {
+func (t *BPTree) splitLeaf(leaf *Node, key []byte, pointer *model.Record) error {
 	var j, k, i int
 
-	tmpKeys := make([][]byte, order)
-	tmpPointers := make([]interface{}, order)
+	tmpKeys := make([][]byte, consts.Order)
+	tmpPointers := make([]interface{}, consts.Order)
 
 	// Find the ready position of the insertion.
-	for i < order-1 {
+	for i < consts.Order-1 {
 		if compare(leaf.Keys[i], key) < 0 {
 			i++
 		} else {
@@ -766,7 +717,7 @@ func (t *BPTree) splitLeaf(leaf *Node, key []byte, pointer *Record) error {
 	tmpPointers[i] = pointer
 
 	// Get the split index for the leaf node.
-	splitIndex := getSplitIndex(order)
+	splitIndex := getSplitIndex(consts.Order)
 
 	// Reset the the keysNum of the leaf.
 	leaf.KeysNum = 0
@@ -781,7 +732,7 @@ func (t *BPTree) splitLeaf(leaf *Node, key []byte, pointer *Record) error {
 	// Set the keys and pointers for the new leaf.
 	j = 0
 	newLeaf := t.newLeaf()
-	for i = splitIndex; i < order; i++ {
+	for i = splitIndex; i < consts.Order; i++ {
 		newLeaf.Keys[j] = tmpKeys[i]
 		newLeaf.pointers[j] = tmpPointers[i]
 		newLeaf.KeysNum++
@@ -789,14 +740,14 @@ func (t *BPTree) splitLeaf(leaf *Node, key []byte, pointer *Record) error {
 	}
 
 	// Set the next to last one pointer of the new leaf node to point the last pointer of the leaf node.
-	if leaf.pointers[order-1] != nil {
-		newLeaf.pointers[order-1] = leaf.pointers[order-1]
+	if leaf.pointers[consts.Order-1] != nil {
+		newLeaf.pointers[consts.Order-1] = leaf.pointers[consts.Order-1]
 	}
 
 	// Reset the next to last one pointer of the leaf node.
-	leaf.pointers[order-1] = newLeaf
+	leaf.pointers[consts.Order-1] = newLeaf
 	// Set the last pointer of newLeaf to leaf node (used in reverse iteration)
-	newLeaf.pointers[order] = leaf
+	newLeaf.pointers[consts.Order] = leaf
 	// Set the parent.
 	newLeaf.parent = leaf.parent
 
@@ -855,7 +806,7 @@ func (t *BPTree) insertIntoParent(left *Node, key []byte, right *Node) error {
 
 	// Check if the parent of left node is full or not
 	// if not full,then insert into the parent node.
-	if left.parent.KeysNum < order-1 {
+	if left.parent.KeysNum < consts.Order-1 {
 		return t.insertIntoNode(left.parent, leftIndex, key, right)
 	}
 
@@ -865,8 +816,8 @@ func (t *BPTree) insertIntoParent(left *Node, key []byte, right *Node) error {
 
 // splitParent splits the given node at the given leftIndex,key and right node.
 func (t *BPTree) splitParent(node *Node, leftIndex int, key []byte, right *Node) error {
-	tmpKeys := make([][]byte, order)
-	tmpPointers := make([]interface{}, order+1)
+	tmpKeys := make([][]byte, consts.Order)
+	tmpPointers := make([]interface{}, consts.Order+1)
 
 	// In addition to the index location of leftIndex filtered out
 	// the other key of the node is stored in tmpKeys.
@@ -896,7 +847,7 @@ func (t *BPTree) splitParent(node *Node, leftIndex int, key []byte, right *Node)
 	tmpPointers[leftIndex+1] = right
 
 	// Get the split index for the intermediate node.
-	splitIndex := getSplitIndex(order - 1)
+	splitIndex := getSplitIndex(consts.Order - 1)
 
 	// Reset the KeysNum of the node.
 	node.KeysNum = 0
@@ -912,7 +863,7 @@ func (t *BPTree) splitParent(node *Node, leftIndex int, key []byte, right *Node)
 	newNode := t.newNode()
 
 	j = 0
-	for i++; i < order; i++ {
+	for i++; i < consts.Order; i++ {
 		newNode.Keys[j] = tmpKeys[i]
 		newNode.pointers[j] = tmpPointers[i]
 		newNode.KeysNum++
@@ -937,7 +888,7 @@ func (t *BPTree) splitParent(node *Node, leftIndex int, key []byte, right *Node)
 }
 
 // insertIntoLeaf inserts the given node at the given key and pointer.
-func insertIntoLeaf(leaf *Node, key []byte, pointer *Record) {
+func insertIntoLeaf(leaf *Node, key []byte, pointer *model.Record) {
 	i := 0
 	for i < leaf.KeysNum {
 		if compare(key, leaf.Keys[i]) > 0 {

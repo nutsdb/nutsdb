@@ -15,15 +15,18 @@
 package inmemory
 
 import (
+	"github.com/xujiajun/nutsdb/consts"
+	"github.com/xujiajun/nutsdb/errs"
+	"github.com/xujiajun/nutsdb/model"
 	"time"
 
 	"github.com/xujiajun/nutsdb"
 )
 
-func (db *DB) Get(bucket string, key []byte) (*nutsdb.Entry, error) {
+func (db *DB) Get(bucket string, key []byte) (*model.Entry, error) {
 	var (
 		err   error
-		entry *nutsdb.Entry
+		entry *model.Entry
 	)
 	err = db.Managed(bucket, false, func(shardDB *ShardDB) error {
 		if idx, ok := shardDB.BPTreeIdx[bucket]; ok {
@@ -32,13 +35,13 @@ func (db *DB) Get(bucket string, key []byte) (*nutsdb.Entry, error) {
 				return err
 			}
 
-			if r.H.Meta.Flag == nutsdb.DataDeleteFlag || r.IsExpired() {
-				return nutsdb.ErrNotFoundKey
+			if r.H.Meta.Flag == consts.DataDeleteFlag || r.IsExpired() {
+				return errs.ErrNotFoundKey
 			}
 
 			entry = r.E
 		} else if !ok {
-			return nutsdb.ErrBucket
+			return errs.ErrBucket
 		}
 		return nil
 	})
@@ -50,12 +53,12 @@ func (db *DB) Get(bucket string, key []byte) (*nutsdb.Entry, error) {
 		return entry, nil
 	}
 
-	return nil, nutsdb.ErrKeyNotFound
+	return nil, errs.ErrKeyNotFound
 }
 
 func (db *DB) Put(bucket string, key, value []byte, ttl uint32) (err error) {
 	err = db.Managed(bucket, true, func(shardDB *ShardDB) error {
-		return put(shardDB, bucket, key, value, ttl, nutsdb.DataSetFlag)
+		return put(shardDB, bucket, key, value, ttl, consts.DataSetFlag)
 	})
 
 	return
@@ -64,7 +67,7 @@ func (db *DB) Put(bucket string, key, value []byte, ttl uint32) (err error) {
 // Delete removes a key from the bucket at given bucket and key.
 func (db *DB) Delete(bucket string, key []byte) (err error) {
 	err = db.Managed(bucket, true, func(shardDB *ShardDB) error {
-		return put(shardDB, bucket, key, nil, nutsdb.Persistent, nutsdb.DataDeleteFlag)
+		return put(shardDB, bucket, key, nil, consts.Persistent, consts.DataDeleteFlag)
 	})
 	return
 }
@@ -74,8 +77,8 @@ func (db *DB) Range(bucket string, start, end []byte, f func(key, value []byte) 
 	err = db.Managed(bucket, false, func(shardDB *ShardDB) error {
 		if index, ok := shardDB.BPTreeIdx[bucket]; ok {
 			index.FindRange(start, end, func(key []byte, pointer interface{}) bool {
-				record := pointer.(*nutsdb.Record)
-				if record.E.Meta.Flag != nutsdb.DataDeleteFlag && !record.IsExpired() {
+				record := pointer.(*model.Record)
+				if record.E.Meta.Flag != consts.DataDeleteFlag && !record.IsExpired() {
 					return f(key, record.E.Value)
 				}
 				return true
@@ -91,8 +94,8 @@ func (db *DB) AllKeys(bucket string) (keys [][]byte, err error) {
 	err = db.Managed(bucket, false, func(shardDB *ShardDB) error {
 		if index, ok := shardDB.BPTreeIdx[bucket]; ok {
 			index.FindRange(index.FirstKey, index.LastKey, func(key []byte, pointer interface{}) bool {
-				record := pointer.(*nutsdb.Record)
-				if record.E.Meta.Flag != nutsdb.DataDeleteFlag && !record.IsExpired() {
+				record := pointer.(*model.Record)
+				if record.E.Meta.Flag != consts.DataDeleteFlag && !record.IsExpired() {
 					keys = append(keys, key)
 				}
 				return true
@@ -111,10 +114,10 @@ func (db *DB) PrefixScan(bucket string, prefix []byte, offsetNum int, limitNum i
 			records, voff, err := idx.PrefixScan(prefix, offsetNum, limitNum)
 			if err != nil {
 				off = voff
-				return nutsdb.ErrPrefixScan
+				return errs.ErrPrefixScan
 			}
 			for _, r := range records {
-				if r.E.Meta.Flag == nutsdb.DataDeleteFlag || r.IsExpired() {
+				if r.E.Meta.Flag == consts.DataDeleteFlag || r.IsExpired() {
 					continue
 				}
 				es = append(es, r.E)
@@ -124,12 +127,12 @@ func (db *DB) PrefixScan(bucket string, prefix []byte, offsetNum int, limitNum i
 		return nil
 	})
 	if len(es) == 0 {
-		return nil, off, nutsdb.ErrPrefixScan
+		return nil, off, errs.ErrPrefixScan
 	}
 	return
 }
 
-func put(shardDB *ShardDB, bucket string, key, value []byte, ttl uint32, flag uint16) (err error) {
+func put(shardDB *ShardDB, bucket string, key, value []byte, ttl uint32, flag consts.DataFlag) (err error) {
 	if _, ok := shardDB.BPTreeIdx[bucket]; !ok {
 		shardDB.BPTreeIdx[bucket] = nutsdb.NewTree()
 	}
@@ -137,10 +140,10 @@ func put(shardDB *ShardDB, bucket string, key, value []byte, ttl uint32, flag ui
 	valueSize := uint32(len(value))
 	timestamp := uint64(time.Now().Unix())
 	bucketSize := uint32(len(bucket))
-	err = shardDB.BPTreeIdx[bucket].Insert(key, &nutsdb.Entry{
+	err = shardDB.BPTreeIdx[bucket].Insert(key, &model.Entry{
 		Key:   key,
 		Value: value,
-		Meta: &nutsdb.MetaData{
+		Meta: &model.MetaData{
 			KeySize:    keySize,
 			ValueSize:  valueSize,
 			Timestamp:  timestamp,
@@ -148,12 +151,12 @@ func put(shardDB *ShardDB, bucket string, key, value []byte, ttl uint32, flag ui
 			TTL:        ttl,
 			Bucket:     []byte(bucket),
 			BucketSize: bucketSize,
-			Status:     nutsdb.Committed,
-			Ds:         nutsdb.DataStructureBPTree,
+			Status:     consts.Committed,
+			Ds:         consts.DataStructureBPTree,
 		},
-	}, &nutsdb.Hint{
+	}, &model.Hint{
 		Key: key,
-		Meta: &nutsdb.MetaData{
+		Meta: &model.MetaData{
 			KeySize:    keySize,
 			ValueSize:  valueSize,
 			Timestamp:  timestamp,
@@ -161,9 +164,9 @@ func put(shardDB *ShardDB, bucket string, key, value []byte, ttl uint32, flag ui
 			TTL:        ttl,
 			Bucket:     []byte(bucket),
 			BucketSize: bucketSize,
-			Status:     nutsdb.Committed,
-			Ds:         nutsdb.DataStructureBPTree,
+			Status:     consts.Committed,
+			Ds:         consts.DataStructureBPTree,
 		},
-	}, nutsdb.CountFlagEnabled)
+	}, consts.CountFlagEnabled)
 	return
 }

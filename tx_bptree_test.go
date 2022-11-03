@@ -16,6 +16,7 @@ package nutsdb
 
 import (
 	"fmt"
+	"github.com/xujiajun/nutsdb/consts"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -59,7 +60,7 @@ func InitForBPTSparseIdxMode() {
 	opt = DefaultOptions
 	opt.Dir = fileDir
 	opt.SegmentSize = 1024
-	opt.EntryIdxMode = HintBPTSparseIdxMode
+	opt.EntryIdxMode = consts.HintBPTSparseIdxMode
 }
 
 func TestTx_PutAndGet(t *testing.T) {
@@ -78,7 +79,7 @@ func TestTx_PutAndGet(t *testing.T) {
 				tx, err := db.Begin(true)
 				require.NoError(t, err)
 
-				err = tx.Put(bucket, key, val, Persistent)
+				err = tx.Put(bucket, key, val, consts.Persistent)
 				assert.NoError(t, err)
 
 				assert.NoError(t, tx.Commit())
@@ -139,12 +140,12 @@ func TestTx_GetAll(t *testing.T) {
 
 				key0 := []byte("key_" + fmt.Sprintf("%07d", 0))
 				val0 := []byte("val" + fmt.Sprintf("%07d", 0))
-				err = tx.Put(bucket, key0, val0, Persistent)
+				err = tx.Put(bucket, key0, val0, consts.Persistent)
 				assert.NoError(t, err)
 
 				key1 := []byte("key_" + fmt.Sprintf("%07d", 1))
 				val1 := []byte("val" + fmt.Sprintf("%07d", 1))
-				err = tx.Put(bucket, key1, val1, Persistent)
+				err = tx.Put(bucket, key1, val1, consts.Persistent)
 				assert.NoError(t, err)
 
 				assert.NoError(t, tx.Commit())
@@ -188,7 +189,7 @@ func TestTx_RangeScan_Err(t *testing.T) {
 			for i := 0; i < 10; i++ {
 				key := []byte("key_" + fmt.Sprintf("%07d", i))
 				val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", i))
-				err = tx.Put(bucket, key, val, Persistent)
+				err = tx.Put(bucket, key, val, consts.Persistent)
 				assert.NoError(t, err)
 			}
 
@@ -225,7 +226,7 @@ func TestTx_RangeScan(t *testing.T) {
 			for i := 0; i < 10; i++ {
 				key := []byte("key_" + fmt.Sprintf("%07d", i))
 				val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", i))
-				err = tx.Put(bucket, key, val, Persistent)
+				err = tx.Put(bucket, key, val, consts.Persistent)
 				assert.NoError(t, err)
 			}
 
@@ -283,7 +284,7 @@ func TestTx_PrefixScan(t *testing.T) {
 				for i := 0; i < 10; i++ {
 					key := []byte(prefix + fmt.Sprintf("%07d", i))
 					val := []byte("foobar" + fmt.Sprintf("%07d", i))
-					err = tx.Put(bucket, key, val, Persistent)
+					err = tx.Put(bucket, key, val, consts.Persistent)
 					assert.NoError(t, err)
 				}
 			}
@@ -330,7 +331,7 @@ func TestTx_PrefixSearchScan(t *testing.T) {
 
 		key := []byte("key_" + fmt.Sprintf("%07d", 0))
 		val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 0))
-		err = tx.Put(bucket, key, val, Persistent)
+		err = tx.Put(bucket, key, val, consts.Persistent)
 		assert.NoError(t, err)
 
 		assert.NoError(t, tx.Commit()) // tx commit
@@ -340,7 +341,7 @@ func TestTx_PrefixSearchScan(t *testing.T) {
 
 		key = []byte("key_" + fmt.Sprintf("%07d", 1))
 		val = []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 1))
-		err = tx.Put(bucket, key, val, Persistent)
+		err = tx.Put(bucket, key, val, consts.Persistent)
 		assert.NoError(t, err)
 
 		assert.NoError(t, tx.Commit()) // tx commit
@@ -379,7 +380,7 @@ func TestTx_DeleteAndGet(t *testing.T) {
 			for i := 0; i <= 10; i++ {
 				key := []byte("key_" + fmt.Sprintf("%07d", i))
 				val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", i))
-				err := tx.Put(bucket, key, val, Persistent)
+				err := tx.Put(bucket, key, val, consts.Persistent)
 				assert.NoError(t, err)
 			}
 
@@ -418,7 +419,7 @@ func TestTx_GetAndScansFromHintKey(t *testing.T) {
 		for i := 0; i <= 10; i++ {
 			key := []byte("key_" + fmt.Sprintf("%07d", i))
 			val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", i))
-			err = tx.Put(bucket, key, val, Persistent)
+			err = tx.Put(bucket, key, val, consts.Persistent)
 			assert.NoError(t, err)
 		}
 		assert.NoError(t, tx.Commit()) // tx commit
@@ -472,7 +473,7 @@ func TestTx_Put_Err(t *testing.T) {
 
 			key := []byte("key_" + fmt.Sprintf("%07d", 0))
 			val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 0))
-			err = tx.Put(bucket, key, val, Persistent)
+			err = tx.Put(bucket, key, val, consts.Persistent)
 			assert.Error(t, err)
 
 			assert.NoError(t, tx.Rollback())
@@ -486,7 +487,7 @@ func TestTx_Put_Err(t *testing.T) {
 
 			key := []byte("") // key cannot be empty
 			val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 0))
-			err = tx.Put(bucket, key, val, Persistent)
+			err = tx.Put(bucket, key, val, consts.Persistent)
 			assert.Error(t, err)
 
 			assert.NoError(t, tx.Rollback())
@@ -504,7 +505,7 @@ func TestTx_Put_Err(t *testing.T) {
 				bigVal += "val" + strconv2.IntToStr(i)
 			}
 
-			err = tx.Put(bucket, key, []byte(bigVal), Persistent)
+			err = tx.Put(bucket, key, []byte(bigVal), consts.Persistent)
 			assert.NoError(t, err)
 
 			assert.Error(t, tx.Commit()) // too big cannot commit by tx
@@ -541,7 +542,7 @@ func TestTx_PrefixScan_NotFound(t *testing.T) {
 				for i := 0; i <= 10; i++ {
 					key := []byte("key_" + fmt.Sprintf("%07d", i))
 					val := []byte("val" + fmt.Sprintf("%07d", i))
-					err = tx.Put(bucket, key, val, Persistent)
+					err = tx.Put(bucket, key, val, consts.Persistent)
 					assert.NoError(t, err)
 				}
 
@@ -612,7 +613,7 @@ func TestTx_PrefixSearchScan_NotFound(t *testing.T) {
 					key := []byte("key_" + fmt.Sprintf("%07d", i))
 					val := []byte("val" + fmt.Sprintf("%07d", i))
 
-					err := tx.Put(bucket, key, val, Persistent)
+					err := tx.Put(bucket, key, val, consts.Persistent)
 					assert.NoError(t, err)
 				}
 				// tx commit
@@ -654,7 +655,7 @@ func TestTx_RangeScan_NotFound(t *testing.T) {
 		for i := 0; i <= 10; i++ {
 			key := []byte("key_" + fmt.Sprintf("%03d", i))
 			val := []byte("val" + fmt.Sprintf("%03d", i))
-			err = tx.Put(bucket, key, val, Persistent)
+			err = tx.Put(bucket, key, val, consts.Persistent)
 			assert.NoError(t, err)
 		}
 		assert.NoError(t, tx.Commit()) // tx commit
@@ -681,7 +682,7 @@ func TestTx_Get_SCan_For_BPTSparseIdxMode(t *testing.T) {
 		for i := 0; i <= 10; i++ {
 			key := []byte("key_" + fmt.Sprintf("%07d", i))
 			val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", i))
-			err := tx.Put(bucket, key, val, Persistent)
+			err := tx.Put(bucket, key, val, consts.Persistent)
 			assert.NoError(t, err)
 		}
 		assert.NoError(t, tx.Commit())
@@ -713,7 +714,7 @@ func TestTx_SCan_For_BPTSparseIdxMode(t *testing.T) {
 			for i := 0; i <= 10; i++ {
 				key := []byte("key_" + fmt.Sprintf("%07d", i))
 				val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", i))
-				err := tx.Put(bucket, key, val, Persistent)
+				err := tx.Put(bucket, key, val, consts.Persistent)
 				assert.NoError(t, err)
 			}
 			assert.NoError(t, tx.Commit())

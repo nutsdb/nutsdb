@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/xujiajun/nutsdb/consts"
 
 	"github.com/xujiajun/nutsdb"
 )
@@ -27,7 +28,7 @@ func main() {
 	for i := 0; i < 10; i++ {
 		key := []byte("key_" + fmt.Sprintf("%03d", i))
 		val := []byte("val_" + fmt.Sprintf("%03d", i))
-		if err = tx.Put(bucket, key, val, nutsdb.Persistent); err != nil {
+		if err = tx.Put(bucket, key, val, consts.Persistent); err != nil {
 			// tx rollback
 			tx.Rollback()
 			fmt.Printf("rollback ok, err %v:", err)

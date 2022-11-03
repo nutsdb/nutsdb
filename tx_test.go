@@ -16,6 +16,7 @@ package nutsdb
 
 import (
 	"fmt"
+	"github.com/xujiajun/nutsdb/consts"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -36,7 +37,7 @@ func TestTx_Rollback(t *testing.T) {
 			if i == 7 {
 				key = []byte("") // set error key to make tx rollback
 			}
-			if err = tx.Put(bucket, key, val, Persistent); err != nil {
+			if err = tx.Put(bucket, key, val, consts.Persistent); err != nil {
 				// tx rollback
 				tx.Rollback()
 
@@ -167,11 +168,11 @@ func TestTx_CommittedStatus(t *testing.T) {
 
 			entry1, err := tx.Get(bucket, []byte("key1"))
 			assert.NoError(t, err)
-			assert.Equalf(t, UnCommitted, entry1.Meta.Status, "not the last entry should be uncommitted")
+			assert.Equalf(t, consts.UnCommitted, entry1.Meta.Status, "not the last entry should be uncommitted")
 
 			entry2, err := tx.Get(bucket, []byte("key2"))
 			assert.NoError(t, err)
-			assert.Equalf(t, Committed, entry2.Meta.Status, "the last entry should be committed")
+			assert.Equalf(t, consts.Committed, entry2.Meta.Status, "the last entry should be committed")
 
 			// check committedTxIds
 			txID := entry1.Meta.TxID

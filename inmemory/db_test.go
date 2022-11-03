@@ -17,10 +17,10 @@ package inmemory
 import (
 	"bytes"
 	"fmt"
+	"github.com/xujiajun/nutsdb/errs"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/xujiajun/nutsdb"
 )
 
 func initTestDB() {
@@ -147,8 +147,8 @@ func TestDB_Get_ERR(t *testing.T) {
 		key         []byte
 		wantedError error
 	}{
-		{"neBucket", []byte("key"), nutsdb.ErrBucket}, // this case should return ErrBucket
-		{"bucket", []byte("neKey"), nutsdb.ErrKeyNotFound},
+		{"neBucket", []byte("key"), errs.ErrBucket}, // this case should return ErrBucket
+		{"bucket", []byte("neKey"), errs.ErrKeyNotFound},
 		{"bucket1", []byte("key1"), nil},
 	}
 	for _, test := range tests {
