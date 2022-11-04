@@ -18,7 +18,7 @@ const (
 
 // fdManager hold a fd cache in memory, it lru based cache.
 type fdManager struct {
-	sync.Mutex
+	lock               sync.Mutex
 	cache              map[string]*FdInfo
 	fdList             *doubleLinkedList
 	size               int
@@ -56,8 +56,8 @@ type FdInfo struct {
 
 // getFd go through this method to get fd.
 func (fdm *fdManager) getFd(path string) (fd *os.File, err error) {
-	fdm.Lock()
-	defer fdm.Unlock()
+	fdm.lock.Lock()
+	defer fdm.lock.Unlock()
 	cleanPath := filepath.Clean(path)
 	if fdInfo := fdm.cache[cleanPath]; fdInfo == nil {
 		fd, err = os.OpenFile(cleanPath, os.O_CREATE|os.O_RDWR, 0o644)
@@ -112,8 +112,8 @@ func (fdm *fdManager) addToCache(fd *os.File, cleanPath string) {
 
 // reduceUsing when RWManager object close, it will go through this method let fdm know it return the fd to cache
 func (fdm *fdManager) reduceUsing(path string) {
-	fdm.Lock()
-	defer fdm.Unlock()
+	fdm.lock.Lock()
+	defer fdm.lock.Unlock()
 	cleanPath := filepath.Clean(path)
 	node, isExist := fdm.cache[cleanPath]
 	if !isExist {
@@ -122,10 +122,10 @@ func (fdm *fdManager) reduceUsing(path string) {
 	node.using--
 }
 
-// close means close the cache.
+// close means the cache.
 func (fdm *fdManager) close() error {
-	fdm.Lock()
-	defer fdm.Unlock()
+	fdm.lock.Lock()
+	defer fdm.lock.Unlock()
 	node := fdm.fdList.tail.prev
 	for node != fdm.fdList.head {
 		err := node.fd.Close()
@@ -199,8 +199,8 @@ func (fdm *fdManager) cleanUselessFd() error {
 }
 
 func (fdm *fdManager) closeByPath(path string) error {
-	fdm.Lock()
-	defer fdm.Unlock()
+	fdm.lock.Lock()
+	defer fdm.lock.Unlock()
 	fdInfo, ok := fdm.cache[path]
 	if !ok {
 		return nil
