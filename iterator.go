@@ -91,6 +91,9 @@ func (it *Iterator) SetNext() (bool, error) {
 		}
 	}
 
+	if it.current == nil {
+		return false, nil
+	}
 	pointer := it.current.pointers[it.i]
 	record := pointer.(*Record)
 
