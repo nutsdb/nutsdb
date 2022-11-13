@@ -124,3 +124,9 @@
 * [Refactor] use size constant value (#204) @elliotchenzichang
 * [Chore] add iterator example (#209) @xujiajun
 * [Chore] remove option StartFileLoadingMode (#218) @xujiajun
+
+## v0.11.1（2022-11-13）
+* [Bug Fix] avoid nil of it.current (#233) @mindon
+* [Bug Fix] it.current may be nil when options.Reverse is false (#234) @xujiajun
+* [Refactor] changing the lock to be one of property of the structure can make the code more readable.(#228) @elliotchenzichang
+* [New Feature] add buffer size of recovery reader as param (#230) @elliotchenzichang
