@@ -82,6 +82,9 @@ func (it *Iterator) SetNext() (bool, error) {
 			it.i = it.current.KeysNum - 1
 		}
 	} else {
+		if it.current == nil {
+			return false, nil
+		}
 		if it.i >= it.current.KeysNum {
 			it.current, _ = it.current.pointers[order-1].(*Node)
 			if it.current == nil {
