@@ -30,7 +30,7 @@ func Test_readEntry(t *testing.T) {
 	_, err = fd.Write(expect.Encode())
 	require.NoError(t, err)
 
-	f, err := newFileRecovery(path)
+	f, err := newFileRecovery(path, 4096)
 	get, err := f.readEntry()
 	require.NoError(t, err)
 
