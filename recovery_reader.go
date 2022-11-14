@@ -12,17 +12,18 @@ type fileRecovery struct {
 	reader *bufio.Reader
 }
 
-func newFileRecovery(path string) (fr *fileRecovery, err error) {
+func newFileRecovery(path string, bufSize int) (fr *fileRecovery, err error) {
 	fd, err := os.OpenFile(path, os.O_RDWR, os.ModePerm)
 	if err != nil {
 		return nil, err
 	}
+	bufSize = calBufferSize(bufSize)
 	return &fileRecovery{
-		reader: bufio.NewReader(fd),
+		reader: bufio.NewReaderSize(fd, bufSize),
 	}, nil
 }
 
-// readEntry will read a Entry from disk.
+// readEntry will read an Entry from disk.
 func (fr *fileRecovery) readEntry() (e *Entry, err error) {
 	buf := make([]byte, DataEntryHeaderSize)
 	_, err = io.ReadFull(fr.reader, buf)
@@ -57,4 +58,19 @@ func (fr *fileRecovery) readEntry() (e *Entry, err error) {
 	}
 
 	return e, nil
+}
+
+// calBufferSize calculates the buffer size of bufio.Reader
+// if the size < 4 * KB, use 4 * KB as the size of buffer in bufio.Reader
+// if the size > 4 * KB, use the nearly blockSize buffer as the size of buffer in bufio.Reader
+func calBufferSize(size int) int {
+	blockSize := 4 * KB
+	if size < blockSize {
+		return blockSize
+	}
+	hasRest := (size%blockSize == 0)
+	if hasRest {
+		return (size/blockSize + 1) * blockSize
+	}
+	return size
 }

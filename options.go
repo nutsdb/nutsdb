@@ -57,6 +57,9 @@ type Options struct {
 
 	// CleanFdsCacheThreshold represents the maximum threshold for recycling fd, it should be between 0 and 1.
 	CleanFdsCacheThreshold float64
+
+	// BufferSizeOfRecovery represents the buffer size of recoveryReader buffer Size
+	BufferSizeOfRecovery int
 }
 
 const (
