@@ -10,8 +10,7 @@ import (
 func Test_readEntry(t *testing.T) {
 	path := "/tmp/test_read_entry"
 
-	err := os.Remove(path)
-	fd, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, os.ModePerm)
+	fd, err := os.OpenFile(path, os.O_TRUNC|os.O_CREATE|os.O_RDWR, os.ModePerm)
 	require.NoError(t, err)
 
 	expect := &Entry{
