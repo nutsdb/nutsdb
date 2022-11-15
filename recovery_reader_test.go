@@ -36,4 +36,7 @@ func Test_readEntry(t *testing.T) {
 
 	assert.Equal(t, expect.Encode(), get.Encode())
 
+	err = fd.Close()
+	require.NoError(t, err)
+
 }
