@@ -31,6 +31,8 @@ func Test_readEntry(t *testing.T) {
 	require.NoError(t, err)
 
 	f, err := newFileRecovery(path, 4096)
+	require.NoError(t, err)
+
 	get, err := f.readEntry()
 	require.NoError(t, err)
 
