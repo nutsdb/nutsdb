@@ -176,6 +176,9 @@ func enqueue(node *Node) {
 }
 
 func dequeue() *Node {
+	if queue == nil {
+		return nil
+	}
 	n := queue
 	queue = queue.Next
 

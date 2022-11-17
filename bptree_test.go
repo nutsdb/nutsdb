@@ -400,3 +400,63 @@ func TestBPTree_Update(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, DataSetFlag, r.H.Meta.Flag)
 }
+
+func Test_Enqueue(t *testing.T) {
+
+	t.Run("test enqueue and dequeue1", func(t *testing.T) {
+		for i := 0; i < 10; i++ {
+			keys := [][]byte{[]byte(fmt.Sprintf("azhs%d", i))}
+			node := &Node{
+				Keys:     keys,
+				pointers: nil,
+				isLeaf:   true,
+			}
+			enqueue(node)
+			res := dequeue()
+			assert.Equal(t, res.Keys, keys)
+			assert.Equal(t, res.isLeaf, true)
+		}
+	})
+
+	t.Run("test enqueue and dequeue2", func(t *testing.T) {
+		for i := 0; i < 10; i++ {
+			keys := [][]byte{[]byte(fmt.Sprintf("azhs%d", i))}
+			node := &Node{
+				Keys:   keys,
+				isLeaf: true,
+			}
+			enqueue(node)
+		}
+		for i := 0; i < 10; i++ {
+			keys := [][]byte{[]byte(fmt.Sprintf("azhs%d", i))}
+			res := dequeue()
+			assert.Equal(t, res.Keys, keys)
+			assert.Equal(t, res.isLeaf, true)
+		}
+	})
+}
+
+func Test_Dequeue(t *testing.T) {
+	t.Run("dequeue nil", func(t *testing.T) {
+		node := dequeue()
+		fmt.Println(node)
+		assert.Nil(t, nil, node)
+	})
+
+	t.Run("dequeue node", func(t *testing.T) {
+		for i := 0; i < 10; i++ {
+			keys := [][]byte{[]byte(fmt.Sprintf("azhs%d", i))}
+			node := &Node{
+				Keys:   keys,
+				isLeaf: true,
+			}
+			enqueue(node)
+		}
+		for i := 0; i < 10; i++ {
+			keys := [][]byte{[]byte(fmt.Sprintf("azhs%d", i))}
+			res := dequeue()
+			assert.Equal(t, res.Keys, keys)
+			assert.Equal(t, res.isLeaf, true)
+		}
+	})
+}
