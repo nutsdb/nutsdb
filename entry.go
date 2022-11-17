@@ -51,6 +51,13 @@ type (
 		Status     uint16 // committed / uncommitted
 		Ds         uint16 // data structure
 	}
+
+	Desc struct {
+		MinTs      int64 `json:"minTs"`
+		MaxTs      int64 `json:"maxTs"`
+		EntryCount int   `json:"entryCount"`
+		EntryBytes int64 `json:"entryBytes"`
+	}
 )
 
 // Size returns the size of the entry.

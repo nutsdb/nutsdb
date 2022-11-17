@@ -51,9 +51,31 @@ func InitOpt(fileDir string, isRemoveFiles bool) {
 
 	opt = DefaultOptions
 	opt.Dir = fileDir
-	opt.SegmentSize = 8 * 1024
+	opt.SegmentSize = 1024 * 8
 	opt.CleanFdsCacheThreshold = 0.5
 	opt.MaxFdNumsInCache = 1024
+}
+
+func TestDB_MetaJsonFile(t *testing.T) {
+	InitOpt("", true)
+	db, err = Open(opt)
+	defer db.Close()
+
+	require.NoError(t, err)
+
+	bucket := "bucket1"
+
+	for i := 1; i < 1000; i++ {
+		key := []byte(fmt.Sprintf("key%d", i))
+
+		val := []byte(fmt.Sprintf("val%d", i))
+		//put
+		err = db.Update(
+			func(tx *Tx) error {
+				return tx.Put(bucket, key, val, Persistent)
+			})
+	}
+
 }
 
 func TestDB_Basic(t *testing.T) {

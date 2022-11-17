@@ -25,6 +25,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/xujiajun/nutsdb/ds/list"
 	"github.com/xujiajun/nutsdb/ds/set"
@@ -155,6 +156,8 @@ type (
 		SortedSetIdx            SortedSetIdx
 		ListIdx                 ListIdx
 		ActiveFile              *DataFile
+		MetaFile                *DataFile
+		Desc                    *Desc
 		ActiveBPTreeIdx         *BPTree
 		ActiveCommittedTxIdsIdx *BPTree
 		committedTxIds          map[uint64]struct{}
@@ -471,6 +474,22 @@ func (db *DB) setActiveFile() (err error) {
 	db.ActiveFile.fileID = db.MaxFileID
 
 	return nil
+}
+
+func (db *DB) setMetaFile() (err error) {
+	filepath := db.getMetaJsonPath(db.MaxFileID)
+	db.MetaFile, err = db.fm.getDataFile(filepath, 1)
+	if err != nil {
+		return
+	}
+	db.MetaFile.fileID = db.MaxFileID
+	return nil
+}
+
+func (db *DB) setDesc() {
+	db.Desc = &Desc{
+		MinTs: time.Now().Unix(),
+	}
 }
 
 // getMaxFileIDAndFileIds returns max fileId and fileIds.
@@ -955,6 +974,12 @@ func (db *DB) buildIndexes() (err error) {
 		return
 	}
 
+	if err = db.setMetaFile(); err != nil {
+		return
+	}
+
+	db.setDesc()
+
 	if dataFileIds == nil && maxFileID == 0 {
 		return
 	}
@@ -1004,6 +1029,11 @@ const bptDir = "bpt"
 func (db *DB) getDataPath(fID int64) string {
 	separator := string(filepath.Separator)
 	return db.opt.Dir + separator + strconv2.Int64ToStr(fID) + DataSuffix
+}
+
+func (db *DB) getMetaJsonPath(fID int64) string {
+	separator := string(filepath.Separator)
+	return db.opt.Dir + separator + strconv2.Int64ToStr(fID) + MetaSuffix
 }
 
 func (db *DB) getMetaPath() string {

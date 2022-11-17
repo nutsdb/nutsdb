@@ -16,7 +16,9 @@ package nutsdb
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 	"sync"
@@ -58,6 +60,9 @@ var (
 
 	// ErrNotFoundKey is returned when key not found int the bucket on an view function.
 	ErrNotFoundKey = errors.New("key not found in the bucket")
+
+	entryCount       = 0
+	entryBytes int64 = 0
 )
 
 var cachePool = sync.Pool{
@@ -174,6 +179,8 @@ func (tx *Tx) Commit() error {
 	for i := 0; i < writesLen; i++ {
 		entry := tx.pendingWrites[i]
 		entrySize := entry.Size()
+		entryBytes += entrySize
+		entryCount++
 		if entrySize > tx.db.opt.SegmentSize {
 			return ErrKeyAndValSize
 		}
@@ -184,11 +191,28 @@ func (tx *Tx) Commit() error {
 			if _, err := tx.writeData(buff.Bytes()); err != nil {
 				return err
 			}
+
+			tx.db.Desc.MaxTs = time.Now().Unix()
+			tx.db.Desc.EntryCount = entryCount
+			tx.db.Desc.EntryBytes = entryBytes
+
+			entryCount = 0
+			entryBytes = 0
+
+			descBytes, err := json.MarshalIndent(tx.db.Desc, "", "     ")
+			if err != nil {
+				return fmt.Errorf("json error, file %s", tx.db.MetaFile.path)
+			}
+			if _, err = tx.writeMetaData(descBytes); err != nil {
+				return err
+			}
 			buff.Reset()
 
 			if err := tx.rotateActiveFile(); err != nil {
 				return err
 			}
+
+			tx.db.Desc.MinTs = time.Now().Unix()
 		}
 
 		offset := tx.db.ActiveFile.writeOff + int64(buff.Len())
@@ -253,6 +277,11 @@ func (tx *Tx) Commit() error {
 	tx.ReservedStoreTxIDIdxes = nil
 
 	return nil
+}
+
+func isFileExist(path string) bool {
+	_, err := os.Stat(path)
+	return !os.IsNotExist(err)
 }
 
 func (tx *Tx) buildTempBucketMetaIdx(bucket string, key []byte, bucketMetaTemp BucketMeta) BucketMeta {
@@ -552,12 +581,15 @@ func (tx *Tx) rotateActiveFile() error {
 
 	// reset ActiveFile
 	path := tx.db.getDataPath(tx.db.MaxFileID)
+	jsonPath := tx.db.getMetaJsonPath(tx.db.MaxFileID)
 	tx.db.ActiveFile, err = tx.db.fm.getDataFile(path, tx.db.opt.SegmentSize)
+	tx.db.MetaFile, err = tx.db.fm.getDataFile(jsonPath, 100)
 	if err != nil {
 		return err
 	}
 
 	tx.db.ActiveFile.fileID = tx.db.MaxFileID
+	tx.db.MetaFile.fileID = tx.db.MaxFileID
 	return nil
 }
 
@@ -582,6 +614,24 @@ func (tx *Tx) writeData(data []byte) (n int, err error) {
 
 	if tx.db.opt.SyncEnable {
 		if err := tx.db.ActiveFile.rwManager.Sync(); err != nil {
+			return 0, err
+		}
+	}
+
+	return
+}
+
+func (tx *Tx) writeMetaData(data []byte) (n int, err error) {
+	if len(data) == 0 {
+		return
+	}
+
+	if n, err = tx.db.MetaFile.WriteAt(data, 0); err != nil {
+		return
+	}
+
+	if tx.db.opt.SyncEnable {
+		if err := tx.db.MetaFile.rwManager.Sync(); err != nil {
 			return 0, err
 		}
 	}
