@@ -28,17 +28,17 @@ func (fr *fileRecovery) readEntry() (e *Entry, err error) {
 	if err != nil {
 		return nil, err
 	}
-	meta := readMetaData(buf)
 
 	e = &Entry{
-		crc:  binary.LittleEndian.Uint32(buf[0:4]),
-		Meta: meta,
+		crc: binary.LittleEndian.Uint32(buf[0:4]),
 	}
+	e.ParseMeta(buf)
 
 	if e.IsZero() {
 		return nil, nil
 	}
 
+	meta := e.Meta
 	dataSize := meta.BucketSize + meta.KeySize + meta.ValueSize
 
 	dataBuf, err := fr.readData(dataSize)
