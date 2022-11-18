@@ -8,6 +8,7 @@ import (
 
 // fileRecovery use bufio.Reader to read entry
 type fileRecovery struct {
+	fd     *os.File
 	reader *bufio.Reader
 }
 
@@ -16,6 +17,7 @@ func newFileRecovery(path string, bufSize int) (fr *fileRecovery, err error) {
 	if err != nil {
 		return nil, err
 	}
+	fr.fd = fd
 	bufSize = calBufferSize(bufSize)
 	return &fileRecovery{
 		reader: bufio.NewReaderSize(fd, bufSize),
@@ -87,4 +89,8 @@ func calBufferSize(size int) int {
 		return (size/blockSize + 1) * blockSize
 	}
 	return size
+}
+
+func (fr *fileRecovery) release() error {
+	return fr.fd.Close()
 }
