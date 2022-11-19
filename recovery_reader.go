@@ -17,9 +17,9 @@ func newFileRecovery(path string, bufSize int) (fr *fileRecovery, err error) {
 	if err != nil {
 		return nil, err
 	}
-	fr.fd = fd
 	bufSize = calBufferSize(bufSize)
 	return &fileRecovery{
+		fd:     fd,
 		reader: bufio.NewReaderSize(fd, bufSize),
 	}, nil
 }
