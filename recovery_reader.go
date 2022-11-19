@@ -32,7 +32,10 @@ func (fr *fileRecovery) readEntry() (e *Entry, err error) {
 	e = &Entry{
 		crc: binary.LittleEndian.Uint32(buf[0:4]),
 	}
-	e.ParseMeta(buf)
+	err = e.ParseMeta(buf)
+	if err != nil {
+		return nil, err
+	}
 
 	if e.IsZero() {
 		return nil, nil
