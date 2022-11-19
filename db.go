@@ -597,6 +597,9 @@ func (db *DB) parseDataFiles(dataFileIds []int) (unconfirmedRecords []*Record, c
 				if err == ErrIndexOutOfBound {
 					break
 				}
+				if err == io.ErrUnexpectedEOF {
+					break
+				}
 				if off >= db.opt.SegmentSize {
 					break
 				}
