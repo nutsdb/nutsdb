@@ -455,7 +455,7 @@ func TestSet_SRem(t *testing.T) {
 	assertions.NoError(mySet.SRem(key, []byte("a")))
 	assertions.NoError(mySet.SRem(key, []byte("b")))
 	assertions.NoError(mySet.SRem(key, []byte("c")))
-	assertions.NoError(mySet.SRem(key, make([]byte, 4, 4)))
+	assertions.NoError(mySet.SRem(key, make([]byte, 4)))
 
 	assertions.Error(mySet.SRem("key_fake", []byte("b")), "TestSet_SRem err")
 	assertions.Error(mySet.SRem(key, nil), ErrItemEmpty)
@@ -519,26 +519,17 @@ func TestSet_SUnion(t *testing.T) {
 		{"key1", "key2", [][]byte{[]byte("a"), []byte("b"), []byte("c"), []byte("d"), []byte("e")}},
 		{"key1", "key3", nil},
 	}
+	sortSlice := func(bytes [][]byte) {
+		sort.Slice(bytes, func(i, j int) bool {
+			return string(bytes[i]) < string(bytes[j])
+		})
+	}
 	for _, tt := range tests {
 		res, _ := mySet.SUnion(tt.key1, tt.key2)
-		sort.Slice(res, func(i, j int) bool { return less(res[i], res[j]) })
-		sort.Slice(tt.res, func(i, j int) bool { return less(tt.res[i], tt.res[j]) })
+		sortSlice(res)
+		sortSlice(tt.res)
 		assertions.Equal(res, tt.res)
 
 	}
 
-}
-
-func less(b1, b2 []byte) bool {
-	length := len(b1)
-	if length > len(b2) {
-		length = len(b2)
-	}
-
-	for i := 0; i < length; i++ {
-		if b1[i] > b2[i] {
-			return false
-		}
-	}
-	return true
 }

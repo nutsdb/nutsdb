@@ -378,7 +378,7 @@ func TestList_LRem7(t *testing.T) {
 	assertions.EqualError(err, ErrMinInt.Error())
 	assertions.Equal(0, num)
 
-	num, err = list.LRem(key, 0, []byte("item_not_exists"))
+	num, _ = list.LRem(key, 0, []byte("item_not_exists"))
 	assertions.Equal(0, num)
 }
 
