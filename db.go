@@ -591,6 +591,8 @@ func (db *DB) parseDataFiles(dataFileIds []int) (unconfirmedRecords []*Record, c
 				off += entry.Size()
 
 			} else {
+				// whatever which logic branch it will choose, we will release the fd.
+				_ = f.release()
 				if err == io.EOF {
 					break
 				}
