@@ -15,6 +15,7 @@
 package set
 
 import (
+	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -251,7 +252,6 @@ func TestSet_SInter(t *testing.T) {
 }
 
 func TestSet_SMembers(t *testing.T) {
-
 	mySet := New()
 
 	key := "mySet8"
@@ -309,7 +309,6 @@ func TestSet_SMembers(t *testing.T) {
 }
 
 func TestSet_SMove(t *testing.T) {
-
 	mySet := New()
 
 	key1 := "mySet9"
@@ -384,15 +383,12 @@ func TestSet_SMove(t *testing.T) {
 }
 
 func TestSet_SPop(t *testing.T) {
-
 	mySet := New()
 	assertions := assert.New(t)
 
 	key := "mySet10"
 
 	assertions.NoError(mySet.SAdd(key, []byte("a")))
-	assertions.NoError(mySet.SAdd(key, []byte("b")))
-	assertions.NoError(mySet.SAdd(key, []byte("c")))
 
 	members, _ := mySet.SMembers(key)
 
@@ -425,6 +421,12 @@ func TestSet_SPop(t *testing.T) {
 			mySet,
 			nil,
 		},
+		{
+			"fake key",
+			args{"fake", 1},
+			mySet,
+			nil,
+		},
 	}
 
 	for _, tt := range tests {
@@ -438,7 +440,6 @@ func TestSet_SPop(t *testing.T) {
 }
 
 func TestSet_SRem(t *testing.T) {
-
 	mySet := New()
 	key := "mySet11"
 	assertions := assert.New(t)
@@ -449,63 +450,77 @@ func TestSet_SRem(t *testing.T) {
 
 	assertions.NoError(mySet.SRem(key, []byte("a")))
 	assertions.NoError(mySet.SRem(key, []byte("b")))
-
-	assertions.False(mySet.SIsMember(key, []byte("a")), "TestSet_SRem err")
-
-	assertions.False(mySet.SIsMember(key, []byte("b")), "TestSet_SRem err")
+	assertions.NoError(mySet.SRem(key, []byte("c")))
+	assertions.NoError(mySet.SRem(key, make([]byte, 4)))
 
 	assertions.Error(mySet.SRem("key_fake", []byte("b")), "TestSet_SRem err")
+	assertions.Error(mySet.SRem(key, nil), ErrItemEmpty)
+}
+
+func TestSet_SIsMember(t *testing.T) {
+	mySet := New()
+	assertions := assert.New(t)
+	_ = mySet.SAdd("key1", []byte("a"))
+	tests := []struct {
+		key string
+		val string
+		res bool
+	}{
+		{"key1", "a", true},
+		{"key1", "b", false},
+		{"key2", "a", false},
+	}
+	for _, tt := range tests {
+		assertions.Equal(mySet.SIsMember(tt.key, []byte(tt.val)), tt.res)
+	}
+}
+
+func TestSet_SAreMembers(t *testing.T) {
+	mySet := New()
+	assertions := assert.New(t)
+	_ = mySet.SAdd("key1", []byte("a"))
+	tests := []struct {
+		key string
+		val string
+		res bool
+	}{
+		{"key1", "a", true},
+		{"key1", "b", false},
+		{"key2", "a", false},
+	}
+	for _, tt := range tests {
+		res, _ := mySet.SAreMembers(tt.key, []byte(tt.val))
+		assertions.Equal(res, tt.res)
+	}
 }
 
 func TestSet_SUnion(t *testing.T) {
 	mySet := New()
-	key1 := "mySet12"
 	assertions := assert.New(t)
-	assertions.NoError(mySet.SAdd(key1, []byte("a")))
-	assertions.NoError(mySet.SAdd(key1, []byte("b")))
-	assertions.NoError(mySet.SAdd(key1, []byte("c")))
-
-	key2 := "mySet12"
-	assertions.NoError(mySet.SAdd(key2, []byte("c")))
-	assertions.NoError(mySet.SAdd(key2, []byte("d")))
-	assertions.NoError(mySet.SAdd(key2, []byte("e")))
-
-	type args struct {
+	_ = mySet.SAdd("key1", []byte("a"))
+	_ = mySet.SAdd("key1", []byte("b"))
+	_ = mySet.SAdd("key1", []byte("c"))
+	_ = mySet.SAdd("key2", []byte("a"))
+	_ = mySet.SAdd("key2", []byte("d"))
+	_ = mySet.SAdd("key2", []byte("e"))
+	tests := []struct {
 		key1 string
 		key2 string
-	}
-
-	tests := []struct {
-		name    string
-		args    args
-		set     *Set
-		want    [][]byte
-		wantErr bool
+		res  [][]byte
 	}{
-		{
-			"normal",
-			args{key1, key2},
-			mySet,
-			[][]byte{[]byte("a"), []byte("b"), []byte("c"), []byte("d"), []byte("e")},
-			false,
-		},
-		{
-			"fake key",
-			args{"fake key", key2},
-			mySet,
-			nil,
-			true,
-		},
+		{"key1", "key2", [][]byte{[]byte("a"), []byte("b"), []byte("c"), []byte("d"), []byte("e")}},
+		{"key1", "key3", nil},
 	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.set.SUnion(tt.args.key1, tt.args.key2)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("SUnion() err = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			assertions.ElementsMatchf(got, tt.want, "SUnion() got = %v, want = %v", got, tt.want)
+	sortSlice := func(bytes [][]byte) {
+		sort.Slice(bytes, func(i, j int) bool {
+			return string(bytes[i]) < string(bytes[j])
 		})
+	}
+	for _, tt := range tests {
+		res, _ := mySet.SUnion(tt.key1, tt.key2)
+		sortSlice(res)
+		sortSlice(tt.res)
+		assertions.Equal(res, tt.res)
+
 	}
 }
