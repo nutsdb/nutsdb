@@ -252,7 +252,6 @@ func TestSet_SInter(t *testing.T) {
 }
 
 func TestSet_SMembers(t *testing.T) {
-
 	mySet := New()
 
 	key := "mySet8"
@@ -310,7 +309,6 @@ func TestSet_SMembers(t *testing.T) {
 }
 
 func TestSet_SMove(t *testing.T) {
-
 	mySet := New()
 
 	key1 := "mySet9"
@@ -385,7 +383,6 @@ func TestSet_SMove(t *testing.T) {
 }
 
 func TestSet_SPop(t *testing.T) {
-
 	mySet := New()
 	assertions := assert.New(t)
 
@@ -443,7 +440,6 @@ func TestSet_SPop(t *testing.T) {
 }
 
 func TestSet_SRem(t *testing.T) {
-
 	mySet := New()
 	key := "mySet11"
 	assertions := assert.New(t)
@@ -462,7 +458,6 @@ func TestSet_SRem(t *testing.T) {
 }
 
 func TestSet_SIsMember(t *testing.T) {
-
 	mySet := New()
 	assertions := assert.New(t)
 	_ = mySet.SAdd("key1", []byte("a"))
@@ -478,11 +473,9 @@ func TestSet_SIsMember(t *testing.T) {
 	for _, tt := range tests {
 		assertions.Equal(mySet.SIsMember(tt.key, []byte(tt.val)), tt.res)
 	}
-
 }
 
 func TestSet_SAreMembers(t *testing.T) {
-
 	mySet := New()
 	assertions := assert.New(t)
 	_ = mySet.SAdd("key1", []byte("a"))
@@ -499,7 +492,6 @@ func TestSet_SAreMembers(t *testing.T) {
 		res, _ := mySet.SAreMembers(tt.key, []byte(tt.val))
 		assertions.Equal(res, tt.res)
 	}
-
 }
 
 func TestSet_SUnion(t *testing.T) {
@@ -531,5 +523,4 @@ func TestSet_SUnion(t *testing.T) {
 		assertions.Equal(res, tt.res)
 
 	}
-
 }
