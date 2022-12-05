@@ -60,7 +60,7 @@ It supports fully serializable transactions and many data structures such as lis
         - [LRem](#lrem)
         - [LRemByIndex](#lrembyindex)
         - [LSet](#lset)
-        - [Ltrim](#ltrim)
+        - [LTrim](#LTrim)
         - [LSize](#lsize)
         - [LKeys](#lkeys)
       - [Set](#set)
@@ -879,7 +879,7 @@ if err := db.Update(
 }
 ```
 
-##### Ltrim 
+##### LTrim 
 
 Trims an existing list so that it will contain only the specified range of elements specified.
 The offsets start and stop are zero-based indexes 0 being the first element of the list (the head of the list),

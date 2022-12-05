@@ -68,7 +68,7 @@ https://www.bilibili.com/video/BV1T34y1x7AS/
      - [LRem](#lrem)
      - [LRemByIndex](#lrembyindex)
      - [LSet](#lset)    
-     - [Ltrim](#ltrim)
+     - [LTrim](#LTrim)
      - [LSize](#lsize)      
      - [LKeys](#lkeys)
    - [Set](#set)
@@ -892,7 +892,7 @@ if err := db.Update(
 }
 ```
 
-##### Ltrim 
+##### LTrim 
 
 修剪一个已存在的 list，这样 list 就会只包含指定范围的指定元素。start 和 stop 都是由0开始计数的， 这里的 0 是列表里的第一个元素（表头），1 是第二个元素，以此类推。
 
