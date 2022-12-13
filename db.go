@@ -450,9 +450,16 @@ func (db *DB) Close() error {
 		return err
 	}
 
+	err = db.MetaFile.rwManager.Release()
+	if err != nil {
+		return err
+	}
+
 	db.ActiveFile = nil
 
 	db.BPTreeIdx = nil
+
+	db.MetaFile = nil
 
 	err = db.fm.close()
 
@@ -477,12 +484,11 @@ func (db *DB) setActiveFile() (err error) {
 }
 
 func (db *DB) setMetaFile() (err error) {
-	filepath := db.getMetaJsonPath(db.MaxFileID)
-	db.MetaFile, err = db.fm.getDataFile(filepath, 1)
+	path := db.getMetaJsonPath()
+	db.MetaFile, err = db.fm.getDataFile(path, 1)
 	if err != nil {
 		return
 	}
-	db.MetaFile.fileID = db.MaxFileID
 	return nil
 }
 
@@ -1031,9 +1037,9 @@ func (db *DB) getDataPath(fID int64) string {
 	return db.opt.Dir + separator + strconv2.Int64ToStr(fID) + DataSuffix
 }
 
-func (db *DB) getMetaJsonPath(fID int64) string {
+func (db *DB) getMetaJsonPath() string {
 	separator := string(filepath.Separator)
-	return db.opt.Dir + separator + strconv2.Int64ToStr(fID) + MetaSuffix
+	return db.opt.Dir + separator + MetaFileName
 }
 
 func (db *DB) getMetaPath() string {

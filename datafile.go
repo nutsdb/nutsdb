@@ -37,7 +37,7 @@ const (
 	// DataEntryHeaderSize returns the entry header size
 	DataEntryHeaderSize = 42
 
-	MetaSuffix = ".json"
+	MetaFileName = "meta.json"
 )
 
 // DataFile records about data file information.

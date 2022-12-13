@@ -53,10 +53,11 @@ type (
 	}
 
 	Desc struct {
-		MinTs      int64 `json:"minTs"`
-		MaxTs      int64 `json:"maxTs"`
-		EntryCount int   `json:"entryCount"`
-		EntryBytes int64 `json:"entryBytes"`
+		FileName   string `json:"fileName"`
+		MinTs      int64  `json:"minTs"`
+		MaxTs      int64  `json:"maxTs"`
+		EntryCount int    `json:"entryCount"`
+		EntryBytes int64  `json:"entryBytes"`
 	}
 )
 

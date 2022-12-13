@@ -63,6 +63,7 @@ var (
 
 	entryCount       = 0
 	entryBytes int64 = 0
+	metaPos    int64 = 0
 )
 
 var cachePool = sync.Pool{
@@ -192,6 +193,7 @@ func (tx *Tx) Commit() error {
 				return err
 			}
 
+			tx.db.Desc.FileName = strconv2.Int64ToStr(tx.db.ActiveFile.fileID) + DataSuffix
 			tx.db.Desc.MaxTs = time.Now().Unix()
 			tx.db.Desc.EntryCount = entryCount
 			tx.db.Desc.EntryBytes = entryBytes
@@ -277,11 +279,6 @@ func (tx *Tx) Commit() error {
 	tx.ReservedStoreTxIDIdxes = nil
 
 	return nil
-}
-
-func isFileExist(path string) bool {
-	_, err := os.Stat(path)
-	return !os.IsNotExist(err)
 }
 
 func (tx *Tx) buildTempBucketMetaIdx(bucket string, key []byte, bucketMetaTemp BucketMeta) BucketMeta {
@@ -581,15 +578,12 @@ func (tx *Tx) rotateActiveFile() error {
 
 	// reset ActiveFile
 	path := tx.db.getDataPath(tx.db.MaxFileID)
-	jsonPath := tx.db.getMetaJsonPath(tx.db.MaxFileID)
 	tx.db.ActiveFile, err = tx.db.fm.getDataFile(path, tx.db.opt.SegmentSize)
-	tx.db.MetaFile, err = tx.db.fm.getDataFile(jsonPath, 100)
 	if err != nil {
 		return err
 	}
 
 	tx.db.ActiveFile.fileID = tx.db.MaxFileID
-	tx.db.MetaFile.fileID = tx.db.MaxFileID
 	return nil
 }
 
@@ -626,9 +620,13 @@ func (tx *Tx) writeMetaData(data []byte) (n int, err error) {
 		return
 	}
 
-	if n, err = tx.db.MetaFile.WriteAt(data, 0); err != nil {
+	data = append(data, []byte("\n")...)
+
+	if n, err = tx.db.MetaFile.WriteAt(data, metaPos); err != nil {
 		return
 	}
+
+	metaPos += int64(len(data))
 
 	if tx.db.opt.SyncEnable {
 		if err := tx.db.MetaFile.rwManager.Sync(); err != nil {
