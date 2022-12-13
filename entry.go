@@ -147,3 +147,19 @@ func (e *Entry) ParsePayload(data []byte) error {
 	e.Value = data[valueLowBound:valueHighBound]
 	return nil
 }
+
+func (e *Entry) ParseMeta(buf []byte) error {
+	meta := &MetaData{
+		Timestamp:  binary.LittleEndian.Uint64(buf[4:12]),
+		KeySize:    binary.LittleEndian.Uint32(buf[12:16]),
+		ValueSize:  binary.LittleEndian.Uint32(buf[16:20]),
+		Flag:       binary.LittleEndian.Uint16(buf[20:22]),
+		TTL:        binary.LittleEndian.Uint32(buf[22:26]),
+		BucketSize: binary.LittleEndian.Uint32(buf[26:30]),
+		Status:     binary.LittleEndian.Uint16(buf[30:32]),
+		Ds:         binary.LittleEndian.Uint16(buf[32:34]),
+		TxID:       binary.LittleEndian.Uint64(buf[34:42]),
+	}
+	e.Meta = meta
+	return nil
+}

@@ -3,11 +3,13 @@ package nutsdb
 import (
 	"bufio"
 	"encoding/binary"
+	"io"
 	"os"
 )
 
 // fileRecovery use bufio.Reader to read entry
 type fileRecovery struct {
+	fd     *os.File
 	reader *bufio.Reader
 }
 
@@ -18,30 +20,35 @@ func newFileRecovery(path string, bufSize int) (fr *fileRecovery, err error) {
 	}
 	bufSize = calBufferSize(bufSize)
 	return &fileRecovery{
+		fd:     fd,
 		reader: bufio.NewReaderSize(fd, bufSize),
 	}, nil
 }
 
 // readEntry will read an Entry from disk.
 func (fr *fileRecovery) readEntry() (e *Entry, err error) {
-	buf, err := fr.readData(DataEntryHeaderSize)
+	buf := make([]byte, DataEntryHeaderSize)
+	_, err = io.ReadFull(fr.reader, buf)
 	if err != nil {
 		return nil, err
 	}
-	meta := readMetaData(buf)
 
 	e = &Entry{
-		crc:  binary.LittleEndian.Uint32(buf[0:4]),
-		Meta: meta,
+		crc: binary.LittleEndian.Uint32(buf[0:4]),
+	}
+	err = e.ParseMeta(buf)
+	if err != nil {
+		return nil, err
 	}
 
 	if e.IsZero() {
 		return nil, nil
 	}
 
+	meta := e.Meta
 	dataSize := meta.BucketSize + meta.KeySize + meta.ValueSize
-
-	dataBuf, err := fr.readData(dataSize)
+	dataBuf := make([]byte, dataSize)
+	_, err = io.ReadFull(fr.reader, dataBuf)
 	if err != nil {
 		return nil, err
 	}
@@ -58,22 +65,6 @@ func (fr *fileRecovery) readEntry() (e *Entry, err error) {
 	return e, nil
 }
 
-// readData will read a byte array from disk by given size, and if the byte size less than given size in the first time it will read twice for the rest data.
-func (fr *fileRecovery) readData(size uint32) (data []byte, err error) {
-	data = make([]byte, size)
-	if n, err := fr.reader.Read(data); err != nil {
-		return nil, err
-	} else {
-		if uint32(n) < size {
-			_, err := fr.reader.Read(data[n:])
-			if err != nil {
-				return nil, err
-			}
-		}
-	}
-	return data, nil
-}
-
 // calBufferSize calculates the buffer size of bufio.Reader
 // if the size < 4 * KB, use 4 * KB as the size of buffer in bufio.Reader
 // if the size > 4 * KB, use the nearly blockSize buffer as the size of buffer in bufio.Reader
@@ -87,4 +78,8 @@ func calBufferSize(size int) int {
 		return (size/blockSize + 1) * blockSize
 	}
 	return size
+}
+
+func (fr *fileRecovery) release() error {
+	return fr.fd.Close()
 }
