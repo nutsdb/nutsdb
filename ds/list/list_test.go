@@ -377,6 +377,22 @@ func TestList_LRem7(t *testing.T) {
 	num, err = list.LRem(key, math2.MinInt, []byte("b"))
 	assertions.EqualError(err, ErrMinInt.Error())
 	assertions.Equal(0, num)
+
+	num, _ = list.LRem(key, 0, []byte("item_not_exists"))
+	assertions.Equal(0, num)
+}
+
+func TestList_LRemNum(t *testing.T) {
+	list, key := InitListData()
+	assertions := assert.New(t)
+
+	num, err := list.LRemNum("key_not_exists", 0, nil)
+	assertions.Equal(0, num)
+	assertions.Error(err)
+
+	num, err = list.LRemNum(key, math2.MaxInt, nil)
+	assertions.Equal(0, num)
+	assertions.Error(err)
 }
 
 func TestList_LRemByIndex(t *testing.T) {
