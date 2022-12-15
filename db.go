@@ -393,6 +393,9 @@ func (db *DB) Merge() error {
 				if err == ErrIndexOutOfBound {
 					break
 				}
+				if err == io.ErrUnexpectedEOF {
+					break
+				}
 				return fmt.Errorf("when merge operation build hintIndex readAt err: %s", err)
 			}
 		}
