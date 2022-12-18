@@ -59,6 +59,9 @@ func InitOpt(fileDir string, isRemoveFiles bool) {
 func TestDB_MetaJsonFile(t *testing.T) {
 	InitOpt("", true)
 	db, err = Open(opt)
+	if err != nil {
+		t.Error(err)
+	}
 	defer db.Close()
 
 	require.NoError(t, err)
