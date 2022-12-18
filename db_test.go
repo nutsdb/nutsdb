@@ -65,7 +65,7 @@ func TestDB_MetaJsonFile(t *testing.T) {
 
 	bucket := "bucket1"
 
-	for i := 1; i < 1000; i++ {
+	for i := 1; i < 10; i++ {
 		key := []byte(fmt.Sprintf("key%d", i))
 
 		val := []byte(fmt.Sprintf("val%d", i))
