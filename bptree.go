@@ -793,7 +793,7 @@ func (t *BPTree) splitLeaf(leaf *Node, key []byte, pointer *Record) error {
 		newLeaf.pointers[order-1] = leaf.pointers[order-1]
 	}
 
-	//link newLeaf and next
+	// link newLeaf and next
 	if next := leaf.pointers[order-1]; next != nil {
 		next := next.(*Node)
 		newLeaf.pointers[order-1] = next
