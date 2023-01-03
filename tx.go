@@ -17,6 +17,7 @@ package nutsdb
 import (
 	"bytes"
 	"errors"
+	"math"
 	"os"
 	"strings"
 	"sync"
@@ -30,8 +31,8 @@ import (
 )
 
 var (
-	// ErrKeyAndValSize is returned when given key and value size is too big.
-	ErrKeyAndValSize = errors.New("key and value size too big")
+	// ErrDataSizeExceed is returned when given key and value size is too big.
+	ErrDataSizeExceed = errors.New("data size too big")
 
 	// ErrTxClosed is returned when committing or rolling back a transaction
 	// that has already been committed or rolled back.
@@ -175,7 +176,11 @@ func (tx *Tx) Commit() error {
 		entry := tx.pendingWrites[i]
 		entrySize := entry.Size()
 		if entrySize > tx.db.opt.SegmentSize {
-			return ErrKeyAndValSize
+			return ErrDataSizeExceed
+		}
+
+		if len(entry.Meta.Bucket) > math.MaxUint32 || len(entry.Key) > math.MaxUint32 || len(entry.Value) > math.MaxUint32 {
+			return ErrDataSizeExceed
 		}
 
 		bucket := string(entry.Meta.Bucket)
