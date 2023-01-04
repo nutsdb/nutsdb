@@ -793,10 +793,17 @@ func (t *BPTree) splitLeaf(leaf *Node, key []byte, pointer *Record) error {
 		newLeaf.pointers[order-1] = leaf.pointers[order-1]
 	}
 
-	// Reset the next to last one pointer of the leaf node.
+	// link newLeaf and next
+	if next := leaf.pointers[order-1]; next != nil {
+		next := next.(*Node)
+		newLeaf.pointers[order-1] = next
+		next.pointers[order] = newLeaf
+	}
+
+	// link leaf and newLeaf
 	leaf.pointers[order-1] = newLeaf
-	// Set the last pointer of newLeaf to leaf node (used in reverse iteration)
 	newLeaf.pointers[order] = leaf
+
 	// Set the parent.
 	newLeaf.parent = leaf.parent
 
