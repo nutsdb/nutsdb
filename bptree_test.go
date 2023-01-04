@@ -400,3 +400,15 @@ func TestBPTree_Update(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, DataSetFlag, r.H.Meta.Flag)
 }
+
+func TestBPTree_SetKeyPosMap(t *testing.T) {
+	tree = NewTree()
+
+	var keyPosMap = map[string]int64{
+		"key_001": 1,
+		"key_002": 2,
+		"key_003": 3,
+	}
+	tree.SetKeyPosMap(keyPosMap)
+	assert.Equal(t, keyPosMap, tree.keyPosMap)
+}
