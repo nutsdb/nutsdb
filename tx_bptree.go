@@ -138,6 +138,9 @@ func (tx *Tx) Get(bucket string, key []byte) (e *Entry, err error) {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return nil, err
 	}
+	if p, ok := tx.getPendingEntry(bucket, key); ok {
+		return p, nil
+	}
 
 	idxMode := tx.db.opt.EntryIdxMode
 
