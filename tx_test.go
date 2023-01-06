@@ -195,18 +195,19 @@ func TestTx_UnCommitted(t *testing.T) {
 		{
 			tx, err := db.Begin(true)
 			assert.NoError(t, err)
-
-			tx.Put(bucket, key, v1, 0) //写入v1
+			//put v1
+			tx.Put(bucket, key, v1, 0)
 
 			item, e := tx.Get(bucket, key)
 			assert.NoError(t, e)
-			assert.Equalf(t, v1, item.Value, "同事务内，无法获得未提交修改")
+			assert.Equalf(t, v1, item.Value, "In the same transaction, modifications cannot be obtained")
 
-			tx.Put(bucket, key, v2, 0) //写入v1
+			//put v2
+			tx.Put(bucket, key, v2, 0)
 
 			item2, e := tx.Get(bucket, key)
 			assert.NoError(t, e)
-			assert.Equalf(t, v2, item2.Value, "同事务内，无法获取未提交的最新修改")
+			assert.Equalf(t, v2, item2.Value, "In the same transaction, the latest modification cannot be obtained")
 
 			err = tx.Commit()
 			assert.NoError(t, err)

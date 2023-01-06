@@ -138,8 +138,14 @@ func (tx *Tx) Get(bucket string, key []byte) (e *Entry, err error) {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return nil, err
 	}
-	if p, ok := tx.getPendingEntry(bucket, key); ok {
-		return p, nil
+
+	if m, ok := tx.pendingWrites[bucket]; ok {
+		//find the latest changes in reverse order
+		for i := len(m) - 1; i >= 0; i-- {
+			if bytes.Equal(m[i].Key, key) {
+				return m[i], nil
+			}
+		}
 	}
 
 	idxMode := tx.db.opt.EntryIdxMode

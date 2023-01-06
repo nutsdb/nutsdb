@@ -151,9 +151,7 @@ func (tx *Tx) Commit() error {
 		return ErrDBClosed
 	}
 
-	writesLen := len(tx.pendingWrites)
-
-	if writesLen == 0 {
+	if len(tx.pendingWrites) == 0 {
 		tx.unlock()
 		tx.db = nil
 		return nil
@@ -675,15 +673,4 @@ func (tx *Tx) put(bucket string, key, value []byte, ttl uint32, flag uint16, tim
 	})
 
 	return nil
-}
-
-func (tx *Tx) getPendingEntry(bucket string, key []byte) (e *Entry, ok bool) {
-	if m, ok := tx.pendingWrites[bucket]; ok {
-		for i := len(m) - 1; i >= 0; i-- {
-			if bytes.Equal(m[i].Key, key) {
-				return m[i], true
-			}
-		}
-	}
-	return nil, false
 }
