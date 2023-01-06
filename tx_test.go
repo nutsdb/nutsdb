@@ -196,14 +196,16 @@ func TestTx_UnCommitted(t *testing.T) {
 			tx, err := db.Begin(true)
 			assert.NoError(t, err)
 			//put v1
-			tx.Put(bucket, key, v1, 0)
+			err = tx.Put(bucket, key, v1, 0)
+			assert.NoError(t, err)
 
 			item, e := tx.Get(bucket, key)
 			assert.NoError(t, e)
 			assert.Equalf(t, v1, item.Value, "In the same transaction, modifications cannot be obtained")
 
 			//put v2
-			tx.Put(bucket, key, v2, 0)
+			err = tx.Put(bucket, key, v2, 0)
+			assert.NoError(t, err)
 
 			item2, e := tx.Get(bucket, key)
 			assert.NoError(t, e)
