@@ -404,7 +404,7 @@ func TestBPTree_Update(t *testing.T) {
 func TestBPTree_SetKeyPosMap(t *testing.T) {
 	tree = NewTree()
 
-	var keyPosMap = map[string]int64{
+	keyPosMap := map[string]int64{
 		"key_001": 1,
 		"key_002": 2,
 		"key_003": 3,
