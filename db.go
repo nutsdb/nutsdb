@@ -341,7 +341,8 @@ func (db *DB) Merge() error {
 
 	for _, pendingMergeFId := range pendingMergeFIds {
 		off = 0
-		f, err := db.fm.getDataFile(db.getDataPath(int64(pendingMergeFId)), db.opt.SegmentSize)
+		path := db.getDataPath(int64(pendingMergeFId))
+		fr, err := newFileRecovery(path, db.opt.BufferSizeOfRecovery)
 		if err != nil {
 			db.isMerging = false
 			return err
@@ -350,7 +351,7 @@ func (db *DB) Merge() error {
 		pendingMergeEntries = []*Entry{}
 
 		for {
-			if entry, err := f.ReadAt(int(off)); err == nil {
+			if entry, err := fr.readEntry(); err == nil {
 				if entry == nil {
 					break
 				}
@@ -392,19 +393,19 @@ func (db *DB) Merge() error {
 				if err == ErrIndexOutOfBound {
 					break
 				}
-				_ = f.rwManager.Release()
+				if err == io.ErrUnexpectedEOF {
+					break
+				}
 				return fmt.Errorf("when merge operation build hintIndex readAt err: %s", err)
 			}
 		}
 
 		if err := db.reWriteData(pendingMergeEntries); err != nil {
-			_ = f.rwManager.Release()
+			_ = fr.release()
 			return err
 		}
 
-		path := db.getDataPath(int64(pendingMergeFId))
-		_ = f.rwManager.Release()
-		err = f.rwManager.Close()
+		err = fr.release()
 		if err != nil {
 			return err
 		}
