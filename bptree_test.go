@@ -15,6 +15,8 @@
 package nutsdb
 
 import (
+	"bytes"
+	"encoding/binary"
 	"fmt"
 	"regexp"
 	"testing"
@@ -411,4 +413,108 @@ func TestBPTree_SetKeyPosMap(t *testing.T) {
 	}
 	tree.SetKeyPosMap(keyPosMap)
 	assert.Equal(t, keyPosMap, tree.keyPosMap)
+}
+
+func TestBPTree_ToBinary(t *testing.T) {
+	// change keyFormat into a pure integer
+	keyFormat = "%03d"
+
+	t.Run("test leaf node without keyPosMap", func(t *testing.T) {
+		withBPTree(t, func(t *testing.T, tree *BPTree) {
+			key := []byte("001")
+
+			n := tree.FindLeaf(key)
+			r, err := tree.ToBinary(n)
+			assert.NoError(t, err)
+
+			bin := BinaryNode{
+				Keys:        [7]int64{0, 1, 2, 3},
+				Pointers:    [9]int64{},
+				IsLeaf:      1,
+				KeysNum:     4,
+				Address:     0,
+				NextAddress: -1,
+			}
+			buf := new(bytes.Buffer)
+			err = binary.Write(buf, binary.LittleEndian, bin)
+			assert.NoError(t, err)
+
+			assert.Equal(t, r, buf.Bytes())
+		})
+	})
+
+	t.Run("test leaf node with keyPosMap", func(t *testing.T) {
+		withBPTree(t, func(t *testing.T, tree *BPTree) {
+			key := []byte("001")
+			keyPosMap := map[string]int64{"000": 3, "001": 2, "002": 1, "003": 0}
+
+			tree.enabledKeyPosMap = true
+			tree.keyPosMap = keyPosMap
+			n := tree.FindLeaf(key)
+			r, err := tree.ToBinary(n)
+			assert.NoError(t, err)
+
+			bin := BinaryNode{
+				Keys:        [7]int64{3, 2, 1, 0},
+				Pointers:    [9]int64{},
+				IsLeaf:      1,
+				KeysNum:     4,
+				Address:     0,
+				NextAddress: -1,
+			}
+			buf := new(bytes.Buffer)
+			err = binary.Write(buf, binary.LittleEndian, bin)
+			assert.NoError(t, err)
+
+			assert.Equal(t, r, buf.Bytes())
+		})
+	})
+
+	t.Run("test non-leaf node without keyPosMap", func(t *testing.T) {
+		withBPTree(t, func(t *testing.T, tree *BPTree) {
+			n := tree.root
+			r, err := tree.ToBinary(n)
+			assert.NoError(t, err)
+
+			bin := BinaryNode{
+				Keys:        [7]int64{20, 40, 60, 80},
+				Pointers:    [9]int64{304, 1520, 2584, 3496, 4408},
+				IsLeaf:      0,
+				KeysNum:     4,
+				Address:     1672,
+				NextAddress: -1,
+			}
+			buf := new(bytes.Buffer)
+			err = binary.Write(buf, binary.LittleEndian, bin)
+			assert.NoError(t, err)
+
+			assert.Equal(t, r, buf.Bytes())
+		})
+	})
+
+	t.Run("test non-leaf node with keyPosMap", func(t *testing.T) {
+		withBPTree(t, func(t *testing.T, tree *BPTree) {
+			keyPosMap := map[string]int64{"020": 80, "040": 60, "060": 40, "080": 20}
+
+			tree.enabledKeyPosMap = true
+			tree.keyPosMap = keyPosMap
+			n := tree.root
+			r, err := tree.ToBinary(n)
+			assert.NoError(t, err)
+
+			bin := BinaryNode{
+				Keys:        [7]int64{80, 60, 40, 20},
+				Pointers:    [9]int64{304, 1520, 2584, 3496, 4408},
+				IsLeaf:      0,
+				KeysNum:     4,
+				Address:     1672,
+				NextAddress: -1,
+			}
+			buf := new(bytes.Buffer)
+			err = binary.Write(buf, binary.LittleEndian, bin)
+			assert.NoError(t, err)
+
+			assert.Equal(t, r, buf.Bytes())
+		})
+	})
 }
