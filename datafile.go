@@ -99,6 +99,40 @@ func (df *DataFile) ReadAt(off int) (e *Entry, err error) {
 	return
 }
 
+// ReadRecord returns entry at the given off(offset).
+// payloadSize = bucketSize + keySize + valueSize
+func (df *DataFile) ReadRecord(off int, payloadSize uint32) (e *Entry, err error) {
+	buf := make([]byte, DataEntryHeaderSize+payloadSize)
+
+	if _, err := df.rwManager.ReadAt(buf, int64(off)); err != nil {
+		return nil, err
+	}
+
+	e = &Entry{
+		crc: binary.LittleEndian.Uint32(buf[0:4]),
+	}
+	err = e.ParseMeta(buf)
+	if err != nil {
+		return nil, err
+	}
+
+	if e.IsZero() {
+		return nil, nil
+	}
+
+	err = e.ParsePayload(buf[DataEntryHeaderSize:])
+	if err != nil {
+		return nil, err
+	}
+
+	crc := e.GetCrc(buf[:DataEntryHeaderSize])
+	if crc != e.crc {
+		return nil, ErrCrc
+	}
+
+	return
+}
+
 // WriteAt copies data to mapped region from the b slice starting at
 // given off and returns number of bytes copied to the mapped region.
 func (df *DataFile) WriteAt(b []byte, off int64) (n int, err error) {
