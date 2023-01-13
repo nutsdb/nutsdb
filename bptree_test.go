@@ -520,50 +520,29 @@ func TestBPTree_ToBinary(t *testing.T) {
 	})
 }
 
-func TestBPTree_WriteNode(t *testing.T) {
-	testFilename := "bptree_test_for_rw"
+func TestBPTree_WriteAndReadNode(t *testing.T) {
+	testFilename := "bptree_rw_test.bptidx"
 
-	t.Run("test write node", func(t *testing.T) {
+	t.Run("test write and read node", func(t *testing.T) {
 		withBPTree(t, func(t *testing.T, tree *BPTree) {
 			key := []byte("key_001")
 			tree.Filepath = testFilename
 
-			fd, err := os.OpenFile(tree.Filepath, os.O_CREATE|os.O_RDWR, 0644)
+			fd, err := os.OpenFile(tree.Filepath, os.O_CREATE|os.O_RDWR, 644)
 			assert.NoError(t, err)
 
 			node := tree.FindLeaf(key)
 			num, err := tree.WriteNode(node, -1, false, fd)
 			assert.NoError(t, err)
 
-			bn, err := tree.ToBinary(node)
+			bnNode := &BinaryNode{[7]int64{}, [9]int64{}, 1, 4, 0, -1}
+			bnByte, err := tree.ToBinary(node)
 			assert.NoError(t, err)
-			assert.Equal(t, num, len(bn))
-		})
-	})
+			assert.Equal(t, num, len(bnByte))
 
-	// remove the test file
-	_ = os.Remove(testFilename)
-}
-
-func TestReadNode(t *testing.T) {
-	testFilename := "bptree_test_for_rw"
-
-	t.Run("test read node", func(t *testing.T) {
-		withBPTree(t, func(t *testing.T, tree *BPTree) {
-			key := []byte("key_001")
-			tree.Filepath = testFilename
-
-			fd, err := os.OpenFile(tree.Filepath, os.O_CREATE|os.O_RDWR, 0644)
-			assert.NoError(t, err)
-
-			node := tree.FindLeaf(key)
-			_, err = tree.WriteNode(node, -1, false, fd)
-			assert.NoError(t, err)
-
-			bn := &BinaryNode{[7]int64{}, [9]int64{}, 1, 4, 0, -1}
 			bnExist, err := ReadNode(tree.Filepath, 0)
 			assert.NoError(t, err)
-			assert.Equal(t, bn, bnExist)
+			assert.Equal(t, bnNode, bnExist)
 
 			bnNotExist, err := ReadNode(tree.Filepath, 1)
 			assert.Error(t, err)
@@ -571,5 +550,6 @@ func TestReadNode(t *testing.T) {
 		})
 	})
 
+	// remove the test file
 	_ = os.Remove(testFilename)
 }
