@@ -78,7 +78,7 @@ func (df *DataFile) ReadAt(off int) (e *Entry, err error) {
 
 	meta := e.Meta
 	off += DataEntryHeaderSize
-	dataSize := meta.BucketSize + meta.KeySize + meta.ValueSize
+	dataSize := meta.PayloadSize()
 
 	dataBuf := make([]byte, dataSize)
 	_, err = df.rwManager.ReadAt(dataBuf, int64(off))
