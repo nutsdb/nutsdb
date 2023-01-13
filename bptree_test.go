@@ -528,7 +528,7 @@ func TestBPTree_WriteNode(t *testing.T) {
 			key := []byte("key_001")
 			tree.Filepath = testFilename
 
-			fd, err := os.OpenFile(tree.Filepath, os.O_CREATE|os.O_RDWR, 644)
+			fd, err := os.OpenFile(tree.Filepath, os.O_CREATE|os.O_RDWR, 0644)
 			assert.NoError(t, err)
 
 			node := tree.FindLeaf(key)
