@@ -46,7 +46,7 @@ func (fr *fileRecovery) readEntry() (e *Entry, err error) {
 	}
 
 	meta := e.Meta
-	dataSize := meta.BucketSize + meta.KeySize + meta.ValueSize
+	dataSize := meta.PayloadSize()
 	dataBuf := make([]byte, dataSize)
 	_, err = io.ReadFull(fr.reader, dataBuf)
 	if err != nil {

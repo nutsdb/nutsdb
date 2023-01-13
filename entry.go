@@ -52,6 +52,10 @@ type (
 	}
 )
 
+func (meta *MetaData) PayloadSize() int64 {
+	return int64(meta.BucketSize) + int64(meta.KeySize) + int64(meta.ValueSize)
+}
+
 // Size returns the size of the entry.
 func (e *Entry) Size() int64 {
 	return int64(DataEntryHeaderSize + e.Meta.KeySize + e.Meta.ValueSize + e.Meta.BucketSize)
