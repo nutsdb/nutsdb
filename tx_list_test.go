@@ -19,6 +19,7 @@ import (
 	"io/ioutil"
 	"os"
 	"testing"
+	"time"
 )
 
 func InitForList() {
@@ -699,6 +700,63 @@ func TestTx_LRemByIndex(t *testing.T) {
 	removedNum, err = tx.LRemByIndex(bucket, key, 1, 0, 8, -8)
 	assertions.Error(err, "TestTx_LRemByIndex")
 	assertions.Equal(0, removedNum, "TestTx_LRemByIndex")
+}
+
+func TestTx_ExpireList(t *testing.T) {
+	InitForList()
+	assertions := assert.New(t)
+	db, err = Open(opt)
+	assertions.NoError(err, "TestTx_ExpireList")
+	tx, err = db.Begin(true)
+
+	bucket := "myBucket"
+	key := []byte("myList")
+	if err := tx.LPush(bucket, key, []byte("d"), []byte("c"), []byte("b"), []byte("a")); err != nil {
+		t.Error("TestTx_ExpireList err")
+	}
+	tx.Commit()
+
+	tx, _ = db.Begin(true)
+	_, err := tx.LRange(bucket, key, 0, -1)
+	if err != nil {
+		t.Error("TestTx_ExpireList err")
+	}
+	err = tx.ExpireList(bucket, key, 1)
+	if err != nil {
+		t.Error("TestTx_ExpireList err")
+	}
+	tx.Commit()
+
+	time.Sleep(time.Second)
+
+	tx, _ = db.Begin(false)
+	_, err = tx.LRange(bucket, key, 0, -1)
+	if err == nil {
+		t.Error("TestTx_ExpireList err")
+	}
+	tx.Commit()
+
+	tx, _ = db.Begin(true)
+	if err := tx.LPush(bucket, key, []byte("d"), []byte("c"), []byte("b"), []byte("a")); err != nil {
+		t.Error("TestTx_ExpireList err")
+	}
+	tx.Commit()
+
+	tx, _ = db.Begin(true)
+	err = tx.ExpireList(bucket, key, Persistent)
+	if err != nil {
+		t.Error("TestTx_ExpireList err")
+	}
+	tx.Commit()
+
+	time.Sleep(time.Second)
+
+	tx, _ = db.Begin(true)
+	_, err = tx.LRange(bucket, key, 0, -1)
+	if err != nil {
+		t.Error("TestTx_ExpireList err")
+	}
+	tx.Commit()
 }
 
 func TestTx_LKeys(t *testing.T) {

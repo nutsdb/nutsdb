@@ -457,10 +457,16 @@ func (tx *Tx) buildListIdx(bucket string, entry *Entry) {
 	if _, ok := tx.db.ListIdx[bucket]; !ok {
 		tx.db.ListIdx[bucket] = list.New()
 	}
-
 	key, value := entry.Key, entry.Value
-
+	if IsExpired(entry.Meta.TTL, entry.Meta.Timestamp) {
+		return
+	}
 	switch entry.Meta.Flag {
+	case DataExpireListFlag:
+		t, _ := strconv2.StrToInt64(string(value))
+		ttl := uint32(t)
+		tx.db.ListIdx[bucket].TTL[string(key)] = ttl
+		tx.db.ListIdx[bucket].TimeStamp[string(key)] = entry.Meta.Timestamp
 	case DataLPushFlag:
 		_, _ = tx.db.ListIdx[bucket].LPush(string(key), value)
 	case DataRPushFlag:
