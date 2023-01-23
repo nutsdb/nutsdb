@@ -84,7 +84,7 @@ func TestDataFile1(t *testing.T) {
 		t.Error("err TestDataFile_All ReadAt")
 	}
 
-	payloadSize := entry.Meta.BucketSize + entry.Meta.KeySize + entry.Meta.ValueSize
+	payloadSize := entry.Meta.PayloadSize()
 	e, err = df.ReadRecord(n, payloadSize)
 	if e != nil || err != nil {
 		t.Error("err TestDataFile_All ReadAt")
@@ -119,7 +119,7 @@ func TestDataFile2(t *testing.T) {
 		t.Error("err TestDataFile_All ReadAt")
 	}
 
-	payloadSize := entry.Meta.BucketSize + entry.Meta.KeySize + entry.Meta.ValueSize
+	payloadSize := entry.Meta.PayloadSize()
 	e, err = df.ReadRecord(0, payloadSize)
 	if err == nil || e != nil {
 		t.Error("err TestDataFile_All ReadAt")
@@ -194,7 +194,7 @@ func TestDataFile_ReadRecord(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	payloadSize := entry.Meta.BucketSize + entry.Meta.KeySize + entry.Meta.ValueSize
+	payloadSize := entry.Meta.PayloadSize()
 	e, err := df.ReadRecord(0, payloadSize)
 	if err != nil && e != nil {
 		t.Error("err ReadAt")
@@ -243,7 +243,7 @@ func TestDataFile_Crc_Err(t *testing.T) {
 	if err == nil || e != nil {
 		t.Error("err TestDataFile_All ReadAt")
 	}
-	payloadSize := entry.Meta.BucketSize + entry.Meta.KeySize + entry.Meta.ValueSize
+	payloadSize := entry.Meta.PayloadSize()
 	e, err = df.ReadRecord(0, payloadSize)
 	if err == nil || e != nil {
 		t.Error("err TestDataFile_All ReadAt")
@@ -308,7 +308,7 @@ func benchmarkReadRecord_FileIO(b *testing.B) {
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		payloadSize := entry.Meta.BucketSize + entry.Meta.KeySize + entry.Meta.ValueSize
+		payloadSize := entry.Meta.PayloadSize()
 		e, err := df.ReadRecord(0, payloadSize)
 		if err != nil || string(e.Key) != "key_0001" || string(e.Value) != "val_0001" || e.Meta.Timestamp != 1547707905 {
 			b.Error("err benchmarkReadRecord_FileIO ReadAt")
@@ -353,7 +353,7 @@ func benchmarkReadRecord_MMap(b *testing.B) {
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		payloadSize := entry.Meta.BucketSize + entry.Meta.KeySize + entry.Meta.ValueSize
+		payloadSize := entry.Meta.PayloadSize()
 		e, err := df.ReadRecord(0, payloadSize)
 		if err != nil || string(e.Key) != "key_0001" || string(e.Value) != "val_0001" || e.Meta.Timestamp != 1547707905 {
 			b.Error("err benchmarkReadRecord_MMap ReadAt")

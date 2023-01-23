@@ -16,7 +16,12 @@ package nutsdb
 
 import (
 	"encoding/binary"
+	"errors"
 	"hash/crc32"
+)
+
+var (
+	payLoadSizeMismatchErr = errors.New("the payload size in meta mismatch with the payload size needed")
 )
 
 type (
@@ -138,6 +143,13 @@ func (e *Entry) ParsePayload(data []byte) error {
 	e.Key = data[keyLowBound:keyHighBound]
 	// parse value
 	e.Value = data[valueLowBound:valueHighBound]
+	return nil
+}
+
+func (e *Entry) checkPayloadSize(size int64) error {
+	if e.Meta.PayloadSize() != size {
+		return payLoadSizeMismatchErr
+	}
 	return nil
 }
 

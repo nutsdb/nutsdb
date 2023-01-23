@@ -177,7 +177,7 @@ func (tx *Tx) Get(bucket string, key []byte) (e *Entry, err error) {
 					}
 				}(df.rwManager)
 
-				payloadSize := r.H.Meta.BucketSize + r.H.Meta.KeySize + r.H.Meta.ValueSize
+				payloadSize := r.H.Meta.PayloadSize()
 				item, err := df.ReadRecord(int(r.H.DataPos), payloadSize)
 				if err != nil {
 					return nil, fmt.Errorf("read err. pos %d, key %s, err %s", r.H.DataPos, string(key), err)
@@ -890,7 +890,7 @@ func (tx *Tx) getHintIdxDataItemsWrapper(records Records, limitNum int, es Entri
 				if err != nil {
 					return nil, err
 				}
-				payloadSize := r.H.Meta.BucketSize + r.H.Meta.KeySize + r.H.Meta.ValueSize
+				payloadSize := r.H.Meta.PayloadSize()
 				if item, err := df.ReadRecord(int(r.H.DataPos), payloadSize); err == nil {
 					es = append(es, item)
 				} else {
