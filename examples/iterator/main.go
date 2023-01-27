@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/xujiajun/nutsdb"
+	"github.com/nutsdb/nutsdb"
 )
 
 var (

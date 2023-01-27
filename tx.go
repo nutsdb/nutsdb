@@ -23,9 +23,9 @@ import (
 	"time"
 
 	"github.com/bwmarrin/snowflake"
-	"github.com/xujiajun/nutsdb/ds/list"
-	"github.com/xujiajun/nutsdb/ds/set"
-	"github.com/xujiajun/nutsdb/ds/zset"
+	"github.com/nutsdb/nutsdb/ds/list"
+	"github.com/nutsdb/nutsdb/ds/set"
+	"github.com/nutsdb/nutsdb/ds/zset"
 	"github.com/xujiajun/utils/strconv2"
 )
 

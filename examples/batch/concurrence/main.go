@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/xujiajun/nutsdb"
+	"github.com/nutsdb/nutsdb"
 	"github.com/xujiajun/utils/strconv2"
 )
 

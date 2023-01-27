@@ -18,9 +18,9 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/nutsdb/nutsdb"
+	"github.com/nutsdb/nutsdb/ds/zset"
 	"github.com/stretchr/testify/assert"
-	"github.com/xujiajun/nutsdb"
-	"github.com/xujiajun/nutsdb/ds/zset"
 )
 
 func TestDB_ZAdd(t *testing.T) {
