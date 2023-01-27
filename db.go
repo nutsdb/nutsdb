@@ -110,6 +110,9 @@ const (
 
 	// LRemByIndex represents the data LRemByIndex flag
 	DataLRemByIndex
+
+	// DataListBucketDeleteFlag represents that set ttl for the list
+	DataExpireListFlag
 )
 
 const (
@@ -889,8 +892,18 @@ func (db *DB) buildListIdx(bucket string, r *Record) error {
 	if r.E == nil {
 		return ErrEntryIdxModeOpt
 	}
-
+	if IsExpired(r.E.Meta.TTL, r.E.Meta.Timestamp) {
+		return nil
+	}
 	switch r.H.Meta.Flag {
+	case DataExpireListFlag:
+		t, err := strconv2.StrToInt64(string(r.E.Value))
+		if err != nil {
+			return err
+		}
+		ttl := uint32(t)
+		db.ListIdx[bucket].TTL[string(r.E.Key)] = ttl
+		db.ListIdx[bucket].TimeStamp[string(r.E.Key)] = r.E.Meta.Timestamp
 	case DataLPushFlag:
 		_, _ = db.ListIdx[bucket].LPush(string(r.E.Key), r.E.Value)
 	case DataRPushFlag:
@@ -1087,6 +1100,10 @@ func (db *DB) getPendingMergeEntries(entry *Entry, pendingMergeEntries []*Entry)
 	}
 
 	if entry.Meta.Ds == DataStructureList {
+		//check the key of list is expired or not
+		//if expired, it will clear the items of index
+		//so that nutsdb can clear entry of expiring list in the function getPendingMergeEntries
+		db.checkListExpired()
 		listIdx, exist := db.ListIdx[string(entry.Meta.Bucket)]
 		if exist {
 			items, _ := listIdx.LRange(string(entry.Key), 0, -1)
@@ -1163,4 +1180,13 @@ func (db *DB) getRecordFromKey(bucket, key []byte) (record *Record, err error) {
 		return nil, ErrBucketNotFound
 	}
 	return idx.Find(key)
+}
+
+func (db *DB) checkListExpired() {
+	listIdx := db.ListIdx
+	for bucket := range listIdx {
+		for key := range listIdx[bucket].TTL {
+			listIdx[bucket].IsExpire(key)
+		}
+	}
 }

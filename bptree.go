@@ -372,7 +372,7 @@ func ReadNode(filePath string, address int64) (bn *BinaryNode, err error) {
 	}
 	defer f.Close()
 
-	size := int64(unsafe.Sizeof(BinaryNode{}))
+	size := getBinaryNodeSize()
 
 	data := make([]byte, size)
 	_, err = f.Seek(address, 0)

@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"os"
 	"regexp"
 	"testing"
 	"time"
@@ -517,4 +518,29 @@ func TestBPTree_ToBinary(t *testing.T) {
 			assert.Equal(t, r, buf.Bytes())
 		})
 	})
+}
+
+func TestBPTree_WriteNode(t *testing.T) {
+	testFilename := "bptree_write_test.bptidx"
+
+	t.Run("test write node", func(t *testing.T) {
+		withBPTree(t, func(t *testing.T, tree *BPTree) {
+			key := []byte("key_001")
+			tree.Filepath = testFilename
+
+			fd, err := os.OpenFile(tree.Filepath, os.O_CREATE|os.O_RDWR, 0644)
+			assert.NoError(t, err)
+
+			node := tree.FindLeaf(key)
+			num, err := tree.WriteNode(node, -1, false, fd)
+			assert.NoError(t, err)
+
+			bnByte, err := tree.ToBinary(node)
+			assert.NoError(t, err)
+			assert.Equal(t, num, len(bnByte))
+		})
+	})
+
+	// remove the test file
+	_ = os.Remove(testFilename)
 }
