@@ -164,6 +164,13 @@ func TestList_LRange(t *testing.T) {
 	_, err = list.RPush(key, []byte("f"))
 	assertions.NoError(err)
 
+	emptyKeyList := New()
+	_, err = emptyKeyList.RPush(key, []byte("g"))
+	assertions.NoError(err)
+
+	_, err = emptyKeyList.LPop(key)
+	assertions.NoError(err)
+
 	type args struct {
 		key   string
 		start int
@@ -231,6 +238,20 @@ func TestList_LRange(t *testing.T) {
 			list,
 			args{key, 0, -1},
 			[][]byte{[]byte("a"), []byte("b"), []byte("c"), []byte("d"), []byte("e"), []byte("f")},
+			false,
+		},
+		{
+			"empty list",
+			New(),
+			args{key, 0, -1},
+			nil,
+			true,
+		},
+		{
+			"list with empty key",
+			emptyKeyList,
+			args{key, 0, -1},
+			nil,
 			false,
 		},
 	}

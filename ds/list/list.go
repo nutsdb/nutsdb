@@ -173,11 +173,8 @@ func (l *List) Size(key string) (int, error) {
 // LRange returns the specified elements of the list stored at key
 // [start,end]
 func (l *List) LRange(key string, start, end int) (list [][]byte, err error) {
-	if l.IsExpire(key) {
-		return nil, ErrListNotFound
-	}
 	size, err := l.Size(key)
-	if err != nil {
+	if err != nil || size == 0 {
 		return
 	}
 
