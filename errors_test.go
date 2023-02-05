@@ -62,3 +62,55 @@ func TestIsKeyEmpty(t *testing.T) {
 		})
 	}
 }
+
+func TestIsBucketNotFound(t *testing.T) {
+	ts := []struct {
+		err  error
+		want bool
+	}{
+		{
+			ErrBucketNotFound,
+			true,
+		},
+		{
+			errors.Wrap(ErrBucketNotFound, "foobar"),
+			true,
+		},
+		{
+			errors.New("foobar"),
+			false,
+		},
+	}
+
+	for _, tc := range ts {
+		got := IsBucketNotFound(tc.err)
+
+		assert.Equal(t, tc.want, got)
+	}
+}
+
+func TestIsBucketEmpty(t *testing.T) {
+	ts := []struct {
+		err  error
+		want bool
+	}{
+		{
+			ErrBucketEmpty,
+			true,
+		},
+		{
+			errors.Wrap(ErrBucketEmpty, "foobar"),
+			true,
+		},
+		{
+			errors.New("foobar"),
+			false,
+		},
+	}
+
+	for _, tc := range ts {
+		got := IsBucketEmpty(tc.err)
+
+		assert.Equal(t, tc.want, got)
+	}
+}
