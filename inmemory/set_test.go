@@ -18,9 +18,9 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/nutsdb/nutsdb"
+	"github.com/nutsdb/nutsdb/ds/set"
 	"github.com/stretchr/testify/assert"
-	"github.com/xujiajun/nutsdb"
-	"github.com/xujiajun/nutsdb/ds/set"
 )
 
 var (

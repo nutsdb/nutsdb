@@ -17,7 +17,7 @@ package inmemory
 import (
 	"sync"
 
-	"github.com/xujiajun/nutsdb"
+	"github.com/nutsdb/nutsdb"
 )
 
 type ShardDB struct {

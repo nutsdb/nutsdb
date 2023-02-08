@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/xujiajun/nutsdb"
+	"github.com/nutsdb/nutsdb"
 )
 
 var (
@@ -15,8 +15,8 @@ func init() {
 	db, _ = nutsdb.Open(
 		nutsdb.DefaultOptions,
 		nutsdb.WithDir("/tmp/nutsdbexample/example_bucket"),
-	// nutsdb.WithRWMode(nutsdb.MMap),
-	// nutsdb.WithSyncEnable(false),
+		// nutsdb.WithRWMode(nutsdb.MMap),
+		// nutsdb.WithSyncEnable(false),
 	)
 }
 

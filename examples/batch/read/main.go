@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/xujiajun/nutsdb"
+	"github.com/nutsdb/nutsdb"
 	"github.com/xujiajun/utils/strconv2"
 	"github.com/xujiajun/utils/time2"
 )

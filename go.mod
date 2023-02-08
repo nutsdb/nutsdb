@@ -1,4 +1,4 @@
-module github.com/xujiajun/nutsdb
+module github.com/nutsdb/nutsdb
 
 go 1.13
 

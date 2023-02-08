@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/xujiajun/nutsdb/inmemory"
+	"github.com/nutsdb/nutsdb/inmemory"
 )
 
 var (

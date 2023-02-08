@@ -15,8 +15,8 @@
 package inmemory
 
 import (
-	"github.com/xujiajun/nutsdb"
-	"github.com/xujiajun/nutsdb/ds/set"
+	"github.com/nutsdb/nutsdb"
+	"github.com/nutsdb/nutsdb/ds/set"
 
 	"github.com/pkg/errors"
 )

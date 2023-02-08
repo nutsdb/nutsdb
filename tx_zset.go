@@ -21,7 +21,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/xujiajun/nutsdb/ds/zset"
+	"github.com/nutsdb/nutsdb/ds/zset"
 	"github.com/xujiajun/utils/strconv2"
 )
 

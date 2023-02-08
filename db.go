@@ -26,9 +26,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/xujiajun/nutsdb/ds/list"
-	"github.com/xujiajun/nutsdb/ds/set"
-	"github.com/xujiajun/nutsdb/ds/zset"
+	"github.com/nutsdb/nutsdb/ds/list"
+	"github.com/nutsdb/nutsdb/ds/set"
+	"github.com/nutsdb/nutsdb/ds/zset"
 	"github.com/xujiajun/utils/filesystem"
 	"github.com/xujiajun/utils/strconv2"
 )

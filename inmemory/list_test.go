@@ -17,9 +17,9 @@ package inmemory
 import (
 	"testing"
 
+	"github.com/nutsdb/nutsdb"
+	"github.com/nutsdb/nutsdb/ds/list"
 	"github.com/stretchr/testify/assert"
-	"github.com/xujiajun/nutsdb"
-	"github.com/xujiajun/nutsdb/ds/list"
 )
 
 func initRPushData(bucket, key string) error {
