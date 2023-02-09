@@ -2,9 +2,9 @@
     <img src="https://user-images.githubusercontent.com/6065007/141310364-62d7eebb-2cbb-4949-80ed-5cd20f705405.png">
 </p>
 
-# NutsDB [![GoDoc](https://godoc.org/github.com/xujiajun/nutsdb?status.svg)](https://godoc.org/github.com/xujiajun/nutsdb)  [![Go Report Card](https://goreportcard.com/badge/github.com/xujiajun/nutsdb)](https://goreportcard.com/report/github.com/xujiajun/nutsdb) <a href="https://travis-ci.org/xujiajun/nutsdb"><img src="https://travis-ci.org/xujiajun/nutsdb.svg?branch=master" alt="Build Status"></a> [![Coverage Status](https://coveralls.io/repos/github/xujiajun/nutsdb/badge.svg?branch=master)](https://coveralls.io/github/xujiajun/nutsdb?branch=master) [![License](http://img.shields.io/badge/license-Apache_2-blue.svg?style=flat-square)](https://raw.githubusercontent.com/xujiajun/nutsdb/master/LICENSE) [![Mentioned in Awesome Go](https://awesome.re/mentioned-badge.svg)](https://github.com/avelino/awesome-go#database)  
+# NutsDB [![GoDoc](https://godoc.org/github.com/nutsdb/nutsdb?status.svg)](https://godoc.org/github.com/nutsdb/nutsdb)  [![Go Report Card](https://goreportcard.com/badge/github.com/nutsdb/nutsdb)](https://goreportcard.com/report/github.com/nutsdb/nutsdb) <a href="https://travis-ci.org/nutsdb/nutsdb"><img src="https://travis-ci.org/nutsdb/nutsdb.svg?branch=master" alt="Build Status"></a> [![Coverage Status](https://coveralls.io/repos/github/nutsdb/nutsdb/badge.svg?branch=master)](https://coveralls.io/github/nutsdb/nutsdb?branch=master) [![License](http://img.shields.io/badge/license-Apache_2-blue.svg?style=flat-square)](https://raw.githubusercontent.com/nutsdb/nutsdb/master/LICENSE) [![Mentioned in Awesome Go](https://awesome.re/mentioned-badge.svg)](https://github.com/avelino/awesome-go#database)  
 
-English | [简体中文](https://github.com/xujiajun/nutsdb/blob/master/README-CN.md)
+English | [简体中文](https://github.com/nutsdb/nutsdb/blob/master/README-CN.md)
 
 NutsDB is a simple, fast, embeddable and persistent key/value store written in pure Go. 
 
@@ -21,7 +21,7 @@ It supports fully serializable transactions and many data structures such as lis
 ![image](https://user-images.githubusercontent.com/6065007/163713248-73a80478-8d6a-4c53-927c-71ba34569ae7.png)
 
 
- Welcome [contributions to NutsDB](https://github.com/xujiajun/nutsdb#contributing).
+ Welcome [contributions to NutsDB](https://github.com/nutsdb/nutsdb#contributing).
 
 ## Table of Contents
 
@@ -115,12 +115,12 @@ It supports fully serializable transactions and many data structures such as lis
 To start using NutsDB, first needs [Go](https://golang.org/dl/) installed (version 1.11+ is required).  and run go get:
 
 ```
-go get -u github.com/xujiajun/nutsdb
+go get -u github.com/nutsdb/nutsdb
 ```
 
 ### Opening a database
 
-To open your database, use the nutsdb.Open() function,with the appropriate options.The `Dir` , `EntryIdxMode`  and  `SegmentSize`  options are must be specified by the client. About options see [here](https://github.com/xujiajun/nutsdb#options) for detail.
+To open your database, use the nutsdb.Open() function,with the appropriate options.The `Dir` , `EntryIdxMode`  and  `SegmentSize`  options are must be specified by the client. About options see [here](https://github.com/nutsdb/nutsdb#options) for detail.
 
 ```golang
 package main
@@ -128,7 +128,7 @@ package main
 import (
     "log"
 
-    "github.com/xujiajun/nutsdb"
+    "github.com/nutsdb/nutsdb"
 )
 
 func main() {
@@ -168,7 +168,7 @@ NutsDB will truncate data file if the active file is larger than `SegmentSize`.
 Current version default `SegmentSize` is 8MB,but you can custom it.
 **The defaultSegmentSize becomes 256MB when the version is greater than 0.8.0.**
 
-Once set, it cannot be changed. see [caveats--limitations](https://github.com/xujiajun/nutsdb#caveats--limitations) for detail.
+Once set, it cannot be changed. see [caveats--limitations](https://github.com/nutsdb/nutsdb#caveats--limitations) for detail.
 
 * NodeNum              int64
 
@@ -2024,7 +2024,7 @@ Selected kvstore which is embedded, persistence and support transactions.
 
 * [BadgerDB](https://github.com/dgraph-io/badger) (master branch with default options)
 * [BoltDB](https://github.com/boltdb/bolt) (master branch  with default options)
-* [NutsDB](https://github.com/xujiajun/nutsdb) (master branch with default options or custom options)
+* [NutsDB](https://github.com/nutsdb/nutsdb) (master branch with default options or custom options)
 
 ## Benchmark System:
 
@@ -2040,7 +2040,7 @@ Selected kvstore which is embedded, persistence and support transactions.
 badger 2019/03/11 18:06:05 INFO: All 0 tables opened in 0s
 goos: darwin
 goarch: amd64
-pkg: github.com/xujiajun/kvstore-bench
+pkg: github.com/nutsdb/kvstore-bench
 BenchmarkBadgerDBPutValue64B-8         10000        112382 ns/op        2374 B/op         74 allocs/op
 BenchmarkBadgerDBPutValue128B-8        20000         94110 ns/op        2503 B/op         74 allocs/op
 BenchmarkBadgerDBPutValue256B-8        20000         93480 ns/op        2759 B/op         74 allocs/op
@@ -2058,7 +2058,7 @@ BenchmarkNutsDBPutValue512B-8          30000         55787 ns/op        1432 B/o
 BenchmarkNutsDBGet-8                 2000000           661 ns/op          88 B/op          3 allocs/op
 BenchmarkNutsDBGetByHintKey-8          50000         27255 ns/op         840 B/op         16 allocs/op
 PASS
-ok      github.com/xujiajun/kvstore-bench   83.856s
+ok      github.com/nutsdb/kvstore-bench   83.856s
 ```
 
 ## Conclusions:
@@ -2074,7 +2074,7 @@ All are fast. And NutsDB is 1x faster than others.
 And NutsDB reads with HintKey option is much slower than its default option way. 
 
 
-the benchmark code can be found in the [gokvstore-bench](https://github.com/xujiajun/gokvstore-bench) repo.
+the benchmark code can be found in the [gokvstore-bench](https://github.com/nutsdb/gokvstore-bench) repo.
 
 ### Caveats & Limitations
 
@@ -2101,11 +2101,11 @@ Recommend use the latest version.
 
 ### Contact
 
-* [xujiajun](https://github.com/xujiajun)
+* [nutsdb](https://github.com/nutsdb)
 
 ### Contributing
 
-See [CONTRIBUTING](https://github.com/xujiajun/nutsdb/blob/master/CONTRIBUTING.md) for details on submitting patches and the contribution workflow.
+See [CONTRIBUTING](https://github.com/nutsdb/nutsdb/blob/master/CONTRIBUTING.md) for details on submitting patches and the contribution workflow.
 
 ### Acknowledgements
 
@@ -2119,4 +2119,4 @@ This package is inspired by the following:
 
 ### License
 
-The NutsDB is open-sourced software licensed under the [Apache 2.0 license](https://github.com/xujiajun/nutsdb/blob/master/LICENSE).
+The NutsDB is open-sourced software licensed under the [Apache 2.0 license](https://github.com/nutsdb/nutsdb/blob/master/LICENSE).
