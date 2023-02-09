@@ -2,13 +2,13 @@
     <img src="https://user-images.githubusercontent.com/6065007/141310364-62d7eebb-2cbb-4949-80ed-5cd20f705405.png">
 </p>
 
-# NutsDB [![GoDoc](https://godoc.org/github.com/xujiajun/nutsdb?status.svg)](https://godoc.org/github.com/xujiajun/nutsdb)  [![Go Report Card](https://goreportcard.com/badge/github.com/xujiajun/nutsdb)](https://goreportcard.com/report/github.com/xujiajun/nutsdb) <a href="https://travis-ci.org/xujiajun/nutsdb"><img src="https://travis-ci.org/xujiajun/nutsdb.svg?branch=master" alt="Build Status"></a> [![Coverage Status](https://coveralls.io/repos/github/xujiajun/nutsdb/badge.svg?branch=master)](https://coveralls.io/github/xujiajun/nutsdb?branch=master) [![License](http://img.shields.io/badge/license-Apache_2-blue.svg?style=flat-square)](https://raw.githubusercontent.com/xujiajun/nutsdb/master/LICENSE) [![Mentioned in Awesome Go](https://awesome.re/mentioned-badge.svg)](https://github.com/avelino/awesome-go#database)  
+# NutsDB [![GoDoc](https://godoc.org/github.com/nutsdb/nutsdb?status.svg)](https://godoc.org/github.com/nutsdb/nutsdb)  [![Go Report Card](https://goreportcard.com/badge/github.com/nutsdb/nutsdb)](https://goreportcard.com/report/github.com/nutsdb/nutsdb) <a href="https://travis-ci.org/nutsdb/nutsdb"><img src="https://travis-ci.org/nutsdb/nutsdb.svg?branch=master" alt="Build Status"></a> [![Coverage Status](https://coveralls.io/repos/github/nutsdb/nutsdb/badge.svg?branch=master)](https://coveralls.io/github/nutsdb/nutsdb?branch=master) [![License](http://img.shields.io/badge/license-Apache_2-blue.svg?style=flat-square)](https://raw.githubusercontent.com/nutsdb/nutsdb/master/LICENSE) [![Mentioned in Awesome Go](https://awesome.re/mentioned-badge.svg)](https://github.com/avelino/awesome-go#database)  
 
-[English](https://github.com/xujiajun/nutsdb/blob/master/README.md) | 简体中文
+[English](https://github.com/nutsdb/nutsdb/blob/master/README.md) | 简体中文
 
 NutsDB是纯Go语言编写一个简单、高性能、内嵌型、持久化的key-value数据库。
 
-NutsDB支持事务，从v0.2.0之后的版本开始支持ACID的特性，建议使用最新的release版本。v0.2.0之前的版本，保持高性能，没有作sync，但是具备高性能的写（本地测试，百万数据写入达40~50W+/s）。所有的操作都在事务中执行。NutsDB从v0.2.0版本开始支持多种数据结构，如列表(list)、集合(set)、有序集合(sorted set)。从0.4.0版本开始增加自定义配置读写方式、启动时候的文件载入方式、sync是否开启等，详情见[选项配置](https://github.com/xujiajun/nutsdb/blob/master/README-CN.md#%E9%80%89%E9%A1%B9%E9%85%8D%E7%BD%AE)
+NutsDB支持事务，从v0.2.0之后的版本开始支持ACID的特性，建议使用最新的release版本。v0.2.0之前的版本，保持高性能，没有作sync，但是具备高性能的写（本地测试，百万数据写入达40~50W+/s）。所有的操作都在事务中执行。NutsDB从v0.2.0版本开始支持多种数据结构，如列表(list)、集合(set)、有序集合(sorted set)。从0.4.0版本开始增加自定义配置读写方式、启动时候的文件载入方式、sync是否开启等，详情见[选项配置](https://github.com/nutsdb/nutsdb/blob/master/README-CN.md#%E9%80%89%E9%A1%B9%E9%85%8D%E7%BD%AE)
 
 
 ### 加群
@@ -123,7 +123,7 @@ https://www.bilibili.com/video/BV1T34y1x7AS/
 NutsDB的安装很简单，首先保证 [Golang](https://golang.org/dl/) 已经安装好 (版本要求1.11以上). 然后在终端执行命令:
 
 ```
-go get -u github.com/xujiajun/nutsdb
+go get -u github.com/nutsdb/nutsdb
 ```
 
 ### 开启数据库
@@ -138,7 +138,7 @@ package main
 import (
     "log"
 
-    "github.com/xujiajun/nutsdb"
+    "github.com/nutsdb/nutsdb"
 )
 
 func main() {
@@ -178,7 +178,7 @@ func main() {
 * SegmentSize          int64 
 
  `SegmentSize` 代表数据库的数据单元，每个数据单元（文件）为`SegmentSize`，现在默认是8。**注意：从大于0.8.0版本开始，默认SegmentSize变成256MB**
-MB，这个可以自己配置。但是一旦被设置，下次启动数据库也要用这个配置，不然会报错。详情见 [限制和警告](https://github.com/xujiajun/nutsdb/blob/master/README-CN.md#%E8%AD%A6%E5%91%8A%E5%92%8C%E9%99%90%E5%88%B6)。
+MB，这个可以自己配置。但是一旦被设置，下次启动数据库也要用这个配置，不然会报错。详情见 [限制和警告](https://github.com/nutsdb/nutsdb/blob/master/README-CN.md#%E8%AD%A6%E5%91%8A%E5%92%8C%E9%99%90%E5%88%B6)。
 
 * NodeNum              int64
 
@@ -216,7 +216,7 @@ var DefaultOptions = Options{
 ### 使用事务
 
 NutsDB为了保证隔离性，防止并发读写事务时候数据的不一致性，同一时间只能执行一个读写事务，但是允许同一时间执行多个只读事务。
-从v0.3.0版本开始，NutsDB遵循标准的ACID原则。（参见[限制和警告](https://github.com/xujiajun/nutsdb/blob/master/README-CN.md#%E8%AD%A6%E5%91%8A%E5%92%8C%E9%99%90%E5%88%B6)）
+从v0.3.0版本开始，NutsDB遵循标准的ACID原则。（参见[限制和警告](https://github.com/nutsdb/nutsdb/blob/master/README-CN.md#%E8%AD%A6%E5%91%8A%E5%92%8C%E9%99%90%E5%88%B6)）
 
 
 #### 读写事务
@@ -2040,7 +2040,7 @@ Badger也是基于LSM tree模型。但是写性能没有我想象中高。不支
 
 * [BadgerDB](https://github.com/dgraph-io/badger) (master分支和默认配置)
 * [BoltDB](https://github.com/boltdb/bolt) (master分支和默认配置)
-* [NutsDB](https://github.com/xujiajun/nutsdb) (master分支和默认配置+自定义配置)
+* [NutsDB](https://github.com/nutsdb/nutsdb) (master分支和默认配置+自定义配置)
 
 ## 测试的环境:
 
@@ -2057,7 +2057,7 @@ Badger也是基于LSM tree模型。但是写性能没有我想象中高。不支
 badger 2019/03/11 18:06:05 INFO: All 0 tables opened in 0s
 goos: darwin
 goarch: amd64
-pkg: github.com/xujiajun/kvstore-bench
+pkg: github.com/nutsdb/kvstore-bench
 BenchmarkBadgerDBPutValue64B-8         10000        112382 ns/op        2374 B/op         74 allocs/op
 BenchmarkBadgerDBPutValue128B-8        20000         94110 ns/op        2503 B/op         74 allocs/op
 BenchmarkBadgerDBPutValue256B-8        20000         93480 ns/op        2759 B/op         74 allocs/op
@@ -2075,7 +2075,7 @@ BenchmarkNutsDBPutValue512B-8          30000         55787 ns/op        1432 B/o
 BenchmarkNutsDBGet-8                 2000000           661 ns/op          88 B/op          3 allocs/op
 BenchmarkNutsDBGetByHintKey-8          50000         27255 ns/op         840 B/op         16 allocs/op
 PASS
-ok      github.com/xujiajun/kvstore-bench   83.856s
+ok      github.com/nutsdb/kvstore-bench   83.856s
 ```
 
 ## 结论:
@@ -2125,7 +2125,7 @@ entry的的大小=EntryHeader的大小+key的大小+value的大小+bucket的大�
 
 在传统的关系式数据库中，常常用 ACID 性质来检验事务功能的安全性，~~NutsDB目前的版本并没有完全支持ACID。~~ NutsDB从v0.2.0之后的版本开始完全支持ACID。
 
-这这特别感谢 @damnever 给我提的[issue](https://github.com/xujiajun/nutsdb/issues/10)给我指出，特别在这说明下，免得误导大家。
+这这特别感谢 @damnever 给我提的[issue](https://github.com/nutsdb/nutsdb/issues/10)给我指出，特别在这说明下，免得误导大家。
 
 从v0.3.0版本起，NutsDB支持（A）原子性、C（一致性）、I（隔离性），并保证（D）持久化。以下参考[wiki百科](https://zh.wikipedia.org/wiki/ACID)的对ACID定义分别讲一下。如讲的有误，欢迎帮我指正。
 
@@ -2179,7 +2179,7 @@ nutsDB不会出现“不可重复读”这种情况，当高并发的时候，�
 
 ### 联系作者
 
-* [xujiajun](https://github.com/xujiajun)
+* [nutsdb](https://github.com/nutsdb)
 
 ### 参与贡献
 
@@ -2211,7 +2211,7 @@ https://github.com/golang/go/wiki/CodeReviewComments
  
  
 
-详情参考英文版的 [CONTRIBUTING](https://github.com/xujiajun/nutsdb/blob/master/CONTRIBUTING.md) 。
+详情参考英文版的 [CONTRIBUTING](https://github.com/nutsdb/nutsdb/blob/master/CONTRIBUTING.md) 。
 
 ### 致谢
 
@@ -2225,4 +2225,4 @@ https://github.com/golang/go/wiki/CodeReviewComments
 
 ### License
 
-The NutsDB is open-sourced software licensed under the [Apache 2.0 license](https://github.com/xujiajun/nutsdb/blob/master/LICENSE).
+The NutsDB is open-sourced software licensed under the [Apache 2.0 license](https://github.com/nutsdb/nutsdb/blob/master/LICENSE).
