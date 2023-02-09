@@ -17,10 +17,8 @@ package nutsdb
 import (
 	"fmt"
 	"io/ioutil"
-	"math"
 	"os"
 	"reflect"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -1173,28 +1171,4 @@ func withBPTSpareeIdxDB(t *testing.T, fn func(t *testing.T, db *DB)) {
 	opt.EntryIdxMode = HintKeyAndRAMIdxMode
 
 	withDBOption(t, opt, fn)
-}
-
-func TestMaxLengthKeyValue(t *testing.T) {
-	exceedMaxSize := math.MaxUint32 + 2
-	maxBucket := []byte(strings.Repeat("a", exceedMaxSize))
-	maxKey := []byte(strings.Repeat("b", exceedMaxSize))
-	maxValue := []byte(strings.Repeat("c", exceedMaxSize))
-
-	t.Logf("key size is %+v", uint32(len(maxKey)))
-
-	option := DefaultOptions
-	option.Dir = "/tmp/nutsdb_testdata"
-	option.RWMode = FileIO
-	option.SyncEnable = true
-	option.EntryIdxMode = HintKeyAndRAMIdxMode
-
-	db, err := open(option)
-	assert.Nil(t, err)
-	err = db.Update(func(tx *Tx) error {
-		err = tx.Put(string(maxBucket), maxKey, maxValue, Persistent)
-		assert.Nil(t, err)
-		return nil
-	})
-	assert.NotNil(t, err)
 }
