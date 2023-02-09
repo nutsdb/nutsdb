@@ -20,9 +20,7 @@ import (
 	"hash/crc32"
 )
 
-var (
-	payLoadSizeMismatchErr = errors.New("the payload size in meta mismatch with the payload size needed")
-)
+var payLoadSizeMismatchErr = errors.New("the payload size in meta mismatch with the payload size needed")
 
 type (
 	// Entry represents the data item.
