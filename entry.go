@@ -20,6 +20,8 @@ import (
 	"hash/crc32"
 )
 
+var payLoadSizeMismatchErr = errors.New("the payload size in meta mismatch with the payload size needed")
+
 type (
 	// Entry represents the data item.
 	Entry struct {
@@ -52,6 +54,10 @@ type (
 		Ds         uint16 // data structure
 	}
 )
+
+func (meta *MetaData) PayloadSize() int64 {
+	return int64(meta.BucketSize) + int64(meta.KeySize) + int64(meta.ValueSize)
+}
 
 // Size returns the size of the entry.
 func (e *Entry) Size() int64 {
@@ -121,9 +127,6 @@ func (e *Entry) GetCrc(buf []byte) uint32 {
 
 // ParsePayload means this function will parse a byte array to bucket, key, size of an entry
 func (e *Entry) ParsePayload(data []byte) error {
-	if e.Meta == nil || (e.Meta.BucketSize+e.Meta.KeySize+e.Meta.ValueSize != uint32(len(data))) {
-		return errors.New("data validation fail")
-	}
 	meta := e.Meta
 	bucketLowBound := 0
 	bucketHighBound := meta.BucketSize
@@ -138,6 +141,13 @@ func (e *Entry) ParsePayload(data []byte) error {
 	e.Key = data[keyLowBound:keyHighBound]
 	// parse value
 	e.Value = data[valueLowBound:valueHighBound]
+	return nil
+}
+
+func (e *Entry) checkPayloadSize(size int64) error {
+	if e.Meta.PayloadSize() != size {
+		return payLoadSizeMismatchErr
+	}
 	return nil
 }
 

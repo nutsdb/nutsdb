@@ -78,7 +78,7 @@ func (df *DataFile) ReadAt(off int) (e *Entry, err error) {
 
 	meta := e.Meta
 	off += DataEntryHeaderSize
-	dataSize := meta.BucketSize + meta.KeySize + meta.ValueSize
+	dataSize := meta.PayloadSize()
 
 	dataBuf := make([]byte, dataSize)
 	_, err = df.rwManager.ReadAt(dataBuf, int64(off))
@@ -101,7 +101,7 @@ func (df *DataFile) ReadAt(off int) (e *Entry, err error) {
 
 // ReadRecord returns entry at the given off(offset).
 // payloadSize = bucketSize + keySize + valueSize
-func (df *DataFile) ReadRecord(off int, payloadSize uint32) (e *Entry, err error) {
+func (df *DataFile) ReadRecord(off int, payloadSize int64) (e *Entry, err error) {
 	buf := make([]byte, DataEntryHeaderSize+payloadSize)
 
 	if _, err := df.rwManager.ReadAt(buf, int64(off)); err != nil {
@@ -118,6 +118,10 @@ func (df *DataFile) ReadRecord(off int, payloadSize uint32) (e *Entry, err error
 
 	if e.IsZero() {
 		return nil, nil
+	}
+
+	if err := e.checkPayloadSize(payloadSize); err != nil {
+		return nil, err
 	}
 
 	err = e.ParsePayload(buf[DataEntryHeaderSize:])
