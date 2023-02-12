@@ -34,5 +34,5 @@ func IsPrefixScan(err error) bool {
 
 // IsPrefixSearchScan is true if prefix and search scanning not found the result.
 func IsPrefixSearchScan(err error) bool {
-	return errors.Is(err, ErrPrefixScan)
+	return errors.Is(err, ErrPrefixSearchScan)
 }
