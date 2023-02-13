@@ -42,7 +42,7 @@ type List struct {
 	TimeStamp map[string]uint64
 }
 
-// New returns returns a newly initialized List Object that implements the List.
+// New returns a newly initialized List Object that implements the List.
 func New() *List {
 	return &List{
 		Items:     make(map[string][][]byte),
