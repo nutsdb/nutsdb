@@ -547,6 +547,12 @@ func TestList_IsEmpty(t *testing.T) {
 	assertions.Equal(false, r, "IsEmpty failed on non-empty list")
 
 	r, err = emptyList.IsEmpty(emptyKey)
+	assertions.Equal(ErrListNotFound, err, "TestList_IsEmpty got no err")
+	assertions.Equal(false, r, "IsEmpty expect an error here")
+
+	_, err = emptyList.RPush(emptyKey, []byte("a"))
+	_, err = emptyList.LPop(emptyKey)
+	r, err = emptyList.IsEmpty(emptyKey)
 	assertions.Nil(err, "TestList_IsEmpty empty err")
 	assertions.Equal(true, r, "IsEmpty failed on empty list")
 }
