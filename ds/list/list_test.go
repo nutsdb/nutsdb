@@ -536,3 +536,17 @@ func TestList_Ltrim(t *testing.T) {
 	err = list.Ltrim(key, -1, -2)
 	assertions.Error(err, "TestList_Ltrim err")
 }
+
+func TestList_IsEmpty(t *testing.T) {
+	nonEmptyList, nonEmptyKey := InitListData()
+	emptyList, emptyKey := New(), "empty"
+	assertions := assert.New(t)
+
+	r, err := nonEmptyList.IsEmpty(nonEmptyKey)
+	assertions.Nil(err, "TestList_IsEmpty non-empty err")
+	assertions.Equal(false, r, "IsEmpty failed on non-empty list")
+
+	r, err = emptyList.IsEmpty(emptyKey)
+	assertions.Nil(err, "TestList_IsEmpty empty err")
+	assertions.Equal(true, r, "IsEmpty failed on empty list")
+}

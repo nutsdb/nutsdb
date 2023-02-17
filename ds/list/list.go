@@ -431,3 +431,11 @@ func (l *List) IsExpire(key string) bool {
 	delete(l.TimeStamp, key)
 	return true
 }
+
+func (l *List) IsEmpty(key string) (bool, error) {
+	size, err := l.Size(key)
+	if err != nil || size > 0 {
+		return false, err
+	}
+	return true, nil
+}
