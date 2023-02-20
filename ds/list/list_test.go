@@ -164,6 +164,13 @@ func TestList_LRange(t *testing.T) {
 	_, err = list.RPush(key, []byte("f"))
 	assertions.NoError(err)
 
+	emptyKeyList := New()
+	_, err = emptyKeyList.RPush(key, []byte("g"))
+	assertions.NoError(err)
+
+	_, err = emptyKeyList.LPop(key)
+	assertions.NoError(err)
+
 	type args struct {
 		key   string
 		start int
@@ -231,6 +238,20 @@ func TestList_LRange(t *testing.T) {
 			list,
 			args{key, 0, -1},
 			[][]byte{[]byte("a"), []byte("b"), []byte("c"), []byte("d"), []byte("e"), []byte("f")},
+			false,
+		},
+		{
+			"empty list",
+			New(),
+			args{key, 0, -1},
+			nil,
+			true,
+		},
+		{
+			"list with empty key",
+			emptyKeyList,
+			args{key, 0, -1},
+			nil,
 			false,
 		},
 	}
@@ -514,4 +535,24 @@ func TestList_Ltrim(t *testing.T) {
 
 	err = list.Ltrim(key, -1, -2)
 	assertions.Error(err, "TestList_Ltrim err")
+}
+
+func TestList_IsEmpty(t *testing.T) {
+	nonEmptyList, nonEmptyKey := InitListData()
+	emptyList, emptyKey := New(), "empty"
+	assertions := assert.New(t)
+
+	r, err := nonEmptyList.IsEmpty(nonEmptyKey)
+	assertions.Nil(err, "TestList_IsEmpty non-empty err")
+	assertions.Equal(false, r, "IsEmpty failed on non-empty list")
+
+	r, err = emptyList.IsEmpty(emptyKey)
+	assertions.Equal(ErrListNotFound, err, "TestList_IsEmpty got no err")
+	assertions.Equal(false, r, "IsEmpty expect an error here")
+
+	_, err = emptyList.RPush(emptyKey, []byte("a"))
+	_, err = emptyList.LPop(emptyKey)
+	r, err = emptyList.IsEmpty(emptyKey)
+	assertions.Nil(err, "TestList_IsEmpty empty err")
+	assertions.Equal(true, r, "IsEmpty failed on empty list")
 }
