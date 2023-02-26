@@ -2,7 +2,7 @@
     <img src="https://user-images.githubusercontent.com/6065007/141310364-62d7eebb-2cbb-4949-80ed-5cd20f705405.png">
 </p>
 
-# NutsDB [![GoDoc](https://godoc.org/github.com/nutsdb/nutsdb?status.svg)](https://godoc.org/github.com/nutsdb/nutsdb)  [![Go Report Card](https://goreportcard.com/badge/github.com/nutsdb/nutsdb)](https://goreportcard.com/report/github.com/nutsdb/nutsdb)  [![Go](https://github.com/nutsdb/nutsdb/workflows/Go/badge.svg?branch=master)](https://github.com/nutsdb/nutsdb/actions) [![Coverage Status](https://coveralls.io/repos/github/nutsdb/nutsdb/badge.svg?branch=master)](https://coveralls.io/github/nutsdb/nutsdb?branch=master) [![License](http://img.shields.io/badge/license-Apache_2-blue.svg?style=flat-square)](https://raw.githubusercontent.com/nutsdb/nutsdb/master/LICENSE) [![Mentioned in Awesome Go](https://awesome.re/mentioned-badge.svg)](https://github.com/avelino/awesome-go#database)  
+# NutsDB [![GoDoc](https://godoc.org/github.com/nutsdb/nutsdb?status.svg)](https://godoc.org/github.com/nutsdb/nutsdb)  [![Go Report Card](https://goreportcard.com/badge/github.com/nutsdb/nutsdb)](https://goreportcard.com/report/github.com/nutsdb/nutsdb)  [![Go](https://github.com/nutsdb/nutsdb/workflows/Go/badge.svg?branch=master)](https://github.com/nutsdb/nutsdb/actions) [![codecov](https://codecov.io/gh/nutsdb/nutsdb/branch/master/graph/badge.svg?token=CupujOXpbe)](https://codecov.io/gh/nutsdb/nutsdb) [![License](http://img.shields.io/badge/license-Apache_2-blue.svg?style=flat-square)](https://raw.githubusercontent.com/nutsdb/nutsdb/master/LICENSE) [![Mentioned in Awesome Go](https://awesome.re/mentioned-badge.svg)](https://github.com/avelino/awesome-go#database)  
 
 [English](https://github.com/nutsdb/nutsdb/blob/master/README.md) | 简体中文
 
