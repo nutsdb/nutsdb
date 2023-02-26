@@ -130,3 +130,28 @@
 * [Bug Fix] it.current may be nil when options.Reverse is false (#234) @xujiajun
 * [Refactor] changing the lock to be one of property of the structure can make the code more readable.(#228) @elliotchenzichang
 * [New Feature] add buffer size of recovery reader as param (#230) @elliotchenzichang
+
+## v0.12.0（2023-02-26）
+* [New Feature] feat:support ttl function for list (feat:support ttl function for list #263) @xuyukeviki
+* [Bug Fix] fix: panic: db.buildIndexes error: unexpected EOF issue (panic: db.buildIndexes error: unexpected EOF #244) @xujiajun
+* [Bug Fix] issue NewIterator with Reverse=true stop at 28 records #250 :: Andrew :: bug fixed (issue #250 :: Andrew :: bug fixed #266) @andrewhzy
+* [Bug Fix] Fix issues LIST "start or end error" after deleting the last item from list  #280: LIST "start or end error" after deleting the last item Fix issues #280: LIST "start or end error" after deleting the last item #282 @ShawnHXH
+* [Performance] Use file recovery in merge (Use file recovery in merge #259) @elliotchenzichang
+* [Performance] perf(read): reduce one read I/O perf(read): reduce one read I/O #271 @lugosix
+* [Refactor] add options function of BufferSizeOfRecovery (add options function of BufferSizeOfRecovery #236) @elliotchenzichang
+* [Refactor] add fd release logic to file recovery reader (add fd release logic to file recovery reader #242 ) @elliotchenzichang
+* [Refactor] rebuild parse meta func (rebuild parse meta func #243 ) @elliotchenzichang
+* [Refactor] change the xujiajun/nutsdb -> nutsdb/nutsdb change the xujiajun/nutsdb -> nutsdb/nutsdb #281 @elliotchenzichang
+* [Refactor] Update doc Update doc #285 @elliotchenzichang
+* [Refactor] Fix verify logic Fix verify logic #286 @elliotchenzichang
+* [Refactor] fix: issue (Error description problem about IsPrefixSearchScan #288) fix: issue (#288) #289 @CodePrometheus
+* [Refactor] docs: fix typo( docs: fix typo #252) @icpd
+* [Refactor] fix a typo in code fix a typo #291 @elliotchenzichang
+* [UnitTest] Adding a test of readEntry() and refacting readEntry() (Adding a test of readEntry() and refacting readEntry() #237 ) @wangxuanni
+* [UnitTest] test coverage improvement (fix: issue (#213) #214 ) @andrewhzy
+* [UnitTest] adding a test for IsKeyEmpty func in github.com/xujiajun/nutsdb/errors.go:26 (adding a test for IsKeyEmpty func in github.com/xujiajun/nutsdb/errors.go:26: #265) @lyr-2000
+* [UnitTest] Add test for SetKeyPosMap in nutsdb/bptree.go (Add test for SetKeyPosMap in nutsdb/bptree.go #268) @ShawnHXH
+* [UnitTest] Add test for ToBinary in bptree.go Add test for ToBinary in bptree.go #272 @ShawnHXH
+* [UnitTest] Add test for bucket in errors.go Add test for bucket in errors.go #278 @ShawnHXH
+* [UnitTest] add test for rwmanger_mmap.Release add test for rwmanger_mmap.Release #283 @vegetabledogdog
+* [UnitTest] test: add tests for IsDBClosed, IsPrefixScan and IsPrefixSearchScan test: add tests for IsDBClosed, IsPrefixScan and IsPrefixSearchScan #290 @CodePrometheus
