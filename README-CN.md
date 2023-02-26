@@ -14,6 +14,10 @@ NutsDB支持事务，从v0.2.0之后的版本开始支持ACID的特性，建议�
 ### 加群
 欢迎对NutsDB感兴趣的加群、一起开发，具体看这个issue：https://github.com/nutsdb/nutsdb/issues/116
 
+### 关注nutsdb公众号
+ <img src="https://user-images.githubusercontent.com/6065007/221391600-4f53e966-c376-426e-9dec-27364a0704d1.png"   height = "300" alt="nutsdb公众号" align=center />
+
+
 ### 公告
 * v0.12.0 release, 详情见：https://github.com/nutsdb/nutsdb/issues/293
 * v0.11.0 release, 详情见： https://github.com/nutsdb/nutsdb/issues/219
