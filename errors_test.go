@@ -2,6 +2,7 @@ package nutsdb
 
 import (
 	"fmt"
+	"github.com/stretchr/testify/require"
 	"testing"
 
 	"github.com/pkg/errors"
@@ -113,4 +114,109 @@ func TestIsBucketEmpty(t *testing.T) {
 
 		assert.Equal(t, tc.want, got)
 	}
+}
+
+func TestIsDBClosed(t *testing.T) {
+	InitOpt("", true)
+	bucket := "test_closed"
+	key := []byte("foo")
+	val := []byte("bar")
+	db, err = Open(opt)
+
+	t.Run("db can be used before closed", func(t *testing.T) {
+		err = db.Update(
+			func(tx *Tx) error {
+				return tx.Put(bucket, key, val, Persistent)
+			})
+		require.NoError(t, err)
+	})
+	assert.NoError(t, db.Close())
+
+	t.Run("db can't be used after closed", func(t *testing.T) {
+		err = db.Update(
+			func(tx *Tx) error {
+				return tx.Put(bucket, key, val, Persistent)
+			})
+		got := IsDBClosed(err)
+		assert.Equal(t, true, got)
+	})
+}
+
+func TestIsPrefixScan(t *testing.T) {
+	bucket := "test_prefix_scan"
+	t.Run("if prefix scanning not found the result return true", func(t *testing.T) {
+		withDefaultDB(t, func(t *testing.T, db *DB) {
+			{
+				tx, err := db.Begin(true)
+				require.NoError(t, err)
+				for i := 0; i <= 10; i++ {
+					key := []byte("key_" + fmt.Sprintf("%07d", i))
+					val := []byte("val" + fmt.Sprintf("%07d", i))
+					err = tx.Put(bucket, key, val, Persistent)
+					assert.NoError(t, err)
+				}
+				assert.NoError(t, tx.Commit())
+			}
+			{
+				tx, err = db.Begin(false)
+				require.NoError(t, err)
+				prefix := []byte("key_")
+				es, _, err := tx.PrefixScan(bucket, prefix, 0, 10)
+				assert.NoError(t, tx.Commit())
+				assert.NotEmpty(t, es)
+				got := IsPrefixScan(err)
+				assert.Equal(t, false, got)
+			}
+			{
+				tx, err = db.Begin(false)
+				require.NoError(t, err)
+				prefix := []byte("foo_")
+				es, _, err := tx.PrefixScan(bucket, prefix, 0, 10)
+				assert.NoError(t, tx.Commit())
+				assert.Empty(t, es)
+				got := IsPrefixScan(err)
+				assert.Equal(t, true, got)
+			}
+		})
+	})
+}
+
+func TestIsPrefixSearchScan(t *testing.T) {
+	regs := "(.+)"
+	bucket := "test_prefix_search_scan"
+	t.Run("if prefix and search scanning not found the result return true", func(t *testing.T) {
+		withDefaultDB(t, func(t *testing.T, db *DB) {
+			{
+				tx, err := db.Begin(true)
+				require.NoError(t, err)
+				for i := 0; i <= 10; i++ {
+					key := []byte("key_" + fmt.Sprintf("%07d", i))
+					val := []byte("val" + fmt.Sprintf("%07d", i))
+					err = tx.Put(bucket, key, val, Persistent)
+					assert.NoError(t, err)
+				}
+				assert.NoError(t, tx.Commit())
+			}
+			{
+				tx, err = db.Begin(false)
+				require.NoError(t, err)
+				prefix := []byte("key_")
+				es, _, err := tx.PrefixSearchScan(bucket, prefix, regs, 0, 10)
+				assert.NoError(t, tx.Commit())
+				assert.NotEmpty(t, es)
+				got := IsPrefixSearchScan(err)
+				assert.Equal(t, false, got)
+			}
+			{
+				tx, err = db.Begin(false)
+				require.NoError(t, err)
+				prefix := []byte("foo_")
+				es, _, err := tx.PrefixSearchScan(bucket, prefix, regs, 0, 10)
+				assert.NoError(t, tx.Commit())
+				assert.Empty(t, es)
+				got := IsPrefixSearchScan(err)
+				assert.Equal(t, true, got)
+			}
+		})
+	})
 }
