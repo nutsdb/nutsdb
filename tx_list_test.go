@@ -721,10 +721,7 @@ func TestTx_ExpireList(t *testing.T) {
 	if err != nil {
 		t.Error("TestTx_ExpireList err")
 	}
-	err = tx.ExpireList(bucket, key, 1)
-	if err != nil {
-		t.Error("TestTx_ExpireList err")
-	}
+	tx.ExpireList(bucket, string(key), 1)
 	tx.Commit()
 
 	time.Sleep(time.Second)
@@ -743,10 +740,7 @@ func TestTx_ExpireList(t *testing.T) {
 	tx.Commit()
 
 	tx, _ = db.Begin(true)
-	err = tx.ExpireList(bucket, key, Persistent)
-	if err != nil {
-		t.Error("TestTx_ExpireList err")
-	}
+	tx.ExpireList(bucket, string(key), Persistent)
 	tx.Commit()
 
 	time.Sleep(time.Second)

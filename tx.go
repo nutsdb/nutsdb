@@ -74,6 +74,13 @@ type Tx struct {
 	writable               bool
 	pendingWrites          []*Entry
 	ReservedStoreTxIDIdxes map[int64]*BPTree
+	ListTTL                map[string]TTL
+}
+
+// TTL represent the key which will bind a ttl
+type TTL struct {
+	key string
+	ttl uint32
 }
 
 // Begin opens a new transaction.
@@ -107,9 +114,10 @@ func newTx(db *DB, writable bool) (tx *Tx, err error) {
 		writable:               writable,
 		pendingWrites:          []*Entry{},
 		ReservedStoreTxIDIdxes: make(map[int64]*BPTree),
+		ListTTL:                make(map[string]TTL),
 	}
-
 	txID, err = tx.getTxID()
+	db.TxMap[txID] = tx
 	if err != nil {
 		return nil, err
 	}
@@ -150,6 +158,13 @@ func (tx *Tx) Commit() error {
 
 	if tx.db == nil {
 		return ErrDBClosed
+	}
+
+	for bucket, t := range tx.ListTTL {
+		err := tx.db.ExpireList(tx.id, bucket, t.key, t.ttl)
+		if err != nil {
+			return err
+		}
 	}
 
 	writesLen := len(tx.pendingWrites)
@@ -467,11 +482,6 @@ func (tx *Tx) buildListIdx(bucket string, entry *Entry) {
 		return
 	}
 	switch entry.Meta.Flag {
-	case DataExpireListFlag:
-		t, _ := strconv2.StrToInt64(string(value))
-		ttl := uint32(t)
-		tx.db.ListIdx[bucket].TTL[string(key)] = ttl
-		tx.db.ListIdx[bucket].TimeStamp[string(key)] = entry.Meta.Timestamp
 	case DataLPushFlag:
 		_, _ = tx.db.ListIdx[bucket].LPush(string(key), value)
 	case DataRPushFlag:

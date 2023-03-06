@@ -18,7 +18,6 @@ import (
 	"bytes"
 	"errors"
 	"github.com/xujiajun/utils/math2"
-	"time"
 )
 
 var (
@@ -37,27 +36,25 @@ var (
 
 // List represents the list.
 type List struct {
-	Items     map[string][][]byte
-	TTL       map[string]uint32
-	TimeStamp map[string]uint64
+	Items map[string][][]byte
 }
 
 // New returns a newly initialized List Object that implements the List.
 func New() *List {
 	return &List{
-		Items:     make(map[string][][]byte),
-		TTL:       make(map[string]uint32),
-		TimeStamp: make(map[string]uint64),
+		Items: make(map[string][][]byte),
 	}
 }
 
 // RPop removes and returns the last element of the list stored at key.
 func (l *List) RPop(key string) (item []byte, err error) {
+
 	var size int
 	item, size, err = l.RPeek(key)
 	if err != nil {
 		return
 	}
+
 	l.Items[key] = append(l.Items[key][:0:0], l.Items[key][0:size-1]...)
 
 	return
@@ -65,14 +62,14 @@ func (l *List) RPop(key string) (item []byte, err error) {
 
 // RPeek returns the last element of the list stored at key.
 func (l *List) RPeek(key string) (item []byte, size int, err error) {
-	if l.IsExpire(key) {
-		return nil, 0, ErrListNotFound
-	}
+
 	if _, ok := l.Items[key]; !ok {
 		return nil, 0, ErrListNotFound
 	}
 	size, _ = l.Size(key)
+
 	if size > 0 {
+
 		item = l.Items[key][size-1:][0]
 		return
 	}
@@ -82,19 +79,13 @@ func (l *List) RPeek(key string) (item []byte, size int, err error) {
 
 // RPush inserts all the specified values at the tail of the list stored at key.
 func (l *List) RPush(key string, values ...[]byte) (size int, err error) {
-	if l.IsExpire(key) {
-		return 0, ErrListNotFound
-	}
-
 	l.Items[key] = append(l.Items[key], values...)
+
 	return l.Size(key)
 }
 
 // LPush inserts all the specified values at the head of the list stored at key.
 func (l *List) LPush(key string, values ...[]byte) (size int, err error) {
-	if l.IsExpire(key) {
-		return 0, ErrListNotFound
-	}
 
 	size, _ = l.Size(key)
 
@@ -106,6 +97,7 @@ func (l *List) LPush(key string, values ...[]byte) (size int, err error) {
 	var i, j int
 
 	j = valueLen
+
 	for i = 1; i <= size; i++ {
 		if i-1 < size {
 			newList[j] = l.Items[key][i-1]
@@ -125,9 +117,7 @@ func (l *List) LPush(key string, values ...[]byte) (size int, err error) {
 
 // LPop removes and returns the first element of the list stored at key.
 func (l *List) LPop(key string) (item []byte, err error) {
-	if l.IsExpire(key) {
-		return nil, ErrListNotFound
-	}
+
 	item, err = l.LPeek(key)
 	if err != nil {
 		return
@@ -143,14 +133,13 @@ func (l *List) LPop(key string) (item []byte, err error) {
 
 // LPeek returns the first element of the list stored at key.
 func (l *List) LPeek(key string) (item []byte, err error) {
-	if l.IsExpire(key) {
-		return nil, ErrListNotFound
-	}
+
 	if _, ok := l.Items[key]; !ok {
 		return nil, ErrListNotFound
 	}
 
 	if size, _ := l.Size(key); size > 0 {
+
 		item = l.Items[key][0]
 		return
 	}
@@ -160,9 +149,6 @@ func (l *List) LPeek(key string) (item []byte, err error) {
 
 // Size returns the size of the list at given key.
 func (l *List) Size(key string) (int, error) {
-	if l.IsExpire(key) {
-		return 0, ErrListNotFound
-	}
 	if _, ok := l.Items[key]; !ok {
 		return 0, ErrListNotFound
 	}
@@ -209,15 +195,13 @@ func (l *List) LRange(key string, start, end int) (list [][]byte, err error) {
 // count < 0: Remove elements equal to value moving from tail to head.
 // count = 0: Remove all elements equal to value.
 func (l *List) LRem(key string, count int, value []byte) (int, error) {
-	if l.IsExpire(key) {
-		return 0, ErrListNotFound
-	}
 	if _, ok := l.Items[key]; !ok {
 		return 0, ErrListNotFound
 	}
 	size, _ := l.Size(key)
 
 	needRemovedNum, err := l.LRemNum(key, count, value)
+
 	if err != nil {
 		return 0, err
 	}
@@ -274,9 +258,6 @@ func (l *List) LRem(key string, count int, value []byte) (int, error) {
 }
 
 func (l *List) LRemNum(key string, count int, value []byte) (int, error) {
-	if l.IsExpire(key) {
-		return 0, ErrListNotFound
-	}
 	if _, ok := l.Items[key]; !ok {
 		return 0, ErrListNotFound
 	}
@@ -312,9 +293,6 @@ func (l *List) LRemNum(key string, count int, value []byte) (int, error) {
 
 // LSet sets the list element at index to value.
 func (l *List) LSet(key string, index int, value []byte) error {
-	if l.IsExpire(key) {
-		return ErrListNotFound
-	}
 	if _, ok := l.Items[key]; !ok {
 		return ErrListNotFound
 	}
@@ -331,14 +309,13 @@ func (l *List) LSet(key string, index int, value []byte) error {
 
 // Ltrim trim an existing list so that it will contain only the specified range of elements specified.
 func (l *List) Ltrim(key string, start, end int) error {
-	if l.IsExpire(key) {
-		return ErrListNotFound
-	}
+
 	if _, ok := l.Items[key]; !ok {
 		return ErrListNotFound
 	}
 
 	newItems, err := l.LRange(key, start, end)
+
 	if err != nil {
 		return err
 	}
@@ -350,9 +327,6 @@ func (l *List) Ltrim(key string, start, end int) error {
 
 // LRemByIndex remove the list element at specified index
 func (l *List) LRemByIndex(key string, indexes []int) (int, error) {
-	if l.IsExpire(key) {
-		return 0, ErrListNotFound
-	}
 	removedNum := 0
 	if _, ok := l.Items[key]; !ok {
 		return 0, ErrListNotFound
@@ -386,9 +360,6 @@ func (l *List) LRemByIndex(key string, indexes []int) (int, error) {
 
 // LRemByIndexPreCheck count the number of valid indexes
 func (l *List) LRemByIndexPreCheck(key string, indexes []int) (int, error) {
-	if l.IsExpire(key) {
-		return 0, ErrListNotFound
-	}
 	removedNum := 0
 	if _, ok := l.Items[key]; !ok {
 		return 0, ErrListNotFound
@@ -411,25 +382,6 @@ func (l *List) LRemByIndexPreCheck(key string, indexes []int) (int, error) {
 		preIndex = index
 	}
 	return removedNum, nil
-}
-
-func (l *List) IsExpire(key string) bool {
-	if l == nil {
-		return false
-	}
-	_, ok := l.TTL[key]
-	if !ok {
-		return false
-	}
-	now := time.Now().Unix()
-	timestamp := l.TimeStamp[key]
-	if l.TTL[key] > 0 && uint64(l.TTL[key])+timestamp > uint64(now) || l.TTL[key] == uint32(0) {
-		return false
-	}
-	delete(l.Items, key)
-	delete(l.TTL, key)
-	delete(l.TimeStamp, key)
-	return true
 }
 
 func (l *List) IsEmpty(key string) (bool, error) {

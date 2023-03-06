@@ -17,6 +17,7 @@ package nutsdb
 import (
 	"errors"
 	"fmt"
+	"github.com/RussellLuo/timingwheel"
 	"io"
 	"io/ioutil"
 	"os"
@@ -25,6 +26,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/nutsdb/nutsdb/ds/list"
 	"github.com/nutsdb/nutsdb/ds/set"
@@ -110,9 +112,6 @@ const (
 
 	// LRemByIndex represents the data LRemByIndex flag
 	DataLRemByIndex
-
-	// DataListBucketDeleteFlag represents that set ttl for the list
-	DataExpireListFlag
 )
 
 const (
@@ -166,7 +165,9 @@ type (
 		KeyCount                int // total key number ,include expired, deleted, repeated.
 		closed                  bool
 		isMerging               bool
+		tw                      timingwheel.TimingWheel
 		fm                      *fileManager
+		TxMap                   map[uint64]*Tx
 	}
 
 	// BPTreeIdx represents the B+ tree index
@@ -204,7 +205,9 @@ func open(opt Options) (*DB, error) {
 		BPTreeKeyEntryPosMap:    make(map[string]int64),
 		bucketMetas:             make(map[string]*BucketMeta),
 		ActiveCommittedTxIdsIdx: NewTree(),
+		tw:                      *timingwheel.NewTimingWheel(time.Second, opt.TimeWheelSize),
 		fm:                      newFileManager(opt.RWMode, opt.MaxFdNumsInCache, opt.CleanFdsCacheThreshold),
+		TxMap:                   make(map[uint64]*Tx),
 	}
 
 	if ok := filesystem.PathIsExist(db.opt.Dir); !ok {
@@ -896,14 +899,6 @@ func (db *DB) buildListIdx(bucket string, r *Record) error {
 		return nil
 	}
 	switch r.H.Meta.Flag {
-	case DataExpireListFlag:
-		t, err := strconv2.StrToInt64(string(r.E.Value))
-		if err != nil {
-			return err
-		}
-		ttl := uint32(t)
-		db.ListIdx[bucket].TTL[string(r.E.Key)] = ttl
-		db.ListIdx[bucket].TimeStamp[string(r.E.Key)] = r.E.Meta.Timestamp
 	case DataLPushFlag:
 		_, _ = db.ListIdx[bucket].LPush(string(r.E.Key), r.E.Value)
 	case DataRPushFlag:
@@ -1103,7 +1098,6 @@ func (db *DB) getPendingMergeEntries(entry *Entry, pendingMergeEntries []*Entry)
 		//check the key of list is expired or not
 		//if expired, it will clear the items of index
 		//so that nutsdb can clear entry of expiring list in the function getPendingMergeEntries
-		db.checkListExpired()
 		listIdx, exist := db.ListIdx[string(entry.Meta.Bucket)]
 		if exist {
 			items, _ := listIdx.LRange(string(entry.Key), 0, -1)
@@ -1182,11 +1176,31 @@ func (db *DB) getRecordFromKey(bucket, key []byte) (record *Record, err error) {
 	return idx.Find(key)
 }
 
-func (db *DB) checkListExpired() {
-	listIdx := db.ListIdx
-	for bucket := range listIdx {
-		for key := range listIdx[bucket].TTL {
-			listIdx[bucket].IsExpire(key)
-		}
+func (db *DB) ExpireList(txId uint64, bucket string, key string, ttl uint32) error {
+	if ttl == Persistent {
+		return nil
 	}
+	tx := db.TxMap[txId]
+	if err := tx.checkTxIsClosed(); err != nil {
+		return err
+	}
+	if _, ok := tx.db.ListIdx[bucket]; !ok {
+		return ErrBucket
+	}
+	t, _ := time.ParseDuration(strconv2.IntToStr(int(ttl)))
+	tx.db.tw.AfterFunc(t*time.Second, func() {
+		l, exist := db.ListIdx[bucket]
+		if !exist {
+			return
+		}
+		db.mu.Lock()
+		defer db.mu.Unlock()
+		_, exist = l.Items[key]
+		if !exist {
+			return
+		}
+		_ = tx.push(bucket, []byte(key), DataDeleteFlag)
+		delete(l.Items, key)
+	})
+	return nil
 }

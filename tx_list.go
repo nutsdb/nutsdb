@@ -53,10 +53,6 @@ func (tx *Tx) RPeek(bucket string, key []byte) (item []byte, err error) {
 		return nil, ErrBucket
 	}
 
-	if tx.CheckExpire(bucket, key) {
-		return nil, ErrKeyNotFound
-	}
-
 	item, _, err = tx.db.ListIdx[bucket].RPeek(string(key))
 
 	return
@@ -79,9 +75,7 @@ func (tx *Tx) RPush(bucket string, key []byte, values ...[]byte) error {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return err
 	}
-	if tx.CheckExpire(bucket, key) {
-		return ErrKeyNotFound
-	}
+
 	if strings.Contains(string(key), SeparatorForListKey) {
 		return ErrSeparatorForListKey
 	}
@@ -93,9 +87,6 @@ func (tx *Tx) RPush(bucket string, key []byte, values ...[]byte) error {
 func (tx *Tx) LPush(bucket string, key []byte, values ...[]byte) error {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return err
-	}
-	if tx.CheckExpire(bucket, key) {
-		return ErrKeyNotFound
 	}
 
 	if strings.Contains(string(key), SeparatorForListKey) {
@@ -123,9 +114,6 @@ func (tx *Tx) LPeek(bucket string, key []byte) (item []byte, err error) {
 	if _, ok := tx.db.ListIdx[bucket]; !ok {
 		return nil, ErrBucket
 	}
-	if tx.CheckExpire(bucket, key) {
-		return nil, ErrKeyNotFound
-	}
 	item, err = tx.db.ListIdx[bucket].LPeek(string(key))
 
 	return
@@ -138,9 +126,6 @@ func (tx *Tx) LSize(bucket string, key []byte) (int, error) {
 	}
 	if _, ok := tx.db.ListIdx[bucket]; !ok {
 		return 0, ErrBucket
-	}
-	if tx.CheckExpire(bucket, key) {
-		return 0, ErrKeyNotFound
 	}
 	return tx.db.ListIdx[bucket].Size(string(key))
 }
@@ -156,9 +141,6 @@ func (tx *Tx) LRange(bucket string, key []byte, start, end int) (list [][]byte, 
 	}
 	if _, ok := tx.db.ListIdx[bucket]; !ok {
 		return nil, ErrBucket
-	}
-	if tx.CheckExpire(bucket, key) {
-		return nil, ErrKeyNotFound
 	}
 	return tx.db.ListIdx[bucket].LRange(string(key), start, end)
 }
@@ -209,9 +191,6 @@ func (tx *Tx) LSet(bucket string, key []byte, index int, value []byte) error {
 	if _, ok := tx.db.ListIdx[bucket]; !ok {
 		return ErrBucket
 	}
-	if tx.CheckExpire(bucket, key) {
-		return ErrKeyNotFound
-	}
 	if _, ok := tx.db.ListIdx[bucket].Items[string(key)]; !ok {
 		return ErrKeyNotFound
 	}
@@ -249,9 +228,6 @@ func (tx *Tx) LTrim(bucket string, key []byte, start, end int) error {
 		return ErrBucket
 	}
 
-	if tx.CheckExpire(bucket, key) {
-		return ErrKeyNotFound
-	}
 	if _, ok := tx.db.ListIdx[bucket].Items[string(key)]; !ok {
 		return ErrKeyNotFound
 	}
@@ -275,9 +251,6 @@ func (tx *Tx) LRemByIndex(bucket string, key []byte, indexes ...int) (removedNum
 	}
 	if _, ok := tx.db.ListIdx[bucket]; !ok {
 		return 0, ErrBucket
-	}
-	if tx.CheckExpire(bucket, key) {
-		return 0, ErrKeyNotFound
 	}
 	sort.Ints(indexes)
 	removedNum, err = tx.db.ListIdx[bucket].LRemByIndexPreCheck(string(key), indexes)
@@ -304,9 +277,6 @@ func (tx *Tx) LKeys(bucket, pattern string, f func(key string) bool) error {
 		return ErrBucket
 	}
 	for key := range tx.db.ListIdx[bucket].Items {
-		if tx.CheckExpire(bucket, []byte(key)) {
-			continue
-		}
 		if end, err := MatchForRange(pattern, key, f); end || err != nil {
 			return err
 		}
@@ -314,27 +284,7 @@ func (tx *Tx) LKeys(bucket, pattern string, f func(key string) bool) error {
 	return nil
 }
 
-func (tx *Tx) ExpireList(bucket string, key []byte, ttl uint32) error {
-	if err := tx.checkTxIsClosed(); err != nil {
-		return err
-	}
-	if _, ok := tx.db.ListIdx[bucket]; !ok {
-		return ErrBucket
-	}
-	tx.db.ListIdx[bucket].TTL[string(key)] = ttl
-	tx.db.ListIdx[bucket].TimeStamp[string(key)] = uint64(time.Now().Unix())
-	ttls := strconv2.Int64ToStr(int64(ttl))
-	err := tx.push(bucket, key, DataExpireListFlag, []byte(ttls))
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (tx *Tx) CheckExpire(bucket string, key []byte) bool {
-	if tx.db.ListIdx[bucket].IsExpire(string(key)) {
-		_ = tx.push(bucket, key, DataDeleteFlag)
-		return true
-	}
-	return false
+func (tx *Tx) ExpireList(bucket string, key string, ttl uint32) {
+	t := TTL{key: key, ttl: ttl}
+	tx.ListTTL[bucket] = t
 }

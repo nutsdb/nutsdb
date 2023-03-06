@@ -30,6 +30,7 @@ const (
 
 // Options records params for creating DB object.
 type Options struct {
+	TimeWheelSize int64
 	// Dir represents Open the database located in which dir.
 	Dir string
 
@@ -78,11 +79,12 @@ var defaultSegmentSize int64 = 256 * MB
 // DefaultOptions represents the default options.
 var DefaultOptions = func() Options {
 	return Options{
-		EntryIdxMode: HintKeyValAndRAMIdxMode,
-		SegmentSize:  defaultSegmentSize,
-		NodeNum:      1,
-		RWMode:       FileIO,
-		SyncEnable:   true,
+		TimeWheelSize: 200,
+		EntryIdxMode:  HintKeyValAndRAMIdxMode,
+		SegmentSize:   defaultSegmentSize,
+		NodeNum:       1,
+		RWMode:        FileIO,
+		SyncEnable:    true,
 	}
 }()
 
