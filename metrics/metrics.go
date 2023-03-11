@@ -1,7 +1,6 @@
 package metrics
 
 import (
-	"errors"
 	"fmt"
 	"sort"
 	"sync"
@@ -13,8 +12,8 @@ type (
 	}
 	ValidMetrics interface {
 		Metrics
-		UpdateValid(change []int) error
-		UpdateInvalid(change []int) error
+		UpdateValid(change ...int) error
+		UpdateInvalid(change ...int) error
 	}
 	FileMetrics struct {
 		ValidEntries   int32
@@ -31,7 +30,7 @@ var (
 )
 
 func ErrTooManyOrTooLessArgs(expect, actual int) error {
-	return errors.New(fmt.Sprintf("too many or too less args, expect: %d, actual: %d", expect, actual))
+	return fmt.Errorf("too many or too less args, expect: %d, actual: %d", expect, actual)
 }
 
 func Init()                        { once.Do(func() { dbfm = make(dbFileMetrics) }) }
