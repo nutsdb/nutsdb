@@ -20,7 +20,7 @@ func TestDeleteMetrics(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			DeleteMetrics(tt.args.fd)
+			DeleteFileMetrics(tt.args.fd)
 		})
 	}
 }
@@ -28,8 +28,8 @@ func TestDeleteMetrics(t *testing.T) {
 func TestGetMetrics(t *testing.T) {
 	Init()
 	reset()
-	PutMetrics(1, &FileMetrics{1, 1, 1, 1})
-	PutMetrics(2, &FileMetrics{2, 2, 2, 2})
+	PutFileMetrics(1, &FileMetrics{1, 1, 1, 1})
+	PutFileMetrics(2, &FileMetrics{2, 2, 2, 2})
 	type args struct {
 		fd int
 	}
@@ -45,12 +45,12 @@ func TestGetMetrics(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotM, gotOk := GetMetrics(tt.args.fd)
+			gotM, gotOk := GetFileMetrics(tt.args.fd)
 			if !reflect.DeepEqual(gotM, tt.wantM) {
-				t.Errorf("GetMetrics() gotM = %v, want %v", gotM, tt.wantM)
+				t.Errorf("GetFileMetrics() gotM = %v, want %v", gotM, tt.wantM)
 			}
 			if gotOk != tt.wantOk {
-				t.Errorf("GetMetrics() gotOk = %v, want %v", gotOk, tt.wantOk)
+				t.Errorf("GetFileMetrics() gotOk = %v, want %v", gotOk, tt.wantOk)
 			}
 		})
 	}
@@ -87,7 +87,7 @@ func TestPutMetrics(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			PutMetrics(tt.args.fd, tt.args.m)
+			PutFileMetrics(tt.args.fd, tt.args.m)
 		})
 	}
 }
@@ -98,9 +98,9 @@ func TestGetFDsExceedThreshold(t *testing.T) {
 	if gotFds := GetFDsExceedThreshold(.2); gotFds != nil {
 		t.Errorf("GetFDsExceedThreshold() = %v, want %v", gotFds, nil)
 	}
-	PutMetrics(0, &FileMetrics{8, 2, 70, 30})
-	PutMetrics(1, &FileMetrics{9, 1, 81, 19})
-	PutMetrics(2, &FileMetrics{9, 1, 77, 23})
+	PutFileMetrics(0, &FileMetrics{8, 2, 70, 30})
+	PutFileMetrics(1, &FileMetrics{9, 1, 81, 19})
+	PutFileMetrics(2, &FileMetrics{9, 1, 77, 23})
 	type args struct {
 		threshold float64
 	}
@@ -123,10 +123,10 @@ func TestGetFDsExceedThreshold(t *testing.T) {
 func TestCountMetrics(t *testing.T) {
 	Init()
 	reset()
-	PutMetrics(0, &FileMetrics{8, 2, 70, 30})
-	PutMetrics(1, &FileMetrics{9, 1, 81, 19})
-	PutMetrics(2, &FileMetrics{9, 1, 77, 23})
-	DeleteMetrics(0)
+	PutFileMetrics(0, &FileMetrics{8, 2, 70, 30})
+	PutFileMetrics(1, &FileMetrics{9, 1, 81, 19})
+	PutFileMetrics(2, &FileMetrics{9, 1, 77, 23})
+	DeleteFileMetrics(0)
 	tests := []struct {
 		name string
 		want int
@@ -135,8 +135,35 @@ func TestCountMetrics(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := CountMetrics(); got != tt.want {
-				t.Errorf("CountMetrics() = %v, want %v", got, tt.want)
+			if got := CountFileMetrics(); got != tt.want {
+				t.Errorf("CountFileMetrics() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestUpdateFileMetrics(t *testing.T) {
+	Init()
+	reset()
+	PutFileMetrics(0, &FileMetrics{8, 2, 70, 30})
+	PutFileMetrics(1, &FileMetrics{9, 1, 81, 19})
+	PutFileMetrics(2, &FileMetrics{9, 1, 77, 23})
+	type args struct {
+		fd     int
+		change *FileMetrics
+	}
+	tests := []struct {
+		name   string
+		args   args
+		wantFM *FileMetrics
+	}{
+		{"", args{1, &FileMetrics{1, 1, 1, 1}}, &FileMetrics{10, 2, 82, 20}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			UpdateFileMetrics(tt.args.fd, tt.args.change)
+			if fm, _ := GetFileMetrics(tt.args.fd); !reflect.DeepEqual(fm, tt.wantFM) {
+				t.Errorf("get  %v, want %v", fm, tt.wantFM)
 			}
 		})
 	}
