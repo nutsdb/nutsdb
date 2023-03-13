@@ -20,12 +20,35 @@ var (
 	dbfm dbFileMetrics
 )
 
-func Init()  { once.Do(func() { dbfm = make(dbFileMetrics) }) }
-func reset() { dbfm = make(dbFileMetrics) }
+func Init() {
+	once.Do(
+		func() {
+			dbfm = make(dbFileMetrics)
+		},
+	)
+}
 
-func DeleteMetrics(fd int)                   { delete(dbfm, int32(fd)) }
-func PutMetrics(fd int, m *FileMetrics)      { dbfm[int32(fd)] = *m }
-func GetMetrics(fd int) (*FileMetrics, bool) { m, ok := dbfm[int32(fd)]; return &m, ok }
+func reset() {
+	dbfm = make(dbFileMetrics)
+}
+
+func DeleteMetrics(fd int) {
+	delete(dbfm, int32(fd))
+}
+
+func PutMetrics(fd int, m *FileMetrics) {
+	dbfm[int32(fd)] = *m
+}
+
+func GetMetrics(fd int) (*FileMetrics, bool) {
+	m, ok := dbfm[int32(fd)]
+	return &m, ok
+}
+
+func CountMetrics() int {
+	return len(dbfm)
+}
+
 func GetFDsExceedThreshold(threshold float64) []int32 {
 	var fds []int32
 	for fd, m := range dbfm {

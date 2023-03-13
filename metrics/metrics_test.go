@@ -119,3 +119,25 @@ func TestGetFDsExceedThreshold(t *testing.T) {
 		})
 	}
 }
+
+func TestCountMetrics(t *testing.T) {
+	Init()
+	reset()
+	PutMetrics(0, &FileMetrics{8, 2, 70, 30})
+	PutMetrics(1, &FileMetrics{9, 1, 81, 19})
+	PutMetrics(2, &FileMetrics{9, 1, 77, 23})
+	DeleteMetrics(0)
+	tests := []struct {
+		name string
+		want int
+	}{
+		{"", 2},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := CountMetrics(); got != tt.want {
+				t.Errorf("CountMetrics() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
