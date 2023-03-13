@@ -37,16 +37,16 @@ func DeleteFileMetrics(fd int) {
 	delete(dbfm, int32(fd))
 }
 
-//PutFileMetrics you can start with an existing FileMetrics via GetFileMetrics,
-//then update it along the way you update the DB entries,
-//then Put it back to dbfm with PutFileMetrics
+// PutFileMetrics you can start with an existing FileMetrics via GetFileMetrics,
+// then update it along the way you update the DB entries,
+// then Put it back to dbfm with PutFileMetrics
 func PutFileMetrics(fd int, m *FileMetrics) {
 	dbfm[int32(fd)] = *m
 }
 
-//UpdateFileMetrics you can start with a new &FileMetrics{0,0,0,0},
-//then update it along the way you update the DB entries,
-//then update it back to dbfm with UpdateFileMetrics
+// UpdateFileMetrics you can start with a new &FileMetrics{0,0,0,0},
+// then update it along the way you update the DB entries,
+// then update it back to dbfm with UpdateFileMetrics
 func UpdateFileMetrics(fd int, change *FileMetrics) {
 	m := dbfm[int32(fd)]
 	m.ValidEntries += change.ValidEntries
