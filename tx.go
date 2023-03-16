@@ -17,7 +17,6 @@ package nutsdb
 import (
 	"bytes"
 	"errors"
-	"math"
 	"os"
 	"strings"
 	"sync"
@@ -179,7 +178,7 @@ func (tx *Tx) Commit() error {
 			return ErrDataSizeExceed
 		}
 
-		if len(entry.Meta.Bucket) > math.MaxUint32 || len(entry.Key) > math.MaxUint32 || len(entry.Value) > math.MaxUint32 {
+		if len(entry.Meta.Bucket) > MAX_SIZE || len(entry.Key) > MAX_SIZE || len(entry.Value) > MAX_SIZE {
 			return ErrDataSizeExceed
 		}
 
