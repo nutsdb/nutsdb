@@ -17,6 +17,7 @@ package nutsdb
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -177,6 +178,47 @@ func TestTx_CommittedStatus(t *testing.T) {
 			txID := entry1.Meta.TxID
 			_, ok := tx.db.committedTxIds[txID]
 			assert.True(t, ok)
+
+			err = tx.Commit()
+			assert.NoError(t, err)
+		}
+	})
+}
+
+func TestTx_PutWithTimestamp(t *testing.T) {
+	withDefaultDB(t, func(t *testing.T, db *DB) {
+		bucket := "bucket_put_with_timestamp"
+
+		timestamps := []uint64{1547707905, 1547707910, uint64(time.Now().Unix())}
+
+		{ // put with timestamp
+			tx, err := db.Begin(true)
+			assert.NoError(t, err)
+			for i, timestamp := range timestamps {
+				key := []byte("key_" + fmt.Sprintf("%03d", i))
+				val := []byte("val_" + fmt.Sprintf("%03d", i))
+
+				err = tx.PutWithTimestamp(bucket, key, val, 0, timestamp)
+				assert.NoError(t, err)
+
+			}
+			err = tx.Commit()
+			assert.NoError(t, err)
+		}
+
+		{ // check timestamp
+			tx, err := db.Begin(false)
+			assert.NoError(t, err)
+
+			for i, timestamp := range timestamps {
+				key := []byte("key_" + fmt.Sprintf("%03d", i))
+
+				entry, err := tx.Get(bucket, key)
+				assert.NoError(t, err)
+
+				assert.Equalf(t, entry.Meta.Timestamp, timestamp, "entry has wrong timestamp")
+
+			}
 
 			err = tx.Commit()
 			assert.NoError(t, err)
