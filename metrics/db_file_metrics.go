@@ -8,7 +8,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-type FileMetrics struct {
+type FileMetric struct {
 	ValidEntries   int32
 	InvalidEntries int32
 	ValidBytes     int64
@@ -16,75 +16,76 @@ type FileMetrics struct {
 }
 
 var (
-	once  sync.Once
-	fmMap map[int32]*FileMetrics
-	lock  sync.Mutex
+	once        sync.Once
+	fileMetrics map[int32]*atomic.Value // hold all the metrics
+	lock        sync.Mutex
 )
 
 func Init() {
 	once.Do(func() {
-		fmMap = make(map[int32]*FileMetrics)
+		fileMetrics = make(map[int32]*atomic.Value)
 	})
 }
 
-// this method is for test case reset the state.
+// this method is for test purpose
 func reset() {
-	fmMap = make(map[int32]*FileMetrics)
+	fileMetrics = make(map[int32]*atomic.Value)
 }
 
 func DeleteFileMetrics(fd int32) {
-	delete(fmMap, fd)
+	lock.Lock()
+	delete(fileMetrics, fd)
+	lock.Unlock()
 }
 
 // UpdateFileMetrics
-// you can start with a new &FileMetrics{0,0,0,0},
-// then update it along the way you update the DB entries,
-// then update it back to fmMap with UpdateFileMetrics.
-func UpdateFileMetrics(fd int32, update *FileMetrics) error {
-	m, ok := fmMap[fd]
-	if !ok {
-		return errors.Errorf("FileMetrics for fd: %d dese not exist, please Initiate it", fd)
+// for a fd, you should start with a new FileMetric{0,0,0,0},
+// then update it along the way you do your business with the DB,
+// then write it back to fileMetrics using this method.
+func UpdateFileMetrics(fd int32, update *FileMetric) error {
+	if _, ok := fileMetrics[fd]; !ok {
+		return errors.Errorf("FileMetric for fd: %d dese not exist, please Initiate it", fd)
 	}
-	atomicUpdateInt32(&m.ValidEntries, update.ValidEntries)
-	atomicUpdateInt32(&m.InvalidEntries, update.InvalidEntries)
-	atomicUpdateInt64(&m.ValidBytes, update.ValidBytes)
-	atomicUpdateInt64(&m.InvalidBytes, update.InvalidBytes)
-	return nil
-}
-
-func atomicUpdateInt32(addr *int32, delta int32) {
-	for old := atomic.LoadInt32(addr); !atomic.CompareAndSwapInt32(addr, old, old+delta); old = atomic.LoadInt32(addr) {
-	}
-}
-
-func atomicUpdateInt64(addr *int64, delta int64) {
-	for old := atomic.LoadInt64(addr); !atomic.CompareAndSwapInt64(addr, old, old+delta); old = atomic.LoadInt64(addr) {
+	for {
+		mOld := fileMetrics[fd].Load().(FileMetric)
+		mNew := FileMetric{
+			mOld.ValidEntries + update.ValidEntries,
+			mOld.InvalidEntries + update.InvalidEntries,
+			mOld.ValidBytes + update.ValidBytes,
+			mOld.InvalidBytes + update.InvalidBytes,
+		}
+		if fileMetrics[fd].CompareAndSwap(mOld, mNew) {
+			return nil
+		}
 	}
 }
 
 func InitFileMetricsForFd(fd int32) {
 	lock.Lock()
-	if _, ok := fmMap[fd]; !ok {
-		fmMap[fd] = &FileMetrics{0, 0, 0, 0}
+	if _, ok := fileMetrics[fd]; !ok {
+		fileMetrics[fd] = &atomic.Value{}
+		fileMetrics[fd].Store(FileMetric{0, 0, 0, 0})
 	}
 	lock.Unlock()
 }
 
-func GetFileMetrics(fd int32) (*FileMetrics, bool) {
-	m, ok := fmMap[fd]
-	if ok {
-		m = &FileMetrics{m.ValidEntries, m.InvalidEntries, m.ValidBytes, m.InvalidBytes}
+func GetFileMetrics(fd int32) (*FileMetric, bool) {
+	if value, ok := fileMetrics[fd]; ok {
+		fm := value.Load().(FileMetric)
+		return &fm, ok
+	} else {
+		return nil, ok
 	}
-	return m, ok
 }
 
 func CountFileMetrics() int {
-	return len(fmMap)
+	return len(fileMetrics)
 }
 
 func GetFDsExceedThreshold(threshold float64) []int32 {
 	var fds []int32
-	for fd, m := range fmMap {
+	for fd, fm := range fileMetrics {
+		m := fm.Load().(FileMetric)
 		ratio1 := float64(m.InvalidEntries) / float64(m.InvalidEntries+m.ValidEntries)
 		ratio2 := float64(m.InvalidBytes) / float64(m.InvalidBytes+m.ValidBytes)
 		if ratio1 >= threshold || ratio2 >= threshold {
