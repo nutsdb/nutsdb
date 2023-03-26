@@ -32,17 +32,21 @@ func reset() {
 	fileMetrics = make(map[int32]*atomic.Value)
 }
 
-func DeleteFileMetrics(fd int32) {
+func DeleteFileMetric(fd int32) (err error) {
 	lock.Lock()
+	if _, ok := fileMetrics[fd]; !ok {
+		err = errors.Errorf("FileMetric for fd: %d dese not exist, please Initiate it", fd)
+	}
 	delete(fileMetrics, fd)
 	lock.Unlock()
+	return err
 }
 
-// UpdateFileMetrics
-// for a fd, you should start with a new FileMetric{0,0,0,0},
-// then update it along the way you do your business with the DB,
-// then write it back to fileMetrics using this method.
-func UpdateFileMetrics(fd int32, update *FileMetric) error {
+// UpdateFileMetric
+// for an existing fd, you should start with a new FileMetric{0,0,0,0},
+// then use it to accumulate the metric updates when you do your business,
+// after committing, update it into fileMetrics using this method.
+func UpdateFileMetric(fd int32, update *FileMetric) error {
 	if _, ok := fileMetrics[fd]; !ok {
 		return errors.Errorf("FileMetric for fd: %d dese not exist, please Initiate it", fd)
 	}
@@ -60,7 +64,7 @@ func UpdateFileMetrics(fd int32, update *FileMetric) error {
 	}
 }
 
-func InitFileMetricsForFd(fd int32) {
+func InitFileMetricForFile(fd int32) {
 	lock.Lock()
 	if _, ok := fileMetrics[fd]; !ok {
 		fileMetrics[fd] = &atomic.Value{}
@@ -69,7 +73,7 @@ func InitFileMetricsForFd(fd int32) {
 	lock.Unlock()
 }
 
-func GetFileMetrics(fd int32) (*FileMetric, bool) {
+func GetFileMetric(fd int32) (*FileMetric, bool) {
 	if value, ok := fileMetrics[fd]; ok {
 		fm := value.Load().(FileMetric)
 		return &fm, ok
