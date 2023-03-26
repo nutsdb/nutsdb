@@ -45,7 +45,7 @@ func DeleteFileMetric(fd int32) (err error) {
 // UpdateFileMetric
 // for an existing fd, you should start with a new FileMetric{0,0,0,0},
 // then use it to accumulate the metric updates when you do your business,
-// after committing, update it into fileMetrics using this method.
+// after committing, update it into the fileMetrics using this method.
 func UpdateFileMetric(fd int32, update *FileMetric) error {
 	if _, ok := fileMetrics[fd]; !ok {
 		return errors.Errorf("FileMetric for fd: %d dese not exist, please Initiate it", fd)
