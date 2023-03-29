@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"reflect"
+	"sync/atomic"
 	"testing"
 )
 
@@ -17,9 +18,10 @@ func TestDeleteMetric(t *testing.T) {
 		{"test", args{3}},
 		{"test", args{4}},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_ = DeleteFileMetric(tt.args.fd)
+			DeleteFileMetric(tt.args.fd)
 		})
 	}
 }
@@ -100,7 +102,7 @@ func TestCountMetrics(t *testing.T) {
 	_ = UpdateFileMetric(0, &FileMetric{8, 2, 70, 30})
 	_ = UpdateFileMetric(1, &FileMetric{9, 1, 81, 19})
 	_ = UpdateFileMetric(2, &FileMetric{9, 1, 77, 23})
-	_ = DeleteFileMetric(0)
+	DeleteFileMetric(0)
 	tests := []struct {
 		name string
 		want int
@@ -109,8 +111,8 @@ func TestCountMetrics(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := CountFileMetrics(); got != tt.want {
-				t.Errorf("CountFileMetrics() = %v, want %v", got, tt.want)
+			if got := GetFileMetricSize(); got != tt.want {
+				t.Errorf("GetFileMetricSize() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -166,4 +168,9 @@ func InitTest() {
 	InitFileMetricForFile(0)
 	InitFileMetricForFile(1)
 	InitFileMetricForFile(2)
+}
+
+// this method is for test purpose
+func reset() {
+	fileMetrics = make(map[int32]*atomic.Value)
 }

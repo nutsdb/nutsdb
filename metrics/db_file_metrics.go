@@ -21,25 +21,18 @@ var (
 	lock        sync.Mutex
 )
 
+var (
+	ErrFileMetricNotExists = errors.New("fileMetric not exits")
+)
+
 func Init() {
 	once.Do(func() {
 		fileMetrics = make(map[int32]*atomic.Value)
 	})
 }
 
-// this method is for test purpose
-func reset() {
-	fileMetrics = make(map[int32]*atomic.Value)
-}
-
-func DeleteFileMetric(fd int32) (err error) {
-	lock.Lock()
-	if _, ok := fileMetrics[fd]; !ok {
-		err = errors.Errorf("FileMetric for fd: %d dese not exist, please Initiate it", fd)
-	}
+func DeleteFileMetric(fd int32) {
 	delete(fileMetrics, fd)
-	lock.Unlock()
-	return err
 }
 
 // UpdateFileMetric
@@ -48,7 +41,7 @@ func DeleteFileMetric(fd int32) (err error) {
 // after committing, update it into the fileMetrics using this method.
 func UpdateFileMetric(fd int32, update *FileMetric) error {
 	if _, ok := fileMetrics[fd]; !ok {
-		return errors.Errorf("FileMetric for fd: %d dese not exist, please Initiate it", fd)
+		return ErrFileMetricNotExists
 	}
 	for {
 		mOld := fileMetrics[fd].Load().(FileMetric)
@@ -82,7 +75,7 @@ func GetFileMetric(fd int32) (*FileMetric, bool) {
 	}
 }
 
-func CountFileMetrics() int {
+func GetFileMetricSize() int {
 	return len(fileMetrics)
 }
 
@@ -96,6 +89,8 @@ func GetFDsExceedThreshold(threshold float64) []int32 {
 			fds = append(fds, fd)
 		}
 	}
-	sort.Slice(fds, func(i, j int) bool { return fds[i] < fds[j] })
+	sort.Slice(fds, func(i, j int) bool {
+		return fds[i] < fds[j]
+	})
 	return fds
 }
