@@ -439,3 +439,19 @@ func (l *List) IsEmpty(key string) (bool, error) {
 	}
 	return true, nil
 }
+
+func (l *List) GetListTTL(key string) (uint32, error) {
+	if l.IsExpire(key) {
+		return 0, ErrListNotFound
+	}
+	ttl := l.TTL[key]
+	timestamp := l.TimeStamp[key]
+	if ttl == 0 || timestamp == 0 {
+		return 0, nil
+	}
+	now := time.Now().Unix()
+	remain := timestamp + uint64(ttl) - uint64(now)
+
+	return uint32(remain), nil
+
+}
