@@ -818,10 +818,10 @@ func TestTx_GetListTTL(t *testing.T) {
 	if err != nil {
 		t.Error("TestTx_GetListTTL err")
 	}
+	//test for TLL is 0
 	assertions.Equal(uint32(0), ttl)
 
-	tx, _ = db.Begin(true)
-	wantTLL := uint32(100)
+	wantTLL := uint32(1)
 	err = tx.ExpireList(bucket, key, wantTLL)
 	if err != nil {
 		t.Error("TestTx_GetListTTL err")
@@ -833,7 +833,15 @@ func TestTx_GetListTTL(t *testing.T) {
 	if err != nil {
 		t.Error("TestTx_GetListTTL err")
 	}
+	//test while remain bigger than zero
 	assertions.Equal(wantTLL, ttl)
+
+	time.Sleep(3 * time.Second)
+	ttl, err = tx.GetListTTL(bucket, key)
+
+	//test for TLL is expired
+	assertions.Equal(uint32(0), ttl)
+
 	tx.Commit()
 
 }
