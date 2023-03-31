@@ -39,17 +39,17 @@ func DeleteFileMetric(fd int32) {
 // for an existing fd, you should start with a new FileMetric{0,0,0,0},
 // then use it to accumulate the metric updates when you do your business,
 // after committing, update it into the fileMetrics using this method.
-func UpdateFileMetric(fd int32, update *FileMetric) error {
+func UpdateFileMetric(fd int32, delta *FileMetric) error {
 	if _, ok := fileMetrics[fd]; !ok {
 		return ErrFileMetricNotExists
 	}
 	for {
 		mOld := fileMetrics[fd].Load().(FileMetric)
 		mNew := FileMetric{
-			mOld.ValidEntries + update.ValidEntries,
-			mOld.InvalidEntries + update.InvalidEntries,
-			mOld.ValidBytes + update.ValidBytes,
-			mOld.InvalidBytes + update.InvalidBytes,
+			mOld.ValidEntries + delta.ValidEntries,
+			mOld.InvalidEntries + delta.InvalidEntries,
+			mOld.ValidBytes + delta.ValidBytes,
+			mOld.InvalidBytes + delta.InvalidBytes,
 		}
 		if fileMetrics[fd].CompareAndSwap(mOld, mNew) {
 			return nil
