@@ -285,6 +285,9 @@ func (tx *Tx) LKeys(bucket, pattern string, f func(key string) bool) error {
 }
 
 func (tx *Tx) ExpireList(bucket string, key string, ttl uint32) {
+	if ttl == Persistent {
+		return
+	}
 	t := TTL{key: key, ttl: ttl}
 	tx.ListTTL[bucket] = t
 }

@@ -17,7 +17,7 @@ package nutsdb
 import (
 	"errors"
 	"fmt"
-	"github.com/RussellLuo/timingwheel"
+	"github.com/nutsdb/nutsdb/timingwheel"
 	"io"
 	"io/ioutil"
 	"os"
@@ -446,6 +446,8 @@ func (db *DB) Close() error {
 	if db.closed {
 		return ErrDBClosed
 	}
+
+	db.tw.Stop()
 
 	db.closed = true
 
@@ -1188,7 +1190,8 @@ func (db *DB) ExpireList(txId uint64, bucket string, key string, ttl uint32) err
 		return ErrBucket
 	}
 	t, _ := time.ParseDuration(strconv2.IntToStr(int(ttl)))
-	tx.db.tw.AfterFunc(t*time.Second, func() {
+	tag := bucket + ":" + key
+	tx.db.tw.AfterFunc(t*time.Second, tag, func() {
 		l, exist := db.ListIdx[bucket]
 		if !exist {
 			return
