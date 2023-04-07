@@ -146,6 +146,7 @@ func TestUpdateFileMetric(t *testing.T) {
 }
 
 func TestInitFileMetricForFd(t *testing.T) {
+	InitTest()
 	type args struct {
 		fd int32
 	}

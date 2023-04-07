@@ -59,11 +59,11 @@ func UpdateFileMetric(fd int32, delta *FileMetric) error {
 
 func InitFileMetricForFile(fd int32) {
 	lock.Lock()
+	defer lock.Unlock()
 	if _, ok := fileMetrics[fd]; !ok {
 		fileMetrics[fd] = &atomic.Value{}
 		fileMetrics[fd].Store(FileMetric{0, 0, 0, 0})
 	}
-	lock.Unlock()
 }
 
 func GetFileMetric(fd int32) (*FileMetric, bool) {
