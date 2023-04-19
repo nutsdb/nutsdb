@@ -703,7 +703,7 @@ Inserts the values at the head of the list stored in the bucket at given bucket,
 ```golang
 if err := db.Update(
     func(tx *nutsdb.Tx) error {
-            bucket := "bucketForList"
+        bucket := "bucketForList"
         key := []byte("myList")
         val := []byte("val2")
         return tx.LPush(bucket, key, val)
@@ -719,7 +719,7 @@ Removes and returns the first element of the list stored in the bucket at given 
 ```golang
 if err := db.Update(
     func(tx *nutsdb.Tx) error {
-            bucket := "bucketForList"
+        bucket := "bucketForList"
         key := []byte("myList")
         if item, err := tx.LPop(bucket, key); err != nil {
             return err
@@ -739,7 +739,7 @@ Returns the first element of the list stored in the bucket at given bucket and k
 ```golang
 if err := db.View(
     func(tx *nutsdb.Tx) error {
-            bucket := "bucketForList"
+        bucket := "bucketForList"
         key := []byte("myList")
         if item, err := tx.LPeek(bucket, key); err != nil {
             return err
@@ -759,7 +759,7 @@ Removes and returns the last element of the list stored in the bucket at given b
 ```golang
 if err := db.Update(
     func(tx *nutsdb.Tx) error {
-            bucket := "bucketForList"
+        bucket := "bucketForList"
         key := []byte("myList")
         if item, err := tx.RPop(bucket, key); err != nil {
             return err
@@ -779,7 +779,7 @@ Returns the last element of the list stored in the bucket at given bucket and ke
 ```golang
 if err := db.View(
     func(tx *nutsdb.Tx) error {
-            bucket := "bucketForList"
+        bucket := "bucketForList"
         key := []byte("myList")
         if item, err := tx.RPeek(bucket, key); err != nil {
             return err
@@ -803,7 +803,7 @@ where -1 is the last element of the list, -2 the penultimate element and so on.
 ```golang
 if err := db.View(
     func(tx *nutsdb.Tx) error {
-            bucket := "bucketForList"
+        bucket := "bucketForList"
         key := []byte("myList")
         if items, err := tx.LRange(bucket, key, 0, -1); err != nil {
             return err
@@ -832,7 +832,7 @@ The count argument influences the operation in the following ways:
 ```golang
 if err := db.Update(
     func(tx *nutsdb.Tx) error {
-            bucket := "bucketForList"
+        bucket := "bucketForList"
         key := []byte("myList")
         return tx.LRem(bucket, key, 1, []byte("value11))
     }); err != nil {
@@ -867,7 +867,7 @@ Sets the list element at index to value.
 ```golang
 if err := db.Update(
     func(tx *nutsdb.Tx) error {
-            bucket := "bucketForList"
+        bucket := "bucketForList"
         key := []byte("myList")
         if err := tx.LSet(bucket, key, 0, []byte("val11")); err != nil {
             return err
@@ -890,7 +890,7 @@ where -1 is the last element of the list, -2 the penultimate element and so on.
 ```golang
 if err := db.Update(
     func(tx *nutsdb.Tx) error {
-            bucket := "bucketForList"
+        bucket := "bucketForList"
         key := []byte("myList")
         return tx.LTrim(bucket, key, 0, 1)
     }); err != nil {
@@ -905,7 +905,7 @@ Returns the size of key in the bucket in the bucket at given bucket and key.
 ```golang
 if err := db.Update(
     func(tx *nutsdb.Tx) error {
-            bucket := "bucketForList"
+        bucket := "bucketForList"
         key := []byte("myList")
         if size,err := tx.LSize(bucket, key); err != nil {
             return err
@@ -949,7 +949,7 @@ Adds the specified members to the set stored int the bucket at given bucket,key 
 ```go
 if err := db.Update(
     func(tx *nutsdb.Tx) error {
-            bucket := "bucketForSet"
+        bucket := "bucketForSet"
         key := []byte("mySet")
         return tx.SAdd(bucket, key, []byte("a"), []byte("b"), []byte("c"))
     }); err != nil {
@@ -1126,7 +1126,7 @@ if err := db.View(
 
 Returns all the members of the set value stored in the bucket at given bucket and key.
 
-```
+```go
 bucket := "bucketForSet"
 
 if err := db.View(
