@@ -338,3 +338,10 @@ func (tx *Tx) CheckExpire(bucket string, key []byte) bool {
 	}
 	return false
 }
+
+func (tx *Tx) GetListTTL(bucket string, key []byte) (uint32, error) {
+	if err := tx.checkTxIsClosed(); err != nil {
+		return 0, err
+	}
+	return tx.db.ListIdx[bucket].GetListTTL(string(key))
+}

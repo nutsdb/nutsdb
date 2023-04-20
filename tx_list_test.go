@@ -798,3 +798,50 @@ func TestTx_LKeys(t *testing.T) {
 
 	tx.Commit()
 }
+
+func TestTx_GetListTTL(t *testing.T) {
+	InitForList()
+	assertions := assert.New(t)
+	db, err = Open(opt)
+	assertions.NoError(err, "TestTx_GetListTTL")
+	tx, err = db.Begin(true)
+
+	bucket := "myBucket"
+	key := []byte("myList")
+	if err := tx.LPush(bucket, key, []byte("d"), []byte("c"), []byte("b"), []byte("a")); err != nil {
+		t.Error("TestTx_GetListTTL err")
+	}
+	tx.Commit()
+
+	tx, _ = db.Begin(true)
+	ttl, err := tx.GetListTTL(bucket, key)
+	if err != nil {
+		t.Error("TestTx_GetListTTL err")
+	}
+	//test for TLL is 0
+	assertions.Equal(uint32(0), ttl)
+
+	wantTLL := uint32(1)
+	err = tx.ExpireList(bucket, key, wantTLL)
+	if err != nil {
+		t.Error("TestTx_GetListTTL err")
+	}
+	tx.Commit()
+
+	tx, _ = db.Begin(true)
+	ttl, err = tx.GetListTTL(bucket, key)
+	if err != nil {
+		t.Error("TestTx_GetListTTL err")
+	}
+	//test while remain bigger than zero
+	assertions.Equal(wantTLL, ttl)
+
+	time.Sleep(3 * time.Second)
+	ttl, err = tx.GetListTTL(bucket, key)
+
+	//test for TLL is expired
+	assertions.Equal(uint32(0), ttl)
+
+	tx.Commit()
+
+}
