@@ -21,9 +21,7 @@ var (
 	lock        sync.Mutex
 )
 
-var (
-	ErrFileMetricNotExists = errors.New("fileMetric not exits")
-)
+var ErrFileMetricNotExists = errors.New("fileMetric not exits")
 
 func Init() {
 	once.Do(func() {
