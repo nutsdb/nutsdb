@@ -8,6 +8,7 @@ import (
 	"github.com/pkg/errors"
 )
 
+// FileMetric data structure for one file, will be maintained in a map
 type FileMetric struct {
 	ValidEntries   int32
 	InvalidEntries int32
@@ -17,18 +18,20 @@ type FileMetric struct {
 
 var (
 	once        sync.Once
-	fileMetrics map[int32]*atomic.Value // hold all the metrics
+	fileMetrics map[int32]*atomic.Value // a map holding all the metrics for all files
 	lock        sync.Mutex
 )
 
 var ErrFileMetricNotExists = errors.New("fileMetric not exits")
 
+// Init called when start or restart, only the first call will take effect.
 func Init() {
 	once.Do(func() {
 		fileMetrics = make(map[int32]*atomic.Value)
 	})
 }
 
+// DeleteFileMetric delete a metric for a file, should be called when a file is deleted
 func DeleteFileMetric(fd int32) {
 	delete(fileMetrics, fd)
 }
@@ -55,6 +58,7 @@ func UpdateFileMetric(fd int32, delta *FileMetric) error {
 	}
 }
 
+// InitFileMetricForFile initiate a metric for a newly create file
 func InitFileMetricForFile(fd int32) {
 	lock.Lock()
 	defer lock.Unlock()
@@ -77,6 +81,7 @@ func GetFileMetricSize() int {
 	return len(fileMetrics)
 }
 
+// GetFDsExceedThreshold get all the fds for those whose invalid_ratio exceeded the provided threshold
 func GetFDsExceedThreshold(threshold float64) []int32 {
 	var fds []int32
 	for fd, fm := range fileMetrics {
