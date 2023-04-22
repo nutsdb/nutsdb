@@ -66,6 +66,18 @@ var cachePool = sync.Pool{
 	},
 }
 
+// Tx 是否实现了哪个接口？是否需要定义对应的接口？
+// Tx 主要实现了以下几个公共的对外的方法：
+// Commit 提交事务
+// Rollback 回滚事务
+// PutWIthTimestamp
+// Put 放入数据？
+// 注意 1：
+// Tx 没有实现 Get 这一获取数据的公共方法，而是针对不同类型实现了不同的处理
+// 为什么 Get 没有采用公共的实现，而 Put 是公共的实现呢？
+// 注意 2：
+// Tx 没有实现 Begin 方法，而是有 DB 实现的，这样是否合理？
+
 // Tx represents a transaction.
 type Tx struct {
 	id                     uint64
@@ -118,6 +130,7 @@ func newTx(db *DB, writable bool) (tx *Tx, err error) {
 	return
 }
 
+// 利用雪花算法获取一个无符号的 64 位整数作为事务 ID？
 // getTxID returns the tx id.
 func (tx *Tx) getTxID() (id uint64, err error) {
 	node, err := snowflake.NewNode(tx.db.opt.NodeNum)

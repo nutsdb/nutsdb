@@ -66,6 +66,24 @@ func delete() {
 		}); err != nil {
 		log.Fatal(err)
 	}
+
+	// 等价于下面的逻辑
+	// 但是为什么要定义一个函数作为 Update 的入参？
+	// 而且这个函数是非通用的
+	// 比如对于删除操作，只能根据业务定义一个具体的删除函数或者说删除事务
+	// 然后将它传给 Update
+
+	// 但是从 Update 的视角来看，被调用时，
+	// 不用管传进来的事务的具体逻辑是什么，只要传进来的事务符合变量的规范即可
+	// err := db.Update(delOperation)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+}
+
+func delOperation(tx *nutsdb.Tx) error {
+	key := "name1"
+	return tx.Delete(bucket, []byte(key))
 }
 
 func put() {

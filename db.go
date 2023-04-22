@@ -147,6 +147,15 @@ const (
 )
 
 type (
+	// DB 是否是哪个接口的实现？是否需要是？
+	// DB 主要有实现了以下几个对外的方法：
+	// Update 写数据
+	// View 读数据
+	// Merge 合并**？为什么需要合并？
+	// Backup 备份
+	// BackupTarGZ 备份压缩文件？
+	// Close 关闭？释放所有资源
+
 	// DB represents a collection of buckets that persist on disk.
 	DB struct {
 		opt                     Options   // the database options
@@ -207,17 +216,24 @@ func open(opt Options) (*DB, error) {
 		fm:                      newFileManager(opt.RWMode, opt.MaxFdNumsInCache, opt.CleanFdsCacheThreshold),
 	}
 
+	// 这里的判断为啥不放到创建 db 对象之前
+	// 判断 opt 中的目录是否存在
 	if ok := filesystem.PathIsExist(db.opt.Dir); !ok {
+		// 如果不存在，则创建
 		if err := os.MkdirAll(db.opt.Dir, os.ModePerm); err != nil {
 			return nil, err
 		}
 	}
 
+	// 检查索引模式？
 	if err := db.checkEntryIdxMode(); err != nil {
 		return nil, err
 	}
 
+	// 如果 entry 的索引的模式是 b+ 树稀疏索引模式
 	if opt.EntryIdxMode == HintBPTSparseIdxMode {
+		// 判断是否存在 btpDir 相关的目录
+		// 如果不存在，则创建
 		bptRootIdxDir := db.opt.Dir + "/" + bptDir + "/root"
 		if ok := filesystem.PathIsExist(bptRootIdxDir); !ok {
 			if err := os.MkdirAll(bptRootIdxDir, os.ModePerm); err != nil {
@@ -240,6 +256,7 @@ func open(opt Options) (*DB, error) {
 		}
 	}
 
+	// 建立索引
 	if err := db.buildIndexes(); err != nil {
 		return nil, fmt.Errorf("db.buildIndexes error: %s", err)
 	}
@@ -250,6 +267,8 @@ func open(opt Options) (*DB, error) {
 // Open returns a newly initialized DB object with Option.
 func Open(options Options, ops ...Option) (*DB, error) {
 	opts := &options
+	// 这里没太看明白，为啥 ops 用函数类型？
+	// 哪种设计模式？链式？
 	for _, do := range ops {
 		do(opts)
 	}
@@ -260,6 +279,7 @@ func (db *DB) checkEntryIdxMode() error {
 	hasDataFlag := false
 	hasBptDirFlag := false
 
+	// 遍历 db 的工作目录
 	files, err := ioutil.ReadDir(db.opt.Dir)
 	if err != nil {
 		return err
@@ -269,28 +289,39 @@ func (db *DB) checkEntryIdxMode() error {
 		id := f.Name()
 
 		fileSuffix := path.Ext(path.Base(id))
+		// 如果存在 .dat 文件，就将相关标志位置 1
 		if fileSuffix == DataSuffix {
 			hasDataFlag = true
+			// 如果 hasBptDirFlag 为真，就跳出循环
+			// 为什么？
 			if hasBptDirFlag {
 				break
 			}
 		}
 
+		// 如果 id 是 bpt？就将相关标志位置 1
 		if id == bptDir {
 			hasBptDirFlag = true
 		}
 	}
 
+	// 如果是 b+ 树稀疏索引模式，且有 dat 文件和 bpt 文件，说明什么？
 	if db.opt.EntryIdxMode != HintBPTSparseIdxMode && hasDataFlag && hasBptDirFlag {
 		return errors.New("not support HintBPTSparseIdxMode switch to the other EntryIdxMode")
 	}
 
+	// 如果是 b+ 树稀疏索引模式，且没有 bpt 文件，但是有 dat 文件，说明什么？
 	if db.opt.EntryIdxMode == HintBPTSparseIdxMode && !hasBptDirFlag && hasDataFlag {
 		return errors.New("not support the other EntryIdxMode switch to HintBPTSparseIdxMode")
 	}
 
 	return nil
 }
+
+// Update View 和 manage 的实现方式用到了什么设计模式？适配器？
+// Update 写，View 读
+// manage 相当于个中间的什么？
+// 策略模式？
 
 // Update executes a function within a managed read/write transaction.
 func (db *DB) Update(fn func(tx *Tx) error) error {
@@ -329,14 +360,18 @@ func (db *DB) Merge() error {
 		pendingMergeEntries []*Entry
 	)
 
+	// 如果是 b+ 树稀疏索引模式，返回错误：b+ 树稀疏索引模式的数据库不支持合并
 	if db.opt.EntryIdxMode == HintBPTSparseIdxMode {
 		return ErrNotSupportHintBPTSparseIdxMode
 	}
 
+	// 将 正在合并 标志位置为真
 	db.isMerging = true
 
+	// 这里为什么是通过 getMaxFileIDAndFileIDs 函数获取待合并文件列表？
 	_, pendingMergeFIds = db.getMaxFileIDAndFileIDs()
 
+	// 如果待合并的文件数小于 2，说明没有文件需要合并，返回错误
 	if len(pendingMergeFIds) < 2 {
 		db.isMerging = false
 		return errors.New("the number of files waiting to be merged is at least 2")
@@ -344,7 +379,9 @@ func (db *DB) Merge() error {
 
 	for _, pendingMergeFId := range pendingMergeFIds {
 		off = 0
+		// 这个 path 实际上是什么文件的路径呢？
 		path := db.getDataPath(int64(pendingMergeFId))
+		// 这里 newFileRecovery 是什么意思？什么是 recoveryReader ？
 		fr, err := newFileRecovery(path, db.opt.BufferSizeOfRecovery)
 		if err != nil {
 			db.isMerging = false
@@ -353,6 +390,7 @@ func (db *DB) Merge() error {
 
 		pendingMergeEntries = []*Entry{}
 
+		// 下面这个大的 for 循环完全看不懂
 		for {
 			if entry, err := fr.readEntry(); err == nil {
 				if entry == nil {
@@ -361,6 +399,7 @@ func (db *DB) Merge() error {
 
 				var skipEntry bool
 
+				// 判断 entry 是否无效？
 				if db.isFilterEntry(entry) {
 					skipEntry = true
 				}
@@ -374,22 +413,30 @@ func (db *DB) Merge() error {
 					}
 				}
 
+				// 如果需要跳过当前 entry
 				if skipEntry {
+					// 更新偏移量
 					off += entry.Size()
+					// 如果偏移量大于分块的大小，跳出循环
 					if off >= db.opt.SegmentSize {
 						break
 					}
+					// 否则，继续下次迭代
 					continue
 				}
 
+				// 处理当前 entry ？
 				pendingMergeEntries = db.getPendingMergeEntries(entry, pendingMergeEntries)
 
+				// 更新偏移量
 				off += entry.Size()
 				if off >= db.opt.SegmentSize {
 					break
 				}
 
 			} else {
+				// 下面三种是否打印日志比较好？
+				// 不然不知道因为什么原因退出的
 				if err == io.EOF {
 					break
 				}
@@ -399,19 +446,23 @@ func (db *DB) Merge() error {
 				if err == io.ErrUnexpectedEOF {
 					break
 				}
+				// 其他未预期错误
 				return fmt.Errorf("when merge operation build hintIndex readAt err: %s", err)
 			}
 		}
 
+		// 重写数据？
 		if err := db.reWriteData(pendingMergeEntries); err != nil {
 			_ = fr.release()
 			return err
 		}
 
+		// 释放 fr 资源？
 		err = fr.release()
 		if err != nil {
 			return err
 		}
+		// 移除什么文件？
 		if err := os.Remove(path); err != nil {
 			db.isMerging = false
 			return fmt.Errorf("when merge err: %s", err)
@@ -423,6 +474,14 @@ func (db *DB) Merge() error {
 
 // Backup copies the database to file directory at the given dir.
 func (db *DB) Backup(dir string) error {
+	// 这里这样写是什么意思？
+	// 是不是等价于如下注释的部分？
+	// 函数变量？
+	// fn := func(tx *Tx) error {
+	// 	return filesystem.CopyDir(db.opt.Dir, dir)
+	// }
+	// return db.View(fn)
+
 	return db.View(func(tx *Tx) error {
 		return filesystem.CopyDir(db.opt.Dir, dir)
 	})
@@ -444,6 +503,7 @@ func (db *DB) Close() error {
 		return ErrDBClosed
 	}
 
+	// 这个 closed 的标志为啥在这里置为真，而不是在所有处理结束后再置为真？
 	db.closed = true
 
 	err := db.ActiveFile.rwManager.Release()
@@ -990,10 +1050,15 @@ func (db *DB) buildIndexes() (err error) {
 	return db.buildHintIdx(dataFileIds)
 }
 
+// manage 是对 db 所有操作的入口？
+// 而且这个 manage 的实现是基于事务的，因此 nutsdb 的所有操作都是以事务进行的？
 // managed calls a block of code that is fully contained in a transaction.
 func (db *DB) managed(writable bool, fn func(tx *Tx) error) (err error) {
 	var tx *Tx
 
+	// 这个 writable 传给事务后，在哪里用到了呢？暂时没看到呀？
+	// 但是肯定应该是有用到的，比如对于同是不可写的事务，就可以同时提交？
+	// 注意这里的 Begin 是由 db 调用的，而后面的 Commit 是由 tx 调用的，这样是否合理？
 	tx, err = db.Begin(writable)
 	if err != nil {
 		return err
@@ -1004,6 +1069,8 @@ func (db *DB) managed(writable bool, fn func(tx *Tx) error) (err error) {
 			// resume normal execution
 			panicked = true
 		}
+
+		// 如果这个这个函数出现 panic 或者执行完成之前有报错，就回滚
 		if panicked || err != nil {
 			if errRollback := tx.Rollback(); errRollback != nil {
 				err = errRollback
@@ -1017,6 +1084,8 @@ func (db *DB) managed(writable bool, fn func(tx *Tx) error) (err error) {
 	return err
 }
 
+// 这个变量是什么意思？
+// b+ 树目录？
 const bptDir = "bpt"
 
 // getDataPath returns the data path at given fid.
@@ -1027,12 +1096,12 @@ func (db *DB) getDataPath(fID int64) string {
 
 func (db *DB) getMetaPath() string {
 	separator := string(filepath.Separator)
-	return db.opt.Dir + separator + "meta"
+	return db.opt.Dir + separator + "meta" // 这里的 meta 用常量定义是不是更好点？
 }
 
 func (db *DB) getBucketMetaPath() string {
 	separator := string(filepath.Separator)
-	return db.getMetaPath() + separator + "bucket"
+	return db.getMetaPath() + separator + "bucket" // 这里的 bucket 用常量定义是不是更好点？
 }
 
 func (db *DB) getBucketMetaFilePath(name string) string {
@@ -1125,6 +1194,7 @@ func (db *DB) getPendingMergeEntries(entry *Entry, pendingMergeEntries []*Entry)
 	return pendingMergeEntries
 }
 
+// reWriteData 这个函数是干嘛的？
 func (db *DB) reWriteData(pendingMergeEntries []*Entry) error {
 	if len(pendingMergeEntries) == 0 {
 		return nil

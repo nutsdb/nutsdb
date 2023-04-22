@@ -74,6 +74,8 @@ func removeFileDir(fileDir string) {
 	}
 }
 
+// 这个例子中的代码没太看懂？主要是协程那一块，似乎是生产者消费者模式？
+// 这个例子是想说明什么呢？
 func main() {
 	removeFlag := false
 	fileDir := "/tmp/nutsdb_example_concurrence"

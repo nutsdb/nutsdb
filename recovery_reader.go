@@ -7,6 +7,7 @@ import (
 	"os"
 )
 
+// 为什么定义这个类型读取 entry ?
 // fileRecovery use bufio.Reader to read entry
 type fileRecovery struct {
 	fd     *os.File
@@ -81,5 +82,6 @@ func calBufferSize(size int) int {
 }
 
 func (fr *fileRecovery) release() error {
+	// 其所持有的 reader 不需要处理吗？
 	return fr.fd.Close()
 }
