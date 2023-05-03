@@ -70,10 +70,10 @@ func TestInit(t *testing.T) {
 	}
 }
 
-func TestGetFDsExceedThreshold(t *testing.T) {
+func TestGetFIDsExceedThreshold(t *testing.T) {
 	InitTest()
-	if gotFds := GetFDsExceedThreshold(.2); gotFds != nil {
-		t.Errorf("GetFDsExceedThreshold() = %v, want %v", gotFds, nil)
+	if gotFds := GetFIDsExceedThreshold(.2); gotFds != nil {
+		t.Errorf("GetFIDsExceedThreshold() = %v, want %v", gotFds, nil)
 	}
 	_ = UpdateFileMetric(0, &FileMetric{8, 2, 70, 30})
 	_ = UpdateFileMetric(1, &FileMetric{9, 1, 81, 19})
@@ -90,8 +90,8 @@ func TestGetFDsExceedThreshold(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if gotFds := GetFDsExceedThreshold(tt.args.threshold); !reflect.DeepEqual(gotFds, tt.wantFds) {
-				t.Errorf("GetFDsExceedThreshold() = %v, want %v", gotFds, tt.wantFds)
+			if gotFds := GetFIDsExceedThreshold(tt.args.threshold); !reflect.DeepEqual(gotFds, tt.wantFds) {
+				t.Errorf("GetFIDsExceedThreshold() = %v, want %v", gotFds, tt.wantFds)
 			}
 		})
 	}
@@ -134,6 +134,7 @@ func TestUpdateFileMetric(t *testing.T) {
 		wantFM *FileMetric
 	}{
 		{"", args{1, &FileMetric{1, 1, 1, 1}}, &FileMetric{10, 2, 82, 20}},
+		{"", args{2, &FileMetric{1<<31 - 1, 1, 1, 1}}, &FileMetric{9, 1, 77, 23}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
