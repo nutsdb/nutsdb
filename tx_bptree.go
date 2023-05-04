@@ -993,10 +993,6 @@ func (tx *Tx) FindOnDisk(fID uint64, rootOff uint64, key, newKey []byte) (entry 
 			return nil, err
 		}
 
-		if err != nil {
-			return nil, err
-		}
-
 		newKeyTemp := getNewKey(string(entry.Meta.Bucket), entry.Key)
 		if entry != nil && compare(newKey, newKeyTemp) == 0 {
 			return entry, nil
