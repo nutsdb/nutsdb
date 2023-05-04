@@ -366,7 +366,7 @@ func (db *DB) Merge() error {
 				}
 
 				// check if we have a new entry with same key and bucket
-				if r, _ := db.getRecordFromKey(entry.Meta.Bucket, entry.Key); r != nil && !skipEntry {
+				if r, _ := db.getRecordFromKey(entry.Bucket, entry.Key); r != nil && !skipEntry {
 					if r.H.FileID > int64(pendingMergeFId) {
 						skipEntry = true
 					} else if r.H.FileID == int64(pendingMergeFId) && r.H.DataPos > uint64(off) {
@@ -589,7 +589,7 @@ func (db *DB) parseDataFiles(dataFileIds []int) (unconfirmedRecords []*Record, c
 				})
 
 				if db.opt.EntryIdxMode == HintBPTSparseIdxMode {
-					db.BPTreeKeyEntryPosMap[string(getNewKey(string(entry.Meta.Bucket), entry.Key))] = off
+					db.BPTreeKeyEntryPosMap[string(getNewKey(string(entry.Bucket), entry.Key))] = off
 				}
 
 				off += entry.Size()
@@ -678,7 +678,7 @@ func (db *DB) buildBPTreeIdx(bucket string, r *Record) error {
 }
 
 func (db *DB) buildActiveBPTreeIdx(r *Record) error {
-	newKey := getNewKey(string(r.H.Meta.Bucket), r.H.Key)
+	newKey := getNewKey(string(r.E.Bucket), r.H.Key)
 	if err := db.ActiveBPTreeIdx.Insert(newKey, r.E, r.H, CountFlagEnabled); err != nil {
 		return fmt.Errorf("when build BPTreeIdx insert index err: %s", err)
 	}
@@ -756,7 +756,7 @@ func (db *DB) buildHintIdx(dataFileIds []int) error {
 
 	for _, r := range unconfirmedRecords {
 		if _, ok := db.committedTxIds[r.H.Meta.TxID]; ok {
-			bucket := string(r.H.Meta.Bucket)
+			bucket := string(r.E.Bucket)
 
 			if r.H.Meta.Ds == DataStructureBPTree {
 				r.H.Meta.Status = Committed
@@ -1067,7 +1067,7 @@ func (db *DB) getBPTRootTxIDPath(fID int64) string {
 
 func (db *DB) getPendingMergeEntries(entry *Entry, pendingMergeEntries []*Entry) []*Entry {
 	if entry.Meta.Ds == DataStructureBPTree {
-		bptIdx, exist := db.BPTreeIdx[string(entry.Meta.Bucket)]
+		bptIdx, exist := db.BPTreeIdx[string(entry.Bucket)]
 		if exist {
 			r, err := bptIdx.Find(entry.Key)
 			if err == nil && r.H.Meta.Flag == DataSetFlag {
@@ -1077,7 +1077,7 @@ func (db *DB) getPendingMergeEntries(entry *Entry, pendingMergeEntries []*Entry)
 	}
 
 	if entry.Meta.Ds == DataStructureSet {
-		setIdx, exist := db.SetIdx[string(entry.Meta.Bucket)]
+		setIdx, exist := db.SetIdx[string(entry.Bucket)]
 		if exist {
 			if setIdx.SIsMember(string(entry.Key), entry.Value) {
 				pendingMergeEntries = append(pendingMergeEntries, entry)
@@ -1089,7 +1089,7 @@ func (db *DB) getPendingMergeEntries(entry *Entry, pendingMergeEntries []*Entry)
 		keyAndScore := strings.Split(string(entry.Key), SeparatorForZSetKey)
 		if len(keyAndScore) == 2 {
 			key := keyAndScore[0]
-			sortedSetIdx, exist := db.SortedSetIdx[string(entry.Meta.Bucket)]
+			sortedSetIdx, exist := db.SortedSetIdx[string(entry.Bucket)]
 			if exist {
 				n := sortedSetIdx.GetByKey(key)
 				if n != nil {
@@ -1104,7 +1104,7 @@ func (db *DB) getPendingMergeEntries(entry *Entry, pendingMergeEntries []*Entry)
 		//if expired, it will clear the items of index
 		//so that nutsdb can clear entry of expiring list in the function getPendingMergeEntries
 		db.checkListExpired()
-		listIdx, exist := db.ListIdx[string(entry.Meta.Bucket)]
+		listIdx, exist := db.ListIdx[string(entry.Bucket)]
 		if exist {
 			items, _ := listIdx.LRange(string(entry.Key), 0, -1)
 			ok := false
@@ -1144,7 +1144,7 @@ func (db *DB) reWriteData(pendingMergeEntries []*Entry) error {
 	db.MaxFileID++
 
 	for _, e := range pendingMergeEntries {
-		err := tx.put(string(e.Meta.Bucket), e.Key, e.Value, e.Meta.TTL, e.Meta.Flag, e.Meta.Timestamp, e.Meta.Ds)
+		err := tx.put(string(e.Bucket), e.Key, e.Value, e.Meta.TTL, e.Meta.Flag, e.Meta.Timestamp, e.Meta.Ds)
 		if err != nil {
 			tx.Rollback()
 			db.isMerging = false

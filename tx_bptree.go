@@ -437,7 +437,7 @@ func (tx *Tx) getStartIndexForFindPrefix(fID int64, curr *BinaryNode, prefix []b
 			return 0, err
 		}
 
-		newKey := getNewKey(string(entry.Meta.Bucket), entry.Key)
+		newKey := getNewKey(string(entry.Bucket), entry.Key)
 		if compare(newKey, prefix) >= 0 {
 			break
 		}
@@ -489,7 +489,7 @@ func (tx *Tx) findPrefixOnDisk(bucket string, fID, rootOff int64, prefix, newPre
 				return nil, off, err
 			}
 
-			if !bytes.HasPrefix(entry.Key, prefix) || string(entry.Meta.Bucket) != bucket {
+			if !bytes.HasPrefix(entry.Key, prefix) || string(entry.Bucket) != bucket {
 				scanFlag = false
 				break
 			}
@@ -566,7 +566,7 @@ func (tx *Tx) findPrefixSearchOnDisk(bucket string, fID, rootOff int64, prefix [
 			if err != nil {
 				return nil, off, err
 			}
-			if !bytes.HasPrefix(entry.Key, prefix) || string(entry.Meta.Bucket) != bucket {
+			if !bytes.HasPrefix(entry.Key, prefix) || string(entry.Bucket) != bucket {
 				scanFlag = false
 				break
 			}
@@ -620,7 +620,7 @@ func (tx *Tx) getStartIndexForFindRange(fID int64, curr *BinaryNode, start, newS
 			return 0, err
 		}
 
-		newStartTemp := getNewKey(string(entry.Meta.Bucket), entry.Key)
+		newStartTemp := getNewKey(string(entry.Bucket), entry.Key)
 		if compare(newStartTemp, newStart) >= 0 {
 			break
 		}
@@ -663,7 +663,7 @@ func (tx *Tx) findRangeOnDisk(fID, rootOff int64, start, end, newStart, newEnd [
 				return nil, err
 			}
 
-			newEndTemp := getNewKey(string(entry.Meta.Bucket), entry.Key)
+			newEndTemp := getNewKey(string(entry.Bucket), entry.Key)
 
 			if compare(newEndTemp, newEnd) > 0 {
 				scanFlag = false
@@ -993,7 +993,7 @@ func (tx *Tx) FindOnDisk(fID uint64, rootOff uint64, key, newKey []byte) (entry 
 			return nil, err
 		}
 
-		newKeyTemp := getNewKey(string(entry.Meta.Bucket), entry.Key)
+		newKeyTemp := getNewKey(string(entry.Bucket), entry.Key)
 		if entry != nil && compare(newKey, newKeyTemp) == 0 {
 			return entry, nil
 		}
@@ -1034,7 +1034,7 @@ func (tx *Tx) FindLeafOnDisk(fID int64, rootOff int64, key, newKey []byte) (bn *
 			if err != nil {
 				return nil, err
 			}
-			newKeyTemp := getNewKey(string(item.Meta.Bucket), item.Key)
+			newKeyTemp := getNewKey(string(item.Bucket), item.Key)
 			if compare(newKey, newKeyTemp) >= 0 {
 				i++
 			} else {

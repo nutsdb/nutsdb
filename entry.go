@@ -27,6 +27,7 @@ type (
 	Entry struct {
 		Key      []byte
 		Value    []byte
+		Bucket   []byte
 		Meta     *MetaData
 		crc      uint32
 		position uint64
@@ -47,7 +48,6 @@ type (
 		Timestamp  uint64
 		TTL        uint32
 		Flag       uint16 // delete / set
-		Bucket     []byte
 		BucketSize uint32
 		TxID       uint64
 		Status     uint16 // committed / uncommitted
@@ -82,7 +82,7 @@ func (e *Entry) Encode() []byte {
 	buf := make([]byte, e.Size())
 	buf = e.setEntryHeaderBuf(buf)
 	// set bucket\key\value
-	copy(buf[DataEntryHeaderSize:(DataEntryHeaderSize+bucketSize)], e.Meta.Bucket)
+	copy(buf[DataEntryHeaderSize:(DataEntryHeaderSize+bucketSize)], e.Bucket)
 	copy(buf[(DataEntryHeaderSize+bucketSize):(DataEntryHeaderSize+bucketSize+keySize)], e.Key)
 	copy(buf[(DataEntryHeaderSize+bucketSize+keySize):(DataEntryHeaderSize+bucketSize+keySize+valueSize)], e.Value)
 
@@ -118,7 +118,7 @@ func (e *Entry) IsZero() bool {
 // GetCrc returns the crc at given buf slice.
 func (e *Entry) GetCrc(buf []byte) uint32 {
 	crc := crc32.ChecksumIEEE(buf[4:])
-	crc = crc32.Update(crc, crc32.IEEETable, e.Meta.Bucket)
+	crc = crc32.Update(crc, crc32.IEEETable, e.Bucket)
 	crc = crc32.Update(crc, crc32.IEEETable, e.Key)
 	crc = crc32.Update(crc, crc32.IEEETable, e.Value)
 
@@ -136,7 +136,7 @@ func (e *Entry) ParsePayload(data []byte) error {
 	valueHighBound := meta.BucketSize + meta.KeySize + meta.ValueSize
 
 	// parse bucket
-	e.Meta.Bucket = data[bucketLowBound:bucketHighBound]
+	e.Bucket = data[bucketLowBound:bucketHighBound]
 	// parse key
 	e.Key = data[keyLowBound:keyHighBound]
 	// parse value

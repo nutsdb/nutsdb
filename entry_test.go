@@ -31,14 +31,14 @@ type EntryTestSuite struct {
 
 func (suite *EntryTestSuite) SetupSuite() {
 	suite.entry = Entry{
-		Key:   []byte("key_0001"),
-		Value: []byte("val_0001"),
+		Key:    []byte("key_0001"),
+		Value:  []byte("val_0001"),
+		Bucket: []byte("test_entry"),
 		Meta: &MetaData{
 			KeySize:    uint32(len("key_0001")),
 			ValueSize:  uint32(len("val_0001")),
 			Timestamp:  1547707905,
 			TTL:        Persistent,
-			Bucket:     []byte("test_entry"),
 			BucketSize: uint32(len("test_entry")),
 			Flag:       DataSetFlag,
 		},
