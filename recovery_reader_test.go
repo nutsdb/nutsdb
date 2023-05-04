@@ -14,14 +14,15 @@ func Test_readEntry(t *testing.T) {
 	require.NoError(t, err)
 
 	expect := &Entry{
-		Key:   []byte("key"),
-		Value: []byte("val"),
+		Key:    []byte("key"),
+		Value:  []byte("val"),
+		Bucket: []byte("Test_readEntry"),
+		
 		Meta: &MetaData{
 			KeySize:    uint32(len("key")),
 			ValueSize:  uint32(len("val")),
 			Timestamp:  1547707905,
 			TTL:        Persistent,
-			Bucket:     []byte("Test_readEntry"),
 			BucketSize: uint32(len("Test_readEntry")),
 			Flag:       DataSetFlag,
 		},

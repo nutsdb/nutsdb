@@ -178,11 +178,11 @@ func (tx *Tx) Commit() error {
 			return ErrDataSizeExceed
 		}
 
-		if len(entry.Meta.Bucket) > MAX_SIZE || len(entry.Key) > MAX_SIZE || len(entry.Value) > MAX_SIZE {
+		if len(entry.Bucket) > MAX_SIZE || len(entry.Key) > MAX_SIZE || len(entry.Value) > MAX_SIZE {
 			return ErrDataSizeExceed
 		}
 
-		bucket := string(entry.Meta.Bucket)
+		bucket := string(entry.Bucket)
 
 		if tx.db.ActiveFile.ActualSize+int64(buff.Len())+entrySize > tx.db.opt.SegmentSize {
 			if _, err := tx.writeData(buff.Bytes()); err != nil {
@@ -198,7 +198,7 @@ func (tx *Tx) Commit() error {
 		offset := tx.db.ActiveFile.writeOff + int64(buff.Len())
 
 		if entry.Meta.Ds == DataStructureBPTree {
-			tx.db.BPTreeKeyEntryPosMap[string(getNewKey(string(entry.Meta.Bucket), entry.Key))] = offset
+			tx.db.BPTreeKeyEntryPosMap[string(getNewKey(string(entry.Bucket), entry.Key))] = offset
 		}
 
 		if i == lastIndex {
@@ -363,7 +363,7 @@ func (tx *Tx) buildIdxes(writesLen int) {
 	for i := 0; i < writesLen; i++ {
 		entry := tx.pendingWrites[i]
 
-		bucket := string(entry.Meta.Bucket)
+		bucket := string(entry.Bucket)
 
 		if entry.Meta.Ds == DataStructureSet {
 			tx.buildSetIdx(bucket, entry)
@@ -664,15 +664,15 @@ func (tx *Tx) put(bucket string, key, value []byte, ttl uint32, flag uint16, tim
 	}
 
 	tx.pendingWrites = append(tx.pendingWrites, &Entry{
-		Key:   key,
-		Value: value,
+		Key:    key,
+		Value:  value,
+		Bucket: []byte(bucket),
 		Meta: &MetaData{
 			KeySize:    uint32(len(key)),
 			ValueSize:  uint32(len(value)),
 			Timestamp:  timestamp,
 			Flag:       flag,
 			TTL:        ttl,
-			Bucket:     []byte(bucket),
 			BucketSize: uint32(len(bucket)),
 			Status:     UnCommitted,
 			Ds:         ds,
