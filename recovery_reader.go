@@ -2,7 +2,6 @@ package nutsdb
 
 import (
 	"bufio"
-	"encoding/binary"
 	"io"
 	"os"
 )
@@ -33,9 +32,7 @@ func (fr *fileRecovery) readEntry() (e *Entry, err error) {
 		return nil, err
 	}
 
-	e = &Entry{
-		crc: binary.LittleEndian.Uint32(buf[0:4]),
-	}
+	e = new(Entry)
 	err = e.ParseMeta(buf)
 	if err != nil {
 		return nil, err
@@ -58,7 +55,7 @@ func (fr *fileRecovery) readEntry() (e *Entry, err error) {
 	}
 
 	crc := e.GetCrc(buf)
-	if crc != e.crc {
+	if crc != e.Meta.Crc {
 		return nil, ErrCrc
 	}
 
