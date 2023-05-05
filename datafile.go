@@ -15,7 +15,6 @@
 package nutsdb
 
 import (
-	"encoding/binary"
 	"errors"
 )
 
@@ -64,9 +63,7 @@ func (df *DataFile) ReadAt(off int) (e *Entry, err error) {
 		return nil, err
 	}
 
-	e = &Entry{
-		crc: binary.LittleEndian.Uint32(buf[0:4]),
-	}
+	e = new(Entry)
 	err = e.ParseMeta(buf)
 	if err != nil {
 		return nil, err
@@ -92,7 +89,7 @@ func (df *DataFile) ReadAt(off int) (e *Entry, err error) {
 	}
 
 	crc := e.GetCrc(buf)
-	if crc != e.crc {
+	if crc != e.Meta.Crc {
 		return nil, ErrCrc
 	}
 
@@ -108,9 +105,7 @@ func (df *DataFile) ReadRecord(off int, payloadSize int64) (e *Entry, err error)
 		return nil, err
 	}
 
-	e = &Entry{
-		crc: binary.LittleEndian.Uint32(buf[0:4]),
-	}
+	e = new(Entry)
 	err = e.ParseMeta(buf)
 	if err != nil {
 		return nil, err
@@ -130,7 +125,7 @@ func (df *DataFile) ReadRecord(off int, payloadSize int64) (e *Entry, err error)
 	}
 
 	crc := e.GetCrc(buf[:DataEntryHeaderSize])
-	if crc != e.crc {
+	if crc != e.Meta.Crc {
 		return nil, ErrCrc
 	}
 

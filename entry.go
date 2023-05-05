@@ -29,7 +29,6 @@ type (
 		Value    []byte
 		Bucket   []byte
 		Meta     *MetaData
-		crc      uint32
 		position uint64
 	}
 
@@ -52,6 +51,7 @@ type (
 		TxID       uint64
 		Status     uint16 // committed / uncommitted
 		Ds         uint16 // data structure
+		Crc        uint32
 	}
 )
 
@@ -94,6 +94,7 @@ func (e *Entry) Encode() []byte {
 
 // setEntryHeaderBuf sets the entry header buff.
 func (e *Entry) setEntryHeaderBuf(buf []byte) []byte {
+	binary.LittleEndian.PutUint32(buf[0:4], e.Meta.Crc)
 	binary.LittleEndian.PutUint64(buf[4:12], e.Meta.Timestamp)
 	binary.LittleEndian.PutUint32(buf[12:16], e.Meta.KeySize)
 	binary.LittleEndian.PutUint32(buf[16:20], e.Meta.ValueSize)
@@ -109,7 +110,7 @@ func (e *Entry) setEntryHeaderBuf(buf []byte) []byte {
 
 // IsZero checks if the entry is zero or not.
 func (e *Entry) IsZero() bool {
-	if e.crc == 0 && e.Meta.KeySize == 0 && e.Meta.ValueSize == 0 && e.Meta.Timestamp == 0 {
+	if e.Meta.Crc == 0 && e.Meta.KeySize == 0 && e.Meta.ValueSize == 0 && e.Meta.Timestamp == 0 {
 		return true
 	}
 	return false
@@ -153,6 +154,7 @@ func (e *Entry) checkPayloadSize(size int64) error {
 
 func (e *Entry) ParseMeta(buf []byte) error {
 	meta := &MetaData{
+		Crc:        binary.LittleEndian.Uint32(buf[0:4]),
 		Timestamp:  binary.LittleEndian.Uint64(buf[4:12]),
 		KeySize:    binary.LittleEndian.Uint32(buf[12:16]),
 		ValueSize:  binary.LittleEndian.Uint32(buf[16:20]),
