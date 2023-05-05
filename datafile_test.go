@@ -40,7 +40,6 @@ func init() {
 			BucketSize: uint32(len("test_datafile")),
 			Flag:       DataSetFlag,
 		},
-		position: 0,
 	}
 }
 

@@ -25,11 +25,10 @@ var payLoadSizeMismatchErr = errors.New("the payload size in meta mismatch with 
 type (
 	// Entry represents the data item.
 	Entry struct {
-		Key      []byte
-		Value    []byte
-		Bucket   []byte
-		Meta     *MetaData
-		position uint64
+		Key    []byte
+		Value  []byte
+		Bucket []byte
+		Meta   *MetaData
 	}
 
 	// Hint represents the index of the key

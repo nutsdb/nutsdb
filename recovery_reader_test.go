@@ -17,7 +17,7 @@ func Test_readEntry(t *testing.T) {
 		Key:    []byte("key"),
 		Value:  []byte("val"),
 		Bucket: []byte("Test_readEntry"),
-		
+
 		Meta: &MetaData{
 			KeySize:    uint32(len("key")),
 			ValueSize:  uint32(len("val")),
@@ -26,7 +26,6 @@ func Test_readEntry(t *testing.T) {
 			BucketSize: uint32(len("Test_readEntry")),
 			Flag:       DataSetFlag,
 		},
-		position: 0,
 	}
 	_, err = fd.Write(expect.Encode())
 	require.NoError(t, err)

@@ -42,7 +42,6 @@ func (suite *EntryTestSuite) SetupSuite() {
 			BucketSize: uint32(len("test_entry")),
 			Flag:       DataSetFlag,
 		},
-		position: 0,
 	}
 	suite.expectedEncode = []byte{48, 176, 185, 16, 1, 38, 64, 92, 0, 0, 0, 0, 8, 0, 0, 0, 8, 0, 0, 0, 1, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 116, 101, 115, 116, 95, 101, 110, 116, 114, 121, 107, 101, 121, 95, 48, 48, 48, 49, 118, 97, 108, 95, 48, 48, 48, 49}
 }
