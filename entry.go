@@ -168,6 +168,7 @@ func (e *Entry) ParseMeta(buf []byte) error {
 	return nil
 }
 
+// isFilter to confirm if this entry is can be filtered
 func (e *Entry) isFilter() bool {
 	meta := e.Meta
 	if meta.Flag == DataDeleteFlag || meta.Flag == DataRPopFlag ||
