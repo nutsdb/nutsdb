@@ -167,3 +167,17 @@ func (e *Entry) ParseMeta(buf []byte) error {
 	e.Meta = meta
 	return nil
 }
+
+func (e *Entry) isFilter() bool {
+	meta := e.Meta
+	if meta.Flag == DataDeleteFlag || meta.Flag == DataRPopFlag ||
+		meta.Flag == DataLPopFlag || meta.Flag == DataLRemFlag ||
+		meta.Flag == DataLTrimFlag || meta.Flag == DataZRemFlag ||
+		meta.Flag == DataZRemRangeByRankFlag || meta.Flag == DataZPopMaxFlag ||
+		meta.Flag == DataZPopMinFlag || meta.Flag == DataLRemByIndex ||
+		IsExpired(meta.TTL, meta.Timestamp) {
+		return true
+	}
+
+	return false
+}

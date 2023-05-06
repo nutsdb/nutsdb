@@ -361,7 +361,7 @@ func (db *DB) Merge() error {
 
 				var skipEntry bool
 
-				if db.isFilterEntry(entry) {
+				if entry.isFilter() {
 					skipEntry = true
 				}
 
@@ -1153,19 +1153,6 @@ func (db *DB) reWriteData(pendingMergeEntries []*Entry) error {
 	}
 	tx.Commit()
 	return nil
-}
-
-func (db *DB) isFilterEntry(entry *Entry) bool {
-	if entry.Meta.Flag == DataDeleteFlag || entry.Meta.Flag == DataRPopFlag ||
-		entry.Meta.Flag == DataLPopFlag || entry.Meta.Flag == DataLRemFlag ||
-		entry.Meta.Flag == DataLTrimFlag || entry.Meta.Flag == DataZRemFlag ||
-		entry.Meta.Flag == DataZRemRangeByRankFlag || entry.Meta.Flag == DataZPopMaxFlag ||
-		entry.Meta.Flag == DataZPopMinFlag || entry.Meta.Flag == DataLRemByIndex ||
-		IsExpired(entry.Meta.TTL, entry.Meta.Timestamp) {
-		return true
-	}
-
-	return false
 }
 
 // getRecordFromKey fetches Record for given key and bucket
