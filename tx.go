@@ -164,7 +164,10 @@ func (tx *Tx) Commit() error {
 	}
 
 	tx.isRunning.Store(txStatusCommitting)
-	defer tx.isRunning.Store(txStatusClosed)
+	defer func() {
+		tx.isRunning.Store(txStatusClosed)
+		tx.unlock()
+	}()
 
 	writesLen := len(tx.pendingWrites)
 
@@ -263,8 +266,6 @@ func (tx *Tx) Commit() error {
 	}
 
 	tx.buildIdxes(writesLen)
-
-	tx.unlock()
 
 	tx.db = nil
 

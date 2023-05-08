@@ -493,7 +493,7 @@ func TestTx_Put_Err(t *testing.T) {
 		})
 	})
 
-	t.Run("write with TOO big size", func(t *testing.T) {
+	t.Run("write with too big size entry", func(t *testing.T) {
 		withDefaultDB(t, func(t *testing.T, db *DB) {
 			tx, err := db.Begin(true)
 			require.NoError(t, err)
@@ -509,7 +509,6 @@ func TestTx_Put_Err(t *testing.T) {
 
 			assert.Error(t, tx.Commit()) // too big cannot commit by tx
 
-			assert.NoError(t, tx.Rollback())
 		})
 	})
 }
