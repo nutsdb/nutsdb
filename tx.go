@@ -20,6 +20,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/bwmarrin/snowflake"
@@ -58,6 +59,16 @@ var (
 
 	// ErrNotFoundKey is returned when key not found int the bucket on an view function.
 	ErrNotFoundKey = errors.New("key not found in the bucket")
+
+	ErrCanNotRollbackClosedTx = errors.New("can not rollback a closed tx")
+
+	ErrCanNotRollbackCommittingTx = errors.New("can not rollback a committing tx")
+)
+
+const (
+	txStatusClosed = iota
+	txStatusRunning
+	txStatusCommitting
 )
 
 var cachePool = sync.Pool{
@@ -72,6 +83,7 @@ type Tx struct {
 	db                     *DB
 	writable               bool
 	pendingWrites          []*Entry
+	isRunning              atomic.Value
 	ReservedStoreTxIDIdxes map[int64]*BPTree
 }
 
@@ -107,7 +119,7 @@ func newTx(db *DB, writable bool) (tx *Tx, err error) {
 		pendingWrites:          []*Entry{},
 		ReservedStoreTxIDIdxes: make(map[int64]*BPTree),
 	}
-
+	tx.isRunning.Store(txStatusRunning)
 	txID, err = tx.getTxID()
 	if err != nil {
 		return nil, err
@@ -150,6 +162,9 @@ func (tx *Tx) Commit() error {
 	if tx.db == nil {
 		return ErrDBClosed
 	}
+
+	tx.isRunning.Store(txStatusCommitting)
+	defer tx.isRunning.Store(txStatusClosed)
 
 	writesLen := len(tx.pendingWrites)
 
@@ -601,8 +616,18 @@ func (tx *Tx) writeData(data []byte) (n int, err error) {
 
 // Rollback closes the transaction.
 func (tx *Tx) Rollback() error {
+	defer tx.isRunning.Store(txStatusClosed)
 	if tx.db == nil {
 		return ErrDBClosed
+	}
+	// confirmed the status of current status, we can not roll back a closed or committing Tx.
+	status := tx.isRunning.Load().(int)
+	if status == txStatusClosed {
+		return ErrCanNotRollbackClosedTx
+	}
+
+	if status == txStatusCommitting {
+		return ErrCanNotRollbackCommittingTx
 	}
 
 	tx.unlock()
