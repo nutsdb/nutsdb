@@ -1177,3 +1177,8 @@ func (db *DB) checkListExpired() {
 		}
 	}
 }
+
+// IsClose return the value that represents the status of DB
+func (db *DB) IsClose() bool {
+	return db.closed
+}
