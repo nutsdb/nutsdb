@@ -54,7 +54,6 @@ func UpdateFileMetric(fid int32, delta *FileMetric) error {
 		}
 		if mNew.ValidEntries < 0 || mNew.InvalidEntries < 0 {
 			return errors.New("ValidEntries or InvalidEntries overflowed")
-
 		}
 		if fileMetrics[fid].CompareAndSwap(mOld, mNew) {
 			return nil
