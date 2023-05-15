@@ -20,6 +20,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/bwmarrin/snowflake"
@@ -27,6 +28,15 @@ import (
 	"github.com/nutsdb/nutsdb/ds/set"
 	"github.com/nutsdb/nutsdb/ds/zset"
 	"github.com/xujiajun/utils/strconv2"
+)
+
+const (
+	// txStatusRunning means the tx is running
+	txStatusRunning = 1
+	// txStatusCommitting means the tx is committing
+	txStatusCommitting = 2
+	// txStatusClosed means the tx is closed, ether committed or rollback
+	txStatusClosed = 3
 )
 
 var (
@@ -58,6 +68,12 @@ var (
 
 	// ErrNotFoundKey is returned when key not found int the bucket on an view function.
 	ErrNotFoundKey = errors.New("key not found in the bucket")
+
+	// ErrCannotCommitAClosedTx is returned when the tx committing a closed tx
+	ErrCannotCommitAClosedTx = errors.New("can not commit a closed tx")
+
+	// ErrCannotRollbackACommittingTx is returned when the tx rollback a committing tx
+	ErrCannotRollbackACommittingTx = errors.New("can not rollback a committing tx")
 )
 
 var cachePool = sync.Pool{
@@ -71,6 +87,7 @@ type Tx struct {
 	id                     uint64
 	db                     *DB
 	writable               bool
+	status                 atomic.Value
 	pendingWrites          []*Entry
 	ReservedStoreTxIDIdxes map[int64]*BPTree
 }
@@ -88,9 +105,13 @@ func (db *DB) Begin(writable bool) (tx *Tx, err error) {
 	}
 
 	tx.lock()
+	status := txStatusRunning
+	tx.status.Store(status)
 
 	if db.closed {
 		tx.unlock()
+		status = txStatusClosed
+		tx.status.Store(status)
 		return nil, ErrDBClosed
 	}
 
@@ -147,9 +168,22 @@ func (tx *Tx) Commit() error {
 		bucketMetaTemp BucketMeta
 	)
 
+	txCurrentStatus := tx.status.Load().(int)
+	if txCurrentStatus == txStatusClosed {
+		return ErrCannotCommitAClosedTx
+	}
 	if tx.db == nil {
+		status := txStatusClosed
+		tx.status.Store(status)
 		return ErrDBClosed
 	}
+
+	status := txStatusCommitting
+	tx.status.Store(status)
+	defer func() {
+		status = txStatusClosed
+		tx.status.Store(status)
+	}()
 
 	writesLen := len(tx.pendingWrites)
 
@@ -601,10 +635,17 @@ func (tx *Tx) writeData(data []byte) (n int, err error) {
 
 // Rollback closes the transaction.
 func (tx *Tx) Rollback() error {
+	txCurrentStatus := tx.status.Load().(int)
 	if tx.db == nil {
+		status := txStatusClosed
+		tx.status.Store(status)
 		return ErrDBClosed
 	}
-
+	if txCurrentStatus == txStatusCommitting {
+		return ErrCannotRollbackACommittingTx
+	}
+	status := txStatusClosed
+	tx.status.Store(status)
 	tx.unlock()
 
 	tx.db = nil
