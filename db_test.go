@@ -126,7 +126,10 @@ func TestDb_DeleteANonExistKey(t *testing.T) {
 		err := db.Update(func(tx *Tx) error {
 			err := tx.Delete("test_bucket", []byte("test_key"))
 			assert.Equal(t, ErrNotFoundBucket, err)
-			tx.Put("test_bucket", []byte("test_key_1"), []byte("test_value_1"), 0)
+			err = tx.Put("test_bucket", []byte("test_key_1"), []byte("test_value_1"), 0)
+			if err != nil {
+				return err
+			}
 			err = tx.Delete("test_bucket", []byte("test_key"))
 			assert.NotNil(t, ErrNotFoundKey, err)
 			return nil
