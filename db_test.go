@@ -121,6 +121,20 @@ func TestDB_Basic(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestDb_DeleteANonExistKey(t *testing.T) {
+	withDefaultDB(t, func(t *testing.T, db *DB) {
+		err := db.Update(func(tx *Tx) error {
+			err := tx.Delete("test_bucket", []byte("test_key"))
+			assert.Equal(t, ErrNotFoundBucket, err)
+			tx.Put("test_bucket", []byte("test_key_1"), []byte("test_value_1"), 0)
+			err = tx.Delete("test_bucket", []byte("test_key"))
+			assert.NotNil(t, ErrNotFoundKey, err)
+			return nil
+		})
+		assert.Nil(t, err)
+	})
+}
+
 func TestDB_BPTSparse(t *testing.T) {
 	InitOpt("", true)
 	opt.EntryIdxMode = HintBPTSparseIdxMode

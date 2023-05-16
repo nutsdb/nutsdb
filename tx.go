@@ -74,6 +74,9 @@ var (
 
 	// ErrCannotRollbackACommittingTx is returned when the tx rollback a committing tx
 	ErrCannotRollbackACommittingTx = errors.New("can not rollback a committing tx")
+
+	// ErrNotFoundBucket is returned when key not found int the bucket on an view function.
+	ErrNotFoundBucket = errors.New("bucket not found")
 )
 
 var cachePool = sync.Pool{
