@@ -185,6 +185,8 @@ func (tx *Tx) Get(bucket string, key []byte) (e *Entry, err error) {
 
 				return item, nil
 			}
+		} else {
+			return nil, ErrNotFoundBucket
 		}
 	}
 
@@ -870,6 +872,35 @@ func (tx *Tx) PrefixSearchScan(bucket string, prefix []byte, reg string, offsetN
 func (tx *Tx) Delete(bucket string, key []byte) error {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return err
+	}
+	idxMode := tx.db.opt.EntryIdxMode
+
+	if idxMode == HintBPTSparseIdxMode {
+		e, err := tx.getByHintBPTSparseIdx(bucket, key)
+		if e == nil || err == ErrNotFoundKey {
+			return ErrNotFoundKey
+		}
+	}
+
+	if idxMode == HintKeyValAndRAMIdxMode || idxMode == HintKeyAndRAMIdxMode {
+		if idx, ok := tx.db.BPTreeIdx[bucket]; ok {
+			r, err := idx.Find(key)
+			if err != nil {
+				return err
+			}
+			if r == nil {
+				return ErrNotFoundKey
+			}
+			if _, ok := tx.db.committedTxIds[r.H.Meta.TxID]; !ok {
+				return ErrNotFoundKey
+			}
+
+			if r.H.Meta.Flag == DataDeleteFlag || r.IsExpired() {
+				return ErrNotFoundKey
+			}
+		} else {
+			return ErrNotFoundBucket
+		}
 	}
 
 	return tx.put(bucket, key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureBPTree)
