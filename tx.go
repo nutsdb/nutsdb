@@ -108,13 +108,10 @@ func (db *DB) Begin(writable bool) (tx *Tx, err error) {
 	}
 
 	tx.lock()
-	status := txStatusRunning
-	tx.status.Store(status)
-
+	tx.setStatusRunning()
 	if db.closed {
 		tx.unlock()
-		status = txStatusClosed
-		tx.status.Store(status)
+		tx.setStatusClosed()
 		return nil, ErrDBClosed
 	}
 
@@ -171,22 +168,17 @@ func (tx *Tx) Commit() error {
 		bucketMetaTemp BucketMeta
 	)
 
-	txCurrentStatus := tx.status.Load().(int)
-	if txCurrentStatus == txStatusClosed {
+	if tx.isClosed() {
 		return ErrCannotCommitAClosedTx
 	}
+
 	if tx.db == nil {
-		status := txStatusClosed
-		tx.status.Store(status)
+		tx.setStatusClosed()
 		return ErrDBClosed
 	}
 
-	status := txStatusCommitting
-	tx.status.Store(status)
-	defer func() {
-		status = txStatusClosed
-		tx.status.Store(status)
-	}()
+	tx.setStatusCommitting()
+	defer tx.setStatusClosed()
 
 	writesLen := len(tx.pendingWrites)
 
@@ -638,17 +630,14 @@ func (tx *Tx) writeData(data []byte) (n int, err error) {
 
 // Rollback closes the transaction.
 func (tx *Tx) Rollback() error {
-	txCurrentStatus := tx.status.Load().(int)
 	if tx.db == nil {
-		status := txStatusClosed
-		tx.status.Store(status)
+		tx.setStatusClosed()
 		return ErrDBClosed
 	}
-	if txCurrentStatus == txStatusCommitting {
+	if tx.isCommitting() {
 		return ErrCannotRollbackACommittingTx
 	}
-	status := txStatusClosed
-	tx.status.Store(status)
+	tx.setStatusClosed()
 	tx.unlock()
 
 	tx.db = nil
@@ -725,4 +714,40 @@ func (tx *Tx) put(bucket string, key, value []byte, ttl uint32, flag uint16, tim
 	})
 
 	return nil
+}
+
+// setStatusCommitting will change the tx status to txStatusCommitting
+func (tx *Tx) setStatusCommitting() {
+	status := txStatusCommitting
+	tx.status.Store(status)
+}
+
+// setStatusClosed will change the tx status to txStatusClosed
+func (tx *Tx) setStatusClosed() {
+	status := txStatusClosed
+	tx.status.Store(status)
+}
+
+// setStatusRunning will change the tx status to txStatusRunning
+func (tx *Tx) setStatusRunning() {
+	status := txStatusRunning
+	tx.status.Store(status)
+}
+
+// isRunning will check if the tx status is txStatusRunning
+func (tx *Tx) isRunning() bool {
+	status := tx.status.Load().(int)
+	return status == txStatusRunning
+}
+
+// isCommitting will check if the tx status is txStatusCommitting
+func (tx *Tx) isCommitting() bool {
+	status := tx.status.Load().(int)
+	return status == txStatusCommitting
+}
+
+// isClosed will check if the tx status is txStatusClosed
+func (tx *Tx) isClosed() bool {
+	status := tx.status.Load().(int)
+	return status == txStatusClosed
 }
