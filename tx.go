@@ -689,15 +689,7 @@ func (tx *Tx) put(bucket string, key, value []byte, ttl uint32, flag uint16, tim
 		return ErrTxNotWritable
 	}
 
-	if len(key) == 0 {
-		return ErrKeyEmpty
-	}
-
-	if len(bucket) > MAX_SIZE || len(key) > MAX_SIZE || len(value) > MAX_SIZE {
-		return ErrDataSizeExceed
-	}
-
-	tx.pendingWrites = append(tx.pendingWrites, &Entry{
+	e := &Entry{
 		Key:    key,
 		Value:  value,
 		Bucket: []byte(bucket),
@@ -712,7 +704,13 @@ func (tx *Tx) put(bucket string, key, value []byte, ttl uint32, flag uint16, tim
 			Ds:         ds,
 			TxID:       tx.id,
 		},
-	})
+	}
+
+	err := e.valid()
+	if err != nil {
+		return err
+	}
+	tx.pendingWrites = append(tx.pendingWrites, e)
 
 	return nil
 }
