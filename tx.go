@@ -276,7 +276,7 @@ func (tx *Tx) Commit() error {
 		}
 	}
 
-	tx.buildIdxes(writesLen)
+	tx.buildIdxes()
 
 	tx.unlock()
 
@@ -388,7 +388,8 @@ func (tx *Tx) buildTxIDRootIdx(txID uint64, countFlag bool) error {
 	return nil
 }
 
-func (tx *Tx) buildIdxes(writesLen int) {
+func (tx *Tx) buildIdxes() {
+	writesLen := len(tx.pendingWrites)
 	for i := 0; i < writesLen; i++ {
 		entry := tx.pendingWrites[i]
 
