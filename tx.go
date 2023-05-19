@@ -207,10 +207,6 @@ func (tx *Tx) Commit() error {
 			return ErrDataSizeExceed
 		}
 
-		if len(entry.Bucket) > MAX_SIZE || len(entry.Key) > MAX_SIZE || len(entry.Value) > MAX_SIZE {
-			return ErrDataSizeExceed
-		}
-
 		bucket := string(entry.Bucket)
 
 		if tx.db.ActiveFile.ActualSize+int64(buff.Len())+entrySize > tx.db.opt.SegmentSize {
@@ -695,6 +691,10 @@ func (tx *Tx) put(bucket string, key, value []byte, ttl uint32, flag uint16, tim
 
 	if len(key) == 0 {
 		return ErrKeyEmpty
+	}
+
+	if len(bucket) > MAX_SIZE || len(key) > MAX_SIZE || len(value) > MAX_SIZE {
+		return ErrDataSizeExceed
 	}
 
 	tx.pendingWrites = append(tx.pendingWrites, &Entry{
