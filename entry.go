@@ -182,3 +182,13 @@ func (e *Entry) isFilter() bool {
 
 	return false
 }
+
+func (e *Entry) valid() error {
+	if len(e.Key) == 0 {
+		return ErrKeyEmpty
+	}
+	if len(e.Bucket) > MAX_SIZE || len(e.Key) > MAX_SIZE || len(e.Value) > MAX_SIZE {
+		return ErrDataSizeExceed
+	}
+	return nil
+}
