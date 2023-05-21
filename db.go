@@ -566,9 +566,10 @@ func (db *DB) parseDataFiles(dataFileIds []int) (unconfirmedRecords []*Record, c
 				e = nil
 				if db.opt.EntryIdxMode == HintKeyValAndRAMIdxMode {
 					e = &Entry{
-						Key:   entry.Key,
-						Value: entry.Value,
-						Meta:  entry.Meta,
+						Key:    entry.Key,
+						Bucket: entry.Bucket,
+						Value:  entry.Value,
+						Meta:   entry.Meta,
 					}
 				}
 
