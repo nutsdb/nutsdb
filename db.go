@@ -586,7 +586,8 @@ func (db *DB) parseDataFiles(dataFileIds []int) (unconfirmedRecords []*Record, c
 						Meta:    entry.Meta,
 						DataPos: uint64(off),
 					},
-					E: e,
+					E:      e,
+					Bucket: string(entry.Bucket),
 				})
 
 				if db.opt.EntryIdxMode == HintBPTSparseIdxMode {
@@ -757,7 +758,7 @@ func (db *DB) buildHintIdx(dataFileIds []int) error {
 
 	for _, r := range unconfirmedRecords {
 		if _, ok := db.committedTxIds[r.H.Meta.TxID]; ok {
-			bucket := string(r.E.Bucket)
+			bucket := r.Bucket
 
 			if r.H.Meta.Ds == DataStructureBPTree {
 				r.H.Meta.Status = Committed

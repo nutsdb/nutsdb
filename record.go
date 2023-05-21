@@ -18,8 +18,9 @@ import "time"
 
 // Record records entry and hint.
 type Record struct {
-	H *Hint
-	E *Entry
+	H      *Hint
+	E      *Entry
+	Bucket string
 }
 
 // IsExpired returns the record if expired or not.
