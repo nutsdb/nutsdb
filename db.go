@@ -956,7 +956,7 @@ func (db *DB) buildListIdx(bucket string, r *Record) error {
 
 // ErrWhenBuildListIdx returns err when build listIdx
 func ErrWhenBuildListIdx(err error) error {
-	return fmt.Errorf("when build listIdx LRem err: %s", err)
+	return fmt.Errorf("when build listIdx err: %s", err)
 }
 
 // buildIndexes builds indexes when db initialize resource.
