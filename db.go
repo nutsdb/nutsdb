@@ -680,7 +680,7 @@ func (db *DB) buildBPTreeIdx(bucket string, r *Record) error {
 }
 
 func (db *DB) buildActiveBPTreeIdx(r *Record) error {
-	newKey := getNewKey(string(r.E.Bucket), r.H.Key)
+	newKey := getNewKey(r.Bucket, r.H.Key)
 	if err := db.ActiveBPTreeIdx.Insert(newKey, r.E, r.H, CountFlagEnabled); err != nil {
 		return fmt.Errorf("when build BPTreeIdx insert index err: %s", err)
 	}
