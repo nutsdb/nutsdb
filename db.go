@@ -169,18 +169,6 @@ type (
 		fm                      *fileManager
 	}
 
-	// BPTreeIdx represents the B+ tree index
-	BPTreeIdx map[string]*BPTree
-
-	// SetIdx represents the set index
-	SetIdx map[string]*set.Set
-
-	// SortedSetIdx represents the sorted set index
-	SortedSetIdx map[string]*zset.SortedSet
-
-	// ListIdx represents the list index
-	ListIdx map[string]*list.List
-
 	// Entries represents entries
 	Entries []*Entry
 
