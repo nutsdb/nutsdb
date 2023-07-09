@@ -483,9 +483,6 @@ func (tx *Tx) buildSortedSetIdx(bucket string, entry *Entry) {
 }
 
 func (tx *Tx) buildListIdx(bucket string, entry *Entry) {
-	if !tx.db.Index.isBucketExist(bucket) {
-		tx.db.Index.addList(bucket)
-	}
 	l := tx.db.Index.getList(bucket)
 
 	key, value := entry.Key, entry.Value

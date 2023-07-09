@@ -875,11 +875,7 @@ func (db *DB) buildSortedSetIdx(bucket string, r *Record) error {
 
 // buildListIdx builds List index when opening the DB.
 func (db *DB) buildListIdx(bucket string, r *Record) error {
-	var l *list.List
-	if !db.Index.isBucketExist(bucket) {
-		db.Index.addList(bucket)
-	}
-	l = db.Index.getList(bucket)
+	l := db.Index.getList(bucket)
 
 	if r.E == nil {
 		return ErrEntryIdxModeOpt
