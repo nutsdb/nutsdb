@@ -29,7 +29,17 @@ func NewIndex() *index {
 }
 
 func (i *index) getList(bucket string) *list.List {
-	return i.list[bucket]
+	l, isExist := i.list[bucket]
+	if isExist {
+		return l
+	}
+	l = &list.List{
+		Items:     map[string][][]byte{},
+		TTL:       map[string]uint32{},
+		TimeStamp: map[string]uint64{},
+	}
+	i.list[bucket] = l
+	return l
 }
 
 func (i *index) deleteList(bucket string) {
@@ -43,11 +53,6 @@ func (i *index) addList(bucket string) {
 		TimeStamp: map[string]uint64{},
 	}
 	i.list[bucket] = l
-}
-
-func (i *index) isBucketExist(bucket string) bool {
-	_, isExist := i.list[bucket]
-	return isExist
 }
 
 func (i *index) rangeList(f func(l *list.List)) {
