@@ -39,10 +39,15 @@ func (tx *Tx) IterateBuckets(ds uint16, pattern string, f func(key string) bool)
 		}
 	}
 	if ds == DataStructureList {
-		for bucket := range tx.db.ListIdx {
+		f := func(bucket string) error {
 			if end, err := MatchForRange(pattern, bucket, f); end || err != nil {
 				return err
 			}
+			return nil
+		}
+		err := tx.db.Index.handleListBucket(f)
+		if err != nil {
+			return err
 		}
 	}
 	if ds == DataStructureBPTree {

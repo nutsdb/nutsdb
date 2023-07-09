@@ -17,3 +17,51 @@ type SortedSetIdx map[string]*zset.SortedSet
 
 // ListIdx represents the list index
 type ListIdx map[string]*list.List
+
+type index struct {
+	list ListIdx
+}
+
+func NewIndex() *index {
+	i := new(index)
+	i.list = map[string]*list.List{}
+	return i
+}
+
+func (i *index) getList(bucket string) *list.List {
+	return i.list[bucket]
+}
+
+func (i *index) deleteList(bucket string) {
+	delete(i.list, bucket)
+}
+
+func (i *index) addList(bucket string) {
+	l := &list.List{
+		Items:     map[string][][]byte{},
+		TTL:       map[string]uint32{},
+		TimeStamp: map[string]uint64{},
+	}
+	i.list[bucket] = l
+}
+
+func (i *index) isBucketExist(bucket string) bool {
+	_, isExist := i.list[bucket]
+	return isExist
+}
+
+func (i *index) rangeList(f func(l *list.List)) {
+	for _, l := range i.list {
+		f(l)
+	}
+}
+
+func (i *index) handleListBucket(f func(bucket string) error) error {
+	for bucket := range i.list {
+		err := f(bucket)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}

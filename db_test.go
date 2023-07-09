@@ -672,14 +672,10 @@ func opRPushAndCheckForTestMerge(bucketForList string, key []byte, t *testing.T)
 	if err := db.View(func(tx *Tx) error {
 		list, err := tx.LRange(bucketForList, key, 0, 99)
 		if len(list) != 100 {
-			t.Error("TestDB_Merge_For_List err")
+			t.Error("TestDB_Merge_For_List err: ")
 		}
 
-		if err != nil {
-			t.Error(err)
-			return err
-		}
-		return nil
+		return err
 	}); err != nil {
 		t.Fatal(err)
 	}

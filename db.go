@@ -156,7 +156,7 @@ type (
 		bucketMetas             BucketMetasIdx
 		SetIdx                  SetIdx
 		SortedSetIdx            SortedSetIdx
-		ListIdx                 ListIdx
+		Index                   *index
 		ActiveFile              *DataFile
 		ActiveBPTreeIdx         *BPTree
 		ActiveCommittedTxIdsIdx *BPTree
@@ -182,7 +182,6 @@ func open(opt Options) (*DB, error) {
 		BPTreeIdx:               make(BPTreeIdx),
 		SetIdx:                  make(SetIdx),
 		SortedSetIdx:            make(SortedSetIdx),
-		ListIdx:                 make(ListIdx),
 		ActiveBPTreeIdx:         NewTree(),
 		MaxFileID:               0,
 		opt:                     opt,
@@ -192,6 +191,7 @@ func open(opt Options) (*DB, error) {
 		BPTreeKeyEntryPosMap:    make(map[string]int64),
 		bucketMetas:             make(map[string]*BucketMeta),
 		ActiveCommittedTxIdsIdx: NewTree(),
+		Index:                   NewIndex(),
 		fm:                      newFileManager(opt.RWMode, opt.MaxFdNumsInCache, opt.CleanFdsCacheThreshold),
 	}
 
@@ -809,7 +809,7 @@ func (db *DB) deleteBucket(ds uint16, bucket string) {
 		delete(db.BPTreeIdx, bucket)
 	}
 	if ds == DataStructureList {
-		delete(db.ListIdx, bucket)
+		db.Index.deleteList(bucket)
 	}
 }
 
@@ -875,9 +875,11 @@ func (db *DB) buildSortedSetIdx(bucket string, r *Record) error {
 
 // buildListIdx builds List index when opening the DB.
 func (db *DB) buildListIdx(bucket string, r *Record) error {
-	if _, ok := db.ListIdx[bucket]; !ok {
-		db.ListIdx[bucket] = list.New()
+	var l *list.List
+	if !db.Index.isBucketExist(bucket) {
+		db.Index.addList(bucket)
 	}
+	l = db.Index.getList(bucket)
 
 	if r.E == nil {
 		return ErrEntryIdxModeOpt
@@ -892,33 +894,33 @@ func (db *DB) buildListIdx(bucket string, r *Record) error {
 			return err
 		}
 		ttl := uint32(t)
-		db.ListIdx[bucket].TTL[string(r.E.Key)] = ttl
-		db.ListIdx[bucket].TimeStamp[string(r.E.Key)] = r.E.Meta.Timestamp
+		l.TTL[string(r.E.Key)] = ttl
+		l.TimeStamp[string(r.E.Key)] = r.E.Meta.Timestamp
 	case DataLPushFlag:
-		_, _ = db.ListIdx[bucket].LPush(string(r.E.Key), r.E.Value)
+		_, _ = l.LPush(string(r.E.Key), r.E.Value)
 	case DataRPushFlag:
-		_, _ = db.ListIdx[bucket].RPush(string(r.E.Key), r.E.Value)
+		_, _ = l.RPush(string(r.E.Key), r.E.Value)
 	case DataLRemFlag:
 		countAndValueIndex := strings.Split(string(r.E.Value), SeparatorForListKey)
 		count, _ := strconv2.StrToInt(countAndValueIndex[0])
 		value := []byte(countAndValueIndex[1])
 
-		if _, err := db.ListIdx[bucket].LRem(string(r.E.Key), count, value); err != nil {
+		if _, err := l.LRem(string(r.E.Key), count, value); err != nil {
 			return ErrWhenBuildListIdx(err)
 		}
 	case DataLPopFlag:
-		if _, err := db.ListIdx[bucket].LPop(string(r.E.Key)); err != nil {
+		if _, err := l.LPop(string(r.E.Key)); err != nil {
 			return ErrWhenBuildListIdx(err)
 		}
 	case DataRPopFlag:
-		if _, err := db.ListIdx[bucket].RPop(string(r.E.Key)); err != nil {
+		if _, err := l.RPop(string(r.E.Key)); err != nil {
 			return ErrWhenBuildListIdx(err)
 		}
 	case DataLSetFlag:
 		keyAndIndex := strings.Split(string(r.E.Key), SeparatorForListKey)
 		newKey := keyAndIndex[0]
 		index, _ := strconv2.StrToInt(keyAndIndex[1])
-		if err := db.ListIdx[bucket].LSet(newKey, index, r.E.Value); err != nil {
+		if err := l.LSet(newKey, index, r.E.Value); err != nil {
 			return ErrWhenBuildListIdx(err)
 		}
 	case DataLTrimFlag:
@@ -926,7 +928,7 @@ func (db *DB) buildListIdx(bucket string, r *Record) error {
 		newKey := keyAndStartIndex[0]
 		start, _ := strconv2.StrToInt(keyAndStartIndex[1])
 		end, _ := strconv2.StrToInt(string(r.E.Value))
-		if err := db.ListIdx[bucket].Ltrim(newKey, start, end); err != nil {
+		if err := l.Ltrim(newKey, start, end); err != nil {
 			return ErrWhenBuildListIdx(err)
 		}
 	case DataLRemByIndex:
@@ -934,7 +936,7 @@ func (db *DB) buildListIdx(bucket string, r *Record) error {
 		if err != nil {
 			return err
 		}
-		if _, err := db.ListIdx[bucket].LRemByIndex(string(r.E.Key), indexes); err != nil {
+		if _, err := l.LRemByIndex(string(r.E.Key), indexes); err != nil {
 			return ErrWhenBuildListIdx(err)
 		}
 	}
@@ -1094,8 +1096,9 @@ func (db *DB) getPendingMergeEntries(entry *Entry, pendingMergeEntries []*Entry)
 		//if expired, it will clear the items of index
 		//so that nutsdb can clear entry of expiring list in the function getPendingMergeEntries
 		db.checkListExpired()
-		listIdx, exist := db.ListIdx[string(entry.Bucket)]
-		if exist {
+		listIdx := db.Index.getList(string(entry.Bucket))
+
+		if listIdx != nil {
 			items, _ := listIdx.LRange(string(entry.Key), 0, -1)
 			ok := false
 			if entry.Meta.Flag == DataRPushFlag || entry.Meta.Flag == DataLPushFlag {
@@ -1160,12 +1163,11 @@ func (db *DB) getRecordFromKey(bucket, key []byte) (record *Record, err error) {
 }
 
 func (db *DB) checkListExpired() {
-	listIdx := db.ListIdx
-	for bucket := range listIdx {
-		for key := range listIdx[bucket].TTL {
-			listIdx[bucket].IsExpire(key)
+	db.Index.rangeList(func(l *list.List) {
+		for key := range l.TTL {
+			l.IsExpire(key)
 		}
-	}
+	})
 }
 
 // IsClose return the value that represents the status of DB
