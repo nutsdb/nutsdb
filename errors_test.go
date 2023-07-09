@@ -34,3 +34,28 @@ func TestIsKeyNotFound(t *testing.T) {
 		assert.Equal(t, tc.want, got)
 	}
 }
+
+func TestIsDBClosed(t *testing.T) {
+	ts := []struct {
+		err  error
+		want bool
+	}{
+		{
+			ErrDBClosed,
+			true,
+		},
+		{
+			errors.Wrap(ErrDBClosed, "test"),
+			true,
+		},
+		{
+			errors.New("test"),
+			false,
+		},
+	}
+
+	for _, tc := range ts {
+		got := IsDBClosed(tc.err)
+		assert.Equal(t, tc.want, got)
+	}
+}
