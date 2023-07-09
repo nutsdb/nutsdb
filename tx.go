@@ -15,11 +15,9 @@
 package nutsdb
 
 import (
-	"bytes"
 	"errors"
 	"os"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -77,12 +75,6 @@ var (
 	// ErrNotFoundBucket is returned when key not found int the bucket on an view function.
 	ErrNotFoundBucket = errors.New("bucket not found")
 )
-
-var cachePool = sync.Pool{
-	New: func() interface{} {
-		return new(bytes.Buffer)
-	},
-}
 
 // Tx represents a transaction.
 type Tx struct {
@@ -193,11 +185,8 @@ func (tx *Tx) Commit() error {
 		countFlag = CountFlagDisabled
 	}
 
-	buff := cachePool.Get().(*bytes.Buffer)
-	defer func() {
-		buff.Reset()
-		cachePool.Put(buff)
-	}()
+	buff := c.getBuffer()
+	defer c.releaseBuffer(buff)
 
 	for i := 0; i < writesLen; i++ {
 		entry := tx.pendingWrites[i]
