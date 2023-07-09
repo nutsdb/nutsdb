@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"github.com/bwmarrin/snowflake"
-	"github.com/nutsdb/nutsdb/ds/list"
 	"github.com/nutsdb/nutsdb/ds/set"
 	"github.com/nutsdb/nutsdb/ds/zset"
 	"github.com/xujiajun/utils/strconv2"
@@ -484,9 +483,11 @@ func (tx *Tx) buildSortedSetIdx(bucket string, entry *Entry) {
 }
 
 func (tx *Tx) buildListIdx(bucket string, entry *Entry) {
-	if _, ok := tx.db.ListIdx[bucket]; !ok {
-		tx.db.ListIdx[bucket] = list.New()
+	if !tx.db.Index.isBucketExist(bucket) {
+		tx.db.Index.addList(bucket)
 	}
+	l := tx.db.Index.getList(bucket)
+
 	key, value := entry.Key, entry.Value
 	if IsExpired(entry.Meta.TTL, entry.Meta.Timestamp) {
 		return
@@ -495,36 +496,37 @@ func (tx *Tx) buildListIdx(bucket string, entry *Entry) {
 	case DataExpireListFlag:
 		t, _ := strconv2.StrToInt64(string(value))
 		ttl := uint32(t)
-		tx.db.ListIdx[bucket].TTL[string(key)] = ttl
-		tx.db.ListIdx[bucket].TimeStamp[string(key)] = entry.Meta.Timestamp
+		l.TTL[string(key)] = ttl
+		l.TimeStamp[string(key)] = entry.Meta.Timestamp
 	case DataLPushFlag:
-		_, _ = tx.db.ListIdx[bucket].LPush(string(key), value)
+		_, _ = l.LPush(string(key), value)
 	case DataRPushFlag:
-		_, _ = tx.db.ListIdx[bucket].RPush(string(key), value)
+		_, _ = l.RPush(string(key), value)
 	case DataLRemFlag:
 		countAndValue := strings.Split(string(value), SeparatorForListKey)
 		count, _ := strconv2.StrToInt(countAndValue[0])
 		newValue := countAndValue[1]
 
-		_, _ = tx.db.ListIdx[bucket].LRem(string(key), count, []byte(newValue))
+		_, _ = l.LRem(string(key), count, []byte(newValue))
+
 	case DataLPopFlag:
-		_, _ = tx.db.ListIdx[bucket].LPop(string(key))
+		_, _ = l.LPop(string(key))
 	case DataRPopFlag:
-		_, _ = tx.db.ListIdx[bucket].RPop(string(key))
+		_, _ = l.RPop(string(key))
 	case DataLSetFlag:
 		keyAndIndex := strings.Split(string(key), SeparatorForListKey)
 		newKey := keyAndIndex[0]
 		index, _ := strconv2.StrToInt(keyAndIndex[1])
-		_ = tx.db.ListIdx[bucket].LSet(newKey, index, value)
+		_ = l.LSet(newKey, index, value)
 	case DataLTrimFlag:
 		keyAndStartIndex := strings.Split(string(key), SeparatorForListKey)
 		newKey := keyAndStartIndex[0]
 		start, _ := strconv2.StrToInt(keyAndStartIndex[1])
 		end, _ := strconv2.StrToInt(string(value))
-		_ = tx.db.ListIdx[bucket].Ltrim(newKey, start, end)
+		_ = l.Ltrim(newKey, start, end)
 	case DataLRemByIndex:
 		indexes, _ := UnmarshalInts(value)
-		_, _ = tx.db.ListIdx[bucket].LRemByIndex(string(key), indexes)
+		_, _ = l.LRemByIndex(string(key), indexes)
 	}
 }
 
