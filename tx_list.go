@@ -196,9 +196,6 @@ func (tx *Tx) LRem(bucket string, key []byte, count int, value []byte) (removedN
 		return 0, err
 	}
 	l := tx.db.Index.getList(bucket)
-	if l == nil {
-		return 0, ErrBucket
-	}
 
 	removedNum, err = l.LRemNum(string(key), count, value)
 	return
@@ -215,9 +212,6 @@ func (tx *Tx) LSet(bucket string, key []byte, index int, value []byte) error {
 		return err
 	}
 	l := tx.db.Index.getList(bucket)
-	if l == nil {
-		return ErrBucket
-	}
 	if tx.CheckExpire(bucket, key) {
 		return ErrKeyNotFound
 	}
@@ -255,9 +249,6 @@ func (tx *Tx) LTrim(bucket string, key []byte, start, end int) error {
 	}
 
 	l := tx.db.Index.getList(bucket)
-	if l == nil {
-		return ErrBucket
-	}
 	if tx.CheckExpire(bucket, key) {
 		return ErrKeyNotFound
 	}
@@ -283,9 +274,6 @@ func (tx *Tx) LRemByIndex(bucket string, key []byte, indexes ...int) (removedNum
 		return 0, err
 	}
 	l := tx.db.Index.getList(bucket)
-	if l == nil {
-		return 0, ErrBucket
-	}
 	if tx.CheckExpire(bucket, key) {
 		return 0, ErrKeyNotFound
 	}
@@ -330,9 +318,6 @@ func (tx *Tx) ExpireList(bucket string, key []byte, ttl uint32) error {
 		return err
 	}
 	l := tx.db.Index.getList(bucket)
-	if l == nil {
-		return ErrBucket
-	}
 	l.TTL[string(key)] = ttl
 	l.TimeStamp[string(key)] = uint64(time.Now().Unix())
 	ttls := strconv2.Int64ToStr(int64(ttl))
