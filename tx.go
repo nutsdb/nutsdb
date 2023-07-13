@@ -74,6 +74,8 @@ var (
 	// ErrCannotRollbackACommittingTx is returned when the tx rollback a committing tx
 	ErrCannotRollbackACommittingTx = errors.New("can not rollback a committing tx")
 
+	ErrCannotRollbackAClosedTx = errors.New("can not rollback a closed tx")
+
 	// ErrNotFoundBucket is returned when key not found int the bucket on an view function.
 	ErrNotFoundBucket = errors.New("bucket not found")
 )
@@ -161,7 +163,15 @@ func (tx *Tx) getTxID() (id uint64, err error) {
 // 4. build Hint index.
 //
 // 5. Unlock the database and clear the db field.
-func (tx *Tx) Commit() error {
+func (tx *Tx) Commit() (err error) {
+	defer func() {
+		tx.unlock()
+		tx.db = nil
+
+		tx.pendingWrites = nil
+		tx.ReservedStoreTxIDIdxes = nil
+	}()
+
 	var (
 		e              *Entry
 		bucketMetaTemp BucketMeta
@@ -182,8 +192,6 @@ func (tx *Tx) Commit() error {
 	writesLen := len(tx.pendingWrites)
 
 	if writesLen == 0 {
-		tx.unlock()
-		tx.db = nil
 		return nil
 	}
 
@@ -272,13 +280,6 @@ func (tx *Tx) Commit() error {
 	}
 
 	tx.buildIdxes()
-
-	tx.unlock()
-
-	tx.db = nil
-
-	tx.pendingWrites = nil
-	tx.ReservedStoreTxIDIdxes = nil
 
 	return nil
 }
@@ -633,6 +634,11 @@ func (tx *Tx) Rollback() error {
 	if tx.isCommitting() {
 		return ErrCannotRollbackACommittingTx
 	}
+
+	if tx.isClosed() {
+		return ErrCannotRollbackAClosedTx
+	}
+
 	tx.setStatusClosed()
 	tx.unlock()
 
