@@ -508,8 +508,6 @@ func TestTx_Put_Err(t *testing.T) {
 			assert.NoError(t, err)
 
 			assert.Error(t, tx.Commit()) // too big cannot commit by tx
-
-			assert.NoError(t, tx.Rollback())
 		})
 	})
 }

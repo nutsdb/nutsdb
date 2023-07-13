@@ -22,6 +22,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime/debug"
 	"sort"
 	"strings"
 	"sync"
@@ -987,15 +988,9 @@ func (db *DB) managed(writable bool, fn func(tx *Tx) error) (err error) {
 		return err
 	}
 	defer func() {
-		var panicked bool
 		if r := recover(); r != nil {
-			// resume normal execution
-			panicked = true
-		}
-		if panicked || err != nil {
-			if errRollback := tx.Rollback(); errRollback != nil {
-				err = errRollback
-			}
+			err = errors.New(fmt.Sprintf("panic when executing tx, err is %+v", r))
+			debug.PrintStack()
 		}
 	}()
 
