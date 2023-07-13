@@ -215,7 +215,7 @@ func TestDB_SDiffByOneBucket(t *testing.T) {
 		t.Error(err)
 	}
 	for _, v := range list {
-		if bytes.Compare(v, val) != 0 {
+		if !bytes.Equal(v, val) {
 			t.Errorf("err SDiffByOneBucket, expect %s, but get %s", val, v)
 		}
 	}
@@ -249,7 +249,7 @@ func TestDB_SDiffByTwoBuckets(t *testing.T) {
 		t.Error(err)
 	}
 	for _, v := range list {
-		if bytes.Compare(v, val) != 0 {
+		if !bytes.Equal(v, val) {
 			t.Errorf("err SDiffByOneBucket, expect %s, but get %s", val, v)
 		}
 	}
