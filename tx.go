@@ -162,6 +162,9 @@ func (tx *Tx) getTxID() (id uint64, err error) {
 //
 // 5. Unlock the database and clear the db field.
 func (tx *Tx) Commit() error {
+	defer func() {
+		tx.unlock()
+	}()
 	var (
 		e              *Entry
 		bucketMetaTemp BucketMeta
@@ -182,7 +185,6 @@ func (tx *Tx) Commit() error {
 	writesLen := len(tx.pendingWrites)
 
 	if writesLen == 0 {
-		tx.unlock()
 		tx.db = nil
 		return nil
 	}
@@ -272,8 +274,6 @@ func (tx *Tx) Commit() error {
 	}
 
 	tx.buildIdxes()
-
-	tx.unlock()
 
 	tx.db = nil
 
