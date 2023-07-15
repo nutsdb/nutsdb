@@ -65,13 +65,12 @@ func (e *Entry) Size() int64 {
 
 // Encode returns the slice after the entry be encoded.
 //
-//  the entry stored format:
-//  |----------------------------------------------------------------------------------------------------------------|
-//  |  crc  | timestamp | ksz | valueSize | flag  | TTL  |bucketSize| status | ds   | txId |  bucket |  key  | value |
-//  |----------------------------------------------------------------------------------------------------------------|
-//  | uint32| uint64  |uint32 |  uint32 | uint16  | uint32| uint32 | uint16 | uint16 |uint64 |[]byte|[]byte | []byte |
-//  |----------------------------------------------------------------------------------------------------------------|
-//
+//	the entry stored format:
+//	|----------------------------------------------------------------------------------------------------------------|
+//	|  crc  | timestamp | ksz | valueSize | flag  | TTL  |bucketSize| status | ds   | txId |  bucket |  key  | value |
+//	|----------------------------------------------------------------------------------------------------------------|
+//	| uint32| uint64  |uint32 |  uint32 | uint16  | uint32| uint32 | uint16 | uint16 |uint64 |[]byte|[]byte | []byte |
+//	|----------------------------------------------------------------------------------------------------------------|
 func (e *Entry) Encode() []byte {
 	keySize := e.Meta.KeySize
 	valueSize := e.Meta.ValueSize
@@ -191,4 +190,28 @@ func (e *Entry) valid() error {
 		return ErrDataSizeExceed
 	}
 	return nil
+}
+
+func NewHint() *Hint {
+	return new(Hint)
+}
+
+func (h *Hint) WithKey(key []byte) *Hint {
+	h.Key = key
+	return h
+}
+
+func (h *Hint) WithFileId(fid int64) *Hint {
+	h.FileID = fid
+	return h
+}
+
+func (h *Hint) WithMeta(meta *MetaData) *Hint {
+	h.Meta = meta
+	return h
+}
+
+func (h *Hint) WithDataPos(pos uint64) *Hint {
+	h.DataPos = pos
+	return h
 }
