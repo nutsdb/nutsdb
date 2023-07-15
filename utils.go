@@ -82,3 +82,12 @@ func MatchForRange(pattern, key string, f func(key string) bool) (end bool, err 
 	}
 	return false, nil
 }
+
+func OneOfUint16Array(value uint16, array []uint16) bool {
+	for _, v := range array {
+		if v == value {
+			return true
+		}
+	}
+	return false
+}

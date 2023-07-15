@@ -65,13 +65,12 @@ func (e *Entry) Size() int64 {
 
 // Encode returns the slice after the entry be encoded.
 //
-//  the entry stored format:
-//  |----------------------------------------------------------------------------------------------------------------|
-//  |  crc  | timestamp | ksz | valueSize | flag  | TTL  |bucketSize| status | ds   | txId |  bucket |  key  | value |
-//  |----------------------------------------------------------------------------------------------------------------|
-//  | uint32| uint64  |uint32 |  uint32 | uint16  | uint32| uint32 | uint16 | uint16 |uint64 |[]byte|[]byte | []byte |
-//  |----------------------------------------------------------------------------------------------------------------|
-//
+//	the entry stored format:
+//	|----------------------------------------------------------------------------------------------------------------|
+//	|  crc  | timestamp | ksz | valueSize | flag  | TTL  |bucketSize| status | ds   | txId |  bucket |  key  | value |
+//	|----------------------------------------------------------------------------------------------------------------|
+//	| uint32| uint64  |uint32 |  uint32 | uint16  | uint32| uint32 | uint16 | uint16 |uint64 |[]byte|[]byte | []byte |
+//	|----------------------------------------------------------------------------------------------------------------|
 func (e *Entry) Encode() []byte {
 	keySize := e.Meta.KeySize
 	valueSize := e.Meta.ValueSize
@@ -171,11 +170,19 @@ func (e *Entry) ParseMeta(buf []byte) error {
 // isFilter to confirm if this entry is can be filtered
 func (e *Entry) isFilter() bool {
 	meta := e.Meta
-	if meta.Flag == DataDeleteFlag || meta.Flag == DataRPopFlag ||
-		meta.Flag == DataLPopFlag || meta.Flag == DataLRemFlag ||
-		meta.Flag == DataLTrimFlag || meta.Flag == DataZRemFlag ||
-		meta.Flag == DataZRemRangeByRankFlag || meta.Flag == DataZPopMaxFlag ||
-		meta.Flag == DataZPopMinFlag || meta.Flag == DataLRemByIndex ||
+	var filterDataSet = []uint16{
+		DataDeleteFlag,
+		DataRPopFlag,
+		DataLPopFlag,
+		DataLRemFlag,
+		DataLTrimFlag,
+		DataZRemFlag,
+		DataZRemRangeByRankFlag,
+		DataZPopMaxFlag,
+		DataZPopMinFlag,
+		DataLRemByIndex,
+	}
+	if OneOfUint16Array(meta.Flag, filterDataSet) ||
 		IsExpired(meta.TTL, meta.Timestamp) {
 		return true
 	}
