@@ -564,16 +564,12 @@ func (db *DB) parseDataFiles(dataFileIds []int) (unconfirmedRecords []*Record, c
 				if entry.Meta.Status == Committed {
 					committedTxIds[entry.Meta.TxID] = struct{}{}
 					db.ActiveCommittedTxIdsIdx.Insert([]byte(strconv2.Int64ToStr(int64(entry.Meta.TxID))), nil,
-						&Hint{Meta: &MetaData{Flag: DataSetFlag}}, CountFlagEnabled)
+						NewHint().WithMeta(&MetaData{Flag: DataSetFlag}), CountFlagEnabled,
+					)
 				}
 
 				unconfirmedRecords = append(unconfirmedRecords, &Record{
-					H: &Hint{
-						Key:     entry.Key,
-						FileID:  fID,
-						Meta:    entry.Meta,
-						DataPos: uint64(off),
-					},
+					H:      NewHint().WithKey(entry.Key).WithFileId(fID).WithMeta(entry.Meta).WithDataPos(uint64(off)),
 					E:      e,
 					Bucket: string(entry.Bucket),
 				})
