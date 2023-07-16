@@ -170,11 +170,19 @@ func (e *Entry) ParseMeta(buf []byte) error {
 // isFilter to confirm if this entry is can be filtered
 func (e *Entry) isFilter() bool {
 	meta := e.Meta
-	if meta.Flag == DataDeleteFlag || meta.Flag == DataRPopFlag ||
-		meta.Flag == DataLPopFlag || meta.Flag == DataLRemFlag ||
-		meta.Flag == DataLTrimFlag || meta.Flag == DataZRemFlag ||
-		meta.Flag == DataZRemRangeByRankFlag || meta.Flag == DataZPopMaxFlag ||
-		meta.Flag == DataZPopMinFlag || meta.Flag == DataLRemByIndex ||
+	var filterDataSet = []uint16{
+		DataDeleteFlag,
+		DataRPopFlag,
+		DataLPopFlag,
+		DataLRemFlag,
+		DataLTrimFlag,
+		DataZRemFlag,
+		DataZRemRangeByRankFlag,
+		DataZPopMaxFlag,
+		DataZPopMinFlag,
+		DataLRemByIndex,
+	}
+	if OneOfUint16Array(meta.Flag, filterDataSet) ||
 		IsExpired(meta.TTL, meta.Timestamp) {
 		return true
 	}
