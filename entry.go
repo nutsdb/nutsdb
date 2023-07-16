@@ -223,3 +223,27 @@ func (h *Hint) WithDataPos(pos uint64) *Hint {
 	h.DataPos = pos
 	return h
 }
+
+func NewEntry() *Entry {
+	return new(Entry)
+}
+
+func (e *Entry) WithKey(key []byte) *Entry {
+	e.Key = key
+	return e
+}
+
+func (e *Entry) WithValue(value []byte) *Entry {
+	e.Value = value
+	return e
+}
+
+func (e *Entry) WithMeta(meta *MetaData) *Entry {
+	e.Meta = meta
+	return e
+}
+
+func (e *Entry) WithBucket(bucket []byte) *Entry {
+	e.Bucket = bucket
+	return e
+}

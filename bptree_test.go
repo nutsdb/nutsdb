@@ -43,7 +43,7 @@ func withBPTree(t *testing.T, fn func(t *testing.T, tree *BPTree)) {
 
 		meta := &MetaData{Flag: DataSetFlag}
 		err := tree.Insert(key,
-			&Entry{Key: key, Value: val},
+			NewEntry().WithKey(key).WithValue(val),
 			NewHint().WithKey(key).WithMeta(meta),
 			CountFlagEnabled)
 		require.NoError(t, err)
@@ -60,7 +60,12 @@ func setup(t *testing.T, limit int) {
 	for i := 0; i < 100; i++ {
 		key := []byte("key_" + fmt.Sprintf("%03d", i))
 		val := []byte("val_" + fmt.Sprintf("%03d", i))
-		err := tree.Insert(key, &Entry{Key: key, Value: val}, NewHint().WithKey(key).WithMeta(meta), CountFlagEnabled)
+		err := tree.Insert(
+			key,
+			NewEntry().WithKey(key).WithValue(val),
+			NewHint().WithKey(key).WithMeta(meta),
+			CountFlagEnabled,
+		)
 		require.NoError(t, err)
 	}
 
@@ -69,7 +74,12 @@ func setup(t *testing.T, limit int) {
 		key := []byte("key_" + fmt.Sprintf("%03d", i))
 		val := []byte("val_" + fmt.Sprintf("%03d", i))
 
-		expected = append(expected, &Record{E: &Entry{Key: key, Value: val}, H: NewHint().WithKey(key).WithMeta(meta)})
+		expected = append(
+			expected,
+			&Record{
+				E: NewEntry().WithKey(key).WithValue(val),
+				H: NewHint().WithKey(key).WithMeta(meta)},
+		)
 	}
 }
 
@@ -168,7 +178,12 @@ func TestBPTree_PrefixScan(t *testing.T) {
 			for i := 0; i <= 100; i++ {
 				key := []byte("name_" + fmt.Sprintf("%03d", i))
 				val := []byte("val_" + fmt.Sprintf("%03d", i))
-				err := tree.Insert(key, &Entry{Key: key, Value: val}, NewHint().WithKey(key).WithMeta(meta), CountFlagEnabled)
+				err := tree.Insert(
+					key,
+					NewEntry().WithKey(key).WithValue(val),
+					NewHint().WithKey(key).WithMeta(meta),
+					CountFlagEnabled,
+				)
 				require.NoError(t, err)
 			}
 
@@ -261,7 +276,12 @@ func TestBPTree_PrefixSearchScan(t *testing.T) {
 	for i := 0; i <= 100; i++ {
 		key := []byte("name_" + fmt.Sprintf("%03d", i))
 		val := []byte("val_" + fmt.Sprintf("%03d", i))
-		err := tree.Insert(key, &Entry{Key: key, Value: val}, NewHint().WithKey(key).WithMeta(meta), CountFlagEnabled)
+		err := tree.Insert(
+			key,
+			NewEntry().WithKey(key).WithValue(val),
+			NewHint().WithKey(key).WithMeta(meta),
+			CountFlagEnabled,
+		)
 		require.NoError(t, err)
 	}
 
@@ -355,7 +375,12 @@ func TestBPTree_Update(t *testing.T) {
 	for i := 0; i <= 100; i++ {
 		key := []byte("key_" + fmt.Sprintf("%03d", i))
 		val := []byte("val_modify" + fmt.Sprintf("%03d", i))
-		err := tree.Insert(key, &Entry{Key: key, Value: val}, NewHint().WithKey(key).WithMeta(meta), CountFlagEnabled)
+		err := tree.Insert(
+			key,
+			NewEntry().WithKey(key).WithValue(val),
+
+			NewHint().WithKey(key).WithMeta(meta),
+			CountFlagEnabled)
 
 		require.NoError(t, err)
 	}
@@ -368,7 +393,10 @@ func TestBPTree_Update(t *testing.T) {
 		key := []byte("key_" + fmt.Sprintf("%03d", i))
 		val := []byte("val_modify" + fmt.Sprintf("%03d", i))
 
-		expected = append(expected, &Record{E: &Entry{Key: key, Value: val}, H: NewHint().WithKey(key).WithMeta(meta)})
+		expected = append(expected, &Record{
+			E: NewEntry().WithKey(key).WithValue(val),
+			H: NewHint().WithKey(key).WithMeta(meta)},
+		)
 	}
 
 	rs, err := tree.Range([]byte("key_000"), []byte("key_009"))
@@ -384,7 +412,12 @@ func TestBPTree_Update(t *testing.T) {
 	}
 	for i := 1; i <= limit; i++ {
 		key := []byte("key_" + fmt.Sprintf("%03d", i))
-		err := tree.Insert(key, &Entry{Key: key, Value: nil}, NewHint().WithKey(key).WithMeta(meta), CountFlagEnabled)
+		err := tree.Insert(
+			key,
+			NewEntry().WithKey(key),
+			NewHint().WithKey(key).WithMeta(meta),
+			CountFlagEnabled,
+		)
 
 		assert.NoError(t, err)
 	}
@@ -400,7 +433,12 @@ func TestBPTree_Update(t *testing.T) {
 	meta = &MetaData{
 		Flag: DataSetFlag,
 	}
-	err = tree.Insert(key, &Entry{Key: key, Value: nil}, NewHint().WithKey(key).WithMeta(meta), CountFlagEnabled)
+	err = tree.Insert(
+		key,
+		NewEntry().WithKey(key),
+		NewHint().WithKey(key).WithMeta(meta),
+		CountFlagEnabled,
+	)
 	assert.NoError(t, err)
 
 	r, err := tree.Find(key)
