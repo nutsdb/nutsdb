@@ -25,7 +25,7 @@ func TestPrintSortedMap(t *testing.T) {
 	entries := make(map[string]*Entry, 10)
 	for i := 0; i < 10; i++ {
 		k := strconv2.IntToStr(i)
-		entries[k] = &Entry{Key: []byte(k)}
+		entries[k] = NewEntry().WithKey([]byte(k))
 	}
 
 	keys, _ := SortedEntryKeys(entries)

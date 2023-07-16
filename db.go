@@ -553,12 +553,7 @@ func (db *DB) parseDataFiles(dataFileIds []int) (unconfirmedRecords []*Record, c
 
 				e = nil
 				if db.opt.EntryIdxMode == HintKeyValAndRAMIdxMode {
-					e = &Entry{
-						Key:    entry.Key,
-						Bucket: entry.Bucket,
-						Value:  entry.Value,
-						Meta:   entry.Meta,
-					}
+					e = NewEntry().WithKey(entry.Key).WithValue(entry.Value).WithBucket(entry.Bucket).WithMeta(entry.Meta)
 				}
 
 				if entry.Meta.Status == Committed {

@@ -704,22 +704,18 @@ func (tx *Tx) put(bucket string, key, value []byte, ttl uint32, flag uint16, tim
 		return ErrTxNotWritable
 	}
 
-	e := &Entry{
-		Key:    key,
-		Value:  value,
-		Bucket: []byte(bucket),
-		Meta: &MetaData{
-			KeySize:    uint32(len(key)),
-			ValueSize:  uint32(len(value)),
-			Timestamp:  timestamp,
-			Flag:       flag,
-			TTL:        ttl,
-			BucketSize: uint32(len(bucket)),
-			Status:     UnCommitted,
-			Ds:         ds,
-			TxID:       tx.id,
-		},
+	meta := &MetaData{
+		KeySize:    uint32(len(key)),
+		ValueSize:  uint32(len(value)),
+		Timestamp:  timestamp,
+		Flag:       flag,
+		TTL:        ttl,
+		BucketSize: uint32(len(bucket)),
+		Status:     UnCommitted,
+		Ds:         ds,
+		TxID:       tx.id,
 	}
+	e := NewEntry().WithKey(key).WithBucket([]byte(bucket)).WithMeta(meta).WithValue(value)
 
 	err := e.valid()
 	if err != nil {
