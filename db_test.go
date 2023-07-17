@@ -211,7 +211,6 @@ func TestDB_Merge_For_string(t *testing.T) {
 	)
 
 	require.NoError(t, err)
-
 	bucketForString := "test_merge"
 
 	key1 := []byte("key_" + fmt.Sprintf("%07d", 1))
