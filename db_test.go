@@ -207,12 +207,10 @@ func TestDB_Merge_For_string(t *testing.T) {
 	db2, err := Open(
 		DefaultOptions,
 		WithDir(fileDir),
-		WithNodeNum(1011),
 		WithSegmentSize(1*100),
 	)
 
 	require.NoError(t, err)
-	assert.Equal(t, int64(1011), db2.opt.NodeNum)
 	bucketForString := "test_merge"
 
 	key1 := []byte("key_" + fmt.Sprintf("%07d", 1))
