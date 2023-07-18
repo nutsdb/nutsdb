@@ -205,6 +205,8 @@ func (fdm *fdManager) closeByPath(path string) error {
 	if !ok {
 		return nil
 	}
+	delete(fdm.cache, path)
+
 	fdm.fdList.removeNode(fdInfo)
 	return fdInfo.fd.Close()
 }
