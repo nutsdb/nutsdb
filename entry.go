@@ -143,6 +143,7 @@ func (e *Entry) ParsePayload(data []byte) error {
 	return nil
 }
 
+// checkPayloadSize checks the payload size
 func (e *Entry) checkPayloadSize(size int64) error {
 	if e.Meta.PayloadSize() != size {
 		return payLoadSizeMismatchErr
@@ -150,6 +151,7 @@ func (e *Entry) checkPayloadSize(size int64) error {
 	return nil
 }
 
+// ParseMeta parse meta object to entry
 func (e *Entry) ParseMeta(buf []byte) error {
 	meta := &MetaData{
 		Crc:        binary.LittleEndian.Uint32(buf[0:4]),
@@ -190,6 +192,7 @@ func (e *Entry) isFilter() bool {
 	return false
 }
 
+// valid check the entry fields valid or not
 func (e *Entry) valid() error {
 	if len(e.Key) == 0 {
 		return ErrKeyEmpty
@@ -200,49 +203,59 @@ func (e *Entry) valid() error {
 	return nil
 }
 
+// NewHint new Hint object
 func NewHint() *Hint {
 	return new(Hint)
 }
 
+// WithKey set key to Hint
 func (h *Hint) WithKey(key []byte) *Hint {
 	h.Key = key
 	return h
 }
 
+// WithFileId set FileID to Hint
 func (h *Hint) WithFileId(fid int64) *Hint {
 	h.FileID = fid
 	return h
 }
 
+// WithMeta set Meta to Hint
 func (h *Hint) WithMeta(meta *MetaData) *Hint {
 	h.Meta = meta
 	return h
 }
 
+// WithDataPos set DataPos to Hint
 func (h *Hint) WithDataPos(pos uint64) *Hint {
 	h.DataPos = pos
 	return h
 }
 
+// NewEntry new Entry Object
 func NewEntry() *Entry {
 	return new(Entry)
 }
 
+// WithKey set key to Entry
 func (e *Entry) WithKey(key []byte) *Entry {
 	e.Key = key
 	return e
 }
 
+// WithValue set value to Entry
 func (e *Entry) WithValue(value []byte) *Entry {
 	e.Value = value
 	return e
 }
 
+// WithMeta set meta to Entry
 func (e *Entry) WithMeta(meta *MetaData) *Entry {
 	e.Meta = meta
 	return e
 }
 
+// WithBucket set bucket to Entry
 func (e *Entry) WithBucket(bucket []byte) *Entry {
 	e.Bucket = bucket
 	return e
