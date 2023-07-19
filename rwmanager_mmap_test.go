@@ -60,9 +60,8 @@ func TestRWManager_MMap_WriteAt(t *testing.T) {
 	filePath := "/tmp/foo_rw_filemmap"
 	maxFdNums := 1024
 	cleanThreshold := 0.5
-	var fdm *fdManager
+	var fdm = newFdm(maxFdNums, cleanThreshold)
 
-	fdm = newFdm(maxFdNums, cleanThreshold)
 	fd, err := fdm.getFd(filePath)
 	if err != nil {
 		require.NoError(t, err)
@@ -94,9 +93,8 @@ func TestRWManager_MMap_Sync(t *testing.T) {
 	filePath := "/tmp/foo_rw_filemmap"
 	maxFdNums := 1024
 	cleanThreshold := 0.5
-	var fdm *fdManager
+	var fdm = newFdm(maxFdNums, cleanThreshold)
 
-	fdm = newFdm(maxFdNums, cleanThreshold)
 	fd, err := fdm.getFd(filePath)
 	if err != nil {
 		require.NoError(t, err)
@@ -126,9 +124,8 @@ func TestRWManager_MMap_Close(t *testing.T) {
 	filePath := "/tmp/foo_rw_filemmap"
 	maxFdNums := 1024
 	cleanThreshold := 0.5
-	var fdm *fdManager
+	var fdm = newFdm(maxFdNums, cleanThreshold)
 
-	fdm = newFdm(maxFdNums, cleanThreshold)
 	fd, err := fdm.getFd(filePath)
 	if err != nil {
 		require.NoError(t, err)
