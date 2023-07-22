@@ -17,6 +17,7 @@ package nutsdb
 import (
 	"encoding/binary"
 	"errors"
+	"github.com/xujiajun/utils/strconv2"
 	"hash/crc32"
 )
 
@@ -259,4 +260,14 @@ func (e *Entry) WithMeta(meta *MetaData) *Entry {
 func (e *Entry) WithBucket(bucket []byte) *Entry {
 	e.Bucket = bucket
 	return e
+}
+
+// GetBucketString return the string of bucket
+func (e *Entry) GetBucketString() string {
+	return string(e.Bucket)
+}
+
+// GetTxIDBytes return the bytes of TxID
+func (e *Entry) GetTxIDBytes() []byte {
+	return []byte(strconv2.Int64ToStr(int64(e.Meta.TxID)))
 }

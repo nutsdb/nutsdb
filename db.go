@@ -558,16 +558,13 @@ func (db *DB) parseDataFiles(dataFileIds []int) (unconfirmedRecords []*Record, c
 
 				if entry.Meta.Status == Committed {
 					committedTxIds[entry.Meta.TxID] = struct{}{}
-					db.ActiveCommittedTxIdsIdx.Insert([]byte(strconv2.Int64ToStr(int64(entry.Meta.TxID))), nil,
-						NewHint().WithMeta(&MetaData{Flag: DataSetFlag}), CountFlagEnabled,
-					)
+					h := NewHint().WithMeta(&MetaData{Flag: DataSetFlag})
+					db.ActiveCommittedTxIdsIdx.Insert(e.GetTxIDBytes(), nil, h, CountFlagEnabled)
 				}
 
-				unconfirmedRecords = append(unconfirmedRecords, &Record{
-					H:      NewHint().WithKey(entry.Key).WithFileId(fID).WithMeta(entry.Meta).WithDataPos(uint64(off)),
-					E:      e,
-					Bucket: string(entry.Bucket),
-				})
+				h := NewHint().WithKey(entry.Key).WithFileId(fID).WithMeta(entry.Meta).WithDataPos(uint64(off))
+				r := NewRecord().WithHint(h).WithEntry(e).WithBucket(e.GetBucketString())
+				unconfirmedRecords = append(unconfirmedRecords, r)
 
 				if db.opt.EntryIdxMode == HintBPTSparseIdxMode {
 					db.BPTreeKeyEntryPosMap[string(getNewKey(string(entry.Bucket), entry.Key))] = off
