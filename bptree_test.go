@@ -74,11 +74,11 @@ func setup(t *testing.T, limit int) {
 		key := []byte("key_" + fmt.Sprintf("%03d", i))
 		val := []byte("val_" + fmt.Sprintf("%03d", i))
 
+		E := NewEntry().WithKey(key).WithValue(val)
+		H := NewHint().WithKey(key).WithMeta(meta)
 		expected = append(
 			expected,
-			&Record{
-				E: NewEntry().WithKey(key).WithValue(val),
-				H: NewHint().WithKey(key).WithMeta(meta)},
+			NewRecord().WithEntry(E).WithHint(H),
 		)
 	}
 }
@@ -343,10 +343,8 @@ func TestRecordExpired(t *testing.T) {
 			Timestamp: expiredTime,
 			TTL:       10,
 		}
-		record := &Record{
-			H: NewHint().WithMeta(meta),
-			E: nil,
-		}
+		H := NewHint().WithMeta(meta)
+		record := NewRecord().WithHint(H)
 
 		assert.True(t, record.IsExpired())
 	})
@@ -356,11 +354,9 @@ func TestRecordExpired(t *testing.T) {
 			Timestamp: expiredTime,
 			TTL:       Persistent,
 		}
-		record := &Record{
-			H: NewHint().WithMeta(meta),
-			E: nil,
-		}
 
+		H := NewHint().WithMeta(meta)
+		record := NewRecord().WithHint(H)
 		assert.False(t, record.IsExpired())
 	})
 }
@@ -393,10 +389,10 @@ func TestBPTree_Update(t *testing.T) {
 		key := []byte("key_" + fmt.Sprintf("%03d", i))
 		val := []byte("val_modify" + fmt.Sprintf("%03d", i))
 
-		expected = append(expected, &Record{
-			E: NewEntry().WithKey(key).WithValue(val),
-			H: NewHint().WithKey(key).WithMeta(meta)},
-		)
+		E := NewEntry().WithKey(key).WithValue(val)
+		H := NewHint().WithKey(key).WithMeta(meta)
+		R := NewRecord().WithHint(H).WithEntry(E)
+		expected = append(expected, R)
 	}
 
 	rs, err := tree.Range([]byte("key_000"), []byte("key_009"))

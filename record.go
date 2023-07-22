@@ -45,3 +45,26 @@ func (r *Record) UpdateRecord(h *Hint, e *Entry) error {
 
 	return nil
 }
+
+// NewRecord generate a record Obj
+func NewRecord() *Record {
+	return new(Record)
+}
+
+// WithHint set the Hint to Record
+func (r *Record) WithHint(hint *Hint) *Record {
+	r.H = hint
+	return r
+}
+
+// WithEntry set the Entry to Record
+func (r *Record) WithEntry(e *Entry) *Record {
+	r.E = e
+	return r
+}
+
+// WithBucket set the Bucket to Record
+func (r *Record) WithBucket(bucket string) *Record {
+	r.Bucket = bucket
+	return r
+}
