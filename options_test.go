@@ -1,8 +1,9 @@
 package nutsdb
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestWithNodeNum(t *testing.T) {
@@ -13,4 +14,13 @@ func TestWithNodeNum(t *testing.T) {
 	)
 	assert.NoError(t, err)
 	assert.Equal(t, int64(1011), db.opt.NodeNum)
+}
+
+func TestWithRWMode(t *testing.T) {
+	db, err = Open(DefaultOptions,
+		WithDir("/tmp/nutsdb"),
+		WithRWMode(MMap),
+	)
+	assert.NoError(t, err)
+	assert.Equal(t, db.opt.RWMode, MMap)
 }
