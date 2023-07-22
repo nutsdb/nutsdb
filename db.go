@@ -558,8 +558,12 @@ func (db *DB) parseDataFiles(dataFileIds []int) (unconfirmedRecords []*Record, c
 
 				if entry.Meta.Status == Committed {
 					committedTxIds[entry.Meta.TxID] = struct{}{}
-					h := NewHint().WithMeta(&MetaData{Flag: DataSetFlag})
-					db.ActiveCommittedTxIdsIdx.Insert(e.GetTxIDBytes(), nil, h, CountFlagEnabled)
+					meta := &MetaData{Flag: DataSetFlag}
+					h := NewHint().WithMeta(meta)
+					err := db.ActiveCommittedTxIdsIdx.Insert(e.GetTxIDBytes(), nil, h, CountFlagEnabled)
+					if err != nil {
+						return nil, nil, fmt.Errorf("can not ingest the hint obj to ActiveCommittedTxIdsIdx, err: %s", err.Error())
+					}
 				}
 
 				h := NewHint().WithKey(entry.Key).WithFileId(fID).WithMeta(entry.Meta).WithDataPos(uint64(off))
