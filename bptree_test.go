@@ -582,3 +582,29 @@ func TestBPTree_WriteNode(t *testing.T) {
 	// remove the test file
 	_ = os.Remove(testFilename)
 }
+
+func TestEnqueueDequeue(t *testing.T) {
+	// init test data
+	node1 := &Node{KeysNum: 1}
+	node2 := &Node{KeysNum: 2}
+	node3 := &Node{KeysNum: 3}
+
+	// test enqueue() func
+	enqueue(node1)
+	enqueue(node2)
+	enqueue(node3)
+
+	// test dequeue() func and verify result
+	// expected order：1 -> 2 -> 3
+	n := dequeue()
+	assert.Equal(t, node1, n)
+	n = dequeue()
+	assert.Equal(t, node2, n)
+	n = dequeue()
+	assert.Equal(t, node3, n)
+
+	// verify whether the queue is empty or not
+	if queue != nil || tailNode != nil {
+		t.Error("Dequeue() did not empty the queue correctly.")
+	}
+}
