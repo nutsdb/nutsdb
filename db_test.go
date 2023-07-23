@@ -1167,12 +1167,18 @@ func TestErrWhenBuildListIdx(t *testing.T) {
 	}
 }
 
-func TestDB_ReadErrThenWrite(t *testing.T) {
+func TestDB_ErrThenReadWrite(t *testing.T) {
 	InitOpt("", true)
 	db, err = Open(opt)
 	require.NoError(t, err)
 
 	bucket := "testForDeadLock"
+	err = db.View(
+		func(tx *Tx) error {
+			return fmt.Errorf("err happened")
+		})
+	require.NotNil(t, err)
+
 	err = db.View(
 		func(tx *Tx) error {
 			key := []byte("key1")
