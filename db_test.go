@@ -15,6 +15,7 @@
 package nutsdb
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
