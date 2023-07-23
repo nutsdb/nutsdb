@@ -544,3 +544,37 @@ func TestBPTree_WriteNode(t *testing.T) {
 	// remove the test file
 	_ = os.Remove(testFilename)
 }
+
+func TestEnqueueDequeue(t *testing.T) {
+	// 初始化测试数据
+	node1 := &Node{KeysNum: 1}
+	node2 := &Node{KeysNum: 2}
+	node3 := &Node{KeysNum: 3}
+
+	// 测试 enqueue() 函数
+	enqueue(node1)
+	enqueue(node2)
+	enqueue(node3)
+
+	// 测试 dequeue() 函数，并验证结果
+	// 预期顺序：1 -> 2 -> 3
+	n := dequeue()
+	if n != node1 {
+		t.Errorf("Dequeue() returned incorrect node. Expected: %v, Got: %v", node1, n)
+	}
+
+	n = dequeue()
+	if n != node2 {
+		t.Errorf("Dequeue() returned incorrect node. Expected: %v, Got: %v", node2, n)
+	}
+
+	n = dequeue()
+	if n != node3 {
+		t.Errorf("Dequeue() returned incorrect node. Expected: %v, Got: %v", node3, n)
+	}
+
+	// 验证队列是否为空
+	if queue != nil || tailNode != nil {
+		t.Error("Dequeue() did not empty the queue correctly.")
+	}
+}
