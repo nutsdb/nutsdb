@@ -583,6 +583,30 @@ func TestBPTree_WriteNode(t *testing.T) {
 	_ = os.Remove(testFilename)
 }
 
+func TestBPTree_ReadNode(t *testing.T) {
+
+	testFilename := "/tmp/bptree_read_test.bptidx"
+	setup(t, 10)
+
+	key := []byte("key_001")
+	tree.Filepath = testFilename
+
+	fd, err := os.OpenFile(tree.Filepath, os.O_CREATE|os.O_RDWR, 0644)
+	assert.NoError(t, err)
+
+	node := tree.FindLeaf(key)
+	num, err := tree.WriteNode(node, -1, false, fd)
+	assert.NoError(t, err)
+	assert.NotEqual(t, num, int16(0))
+
+	curr, err := ReadNode(testFilename, node.Address)
+	assert.NoError(t, err)
+	assert.NotNil(t, curr)
+
+	_ = os.Remove(testFilename)
+
+}
+
 func TestEnqueueDequeue(t *testing.T) {
 	// init test data
 	node1 := &Node{KeysNum: 1}
