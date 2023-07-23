@@ -17,6 +17,7 @@ package nutsdb
 import (
 	"errors"
 	"fmt"
+	"github.com/gofrs/flock"
 	"io"
 	"io/ioutil"
 	"os"
@@ -52,6 +53,9 @@ var (
 
 	// ErrNotSupportHintBPTSparseIdxMode is returned not support mode `HintBPTSparseIdxMode`
 	ErrNotSupportHintBPTSparseIdxMode = errors.New("not support mode `HintBPTSparseIdxMode`")
+
+	// ErrDirLocked is returned when can't get the file lock of dir
+	ErrDirLocked = errors.New("the dir of db is locked")
 )
 
 const (
@@ -147,6 +151,8 @@ const (
 	DataStructureNone
 )
 
+const FLockName = "nutsdb-flock"
+
 type (
 	// DB represents a collection of buckets that persist on disk.
 	DB struct {
@@ -168,6 +174,7 @@ type (
 		closed                  bool
 		isMerging               bool
 		fm                      *fileManager
+		flock                   *flock.Flock
 	}
 
 	// Entries represents entries
@@ -179,6 +186,12 @@ type (
 
 // open returns a newly initialized DB object.
 func open(opt Options) (*DB, error) {
+	flock := flock.New(filepath.Join(opt.Dir, FLockName))
+	if ok, err := flock.TryLock(); err != nil {
+		return nil, err
+	} else if !ok {
+		return nil, ErrDirLocked
+	}
 	db := &DB{
 		BPTreeIdx:               make(BPTreeIdx),
 		SetIdx:                  make(SetIdx),
@@ -194,6 +207,7 @@ func open(opt Options) (*DB, error) {
 		ActiveCommittedTxIdsIdx: NewTree(),
 		Index:                   NewIndex(),
 		fm:                      newFileManager(opt.RWMode, opt.MaxFdNumsInCache, opt.CleanFdsCacheThreshold),
+		flock:                   flock,
 	}
 
 	if ok := filesystem.PathIsExist(db.opt.Dir); !ok {
@@ -474,6 +488,11 @@ func (db *DB) release() error {
 
 	err = db.fm.close()
 
+	if err != nil {
+		return err
+	}
+
+	err = db.flock.Unlock()
 	if err != nil {
 		return err
 	}
