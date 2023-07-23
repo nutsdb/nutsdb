@@ -986,7 +986,11 @@ func (db *DB) managed(writable bool, fn func(tx *Tx) error) (err error) {
 
 	if err = fn(tx); err == nil {
 		err = tx.Commit()
+	} else {
+		errRollback := tx.Rollback()
+		err = fmt.Errorf("%v. Rollback err: %v", err, errRollback)
 	}
+
 	return err
 }
 
