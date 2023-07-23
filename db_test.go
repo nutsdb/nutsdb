@@ -1173,7 +1173,7 @@ func TestDB_ReadErrThenWrite(t *testing.T) {
 	require.NoError(t, err)
 
 	bucket := "testForDeadLock"
-	db.View(
+	err = db.View(
 		func(tx *Tx) error {
 			key := []byte("key1")
 			_, err := tx.Get(bucket, key)
@@ -1183,15 +1183,17 @@ func TestDB_ReadErrThenWrite(t *testing.T) {
 
 			return nil
 		})
+	require.NotNil(t, err)
 
 	notice := make(chan struct{})
 	go func() {
-		db.Update(
+		err = db.Update(
 			func(tx *Tx) error {
 				notice <- struct{}{}
 
 				return nil
 			})
+		require.NoError(t, err)
 	}()
 
 	select {
