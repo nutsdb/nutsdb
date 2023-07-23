@@ -21,6 +21,7 @@ import (
 	"os"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -1163,6 +1164,40 @@ func TestErrWhenBuildListIdx(t *testing.T) {
 		got := ErrWhenBuildListIdx(tc.err)
 		assert.Equal(t, got, tc.want)
 		assert.NotEqual(t, got, tc.notwant)
+	}
+}
+
+func TestDB_ReadErrThenWrite(t *testing.T) {
+	InitOpt("", true)
+	db, err = Open(opt)
+	require.NoError(t, err)
+
+	bucket := "testForDeadLock"
+	db.View(
+		func(tx *Tx) error {
+			key := []byte("key1")
+			_, err := tx.Get(bucket, key)
+			if err != nil {
+				return err
+			}
+
+			return nil
+		})
+
+	notice := make(chan struct{})
+	go func() {
+		db.Update(
+			func(tx *Tx) error {
+				notice <- struct{}{}
+
+				return nil
+			})
+	}()
+
+	select {
+	case <-notice:
+	case <-time.After(1 * time.Second):
+		t.Fatalf("exist deadlock")
 	}
 }
 
