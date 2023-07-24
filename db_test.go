@@ -128,14 +128,14 @@ func TestDB_Flock(t *testing.T) {
 	db, err = Open(opt)
 
 	// because db already got the flock, db2 can't open successfully
-	db2, err := open(opt)
+	db2, err := Open(opt)
 	assert.Nil(t, db2)
 	assert.NotNil(t, ErrDirLocked, err)
 
 	err = db.Close()
 	assert.Nil(t, err)
 
-	db2, err = open(opt)
+	db2, err = Open(opt)
 	assert.Nil(t, err)
 	assert.NotNil(t, db2)
 
