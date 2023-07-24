@@ -1067,6 +1067,8 @@ func TestOpen(t *testing.T) {
 
 	opSetDataForTestOpen(t)
 
+	db.Close()
+
 	db, err = Open(opt)
 	if err != nil {
 		t.Fatal(err)
@@ -1076,6 +1078,7 @@ func TestOpen(t *testing.T) {
 func TestDB_Backup(t *testing.T) {
 	InitOpt("", false)
 	db, err = Open(opt)
+	defer db.Close()
 	dir := "/tmp/nutsdbtest_backup"
 	err = db.Backup(dir)
 	if err != nil {
@@ -1086,6 +1089,10 @@ func TestDB_Backup(t *testing.T) {
 func TestDB_BackupTarGZ(t *testing.T) {
 	InitOpt("", false)
 	db, err = Open(opt)
+	defer db.Close()
+	if err != nil {
+		t.Fatal("err TestDB_BackupTarGZ")
+	}
 	path := "/tmp/nutsdbtest_backup.tar.gz"
 	f, _ := os.Create(path)
 	defer f.Close()

@@ -186,12 +186,6 @@ type (
 
 // open returns a newly initialized DB object.
 func open(opt Options) (*DB, error) {
-	flock := flock.New(filepath.Join(opt.Dir, FLockName))
-	if ok, err := flock.TryLock(); err != nil {
-		return nil, err
-	} else if !ok {
-		return nil, ErrDirLocked
-	}
 	db := &DB{
 		BPTreeIdx:               make(BPTreeIdx),
 		SetIdx:                  make(SetIdx),
@@ -207,7 +201,6 @@ func open(opt Options) (*DB, error) {
 		ActiveCommittedTxIdsIdx: NewTree(),
 		Index:                   NewIndex(),
 		fm:                      newFileManager(opt.RWMode, opt.MaxFdNumsInCache, opt.CleanFdsCacheThreshold),
-		flock:                   flock,
 	}
 
 	if ok := filesystem.PathIsExist(db.opt.Dir); !ok {
@@ -215,6 +208,15 @@ func open(opt Options) (*DB, error) {
 			return nil, err
 		}
 	}
+
+	flock := flock.New(filepath.Join(opt.Dir, FLockName))
+	if ok, err := flock.TryLock(); err != nil {
+		return nil, err
+	} else if !ok {
+		return nil, ErrDirLocked
+	}
+
+	db.flock = flock
 
 	if err := db.checkEntryIdxMode(); err != nil {
 		return nil, err
