@@ -123,6 +123,31 @@ func TestDB_Basic(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestDB_Flock(t *testing.T) {
+	InitOpt("", true)
+	db, err = Open(opt)
+
+	// because db already got the flock, db2 can't open successfully
+	db2, err := open(opt)
+	assert.Nil(t, db2)
+	assert.NotNil(t, ErrDirLocked, err)
+
+	err = db.Close()
+	assert.Nil(t, err)
+
+	db2, err = open(opt)
+	assert.Nil(t, err)
+	assert.NotNil(t, db2)
+
+	err = db2.flock.Unlock()
+	assert.Nil(t, err)
+	assert.False(t, db2.flock.Locked())
+
+	err = db2.Close()
+	assert.NotNil(t, err)
+	assert.Equal(t, ErrDirUnlocked, err)
+}
+
 func TestDb_DeleteANonExistKey(t *testing.T) {
 	withDefaultDB(t, func(t *testing.T, db *DB) {
 		err := db.Update(func(tx *Tx) error {

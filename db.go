@@ -56,6 +56,8 @@ var (
 
 	// ErrDirLocked is returned when can't get the file lock of dir
 	ErrDirLocked = errors.New("the dir of db is locked")
+
+	ErrDirUnlocked = errors.New("the dir of db is unlocked")
 )
 
 const (
@@ -492,6 +494,10 @@ func (db *DB) release() error {
 
 	if err != nil {
 		return err
+	}
+
+	if !db.flock.Locked() {
+		return ErrDirUnlocked
 	}
 
 	err = db.flock.Unlock()
