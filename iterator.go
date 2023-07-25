@@ -111,7 +111,7 @@ func (it *Iterator) SetNext() (bool, error) {
 	}
 
 	if it.tx.db.opt.EntryIdxMode == HintKeyAndRAMIdxMode {
-		path := it.tx.db.getDataPath(record.H.FileID)
+		path := getDataPath(record.H.FileID, it.tx.db.opt.Dir)
 		df, err := it.tx.db.fm.getDataFile(path, it.tx.db.opt.SegmentSize)
 		if err != nil {
 			return false, err

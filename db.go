@@ -332,7 +332,7 @@ func (db *DB) Merge() error {
 
 	for _, pendingMergeFId := range pendingMergeFIds {
 		off = 0
-		path := db.getDataPath(int64(pendingMergeFId))
+		path := getDataPath(int64(pendingMergeFId), db.opt.Dir)
 		fr, err := newFileRecovery(path, db.opt.BufferSizeOfRecovery)
 		if err != nil {
 			db.isMerging = false
@@ -454,7 +454,7 @@ func (db *DB) Close() error {
 
 // setActiveFile sets the ActiveFile (DataFile object).
 func (db *DB) setActiveFile() (err error) {
-	filepath := db.getDataPath(db.MaxFileID)
+	filepath := getDataPath(db.MaxFileID, db.opt.Dir)
 	db.ActiveFile, err = db.fm.getDataFile(filepath, db.opt.SegmentSize)
 	if err != nil {
 		return
@@ -539,7 +539,7 @@ func (db *DB) parseDataFiles(dataFileIds []int) (unconfirmedRecords []*Record, c
 	for _, dataID := range dataFileIds {
 		off = 0
 		fID := int64(dataID)
-		path := db.getDataPath(fID)
+		path := getDataPath(fID, db.opt.Dir)
 		f, err := newFileRecovery(path, db.opt.BufferSizeOfRecovery)
 		if err != nil {
 			return nil, nil, err
@@ -625,7 +625,7 @@ func (db *DB) buildBPTreeRootIdxes(dataFileIds []int) error {
 
 	for i := 0; i < len(dataFileIds[0:dataFileIdsSize-1]); i++ {
 		off = 0
-		path := db.getBPTRootPath(int64(dataFileIds[i]))
+		path := getBPTRootPath(int64(dataFileIds[i]), db.opt.Dir)
 		fd, err := os.OpenFile(filepath.Clean(path), os.O_RDWR, os.ModePerm)
 		if err != nil {
 			return err
@@ -678,7 +678,7 @@ func (db *DB) buildActiveBPTreeIdx(r *Record) error {
 
 func (db *DB) buildBucketMetaIdx() error {
 	if db.opt.EntryIdxMode == HintBPTSparseIdxMode {
-		files, err := ioutil.ReadDir(db.getBucketMetaPath())
+		files, err := ioutil.ReadDir(getBucketMetaPath(db.opt.Dir))
 		if err != nil {
 			return err
 		}
@@ -693,7 +693,7 @@ func (db *DB) buildBucketMetaIdx() error {
 
 				name = strings.TrimSuffix(name, BucketMetaSuffix)
 
-				bucketMeta, err := ReadBucketMeta(db.getBucketMetaFilePath(name))
+				bucketMeta, err := ReadBucketMeta(getBucketMetaFilePath(name, db.opt.Dir))
 				if err == io.EOF {
 					break
 				}
@@ -1011,52 +1011,6 @@ func (db *DB) managed(writable bool, fn func(tx *Tx) error) (err error) {
 
 const bptDir = "bpt"
 
-// getDataPath returns the data path at given fid.
-func (db *DB) getDataPath(fID int64) string {
-	separator := string(filepath.Separator)
-	return db.opt.Dir + separator + strconv2.Int64ToStr(fID) + DataSuffix
-}
-
-func (db *DB) getMetaPath() string {
-	separator := string(filepath.Separator)
-	return db.opt.Dir + separator + "meta"
-}
-
-func (db *DB) getBucketMetaPath() string {
-	separator := string(filepath.Separator)
-	return db.getMetaPath() + separator + "bucket"
-}
-
-func (db *DB) getBucketMetaFilePath(name string) string {
-	separator := string(filepath.Separator)
-	return db.getBucketMetaPath() + separator + name + BucketMetaSuffix
-}
-
-func (db *DB) getBPTDir() string {
-	separator := string(filepath.Separator)
-	return db.opt.Dir + separator + bptDir
-}
-
-func (db *DB) getBPTPath(fID int64) string {
-	separator := string(filepath.Separator)
-	return db.getBPTDir() + separator + strconv2.Int64ToStr(fID) + BPTIndexSuffix
-}
-
-func (db *DB) getBPTRootPath(fID int64) string {
-	separator := string(filepath.Separator)
-	return db.getBPTDir() + separator + "root" + separator + strconv2.Int64ToStr(fID) + BPTRootIndexSuffix
-}
-
-func (db *DB) getBPTTxIDPath(fID int64) string {
-	separator := string(filepath.Separator)
-	return db.getBPTDir() + separator + "txid" + separator + strconv2.Int64ToStr(fID) + BPTTxIDIndexSuffix
-}
-
-func (db *DB) getBPTRootTxIDPath(fID int64) string {
-	separator := string(filepath.Separator)
-	return db.getBPTDir() + separator + "txid" + separator + strconv2.Int64ToStr(fID) + BPTRootTxIDIndexSuffix
-}
-
 func (db *DB) getPendingMergeEntries(entry *Entry, pendingMergeEntries []*Entry) []*Entry {
 	if entry.Meta.Ds == DataStructureBPTree {
 		bptIdx, exist := db.BPTreeIdx[string(entry.Bucket)]
@@ -1128,7 +1082,7 @@ func (db *DB) reWriteData(pendingMergeEntries []*Entry) error {
 		return err
 	}
 
-	dataFile, err := db.fm.getDataFile(db.getDataPath(db.MaxFileID+1), db.opt.SegmentSize)
+	dataFile, err := db.fm.getDataFile(getDataPath(db.MaxFileID+1, db.opt.Dir), db.opt.SegmentSize)
 	if err != nil {
 		db.isMerging = false
 		return err
