@@ -308,7 +308,7 @@ func txZGetByKey(t *testing.T, db *DB, bucket string, key []byte, expectErr erro
 
 func txZRangeByRank(t *testing.T, db *DB, bucket string, start, end int) {
 	err := db.Update(func(tx *Tx) error {
-		err := tx.ZRemRangeByRank(bucket, 1, 10)
+		err := tx.ZRemRangeByRank(bucket, start, end)
 		require.NoError(t, err)
 		return nil
 	})
