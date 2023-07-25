@@ -22,6 +22,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -434,19 +435,55 @@ func (db *DB) Close() error {
 
 	db.closed = true
 
+	err := db.release()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// release set all obj in the db instance to nil
+func (db *DB) release() error {
+	GCEnable := db.opt.GCWhenClose
+
 	err := db.ActiveFile.rwManager.Release()
 	if err != nil {
 		return err
 	}
 
+	db.BPTreeIdx = nil
+
+	db.BPTreeKeyEntryPosMap = nil
+
+	db.bucketMetas = nil
+
+	db.SetIdx = nil
+
+	db.SortedSetIdx = nil
+
+	db.Index = nil
+
 	db.ActiveFile = nil
 
-	db.BPTreeIdx = nil
+	db.ActiveBPTreeIdx = nil
+
+	db.ActiveCommittedTxIdsIdx = nil
+
+	db.committedTxIds = nil
 
 	err = db.fm.close()
 
 	if err != nil {
 		return err
+	}
+
+	db.fm = nil
+
+	db = nil
+
+	if GCEnable {
+		runtime.GC()
 	}
 
 	return nil

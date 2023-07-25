@@ -60,6 +60,9 @@ type Options struct {
 
 	// BufferSizeOfRecovery represents the buffer size of recoveryReader buffer Size
 	BufferSizeOfRecovery int
+
+	// CcWhenClose represent initiative GC when calling db.Close()
+	GCWhenClose bool
 }
 
 const (
@@ -139,5 +142,11 @@ func WithCleanFdsCacheThreshold(threshold float64) Option {
 func WithBufferSizeOfRecovery(size int) Option {
 	return func(opt *Options) {
 		opt.BufferSizeOfRecovery = size
+	}
+}
+
+func WithGCWhenClose(enable bool) Option {
+	return func(opt *Options) {
+		opt.GCWhenClose = enable
 	}
 }
