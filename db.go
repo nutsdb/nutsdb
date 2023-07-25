@@ -623,7 +623,7 @@ func (db *DB) parseDataFiles(dataFileIds []int) (unconfirmedRecords []*Record, c
 					committedTxIds[entry.Meta.TxID] = struct{}{}
 					meta := &MetaData{Flag: DataSetFlag}
 					h := NewHint().WithMeta(meta)
-					err := db.ActiveCommittedTxIdsIdx.Insert(e.GetTxIDBytes(), nil, h, CountFlagEnabled)
+					err := db.ActiveCommittedTxIdsIdx.Insert(entry.GetTxIDBytes(), nil, h, CountFlagEnabled)
 					if err != nil {
 						return nil, nil, fmt.Errorf("can not ingest the hint obj to ActiveCommittedTxIdsIdx, err: %s", err.Error())
 					}
