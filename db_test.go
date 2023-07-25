@@ -335,7 +335,7 @@ func txZRangeByRank(t *testing.T, db *DB, bucket string, start, end int) {
 	require.NoError(t, err)
 }
 
-func TestDB_MergeForZSET(t *testing.T) {
+func TestDB_MergeForZSet(t *testing.T) {
 	opts := DefaultOptions
 	opts.SegmentSize = 100
 	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
@@ -496,7 +496,7 @@ func TestDB_GetRecordFromKey(t *testing.T) {
 	})
 }
 
-func TestErrWhenBuildListIdx(t *testing.T) {
+func TestDB_ErrWhenBuildListIdx(t *testing.T) {
 	ts := []struct {
 		err     error
 		want    error
