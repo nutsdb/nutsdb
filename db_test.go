@@ -33,6 +33,8 @@ var (
 	err error
 )
 
+const NutsDBTestDirPath = "/tmp/nutsdb-test"
+
 func assertErr(t *testing.T, err error, expectErr error) {
 	if expectErr != nil {
 		require.Equal(t, expectErr, err)
@@ -49,11 +51,10 @@ func removeDir(dir string) {
 
 func runNutsDBTest(t *testing.T, opts *Options, test func(t *testing.T, db *DB)) {
 	if opts == nil {
-		opts = new(Options)
-		*opts = DefaultOptions
+		opts = &DefaultOptions
 	}
 	if opts.Dir == "" {
-		opts.Dir = "/tmp/nutsdb-test"
+		opts.Dir = NutsDBTestDirPath
 	}
 	defer removeDir(opts.Dir)
 	db, err := Open(*opts)
