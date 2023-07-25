@@ -12,6 +12,7 @@ func TestWithNodeNum(t *testing.T) {
 		opt,
 		WithNodeNum(1011),
 	)
+	defer db.Close()
 	assert.NoError(t, err)
 	assert.Equal(t, int64(1011), db.opt.NodeNum)
 }
@@ -21,6 +22,7 @@ func TestWithRWMode(t *testing.T) {
 		WithDir("/tmp/nutsdb"),
 		WithRWMode(MMap),
 	)
+	defer db.Close()
 	assert.NoError(t, err)
 	assert.Equal(t, db.opt.RWMode, MMap)
 }

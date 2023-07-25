@@ -17,6 +17,7 @@ package nutsdb
 import (
 	"errors"
 	"fmt"
+	"github.com/gofrs/flock"
 	"io"
 	"io/ioutil"
 	"os"
@@ -52,6 +53,11 @@ var (
 
 	// ErrNotSupportHintBPTSparseIdxMode is returned not support mode `HintBPTSparseIdxMode`
 	ErrNotSupportHintBPTSparseIdxMode = errors.New("not support mode `HintBPTSparseIdxMode`")
+
+	// ErrDirLocked is returned when can't get the file lock of dir
+	ErrDirLocked = errors.New("the dir of db is locked")
+
+	ErrDirUnlocked = errors.New("the dir of db is unlocked")
 )
 
 const (
@@ -147,6 +153,8 @@ const (
 	DataStructureNone
 )
 
+const FLockName = "nutsdb-flock"
+
 type (
 	// DB represents a collection of buckets that persist on disk.
 	DB struct {
@@ -168,6 +176,7 @@ type (
 		closed                  bool
 		isMerging               bool
 		fm                      *fileManager
+		flock                   *flock.Flock
 	}
 
 	// Entries represents entries
@@ -201,6 +210,15 @@ func open(opt Options) (*DB, error) {
 			return nil, err
 		}
 	}
+
+	flock := flock.New(filepath.Join(opt.Dir, FLockName))
+	if ok, err := flock.TryLock(); err != nil {
+		return nil, err
+	} else if !ok {
+		return nil, ErrDirLocked
+	}
+
+	db.flock = flock
 
 	if err := db.checkEntryIdxMode(); err != nil {
 		return nil, err
@@ -474,6 +492,15 @@ func (db *DB) release() error {
 
 	err = db.fm.close()
 
+	if err != nil {
+		return err
+	}
+
+	if !db.flock.Locked() {
+		return ErrDirUnlocked
+	}
+
+	err = db.flock.Unlock()
 	if err != nil {
 		return err
 	}
