@@ -18,9 +18,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"io"
-	"math/rand"
 	"os"
 	"path/filepath"
 	"sort"
@@ -92,18 +90,4 @@ func OneOfUint16Array(value uint16, array []uint16) bool {
 		}
 	}
 	return false
-}
-
-const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-
-func GetTestBytes(i int) []byte {
-	return []byte(fmt.Sprintf("nutsdb-%09d", i))
-}
-
-func GetRandomBytes(length int) []byte {
-	b := make([]byte, length)
-	for i := range b {
-		b[i] = charset[rand.Intn(len(charset))]
-	}
-	return b
 }
