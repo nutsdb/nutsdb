@@ -591,7 +591,6 @@ func (db *DB) getActiveFileWriteOff() (off int64, err error) {
 func (db *DB) parseDataFiles(dataFileIds []int) (unconfirmedRecords []*Record, committedTxIds map[uint64]struct{}, err error) {
 	var (
 		off int64
-		e   *Entry
 	)
 
 	committedTxIds = make(map[uint64]struct{})
@@ -615,7 +614,7 @@ func (db *DB) parseDataFiles(dataFileIds []int) (unconfirmedRecords []*Record, c
 					break
 				}
 
-				e = nil
+				var e *Entry
 				if db.opt.EntryIdxMode == HintKeyValAndRAMIdxMode {
 					e = NewEntry().WithKey(entry.Key).WithValue(entry.Value).WithBucket(entry.Bucket).WithMeta(entry.Meta)
 				}
@@ -631,7 +630,7 @@ func (db *DB) parseDataFiles(dataFileIds []int) (unconfirmedRecords []*Record, c
 				}
 
 				h := NewHint().WithKey(entry.Key).WithFileId(fID).WithMeta(entry.Meta).WithDataPos(uint64(off))
-				r := NewRecord().WithHint(h).WithEntry(e).WithBucket(e.GetBucketString())
+				r := NewRecord().WithHint(h).WithEntry(e).WithBucket(entry.GetBucketString())
 				unconfirmedRecords = append(unconfirmedRecords, r)
 
 				if db.opt.EntryIdxMode == HintBPTSparseIdxMode {
