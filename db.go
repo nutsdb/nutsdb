@@ -435,15 +435,9 @@ func (db *DB) Close() error {
 
 	db.closed = true
 
-	GCEnable := db.opt.GCWhenClose
-
 	err := db.release()
 	if err != nil {
 		return err
-	}
-
-	if GCEnable {
-		runtime.GC()
 	}
 
 	return nil
@@ -451,6 +445,8 @@ func (db *DB) Close() error {
 
 // release set all obj in the db instance to nil
 func (db *DB) release() error {
+	GCEnable := db.opt.GCWhenClose
+
 	err := db.ActiveFile.rwManager.Release()
 	if err != nil {
 		return err
@@ -485,6 +481,10 @@ func (db *DB) release() error {
 	db.fm = nil
 
 	db = nil
+
+	if GCEnable {
+		runtime.GC()
+	}
 
 	return nil
 }
