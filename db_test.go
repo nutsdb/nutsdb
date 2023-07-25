@@ -33,6 +33,14 @@ var (
 	err error
 )
 
+func assertErr(t *testing.T, err error, expectErr error) {
+	if expectErr != nil {
+		require.Equal(t, expectErr, err)
+	} else {
+		require.NoError(t, err)
+	}
+}
+
 func removeDir(dir string) {
 	if err := os.RemoveAll(dir); err != nil {
 		panic(err)
@@ -61,11 +69,7 @@ func runNutsDBTest(t *testing.T, opts *Options, test func(t *testing.T, db *DB))
 func txPut(t *testing.T, db *DB, bucket string, key, value []byte, ttl uint32, expectErr error) {
 	err := db.Update(func(tx *Tx) error {
 		err = tx.Put(bucket, key, value, ttl)
-		if expectErr != nil {
-			require.Equal(t, expectErr, err)
-		} else {
-			require.NoError(t, err)
-		}
+		assertErr(t, err, expectErr)
 		return nil
 	})
 	require.NoError(t, err)
@@ -87,12 +91,8 @@ func txGet(t *testing.T, db *DB, bucket string, key []byte, expectVal []byte, ex
 
 func txDel(t *testing.T, db *DB, bucket string, key []byte, expectErr error) {
 	err := db.Update(func(tx *Tx) error {
-		err = tx.Delete(bucket, key)
-		if expectErr != nil {
-			require.Equal(t, expectErr, err)
-		} else {
-			require.NoError(t, err)
-		}
+		err := tx.Delete(bucket, key)
+		assertErr(t, err, expectErr)
 		return nil
 	})
 	require.NoError(t, err)
@@ -224,11 +224,7 @@ func TestDB_MergeRepeated(t *testing.T) {
 func txSAdd(t *testing.T, db *DB, bucket string, key, value []byte, expectErr error) {
 	err := db.Update(func(tx *Tx) error {
 		err := tx.SAdd(bucket, key, value)
-		if expectErr != nil {
-			require.Equal(t, expectErr, err)
-		} else {
-			require.NoError(t, err)
-		}
+		assertErr(t, err, expectErr)
 		return nil
 	})
 	require.NoError(t, err)
@@ -246,11 +242,7 @@ func txSIsMember(t *testing.T, db *DB, bucket string, key, value []byte, expect 
 func txSRem(t *testing.T, db *DB, bucket string, key, value []byte, expectErr error) {
 	err := db.Update(func(tx *Tx) error {
 		err := tx.SRem(bucket, key, value)
-		if expectErr != nil {
-			require.Equal(t, expectErr, err)
-		} else {
-			require.NoError(t, err)
-		}
+		assertErr(t, err, expectErr)
 		return nil
 	})
 	require.NoError(t, err)
@@ -290,11 +282,7 @@ func TestDB_MergeForSet(t *testing.T) {
 func txZAdd(t *testing.T, db *DB, bucket string, key, value []byte, score float64, expectErr error) {
 	err := db.Update(func(tx *Tx) error {
 		err := tx.ZAdd(bucket, key, score, value)
-		if err != nil {
-			require.Equal(t, expectErr, err)
-		} else {
-			require.NoError(t, err)
-		}
+		assertErr(t, err, expectErr)
 		return nil
 	})
 	require.NoError(t, err)
@@ -303,11 +291,7 @@ func txZAdd(t *testing.T, db *DB, bucket string, key, value []byte, score float6
 func txZRem(t *testing.T, db *DB, bucket string, key []byte, expectErr error) {
 	err := db.Update(func(tx *Tx) error {
 		err := tx.ZRem(bucket, string(key))
-		if err != nil {
-			require.Equal(t, expectErr, err)
-		} else {
-			require.NoError(t, err)
-		}
+		assertErr(t, err, expectErr)
 		return nil
 	})
 	require.NoError(t, err)
@@ -316,11 +300,7 @@ func txZRem(t *testing.T, db *DB, bucket string, key []byte, expectErr error) {
 func txZGetByKey(t *testing.T, db *DB, bucket string, key []byte, expectErr error) {
 	err := db.View(func(tx *Tx) error {
 		_, err := tx.ZGetByKey(bucket, key)
-		if err != nil {
-			require.Equal(t, expectErr, err)
-		} else {
-			require.NoError(t, err)
-		}
+		assertErr(t, err, expectErr)
 		return nil
 	})
 	require.NoError(t, err)
@@ -400,11 +380,7 @@ func txPush(t *testing.T, db *DB, bucket string, key, val []byte, expectErr erro
 			err = tx.RPush(bucket, key, val)
 		}
 
-		if expectErr != nil {
-			require.Equal(t, expectErr, err)
-		} else {
-			require.NoError(t, err)
-		}
+		assertErr(t, err, expectErr)
 
 		return nil
 	})
