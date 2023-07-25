@@ -34,6 +34,71 @@ var (
 	err error
 )
 
+func removeDir(dir string) {
+	if err := os.RemoveAll(dir); err != nil {
+		panic(err)
+	}
+}
+
+func runNutsDBTest(t *testing.T, opts *Options, test func(t *testing.T, db *DB)) {
+	if opts == nil {
+		opts = new(Options)
+		*opts = DefaultOptions
+	}
+	if opts.Dir == "" {
+		opts.Dir = "/tmp/nutsdb-test"
+	}
+	defer removeDir(opts.Dir)
+	db, err = Open(*opts)
+	require.NoError(t, err)
+	defer func() {
+		if !db.IsClose() {
+			require.NoError(t, db.Close())
+		}
+	}()
+	test(t, db)
+}
+
+func txPut(t *testing.T, db *DB, bucket string, key, value []byte, ttl uint32, expectErr error) {
+	err := db.Update(func(tx *Tx) error {
+		err = tx.Put(bucket, key, value, ttl)
+		if expectErr != nil {
+			require.Equal(t, expectErr, err)
+		} else {
+			require.NoError(t, err)
+		}
+		return nil
+	})
+	require.NoError(t, err)
+}
+
+func txGet(t *testing.T, db *DB, bucket string, key []byte, expectVal []byte, expectErr error) {
+	err := db.View(func(tx *Tx) error {
+		e, err := tx.Get(bucket, key)
+		if expectErr != nil {
+			require.Equal(t, expectErr, err)
+		} else {
+			require.NoError(t, err)
+			require.EqualValuesf(t, expectVal, e.Value, "err Tx Get. got %s want %s", string(e.Value), string(expectVal))
+		}
+		return nil
+	})
+	require.NoError(t, err)
+}
+
+func txDel(t *testing.T, db *DB, bucket string, key []byte, expectErr error) {
+	err := db.Update(func(tx *Tx) error {
+		err = tx.Delete(bucket, key)
+		if expectErr != nil {
+			require.Equal(t, expectErr, err)
+		} else {
+			require.NoError(t, err)
+		}
+		return nil
+	})
+	require.NoError(t, err)
+}
+
 func InitOpt(fileDir string, isRemoveFiles bool) {
 	if fileDir == "" {
 		fileDir = "/tmp/nutsdbtest"
@@ -59,162 +124,71 @@ func InitOpt(fileDir string, isRemoveFiles bool) {
 }
 
 func TestDB_Basic(t *testing.T) {
-	InitOpt("", true)
-	db, err = Open(opt)
-	defer db.Close()
+	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		bucket := "bucket"
+		key0 := GetTestBytes(0)
+		val0 := GetTestBytes(0)
 
-	require.NoError(t, err)
+		// put
+		txPut(t, db, bucket, key0, val0, Persistent, nil)
+		txGet(t, db, bucket, key0, val0, nil)
 
-	bucket := "bucket1"
-	key := []byte("key1")
-	val := []byte("val1")
+		val1 := GetTestBytes(1)
 
-	//put
-	err = db.Update(
-		func(tx *Tx) error {
-			return tx.Put(bucket, key, val, Persistent)
-		})
-	require.NoError(t, err)
+		// update
+		txPut(t, db, bucket, key0, val1, Persistent, nil)
+		txGet(t, db, bucket, key0, val1, nil)
 
-	//get
-	err = db.View(
-		func(tx *Tx) error {
-			e, err := tx.Get(bucket, key)
-			if assert.NoError(t, err) {
-				assert.EqualValuesf(t, val, e.Value, "err Tx Get. got %s want %s", string(e.Value), string(val))
-			}
-			return nil
-		})
-	require.NoError(t, err)
-
-	// delete
-	err = db.Update(
-		func(tx *Tx) error {
-			err := tx.Delete(bucket, key)
-			require.NoError(t, err)
-			return nil
-		})
-	require.NoError(t, err)
-
-	err = db.View(
-		func(tx *Tx) error {
-			_, err := tx.Get(bucket, key)
-			assert.Error(t, err, "err Tx Get.")
-			return nil
-		})
-	require.NoError(t, err)
-
-	//update
-	val = []byte("val001")
-	err = db.Update(
-		func(tx *Tx) error {
-			return tx.Put(bucket, key, val, Persistent)
-		})
-	require.NoError(t, err)
-
-	err := db.View(
-		func(tx *Tx) error {
-			e, err := tx.Get(bucket, key)
-			if assert.NoError(t, err) {
-				assert.EqualValuesf(t, val, e.Value, "err Tx Get. got %s want %s", string(e.Value), string(val))
-			}
-			return nil
-		})
-	require.NoError(t, err)
+		// del
+		txDel(t, db, bucket, key0, nil)
+		txGet(t, db, bucket, key0, val1, ErrNotFoundKey)
+	})
 }
 
 func TestDB_Flock(t *testing.T) {
-	InitOpt("", true)
-	db, err = Open(opt)
+	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		db2, err := Open(db.opt)
+		require.Nil(t, db2)
+		require.Equal(t, ErrDirLocked, err)
 
-	// because db already got the flock, db2 can't open successfully
-	db2, err := Open(opt)
-	assert.Nil(t, db2)
-	assert.NotNil(t, ErrDirLocked, err)
+		err = db.Close()
+		require.NoError(t, err)
 
-	err = db.Close()
-	assert.Nil(t, err)
+		db2, err = Open(db.opt)
+		require.NoError(t, err)
+		require.NotNil(t, db2)
 
-	db2, err = Open(opt)
-	assert.Nil(t, err)
-	assert.NotNil(t, db2)
+		err = db2.flock.Unlock()
+		require.NoError(t, err)
+		require.False(t, db2.flock.Locked())
 
-	err = db2.flock.Unlock()
-	assert.Nil(t, err)
-	assert.False(t, db2.flock.Locked())
-
-	err = db2.Close()
-	assert.NotNil(t, err)
-	assert.Equal(t, ErrDirUnlocked, err)
+		err = db2.Close()
+		require.Error(t, err)
+		require.Equal(t, ErrDirUnlocked, err)
+	})
 }
 
 func TestDb_DeleteANonExistKey(t *testing.T) {
-	withDefaultDB(t, func(t *testing.T, db *DB) {
-		err := db.Update(func(tx *Tx) error {
-			err := tx.Delete("test_bucket", []byte("test_key"))
-			assert.Equal(t, ErrNotFoundBucket, err)
-			err = tx.Put("test_bucket", []byte("test_key_1"), []byte("test_value_1"), 0)
-			if err != nil {
-				return err
-			}
-			err = tx.Delete("test_bucket", []byte("test_key"))
-			assert.NotNil(t, ErrNotFoundKey, err)
-			return nil
-		})
-		assert.Nil(t, err)
+	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		testBucket := "test_bucket"
+		txDel(t, db, testBucket, GetTestBytes(0), ErrNotFoundBucket)
+		txPut(t, db, testBucket, GetTestBytes(1), GetTestBytes(1), Persistent, nil)
+		txDel(t, db, testBucket, GetTestBytes(0), ErrKeyNotFound)
 	})
 }
 
 func TestDB_BPTSparse(t *testing.T) {
-	InitOpt("", true)
+	opt := DefaultOptions
 	opt.EntryIdxMode = HintBPTSparseIdxMode
-	db, err = Open(opt)
-	require.NoError(t, err)
-	defer db.Close()
-
-	bucket1 := "AA"
-	key1 := []byte("BB")
-	val1 := []byte("key1")
-
-	bucket2 := "AAB"
-	key2 := []byte("B")
-	val2 := []byte("key2")
-
-	//put
-	err = db.Update(
-		func(tx *Tx) error {
-			return tx.Put(bucket1, key1, val1, Persistent)
-		})
-	require.NoError(t, err)
-
-	//put
-	err = db.Update(
-		func(tx *Tx) error {
-			return tx.Put(bucket2, key2, val2, Persistent)
-		})
-	require.NoError(t, err)
-
-	//get
-	err = db.View(
-		func(tx *Tx) error {
-			e, err := tx.Get(bucket1, key1)
-			if assert.NoError(t, err) {
-				assert.EqualValuesf(t, val1, e.Value, "err Tx Get. got %s want %s", string(e.Value), string(val1))
-			}
-			return nil
-		})
-	require.NoError(t, err)
-	//get
-	err = db.View(
-		func(tx *Tx) error {
-			e, err := tx.Get(bucket2, key2)
-			if assert.NoError(t, err) {
-				assert.EqualValuesf(t, val2, e.Value, "err Tx Get. got %s want %s", string(e.Value), string(val2))
-			}
-			return nil
-		})
-	require.NoError(t, err)
-
+	runNutsDBTest(t, &opt, func(t *testing.T, db *DB) {
+		bucket1, bucket2 := "AA", "AAB"
+		key1, key2 := []byte("BB"), []byte("B")
+		val1, val2 := []byte("key1"), []byte("key2")
+		txPut(t, db, bucket1, key1, val1, Persistent, nil)
+		txPut(t, db, bucket2, key2, val2, Persistent, nil)
+		txGet(t, db, bucket1, key1, val1, nil)
+		txGet(t, db, bucket2, key2, val2, nil)
+	})
 }
 
 func TestDB_Merge_For_string(t *testing.T) {
@@ -764,31 +738,13 @@ func TestDB_Merge_For_List(t *testing.T) {
 	}
 }
 
-func TestTx_Get_NotFound(t *testing.T) {
-	InitOpt("", false)
-	db, err = Open(opt)
-	defer db.Close()
-
-	if err != nil {
-		t.Fatal(err)
-	}
-	bucket := "bucketfoo"
-	key := []byte("keyfoo")
-	//get
-	if err := db.View(
-		func(tx *Tx) error {
-			e, err := tx.Get(bucket, key)
-			if err == nil {
-				t.Error("err TestTx_Get_Err")
-			}
-			if e != nil {
-				t.Error("err TestTx_Get_Err")
-			}
-			return nil
-		}); err != nil {
-		t.Fatal(err)
-	}
-
+func TestTx_Get_KeyNotFound(t *testing.T) {
+	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		bucket := "bucket"
+		txGet(t, db, bucket, GetTestBytes(0), nil, ErrBucketNotFound)
+		txPut(t, db, bucket, GetTestBytes(1), GetTestBytes(1), Persistent, nil)
+		txGet(t, db, bucket, GetTestBytes(0), nil, ErrKeyNotFound)
+	})
 }
 
 func opStrDataForTestOpen(t *testing.T) {
