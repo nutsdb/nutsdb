@@ -127,13 +127,13 @@ func TestDB_Basic(t *testing.T) {
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		bucket := "bucket"
 		key0 := GetTestBytes(0)
-		val0 := GetTestBytes(0)
+		val0 := GetRandomBytes(24)
 
 		// put
 		txPut(t, db, bucket, key0, val0, Persistent, nil)
 		txGet(t, db, bucket, key0, val0, nil)
 
-		val1 := GetTestBytes(1)
+		val1 := GetRandomBytes(24)
 
 		// update
 		txPut(t, db, bucket, key0, val1, Persistent, nil)
@@ -172,7 +172,7 @@ func TestDb_DeleteANonExistKey(t *testing.T) {
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		testBucket := "test_bucket"
 		txDel(t, db, testBucket, GetTestBytes(0), ErrNotFoundBucket)
-		txPut(t, db, testBucket, GetTestBytes(1), GetTestBytes(1), Persistent, nil)
+		txPut(t, db, testBucket, GetTestBytes(1), GetRandomBytes(24), Persistent, nil)
 		txDel(t, db, testBucket, GetTestBytes(0), ErrKeyNotFound)
 	})
 }
@@ -742,7 +742,7 @@ func TestTx_Get_KeyNotFound(t *testing.T) {
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		bucket := "bucket"
 		txGet(t, db, bucket, GetTestBytes(0), nil, ErrBucketNotFound)
-		txPut(t, db, bucket, GetTestBytes(1), GetTestBytes(1), Persistent, nil)
+		txPut(t, db, bucket, GetTestBytes(1), GetRandomBytes(24), Persistent, nil)
 		txGet(t, db, bucket, GetTestBytes(0), nil, ErrKeyNotFound)
 	})
 }
