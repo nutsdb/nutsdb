@@ -74,6 +74,8 @@ var (
 	// ErrCannotRollbackACommittingTx is returned when the tx rollback a committing tx
 	ErrCannotRollbackACommittingTx = errors.New("can not rollback a committing tx")
 
+	ErrCannotRollbackAClosedTx = errors.New("can not rollback a closed tx")
+
 	// ErrNotFoundBucket is returned when key not found int the bucket on an view function.
 	ErrNotFoundBucket = errors.New("bucket not found")
 )
@@ -161,7 +163,15 @@ func (tx *Tx) getTxID() (id uint64, err error) {
 // 4. build Hint index.
 //
 // 5. Unlock the database and clear the db field.
-func (tx *Tx) Commit() error {
+func (tx *Tx) Commit() (err error) {
+	defer func() {
+		tx.unlock()
+		tx.db = nil
+
+		tx.pendingWrites = nil
+		tx.ReservedStoreTxIDIdxes = nil
+	}()
+
 	var (
 		e              *Entry
 		bucketMetaTemp BucketMeta
@@ -182,8 +192,6 @@ func (tx *Tx) Commit() error {
 	writesLen := len(tx.pendingWrites)
 
 	if writesLen == 0 {
-		tx.unlock()
-		tx.db = nil
 		return nil
 	}
 
@@ -273,13 +281,6 @@ func (tx *Tx) Commit() error {
 
 	tx.buildIdxes()
 
-	tx.unlock()
-
-	tx.db = nil
-
-	tx.pendingWrites = nil
-	tx.ReservedStoreTxIDIdxes = nil
-
 	return nil
 }
 
@@ -353,15 +354,22 @@ func (tx *Tx) buildBucketMetaIdx(bucket string, key []byte, bucketMetaTemp Bucke
 func (tx *Tx) buildTxIDRootIdx(txID uint64, countFlag bool) error {
 	txIDStr := strconv2.IntToStr(int(txID))
 
-	tx.db.ActiveCommittedTxIdsIdx.Insert([]byte(txIDStr), nil, &Hint{Meta: &MetaData{Flag: DataSetFlag}}, countFlag)
+	meta := &MetaData{Flag: DataSetFlag}
+	err := tx.db.ActiveCommittedTxIdsIdx.Insert([]byte(txIDStr), nil, NewHint().WithMeta(meta), countFlag)
+	if err != nil {
+		return err
+	}
 	if len(tx.ReservedStoreTxIDIdxes) > 0 {
 		for fID, txIDIdx := range tx.ReservedStoreTxIDIdxes {
 			filePath := getBPTTxIDPath(fID, tx.db.opt.Dir)
 
-			txIDIdx.Insert([]byte(txIDStr), nil, &Hint{Meta: &MetaData{Flag: DataSetFlag}}, countFlag)
+			err := txIDIdx.Insert([]byte(txIDStr), nil, NewHint().WithMeta(meta), countFlag)
+			if err != nil {
+				return err
+			}
 			txIDIdx.Filepath = filePath
 
-			err := txIDIdx.WriteNodes(tx.db.opt.RWMode, tx.db.opt.SyncEnable, 2)
+			err = txIDIdx.WriteNodes(tx.db.opt.RWMode, tx.db.opt.SyncEnable, 2)
 			if err != nil {
 				return err
 			}
@@ -370,7 +378,10 @@ func (tx *Tx) buildTxIDRootIdx(txID uint64, countFlag bool) error {
 			txIDRootIdx := NewTree()
 			rootAddress := strconv2.Int64ToStr(txIDIdx.root.Address)
 
-			txIDRootIdx.Insert([]byte(rootAddress), nil, &Hint{Meta: &MetaData{Flag: DataSetFlag}}, countFlag)
+			err = txIDRootIdx.Insert([]byte(rootAddress), nil, NewHint().WithMeta(meta), countFlag)
+			if err != nil {
+				return err
+			}
 			txIDRootIdx.Filepath = filePath
 
 			err = txIDRootIdx.WriteNodes(tx.db.opt.RWMode, tx.db.opt.SyncEnable, 2)
@@ -483,9 +494,6 @@ func (tx *Tx) buildSortedSetIdx(bucket string, entry *Entry) {
 }
 
 func (tx *Tx) buildListIdx(bucket string, entry *Entry) {
-	if !tx.db.Index.isBucketExist(bucket) {
-		tx.db.Index.addList(bucket)
-	}
 	l := tx.db.Index.getList(bucket)
 
 	key, value := entry.Key, entry.Value
@@ -636,6 +644,11 @@ func (tx *Tx) Rollback() error {
 	if tx.isCommitting() {
 		return ErrCannotRollbackACommittingTx
 	}
+
+	if tx.isClosed() {
+		return ErrCannotRollbackAClosedTx
+	}
+
 	tx.setStatusClosed()
 	tx.unlock()
 
@@ -691,22 +704,18 @@ func (tx *Tx) put(bucket string, key, value []byte, ttl uint32, flag uint16, tim
 		return ErrTxNotWritable
 	}
 
-	e := &Entry{
-		Key:    key,
-		Value:  value,
-		Bucket: []byte(bucket),
-		Meta: &MetaData{
-			KeySize:    uint32(len(key)),
-			ValueSize:  uint32(len(value)),
-			Timestamp:  timestamp,
-			Flag:       flag,
-			TTL:        ttl,
-			BucketSize: uint32(len(bucket)),
-			Status:     UnCommitted,
-			Ds:         ds,
-			TxID:       tx.id,
-		},
+	meta := &MetaData{
+		KeySize:    uint32(len(key)),
+		ValueSize:  uint32(len(value)),
+		Timestamp:  timestamp,
+		Flag:       flag,
+		TTL:        ttl,
+		BucketSize: uint32(len(bucket)),
+		Status:     UnCommitted,
+		Ds:         ds,
+		TxID:       tx.id,
 	}
+	e := NewEntry().WithKey(key).WithBucket([]byte(bucket)).WithMeta(meta).WithValue(value)
 
 	err := e.valid()
 	if err != nil {

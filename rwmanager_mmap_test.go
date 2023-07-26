@@ -15,7 +15,12 @@
 package nutsdb
 
 import (
+	"os"
 	"testing"
+
+	"github.com/stretchr/testify/require"
+
+	"github.com/xujiajun/mmap-go"
 )
 
 func TestRWManager_MMap_Release(t *testing.T) {
@@ -48,5 +53,107 @@ func TestRWManager_MMap_Release(t *testing.T) {
 }
 
 func (rwmanager *MMapRWManager) IsActive() bool {
-	return	rwmanager.fdm.cache[rwmanager.path].using != 0
+	return rwmanager.fdm.cache[rwmanager.path].using != 0
+}
+
+func TestRWManager_MMap_WriteAt(t *testing.T) {
+	filePath := "/tmp/foo_rw_filemmap"
+	maxFdNums := 1024
+	cleanThreshold := 0.5
+	var fdm = newFdm(maxFdNums, cleanThreshold)
+
+	fd, err := fdm.getFd(filePath)
+	if err != nil {
+		require.NoError(t, err)
+	}
+	defer os.Remove(fd.Name())
+
+	err = Truncate(filePath, 1024, fd)
+	if err != nil {
+		require.NoError(t, err)
+
+	}
+	m, err := mmap.Map(fd, mmap.RDWR, 0)
+	if err != nil {
+		require.NoError(t, err)
+	}
+
+	mmManager := &MMapRWManager{filePath, fdm, m}
+	b := []byte("test write at")
+	off := int64(3)
+	n, err := mmManager.WriteAt(b, off)
+	if err != nil {
+		require.NoError(t, err)
+	}
+	require.Equal(t, len(b), n)
+	require.Equal(t, append([]byte{0, 0, 0}, b...), []byte(m[:off+int64(len(b))]))
+}
+
+func TestRWManager_MMap_Sync(t *testing.T) {
+	filePath := "/tmp/foo_rw_filemmap"
+	maxFdNums := 1024
+	cleanThreshold := 0.5
+	var fdm = newFdm(maxFdNums, cleanThreshold)
+
+	fd, err := fdm.getFd(filePath)
+	if err != nil {
+		require.NoError(t, err)
+	}
+	defer os.Remove(fd.Name())
+
+	err = Truncate(filePath, 1024, fd)
+	if err != nil {
+		require.NoError(t, err)
+
+	}
+	m, err := mmap.Map(fd, mmap.RDWR, 0)
+	if err != nil {
+		require.NoError(t, err)
+	}
+
+	mmManager := &MMapRWManager{filePath, fdm, m}
+	m[1] = 'z'
+	err = mmManager.Sync()
+	require.NoError(t, err)
+	fileContents, err := os.ReadFile(filePath)
+	require.NoError(t, err)
+	require.Equal(t, fileContents, []byte(m[:]))
+}
+
+func TestRWManager_MMap_Close(t *testing.T) {
+	filePath := "/tmp/foo_rw_filemmap"
+	maxFdNums := 1024
+	cleanThreshold := 0.5
+	var fdm = newFdm(maxFdNums, cleanThreshold)
+
+	fd, err := fdm.getFd(filePath)
+	if err != nil {
+		require.NoError(t, err)
+	}
+	defer os.Remove(fd.Name())
+
+	err = Truncate(filePath, 1024, fd)
+	if err != nil {
+		require.NoError(t, err)
+
+	}
+	m, err := mmap.Map(fd, mmap.RDWR, 0)
+	if err != nil {
+		require.NoError(t, err)
+	}
+
+	mmManager := &MMapRWManager{filePath, fdm, m}
+	err = mmManager.Close()
+	err = isFileDescriptorClosed(fd.Fd())
+	if err == nil {
+		t.Error("expected file descriptor to be closed, but it's still open")
+	}
+}
+
+func isFileDescriptorClosed(fd uintptr) error {
+	file := os.NewFile(fd, "")
+	defer file.Close()
+	_, err := file.Stat()
+
+	return err
 }

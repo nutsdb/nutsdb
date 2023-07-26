@@ -76,7 +76,7 @@ func Benchmark_TestMap_Get_RunParallel(b *testing.B) {
 		b.ReportAllocs()
 		for pb.Next() {
 			val := m.get(key)
-			if bytes.Compare(val, value) != 0 {
+			if !bytes.Equal(val, value) {
 				b.Error("err testDB Get")
 			}
 		}
@@ -130,7 +130,7 @@ func BenchmarkShardDB_Get(b *testing.B) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		if bytes.Compare(entry.Value, value) != 0 {
+		if !bytes.Equal(entry.Value, value) {
 			b.Error("err testDB Get")
 		}
 	}
@@ -154,7 +154,7 @@ func BenchmarkShardDB_GET_RunParallel(b *testing.B) {
 			if err != nil {
 				log.Fatal(err)
 			}
-			if bytes.Compare(entry.Value, value) != 0 {
+			if !bytes.Equal(entry.Value, value) {
 				b.Error("err testDB Get")
 			}
 		}

@@ -63,7 +63,7 @@ func (df *DataFile) ReadAt(off int) (e *Entry, err error) {
 		return nil, err
 	}
 
-	e = new(Entry)
+	e = NewEntry()
 	err = e.ParseMeta(buf)
 	if err != nil {
 		return nil, err

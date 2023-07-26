@@ -138,3 +138,12 @@ func getBPTRootTxIDPath(fID int64, dir string) string {
 	separator := string(filepath.Separator)
 	return getBPTDir(dir) + separator + "txid" + separator + strconv2.Int64ToStr(fID) + BPTRootTxIDIndexSuffix
 }
+
+func OneOfUint16Array(value uint16, array []uint16) bool {
+	for _, v := range array {
+		if v == value {
+			return true
+		}
+	}
+	return false
+}

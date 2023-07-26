@@ -41,9 +41,10 @@ func withBPTree(t *testing.T, fn func(t *testing.T, tree *BPTree)) {
 		key := []byte(fmt.Sprintf(keyFormat, i))
 		val := []byte(fmt.Sprintf(valFormat, i))
 
+		meta := &MetaData{Flag: DataSetFlag}
 		err := tree.Insert(key,
-			&Entry{Key: key, Value: val},
-			&Hint{Key: key, Meta: &MetaData{Flag: DataSetFlag}},
+			NewEntry().WithKey(key).WithValue(val),
+			NewHint().WithKey(key).WithMeta(meta),
 			CountFlagEnabled)
 		require.NoError(t, err)
 	}
@@ -53,12 +54,18 @@ func withBPTree(t *testing.T, fn func(t *testing.T, tree *BPTree)) {
 
 func setup(t *testing.T, limit int) {
 	tree = NewTree()
+	meta := &MetaData{
+		Flag: DataSetFlag,
+	}
 	for i := 0; i < 100; i++ {
 		key := []byte("key_" + fmt.Sprintf("%03d", i))
 		val := []byte("val_" + fmt.Sprintf("%03d", i))
-		err := tree.Insert(key, &Entry{Key: key, Value: val}, &Hint{Key: key, Meta: &MetaData{
-			Flag: DataSetFlag,
-		}}, CountFlagEnabled)
+		err := tree.Insert(
+			key,
+			NewEntry().WithKey(key).WithValue(val),
+			NewHint().WithKey(key).WithMeta(meta),
+			CountFlagEnabled,
+		)
 		require.NoError(t, err)
 	}
 
@@ -67,9 +74,12 @@ func setup(t *testing.T, limit int) {
 		key := []byte("key_" + fmt.Sprintf("%03d", i))
 		val := []byte("val_" + fmt.Sprintf("%03d", i))
 
-		expected = append(expected, &Record{E: &Entry{Key: key, Value: val}, H: &Hint{Key: key, Meta: &MetaData{
-			Flag: DataSetFlag,
-		}}})
+		E := NewEntry().WithKey(key).WithValue(val)
+		H := NewHint().WithKey(key).WithMeta(meta)
+		expected = append(
+			expected,
+			NewRecord().WithEntry(E).WithHint(H),
+		)
 	}
 }
 
@@ -162,12 +172,18 @@ func TestBPTree_PrefixScan(t *testing.T) {
 
 	t.Run("prefix scan after insert a new record", func(t *testing.T) {
 		withBPTree(t, func(t *testing.T, tree *BPTree) {
+			meta := &MetaData{
+				Flag: DataSetFlag,
+			}
 			for i := 0; i <= 100; i++ {
 				key := []byte("name_" + fmt.Sprintf("%03d", i))
 				val := []byte("val_" + fmt.Sprintf("%03d", i))
-				err := tree.Insert(key, &Entry{Key: key, Value: val}, &Hint{Key: key, Meta: &MetaData{
-					Flag: DataSetFlag,
-				}}, CountFlagEnabled)
+				err := tree.Insert(
+					key,
+					NewEntry().WithKey(key).WithValue(val),
+					NewHint().WithKey(key).WithMeta(meta),
+					CountFlagEnabled,
+				)
 				require.NoError(t, err)
 			}
 
@@ -254,12 +270,18 @@ func TestBPTree_PrefixSearchScan(t *testing.T) {
 		t.Errorf("err prefix search Scan. Regexp not found")
 	}
 
+	meta := &MetaData{
+		Flag: DataSetFlag,
+	}
 	for i := 0; i <= 100; i++ {
 		key := []byte("name_" + fmt.Sprintf("%03d", i))
 		val := []byte("val_" + fmt.Sprintf("%03d", i))
-		err := tree.Insert(key, &Entry{Key: key, Value: val}, &Hint{Key: key, Meta: &MetaData{
-			Flag: DataSetFlag,
-		}}, CountFlagEnabled)
+		err := tree.Insert(
+			key,
+			NewEntry().WithKey(key).WithValue(val),
+			NewHint().WithKey(key).WithMeta(meta),
+			CountFlagEnabled,
+		)
 		require.NoError(t, err)
 	}
 
@@ -317,30 +339,24 @@ func TestRecordExpired(t *testing.T) {
 
 	t.Run("test expired record", func(t *testing.T) {
 
-		record := &Record{
-			H: &Hint{
-				Meta: &MetaData{
-					Timestamp: expiredTime,
-					TTL:       10,
-				},
-			},
-			E: nil,
+		meta := &MetaData{
+			Timestamp: expiredTime,
+			TTL:       10,
 		}
+		H := NewHint().WithMeta(meta)
+		record := NewRecord().WithHint(H)
 
 		assert.True(t, record.IsExpired())
 	})
 
 	t.Run("test persistent record", func(t *testing.T) {
-		record := &Record{
-			H: &Hint{
-				Meta: &MetaData{
-					Timestamp: expiredTime,
-					TTL:       Persistent,
-				},
-			},
-			E: nil,
+		meta := &MetaData{
+			Timestamp: expiredTime,
+			TTL:       Persistent,
 		}
 
+		H := NewHint().WithMeta(meta)
+		record := NewRecord().WithHint(H)
 		assert.False(t, record.IsExpired())
 	})
 }
@@ -349,24 +365,34 @@ func TestBPTree_Update(t *testing.T) {
 	limit := 10
 	setup(t, limit)
 
+	meta := &MetaData{
+		Flag: DataSetFlag,
+	}
 	for i := 0; i <= 100; i++ {
 		key := []byte("key_" + fmt.Sprintf("%03d", i))
 		val := []byte("val_modify" + fmt.Sprintf("%03d", i))
-		err := tree.Insert(key, &Entry{Key: key, Value: val}, &Hint{Key: key, Meta: &MetaData{
-			Flag: DataSetFlag,
-		}}, CountFlagEnabled)
+		err := tree.Insert(
+			key,
+			NewEntry().WithKey(key).WithValue(val),
+
+			NewHint().WithKey(key).WithMeta(meta),
+			CountFlagEnabled)
 
 		require.NoError(t, err)
 	}
 
 	expected := Records{}
+	meta = &MetaData{
+		Flag: DataSetFlag,
+	}
 	for i := 0; i <= limit; i++ {
 		key := []byte("key_" + fmt.Sprintf("%03d", i))
 		val := []byte("val_modify" + fmt.Sprintf("%03d", i))
 
-		expected = append(expected, &Record{E: &Entry{Key: key, Value: val}, H: &Hint{Key: key, Meta: &MetaData{
-			Flag: DataSetFlag}},
-		})
+		E := NewEntry().WithKey(key).WithValue(val)
+		H := NewHint().WithKey(key).WithMeta(meta)
+		R := NewRecord().WithHint(H).WithEntry(E)
+		expected = append(expected, R)
 	}
 
 	rs, err := tree.Range([]byte("key_000"), []byte("key_009"))
@@ -377,11 +403,17 @@ func TestBPTree_Update(t *testing.T) {
 	}
 
 	// delete
+	meta = &MetaData{
+		Flag: DataDeleteFlag,
+	}
 	for i := 1; i <= limit; i++ {
 		key := []byte("key_" + fmt.Sprintf("%03d", i))
-		err := tree.Insert(key, &Entry{Key: key, Value: nil}, &Hint{Key: key, Meta: &MetaData{
-			Flag: DataDeleteFlag,
-		}}, CountFlagEnabled)
+		err := tree.Insert(
+			key,
+			NewEntry().WithKey(key),
+			NewHint().WithKey(key).WithMeta(meta),
+			CountFlagEnabled,
+		)
 
 		assert.NoError(t, err)
 	}
@@ -394,9 +426,15 @@ func TestBPTree_Update(t *testing.T) {
 	}
 
 	key := []byte("key_001")
-	err = tree.Insert(key, &Entry{Key: key, Value: nil}, &Hint{Key: key, Meta: &MetaData{
+	meta = &MetaData{
 		Flag: DataSetFlag,
-	}}, CountFlagEnabled)
+	}
+	err = tree.Insert(
+		key,
+		NewEntry().WithKey(key),
+		NewHint().WithKey(key).WithMeta(meta),
+		CountFlagEnabled,
+	)
 	assert.NoError(t, err)
 
 	r, err := tree.Find(key)
@@ -543,6 +581,30 @@ func TestBPTree_WriteNode(t *testing.T) {
 
 	// remove the test file
 	_ = os.Remove(testFilename)
+}
+
+func TestBPTree_ReadNode(t *testing.T) {
+
+	testFilename := "/tmp/bptree_read_test.bptidx"
+	setup(t, 10)
+
+	key := []byte("key_001")
+	tree.Filepath = testFilename
+
+	fd, err := os.OpenFile(tree.Filepath, os.O_CREATE|os.O_RDWR, 0644)
+	assert.NoError(t, err)
+
+	node := tree.FindLeaf(key)
+	num, err := tree.WriteNode(node, -1, false, fd)
+	assert.NoError(t, err)
+	assert.NotEqual(t, num, int16(0))
+
+	curr, err := ReadNode(testFilename, node.Address)
+	assert.NoError(t, err)
+	assert.NotNil(t, curr)
+
+	_ = os.Remove(testFilename)
+
 }
 
 func TestEnqueueDequeue(t *testing.T) {

@@ -700,7 +700,7 @@ func (t *BPTree) Insert(key []byte, e *Entry, h *Hint, countFlag bool) error {
 	}
 
 	// Initialize the Record object When key does not exist.
-	pointer := &Record{H: h, E: e}
+	pointer := NewRecord().WithEntry(e).WithHint(h)
 
 	// Update the validKeyCount number
 	t.ValidKeyCount++

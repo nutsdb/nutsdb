@@ -17,11 +17,13 @@ package nutsdb
 import (
 	"errors"
 	"fmt"
+	"github.com/gofrs/flock"
 	"io"
 	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -51,6 +53,11 @@ var (
 
 	// ErrNotSupportHintBPTSparseIdxMode is returned not support mode `HintBPTSparseIdxMode`
 	ErrNotSupportHintBPTSparseIdxMode = errors.New("not support mode `HintBPTSparseIdxMode`")
+
+	// ErrDirLocked is returned when can't get the file lock of dir
+	ErrDirLocked = errors.New("the dir of db is locked")
+
+	ErrDirUnlocked = errors.New("the dir of db is unlocked")
 )
 
 const (
@@ -146,6 +153,8 @@ const (
 	DataStructureNone
 )
 
+const FLockName = "nutsdb-flock"
+
 type (
 	// DB represents a collection of buckets that persist on disk.
 	DB struct {
@@ -167,6 +176,7 @@ type (
 		closed                  bool
 		isMerging               bool
 		fm                      *fileManager
+		flock                   *flock.Flock
 	}
 
 	// Entries represents entries
@@ -200,6 +210,15 @@ func open(opt Options) (*DB, error) {
 			return nil, err
 		}
 	}
+
+	flock := flock.New(filepath.Join(opt.Dir, FLockName))
+	if ok, err := flock.TryLock(); err != nil {
+		return nil, err
+	} else if !ok {
+		return nil, ErrDirLocked
+	}
+
+	db.flock = flock
 
 	if err := db.checkEntryIdxMode(); err != nil {
 		return nil, err
@@ -434,19 +453,64 @@ func (db *DB) Close() error {
 
 	db.closed = true
 
+	err := db.release()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// release set all obj in the db instance to nil
+func (db *DB) release() error {
+	GCEnable := db.opt.GCWhenClose
+
 	err := db.ActiveFile.rwManager.Release()
 	if err != nil {
 		return err
 	}
 
+	db.BPTreeIdx = nil
+
+	db.BPTreeKeyEntryPosMap = nil
+
+	db.bucketMetas = nil
+
+	db.SetIdx = nil
+
+	db.SortedSetIdx = nil
+
+	db.Index = nil
+
 	db.ActiveFile = nil
 
-	db.BPTreeIdx = nil
+	db.ActiveBPTreeIdx = nil
+
+	db.ActiveCommittedTxIdsIdx = nil
+
+	db.committedTxIds = nil
 
 	err = db.fm.close()
 
 	if err != nil {
 		return err
+	}
+
+	if !db.flock.Locked() {
+		return ErrDirUnlocked
+	}
+
+	err = db.flock.Unlock()
+	if err != nil {
+		return err
+	}
+
+	db.fm = nil
+
+	db = nil
+
+	if GCEnable {
+		runtime.GC()
 	}
 
 	return nil
@@ -527,7 +591,6 @@ func (db *DB) getActiveFileWriteOff() (off int64, err error) {
 func (db *DB) parseDataFiles(dataFileIds []int) (unconfirmedRecords []*Record, committedTxIds map[uint64]struct{}, err error) {
 	var (
 		off int64
-		e   *Entry
 	)
 
 	committedTxIds = make(map[uint64]struct{})
@@ -551,32 +614,24 @@ func (db *DB) parseDataFiles(dataFileIds []int) (unconfirmedRecords []*Record, c
 					break
 				}
 
-				e = nil
+				var e *Entry
 				if db.opt.EntryIdxMode == HintKeyValAndRAMIdxMode {
-					e = &Entry{
-						Key:    entry.Key,
-						Bucket: entry.Bucket,
-						Value:  entry.Value,
-						Meta:   entry.Meta,
-					}
+					e = NewEntry().WithKey(entry.Key).WithValue(entry.Value).WithBucket(entry.Bucket).WithMeta(entry.Meta)
 				}
 
 				if entry.Meta.Status == Committed {
 					committedTxIds[entry.Meta.TxID] = struct{}{}
-					db.ActiveCommittedTxIdsIdx.Insert([]byte(strconv2.Int64ToStr(int64(entry.Meta.TxID))), nil,
-						&Hint{Meta: &MetaData{Flag: DataSetFlag}}, CountFlagEnabled)
+					meta := &MetaData{Flag: DataSetFlag}
+					h := NewHint().WithMeta(meta)
+					err := db.ActiveCommittedTxIdsIdx.Insert(entry.GetTxIDBytes(), nil, h, CountFlagEnabled)
+					if err != nil {
+						return nil, nil, fmt.Errorf("can not ingest the hint obj to ActiveCommittedTxIdsIdx, err: %s", err.Error())
+					}
 				}
 
-				unconfirmedRecords = append(unconfirmedRecords, &Record{
-					H: &Hint{
-						Key:     entry.Key,
-						FileID:  fID,
-						Meta:    entry.Meta,
-						DataPos: uint64(off),
-					},
-					E:      e,
-					Bucket: string(entry.Bucket),
-				})
+				h := NewHint().WithKey(entry.Key).WithFileId(fID).WithMeta(entry.Meta).WithDataPos(uint64(off))
+				r := NewRecord().WithHint(h).WithEntry(e).WithBucket(entry.GetBucketString())
+				unconfirmedRecords = append(unconfirmedRecords, r)
 
 				if db.opt.EntryIdxMode == HintBPTSparseIdxMode {
 					db.BPTreeKeyEntryPosMap[string(getNewKey(string(entry.Bucket), entry.Key))] = off
@@ -875,11 +930,7 @@ func (db *DB) buildSortedSetIdx(bucket string, r *Record) error {
 
 // buildListIdx builds List index when opening the DB.
 func (db *DB) buildListIdx(bucket string, r *Record) error {
-	var l *list.List
-	if !db.Index.isBucketExist(bucket) {
-		db.Index.addList(bucket)
-	}
-	l = db.Index.getList(bucket)
+	l := db.Index.getList(bucket)
 
 	if r.E == nil {
 		return ErrEntryIdxModeOpt
@@ -991,21 +1042,18 @@ func (db *DB) managed(writable bool, fn func(tx *Tx) error) (err error) {
 		return err
 	}
 	defer func() {
-		var panicked bool
 		if r := recover(); r != nil {
-			// resume normal execution
-			panicked = true
-		}
-		if panicked || err != nil {
-			if errRollback := tx.Rollback(); errRollback != nil {
-				err = errRollback
-			}
+			err = fmt.Errorf("panic when executing tx, err is %+v", r)
 		}
 	}()
 
 	if err = fn(tx); err == nil {
 		err = tx.Commit()
+	} else {
+		errRollback := tx.Rollback()
+		err = fmt.Errorf("%v. Rollback err: %v", err, errRollback)
 	}
+
 	return err
 }
 
