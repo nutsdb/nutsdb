@@ -330,7 +330,7 @@ func (tx *Tx) buildBucketMetaIdx(bucket string, key []byte, bucketMetaTemp Bucke
 	}
 
 	if updateFlag {
-		fd, err := os.OpenFile(tx.db.getBucketMetaFilePath(bucket), os.O_CREATE|os.O_RDWR, 0644)
+		fd, err := os.OpenFile(getBucketMetaFilePath(bucket, tx.db.opt.Dir), os.O_CREATE|os.O_RDWR, 0644)
 		if err != nil {
 			return err
 		}
@@ -361,7 +361,7 @@ func (tx *Tx) buildTxIDRootIdx(txID uint64, countFlag bool) error {
 	}
 	if len(tx.ReservedStoreTxIDIdxes) > 0 {
 		for fID, txIDIdx := range tx.ReservedStoreTxIDIdxes {
-			filePath := tx.db.getBPTTxIDPath(fID)
+			filePath := getBPTTxIDPath(fID, tx.db.opt.Dir)
 
 			err := txIDIdx.Insert([]byte(txIDStr), nil, NewHint().WithMeta(meta), countFlag)
 			if err != nil {
@@ -374,7 +374,7 @@ func (tx *Tx) buildTxIDRootIdx(txID uint64, countFlag bool) error {
 				return err
 			}
 
-			filePath = tx.db.getBPTRootTxIDPath(fID)
+			filePath = getBPTRootTxIDPath(fID, tx.db.opt.Dir)
 			txIDRootIdx := NewTree()
 			rootAddress := strconv2.Int64ToStr(txIDIdx.root.Address)
 
@@ -555,7 +555,7 @@ func (tx *Tx) rotateActiveFile() error {
 	}
 
 	if tx.db.opt.EntryIdxMode == HintBPTSparseIdxMode {
-		tx.db.ActiveBPTreeIdx.Filepath = tx.db.getBPTPath(fID)
+		tx.db.ActiveBPTreeIdx.Filepath = getBPTPath(fID, tx.db.opt.Dir)
 		tx.db.ActiveBPTreeIdx.enabledKeyPosMap = true
 		tx.db.ActiveBPTreeIdx.SetKeyPosMap(tx.db.BPTreeKeyEntryPosMap)
 
@@ -573,7 +573,7 @@ func (tx *Tx) rotateActiveFile() error {
 			end:       tx.db.ActiveBPTreeIdx.LastKey,
 		}
 
-		_, err := BPTreeRootIdx.Persistence(tx.db.getBPTRootPath(fID),
+		_, err := BPTreeRootIdx.Persistence(getBPTRootPath(fID, tx.db.opt.Dir),
 			0, tx.db.opt.SyncEnable)
 		if err != nil {
 			return err
@@ -597,7 +597,7 @@ func (tx *Tx) rotateActiveFile() error {
 	}
 
 	// reset ActiveFile
-	path := tx.db.getDataPath(tx.db.MaxFileID)
+	path := getDataPath(tx.db.MaxFileID, tx.db.opt.Dir)
 	tx.db.ActiveFile, err = tx.db.fm.getDataFile(path, tx.db.opt.SegmentSize)
 	if err != nil {
 		return err
