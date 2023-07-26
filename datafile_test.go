@@ -32,14 +32,9 @@ func init() {
 		Key:    []byte("key_0001"),
 		Value:  []byte("val_0001"),
 		Bucket: []byte("test_DataFile"),
-		Meta: &MetaData{
-			KeySize:    uint32(len("key_0001")),
-			ValueSize:  uint32(len("val_0001")),
-			Timestamp:  1547707905,
-			TTL:        Persistent,
-			BucketSize: uint32(len("test_datafile")),
-			Flag:       DataSetFlag,
-		},
+		Meta: NewMetaData().WithKeySize(uint32(len("key_0001"))).
+			WithValueSize(uint32(len("val_0001"))).WithTimeStamp(1547707905).WithTTL(Persistent).
+			WithBucketSize(uint32(len("test_datafile"))).WithFlag(DataSetFlag),
 	}
 }
 

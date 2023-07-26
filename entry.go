@@ -154,19 +154,12 @@ func (e *Entry) checkPayloadSize(size int64) error {
 
 // ParseMeta parse meta object to entry
 func (e *Entry) ParseMeta(buf []byte) error {
-	meta := &MetaData{
-		Crc:        binary.LittleEndian.Uint32(buf[0:4]),
-		Timestamp:  binary.LittleEndian.Uint64(buf[4:12]),
-		KeySize:    binary.LittleEndian.Uint32(buf[12:16]),
-		ValueSize:  binary.LittleEndian.Uint32(buf[16:20]),
-		Flag:       binary.LittleEndian.Uint16(buf[20:22]),
-		TTL:        binary.LittleEndian.Uint32(buf[22:26]),
-		BucketSize: binary.LittleEndian.Uint32(buf[26:30]),
-		Status:     binary.LittleEndian.Uint16(buf[30:32]),
-		Ds:         binary.LittleEndian.Uint16(buf[32:34]),
-		TxID:       binary.LittleEndian.Uint64(buf[34:42]),
-	}
-	e.Meta = meta
+	e.Meta = NewMetaData().WithCrc(binary.LittleEndian.Uint32(buf[0:4])).
+		WithTimeStamp(binary.LittleEndian.Uint64(buf[4:12])).WithKeySize(binary.LittleEndian.Uint32(buf[12:16])).
+		WithValueSize(binary.LittleEndian.Uint32(buf[16:20])).WithFlag(binary.LittleEndian.Uint16(buf[20:22])).
+		WithTTL(binary.LittleEndian.Uint32(buf[22:26])).WithBucketSize(binary.LittleEndian.Uint32(buf[26:30])).
+		WithStatus(binary.LittleEndian.Uint16(buf[30:32])).WithDs(binary.LittleEndian.Uint16(buf[32:34])).
+		WithTxID(binary.LittleEndian.Uint64(buf[34:42]))
 	return nil
 }
 
@@ -270,4 +263,58 @@ func (e *Entry) GetBucketString() string {
 // GetTxIDBytes return the bytes of TxID
 func (e *Entry) GetTxIDBytes() []byte {
 	return []byte(strconv2.Int64ToStr(int64(e.Meta.TxID)))
+}
+
+func NewMetaData() *MetaData {
+	return new(MetaData)
+}
+
+func (meta *MetaData) WithKeySize(keySize uint32) *MetaData {
+	meta.KeySize = keySize
+	return meta
+}
+
+func (meta *MetaData) WithValueSize(valueSize uint32) *MetaData {
+	meta.ValueSize = valueSize
+	return meta
+}
+
+func (meta *MetaData) WithTimeStamp(timestamp uint64) *MetaData {
+	meta.Timestamp = timestamp
+	return meta
+}
+
+func (meta *MetaData) WithTTL(ttl uint32) *MetaData {
+	meta.TTL = ttl
+	return meta
+}
+
+func (meta *MetaData) WithFlag(flag uint16) *MetaData {
+	meta.Flag = flag
+	return meta
+}
+
+func (meta *MetaData) WithBucketSize(bucketSize uint32) *MetaData {
+	meta.BucketSize = bucketSize
+	return meta
+}
+
+func (meta *MetaData) WithTxID(txID uint64) *MetaData {
+	meta.TxID = txID
+	return meta
+}
+
+func (meta *MetaData) WithStatus(status uint16) *MetaData {
+	meta.Status = status
+	return meta
+}
+
+func (meta *MetaData) WithDs(ds uint16) *MetaData {
+	meta.Ds = ds
+	return meta
+}
+
+func (meta *MetaData) WithCrc(crc uint32) *MetaData {
+	meta.Crc = crc
+	return meta
 }

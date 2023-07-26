@@ -621,7 +621,7 @@ func (db *DB) parseDataFiles(dataFileIds []int) (unconfirmedRecords []*Record, c
 
 				if entry.Meta.Status == Committed {
 					committedTxIds[entry.Meta.TxID] = struct{}{}
-					meta := &MetaData{Flag: DataSetFlag}
+					meta := NewMetaData().WithFlag(DataSetFlag)
 					h := NewHint().WithMeta(meta)
 					err := db.ActiveCommittedTxIdsIdx.Insert(entry.GetTxIDBytes(), nil, h, CountFlagEnabled)
 					if err != nil {

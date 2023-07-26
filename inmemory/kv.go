@@ -136,33 +136,16 @@ func put(shardDB *ShardDB, bucket string, key, value []byte, ttl uint32, flag ui
 	valueSize := uint32(len(value))
 	timestamp := uint64(time.Now().Unix())
 	bucketSize := uint32(len(bucket))
+	meta := nutsdb.NewMetaData().WithTimeStamp(timestamp).WithKeySize(keySize).WithValueSize(valueSize).WithFlag(flag).WithTTL(ttl).
+		WithBucketSize(bucketSize).WithStatus(nutsdb.Committed).WithDs(nutsdb.DataStructureBPTree)
 	err = shardDB.BPTreeIdx[bucket].Insert(key, &nutsdb.Entry{
 		Key:    key,
 		Value:  value,
 		Bucket: []byte(bucket),
-
-		Meta: &nutsdb.MetaData{
-			KeySize:    keySize,
-			ValueSize:  valueSize,
-			Timestamp:  timestamp,
-			Flag:       flag,
-			TTL:        ttl,
-			BucketSize: bucketSize,
-			Status:     nutsdb.Committed,
-			Ds:         nutsdb.DataStructureBPTree,
-		},
+		Meta:   meta,
 	}, &nutsdb.Hint{
-		Key: key,
-		Meta: &nutsdb.MetaData{
-			KeySize:    keySize,
-			ValueSize:  valueSize,
-			Timestamp:  timestamp,
-			Flag:       flag,
-			TTL:        ttl,
-			BucketSize: bucketSize,
-			Status:     nutsdb.Committed,
-			Ds:         nutsdb.DataStructureBPTree,
-		},
+		Key:  key,
+		Meta: meta,
 	}, nutsdb.CountFlagEnabled)
 	return
 }
