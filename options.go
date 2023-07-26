@@ -76,6 +76,9 @@ type Options struct {
 	// CcWhenClose represent initiative GC when calling db.Close()
 	GCWhenClose bool
 
+	// CommitBufferSize represent allocated memory for tx
+	CommitBufferSize int64
+
 	// ErrorHandler handles an error occurred during transaction.
 	// Example:
 	//     func triggerAlertError(err error) {
@@ -102,11 +105,12 @@ var defaultSegmentSize int64 = 256 * MB
 // DefaultOptions represents the default options.
 var DefaultOptions = func() Options {
 	return Options{
-		EntryIdxMode: HintKeyValAndRAMIdxMode,
-		SegmentSize:  defaultSegmentSize,
-		NodeNum:      1,
-		RWMode:       FileIO,
-		SyncEnable:   true,
+		EntryIdxMode:     HintKeyValAndRAMIdxMode,
+		SegmentSize:      defaultSegmentSize,
+		NodeNum:          1,
+		RWMode:           FileIO,
+		SyncEnable:       true,
+		CommitBufferSize: 4 * MB,
 	}
 }()
 
@@ -175,5 +179,11 @@ func WithGCWhenClose(enable bool) Option {
 func WithErrorHandler(errorHandler ErrorHandler) Option {
 	return func(opt *Options) {
 		opt.ErrorHandler = errorHandler
+	}
+}
+
+func WithCommitBufferSize(commitBufferSize int64) Option {
+	return func(opt *Options) {
+		opt.CommitBufferSize = commitBufferSize
 	}
 }
