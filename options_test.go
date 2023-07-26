@@ -62,3 +62,15 @@ func TestWithCleanFdsCacheThreshold(t *testing.T) {
 
 	defer db.Close()
 }
+
+func TestWithErrorHandler(t *testing.T) {
+	db, err = Open(DefaultOptions,
+		WithDir("/tmp/nutsdb"),
+		WithErrorHandler(ErrorHandlerFunc(func(err error) {
+		})),
+	)
+	assert.NoError(t, err)
+	assert.NotNil(t, db.opt.ErrorHandler)
+
+	defer db.Close()
+}

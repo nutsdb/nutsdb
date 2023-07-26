@@ -1050,6 +1050,10 @@ func (db *DB) managed(writable bool, fn func(tx *Tx) error) (err error) {
 	if err = fn(tx); err == nil {
 		err = tx.Commit()
 	} else {
+		if db.opt.ErrorHandler != nil {
+			db.opt.ErrorHandler.HandleError(err)
+		}
+
 		errRollback := tx.Rollback()
 		err = fmt.Errorf("%v. Rollback err: %v", err, errRollback)
 	}
