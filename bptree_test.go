@@ -41,7 +41,7 @@ func withBPTree(t *testing.T, fn func(t *testing.T, tree *BPTree)) {
 		key := []byte(fmt.Sprintf(keyFormat, i))
 		val := []byte(fmt.Sprintf(valFormat, i))
 
-		meta := &MetaData{Flag: DataSetFlag}
+		meta := NewMetaData().WithFlag(DataSetFlag)
 		err := tree.Insert(key,
 			NewEntry().WithKey(key).WithValue(val),
 			NewHint().WithKey(key).WithMeta(meta),
@@ -54,9 +54,7 @@ func withBPTree(t *testing.T, fn func(t *testing.T, tree *BPTree)) {
 
 func setup(t *testing.T, limit int) {
 	tree = NewTree()
-	meta := &MetaData{
-		Flag: DataSetFlag,
-	}
+	meta := NewMetaData().WithFlag(DataSetFlag)
 	for i := 0; i < 100; i++ {
 		key := []byte("key_" + fmt.Sprintf("%03d", i))
 		val := []byte("val_" + fmt.Sprintf("%03d", i))
@@ -172,9 +170,7 @@ func TestBPTree_PrefixScan(t *testing.T) {
 
 	t.Run("prefix scan after insert a new record", func(t *testing.T) {
 		withBPTree(t, func(t *testing.T, tree *BPTree) {
-			meta := &MetaData{
-				Flag: DataSetFlag,
-			}
+			meta := NewMetaData().WithFlag(DataSetFlag)
 			for i := 0; i <= 100; i++ {
 				key := []byte("name_" + fmt.Sprintf("%03d", i))
 				val := []byte("val_" + fmt.Sprintf("%03d", i))
@@ -270,9 +266,7 @@ func TestBPTree_PrefixSearchScan(t *testing.T) {
 		t.Errorf("err prefix search Scan. Regexp not found")
 	}
 
-	meta := &MetaData{
-		Flag: DataSetFlag,
-	}
+	meta := NewMetaData().WithFlag(DataSetFlag)
 	for i := 0; i <= 100; i++ {
 		key := []byte("name_" + fmt.Sprintf("%03d", i))
 		val := []byte("val_" + fmt.Sprintf("%03d", i))
@@ -338,11 +332,7 @@ func TestRecordExpired(t *testing.T) {
 	expiredTime := uint64(time.Now().Add(-1 * time.Hour).Unix())
 
 	t.Run("test expired record", func(t *testing.T) {
-
-		meta := &MetaData{
-			Timestamp: expiredTime,
-			TTL:       10,
-		}
+		meta := NewMetaData().WithTimeStamp(expiredTime).WithTTL(10)
 		H := NewHint().WithMeta(meta)
 		record := NewRecord().WithHint(H)
 
@@ -350,10 +340,7 @@ func TestRecordExpired(t *testing.T) {
 	})
 
 	t.Run("test persistent record", func(t *testing.T) {
-		meta := &MetaData{
-			Timestamp: expiredTime,
-			TTL:       Persistent,
-		}
+		meta := NewMetaData().WithTimeStamp(expiredTime).WithTTL(Persistent)
 
 		H := NewHint().WithMeta(meta)
 		record := NewRecord().WithHint(H)
@@ -365,9 +352,7 @@ func TestBPTree_Update(t *testing.T) {
 	limit := 10
 	setup(t, limit)
 
-	meta := &MetaData{
-		Flag: DataSetFlag,
-	}
+	meta := NewMetaData().WithFlag(DataSetFlag)
 	for i := 0; i <= 100; i++ {
 		key := []byte("key_" + fmt.Sprintf("%03d", i))
 		val := []byte("val_modify" + fmt.Sprintf("%03d", i))
@@ -382,9 +367,7 @@ func TestBPTree_Update(t *testing.T) {
 	}
 
 	expected := Records{}
-	meta = &MetaData{
-		Flag: DataSetFlag,
-	}
+	meta = NewMetaData().WithFlag(DataSetFlag)
 	for i := 0; i <= limit; i++ {
 		key := []byte("key_" + fmt.Sprintf("%03d", i))
 		val := []byte("val_modify" + fmt.Sprintf("%03d", i))
@@ -403,9 +386,7 @@ func TestBPTree_Update(t *testing.T) {
 	}
 
 	// delete
-	meta = &MetaData{
-		Flag: DataDeleteFlag,
-	}
+	meta = NewMetaData().WithFlag(DataDeleteFlag)
 	for i := 1; i <= limit; i++ {
 		key := []byte("key_" + fmt.Sprintf("%03d", i))
 		err := tree.Insert(
@@ -426,9 +407,7 @@ func TestBPTree_Update(t *testing.T) {
 	}
 
 	key := []byte("key_001")
-	meta = &MetaData{
-		Flag: DataSetFlag,
-	}
+	meta = NewMetaData().WithFlag(DataSetFlag)
 	err = tree.Insert(
 		key,
 		NewEntry().WithKey(key),

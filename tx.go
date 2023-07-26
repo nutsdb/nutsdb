@@ -354,7 +354,7 @@ func (tx *Tx) buildBucketMetaIdx(bucket string, key []byte, bucketMetaTemp Bucke
 func (tx *Tx) buildTxIDRootIdx(txID uint64, countFlag bool) error {
 	txIDStr := strconv2.IntToStr(int(txID))
 
-	meta := &MetaData{Flag: DataSetFlag}
+	meta := NewMetaData().WithFlag(DataSetFlag)
 	err := tx.db.ActiveCommittedTxIdsIdx.Insert([]byte(txIDStr), nil, NewHint().WithMeta(meta), countFlag)
 	if err != nil {
 		return err
@@ -704,17 +704,8 @@ func (tx *Tx) put(bucket string, key, value []byte, ttl uint32, flag uint16, tim
 		return ErrTxNotWritable
 	}
 
-	meta := &MetaData{
-		KeySize:    uint32(len(key)),
-		ValueSize:  uint32(len(value)),
-		Timestamp:  timestamp,
-		Flag:       flag,
-		TTL:        ttl,
-		BucketSize: uint32(len(bucket)),
-		Status:     UnCommitted,
-		Ds:         ds,
-		TxID:       tx.id,
-	}
+	meta := NewMetaData().WithTimeStamp(timestamp).WithKeySize(uint32(len(key))).WithValueSize(uint32(len(value))).WithFlag(flag).
+		WithTTL(ttl).WithBucketSize(uint32(len(bucket))).WithStatus(UnCommitted).WithDs(ds).WithTxID(tx.id)
 	e := NewEntry().WithKey(key).WithBucket([]byte(bucket)).WithMeta(meta).WithValue(value)
 
 	err := e.valid()
