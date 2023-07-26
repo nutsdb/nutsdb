@@ -165,6 +165,9 @@ func (tx *Tx) getTxID() (id uint64, err error) {
 // 5. Unlock the database and clear the db field.
 func (tx *Tx) Commit() (err error) {
 	defer func() {
+		if err != nil {
+			tx.handleErr(err)
+		}
 		tx.unlock()
 		tx.db = nil
 
@@ -673,6 +676,12 @@ func (tx *Tx) unlock() {
 		tx.db.mu.Unlock()
 	} else {
 		tx.db.mu.RUnlock()
+	}
+}
+
+func (tx *Tx) handleErr(err error) {
+	if tx.db.opt.ErrorHandler != nil {
+		tx.db.opt.ErrorHandler.HandleError(err)
 	}
 }
 

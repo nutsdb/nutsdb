@@ -28,6 +28,18 @@ const (
 	HintBPTSparseIdxMode
 )
 
+// An ErrorHandler handles an error occurred during transaction.
+type ErrorHandler interface {
+	HandleError(err error)
+}
+
+// The ErrorHandlerFunc type is an adapter to ErrorHandler.
+type ErrorHandlerFunc func(err error)
+
+func (fn ErrorHandlerFunc) HandleError(err error) {
+	fn(err)
+}
+
 // Options records params for creating DB object.
 type Options struct {
 	// Dir represents Open the database located in which dir.
@@ -63,6 +75,15 @@ type Options struct {
 
 	// CcWhenClose represent initiative GC when calling db.Close()
 	GCWhenClose bool
+
+	// ErrorHandler handles an error occurred during transaction.
+	// Example:
+	//     func triggerAlertError(err error) {
+	//     	   if errors.Is(err, targetErr) {
+	//         		alertManager.TriggerAlert()
+	//     	   }
+	//     })
+	ErrorHandler ErrorHandler
 }
 
 const (
@@ -148,5 +169,11 @@ func WithBufferSizeOfRecovery(size int) Option {
 func WithGCWhenClose(enable bool) Option {
 	return func(opt *Options) {
 		opt.GCWhenClose = enable
+	}
+}
+
+func WithErrorHandler(errorHandler ErrorHandler) Option {
+	return func(opt *Options) {
+		opt.ErrorHandler = errorHandler
 	}
 }

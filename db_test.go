@@ -534,6 +534,23 @@ func TestDB_ErrThenReadWrite(t *testing.T) {
 	})
 }
 
+func TestDB_ErrorHandler(t *testing.T) {
+	opts := DefaultOptions
+	handleErrCalled := false
+	opts.ErrorHandler = ErrorHandlerFunc(func(err error) {
+		handleErrCalled = true
+	})
+
+	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
+		err = db.View(
+			func(tx *Tx) error {
+				return fmt.Errorf("err happened")
+			})
+		require.NotNil(t, err)
+		require.Equal(t, handleErrCalled, true)
+	})
+}
+
 func withDBOption(t *testing.T, opt Options, fn func(t *testing.T, db *DB)) {
 	db, err := Open(opt)
 	require.NoError(t, err)
