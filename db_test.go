@@ -646,6 +646,21 @@ func withRAMIdxDB(t *testing.T, fn func(t *testing.T, db *DB)) {
 	withDBOption(t, opt, fn)
 }
 
+func TestEntries_processEntriesScanOnDisk(t *testing.T) {
+	tests := []struct {
+		name       string
+		e          Entries
+		wantResult []*Entry
+	}{
+		// TODO: Add test cases.
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equalf(t, tt.wantResult, tt.e.processEntriesScanOnDisk(), "processEntriesScanOnDisk()")
+		})
+	}
+}
+
 func withBPTSpareeIdxDB(t *testing.T, fn func(t *testing.T, db *DB)) {
 	tmpdir, _ := ioutil.TempDir("", "nutsdb")
 	opt := DefaultOptions

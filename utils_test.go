@@ -18,25 +18,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/xujiajun/utils/strconv2"
 )
-
-func TestPrintSortedMap(t *testing.T) {
-	entries := make(map[string]*Entry, 10)
-	for i := 0; i < 10; i++ {
-		k := strconv2.IntToStr(i)
-		entries[k] = NewEntry().WithKey([]byte(k))
-	}
-
-	keys, _ := SortedEntryKeys(entries)
-
-	for i := 0; i < 10; i++ {
-		k := strconv2.IntToStr(i)
-		if k != keys[i] {
-			t.Errorf("err TestPrintSortedMap. got %s want %s", keys[i], k)
-		}
-	}
-}
 
 func TestMarshalInts(t *testing.T) {
 	assertions := assert.New(t)

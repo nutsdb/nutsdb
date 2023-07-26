@@ -21,21 +21,9 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"sort"
 
 	"github.com/xujiajun/utils/strconv2"
 )
-
-// SortedEntryKeys returns sorted entries.
-func SortedEntryKeys(m map[string]*Entry) (keys []string, es map[string]*Entry) {
-	for k := range m {
-		keys = append(keys, k)
-	}
-
-	sort.Strings(keys)
-
-	return keys, m
-}
 
 // Truncate changes the size of the file.
 func Truncate(path string, capacity int64, f *os.File) error {

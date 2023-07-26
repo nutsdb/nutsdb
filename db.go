@@ -192,6 +192,29 @@ type (
 	BucketMetasIdx map[string]*BucketMeta
 )
 
+func (e Entries) Len() int { return len(e) }
+
+func (e Entries) Less(i, j int) bool {
+	l := string(e[i].Key)
+	r := string(e[j].Key)
+
+	return strings.Compare(l, r) == -1
+}
+
+func (e Entries) Swap(i, j int) { e[i], e[j] = e[j], e[i] }
+
+func (e Entries) processEntriesScanOnDisk() (result []*Entry) {
+	sort.Sort(e)
+	for _, ele := range e {
+		curE := ele
+		if !IsExpired(curE.Meta.TTL, curE.Meta.Timestamp) && curE.Meta.Flag != DataDeleteFlag {
+			result = append(result, curE)
+		}
+	}
+
+	return result
+}
+
 // open returns a newly initialized DB object.
 func open(opt Options) (*DB, error) {
 	db := &DB{
