@@ -197,20 +197,7 @@ func (tx *Tx) Commit() (err error) {
 		countFlag = CountFlagDisabled
 	}
 
-	var txSize int64
-	for i := 0; i < writesLen; i++ {
-		txSize += tx.pendingWrites[i].Size()
-	}
-
-	var buff *bytes.Buffer
-
-	if txSize < tx.db.opt.CommitBufferSize {
-		buff = tx.db.commitBuffer
-	} else {
-		buff = new(bytes.Buffer)
-		// avoid grow
-		buff.Grow(int(txSize))
-	}
+	buff := tx.allocCommitBuffer()
 
 	for i := 0; i < writesLen; i++ {
 		entry := tx.pendingWrites[i]
@@ -289,6 +276,25 @@ func (tx *Tx) Commit() (err error) {
 	tx.buildIdxes()
 
 	return nil
+}
+
+func (tx *Tx) allocCommitBuffer() *bytes.Buffer {
+	var txSize int64
+	for i := 0; i < len(tx.pendingWrites); i++ {
+		txSize += tx.pendingWrites[i].Size()
+	}
+
+	var buff *bytes.Buffer
+
+	if txSize < tx.db.opt.CommitBufferSize {
+		buff = tx.db.commitBuffer
+	} else {
+		buff = new(bytes.Buffer)
+		// avoid grow
+		buff.Grow(int(txSize))
+	}
+
+	return buff
 }
 
 func (tx *Tx) buildTempBucketMetaIdx(bucket string, key []byte, bucketMetaTemp BucketMeta) BucketMeta {
