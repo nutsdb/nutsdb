@@ -198,6 +198,7 @@ func (tx *Tx) Commit() (err error) {
 	}
 
 	buff := tx.allocCommitBuffer()
+	defer tx.db.commitBuffer.Reset()
 
 	for i := 0; i < writesLen; i++ {
 		entry := tx.pendingWrites[i]
@@ -270,8 +271,6 @@ func (tx *Tx) Commit() (err error) {
 			tx.db.deleteBucket(DataStructureBPTree, bucket)
 		}
 	}
-
-	tx.db.commitBuffer.Reset()
 
 	tx.buildIdxes()
 
