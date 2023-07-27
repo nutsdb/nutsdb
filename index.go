@@ -28,6 +28,11 @@ func NewIndex() *index {
 	return i
 }
 
+func (i *index) existList(bucket string) bool {
+	_, isExist := i.list[bucket]
+	return isExist
+}
+
 func (i *index) getList(bucket string) *list.List {
 	l, isExist := i.list[bucket]
 	if isExist {
