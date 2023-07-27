@@ -52,12 +52,16 @@ var (
 	// ErrBucketNotFound is returned when looking for bucket that does not exist
 	ErrBucketNotFound = errors.New("bucket not found")
 
+	// ErrDataStructureNotSupported is returned when pass a not supported data structure
+	ErrDataStructureNotSupported = errors.New("this data structure is not supported for now")
+
 	// ErrNotSupportHintBPTSparseIdxMode is returned not support mode `HintBPTSparseIdxMode`
 	ErrNotSupportHintBPTSparseIdxMode = errors.New("not support mode `HintBPTSparseIdxMode`")
 
 	// ErrDirLocked is returned when can't get the file lock of dir
 	ErrDirLocked = errors.New("the dir of db is locked")
 
+	// ErrDirUnlocked is returned when the file lock already unlocked
 	ErrDirUnlocked = errors.New("the dir of db is unlocked")
 )
 

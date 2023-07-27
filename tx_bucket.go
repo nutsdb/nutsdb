@@ -68,6 +68,15 @@ func (tx *Tx) DeleteBucket(ds uint16, bucket string) error {
 	if tx.db.opt.EntryIdxMode == HintBPTSparseIdxMode {
 		return ErrNotSupportHintBPTSparseIdxMode
 	}
+
+	ok, err := tx.ExistBucket(ds, bucket)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return ErrBucketNotFound
+	}
+
 	if ds == DataStructureSet {
 		return tx.put(bucket, []byte("0"), nil, Persistent, DataSetBucketDeleteFlag, uint64(time.Now().Unix()), DataStructureNone)
 	}
@@ -81,4 +90,23 @@ func (tx *Tx) DeleteBucket(ds uint16, bucket string) error {
 		return tx.put(bucket, []byte("3"), nil, Persistent, DataListBucketDeleteFlag, uint64(time.Now().Unix()), DataStructureNone)
 	}
 	return nil
+}
+
+func (tx *Tx) ExistBucket(ds uint16, bucket string) (bool, error) {
+	var ok bool
+
+	switch ds {
+	case DataStructureSet:
+		_, ok = tx.db.SetIdx[bucket]
+	case DataStructureSortedSet:
+		_, ok = tx.db.SortedSetIdx[bucket]
+	case DataStructureBPTree:
+		_, ok = tx.db.BPTreeIdx[bucket]
+	case DataStructureList:
+		ok = tx.db.Index.existList(bucket)
+	default:
+		return false, ErrDataStructureNotSupported
+	}
+
+	return ok, nil
 }

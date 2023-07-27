@@ -142,7 +142,7 @@ func (suite *TxBucketTestSuite) TestB_DeleteBucket() {
 	assert.Nil(suite.T(), err)
 
 	err = tx.DeleteBucket(DataStructureNone, "none_bucket")
-	assert.Nil(suite.T(), err)
+	assert.Error(suite.T(), err)
 
 	err = tx.Commit()
 	assert.Nil(suite.T(), err)

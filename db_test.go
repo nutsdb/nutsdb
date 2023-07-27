@@ -99,6 +99,15 @@ func txDel(t *testing.T, db *DB, bucket string, key []byte, expectErr error) {
 	require.NoError(t, err)
 }
 
+func txDeleteBucket(t *testing.T, db *DB, ds uint16, bucket string, expectErr error) {
+	err := db.Update(func(tx *Tx) error {
+		err := tx.DeleteBucket(ds, bucket)
+		assertErr(t, err, expectErr)
+		return nil
+	})
+	require.NoError(t, err)
+}
+
 func InitOpt(fileDir string, isRemoveFiles bool) {
 	if fileDir == "" {
 		fileDir = "/tmp/nutsdbtest"
@@ -586,6 +595,23 @@ func TestDB_CommitBuffer(t *testing.T) {
 
 		require.Equal(t, 0, db.commitBuffer.Len())
 		require.Equal(t, db.opt.CommitBufferSize, int64(db.commitBuffer.Cap()))
+	})
+}
+
+func TestDB_DeleteBucket(t *testing.T) {
+	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		bucket := "bucket"
+		key := GetTestBytes(0)
+		val := GetTestBytes(0)
+
+		txDeleteBucket(t, db, DataStructureBPTree, bucket, ErrBucketNotFound)
+
+		txPut(t, db, bucket, key, val, Persistent, nil)
+		txGet(t, db, bucket, key, val, nil)
+
+		txDeleteBucket(t, db, DataStructureBPTree, bucket, nil)
+		txGet(t, db, bucket, key, nil, ErrBucketNotFound)
+		txDeleteBucket(t, db, DataStructureBPTree, bucket, ErrBucketNotFound)
 	})
 }
 
