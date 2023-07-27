@@ -551,6 +551,44 @@ func TestDB_ErrorHandler(t *testing.T) {
 	})
 }
 
+func TestDB_CommitBuffer(t *testing.T) {
+	bucket := "bucket"
+
+	opts := DefaultOptions
+	opts.CommitBufferSize = 8 * MB
+	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
+		require.Equal(t, int64(8*MB), db.opt.CommitBufferSize)
+		// When the database starts, the commit buffer should be allocated with the size of CommitBufferSize.
+		require.Equal(t, 0, db.commitBuffer.Len())
+		require.Equal(t, db.opt.CommitBufferSize, int64(db.commitBuffer.Cap()))
+
+		txPut(t, db, bucket, GetTestBytes(0), GetRandomBytes(24), Persistent, nil)
+
+		// When tx is committed, content of commit buffer should be empty, but do not release memory
+		require.Equal(t, 0, db.commitBuffer.Len())
+		require.Equal(t, db.opt.CommitBufferSize, int64(db.commitBuffer.Cap()))
+	})
+
+	opts = DefaultOptions
+	opts.CommitBufferSize = 1 * KB
+	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
+		require.Equal(t, int64(1*KB), db.opt.CommitBufferSize)
+
+		err := db.Update(func(tx *Tx) error {
+			// making this tx big enough, it should not use the commit buffer
+			for i := 0; i < 1000; i++ {
+				err := tx.Put(bucket, GetTestBytes(i), GetRandomBytes(1024), Persistent)
+				require.NoError(t, err)
+			}
+			return nil
+		})
+		require.NoError(t, err)
+
+		require.Equal(t, 0, db.commitBuffer.Len())
+		require.Equal(t, db.opt.CommitBufferSize, int64(db.commitBuffer.Cap()))
+	})
+}
+
 func withDBOption(t *testing.T, opt Options, fn func(t *testing.T, db *DB)) {
 	db, err := Open(opt)
 	require.NoError(t, err)

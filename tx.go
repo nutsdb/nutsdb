@@ -19,7 +19,6 @@ import (
 	"errors"
 	"os"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -79,12 +78,6 @@ var (
 	// ErrNotFoundBucket is returned when key not found int the bucket on an view function.
 	ErrNotFoundBucket = errors.New("bucket not found")
 )
-
-var cachePool = sync.Pool{
-	New: func() interface{} {
-		return new(bytes.Buffer)
-	},
-}
 
 // Tx represents a transaction.
 type Tx struct {
@@ -204,11 +197,8 @@ func (tx *Tx) Commit() (err error) {
 		countFlag = CountFlagDisabled
 	}
 
-	buff := cachePool.Get().(*bytes.Buffer)
-	defer func() {
-		buff.Reset()
-		cachePool.Put(buff)
-	}()
+	buff := tx.allocCommitBuffer()
+	defer tx.db.commitBuffer.Reset()
 
 	for i := 0; i < writesLen; i++ {
 		entry := tx.pendingWrites[i]
@@ -285,6 +275,25 @@ func (tx *Tx) Commit() (err error) {
 	tx.buildIdxes()
 
 	return nil
+}
+
+func (tx *Tx) allocCommitBuffer() *bytes.Buffer {
+	var txSize int64
+	for i := 0; i < len(tx.pendingWrites); i++ {
+		txSize += tx.pendingWrites[i].Size()
+	}
+
+	var buff *bytes.Buffer
+
+	if txSize < tx.db.opt.CommitBufferSize {
+		buff = tx.db.commitBuffer
+	} else {
+		buff = new(bytes.Buffer)
+		// avoid grow
+		buff.Grow(int(txSize))
+	}
+
+	return buff
 }
 
 func (tx *Tx) buildTempBucketMetaIdx(bucket string, key []byte, bucketMetaTemp BucketMeta) BucketMeta {

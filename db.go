@@ -15,6 +15,7 @@
 package nutsdb
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"github.com/gofrs/flock"
@@ -177,6 +178,7 @@ type (
 		isMerging               bool
 		fm                      *fileManager
 		flock                   *flock.Flock
+		commitBuffer            *bytes.Buffer
 	}
 
 	// Entries represents entries
@@ -204,6 +206,10 @@ func open(opt Options) (*DB, error) {
 		Index:                   NewIndex(),
 		fm:                      newFileManager(opt.RWMode, opt.MaxFdNumsInCache, opt.CleanFdsCacheThreshold),
 	}
+
+	commitBuffer := new(bytes.Buffer)
+	commitBuffer.Grow(int(db.opt.CommitBufferSize))
+	db.commitBuffer = commitBuffer
 
 	if ok := filesystem.PathIsExist(db.opt.Dir); !ok {
 		if err := os.MkdirAll(db.opt.Dir, os.ModePerm); err != nil {
