@@ -273,7 +273,7 @@ func (tx *Tx) RangeScan(bucket string, start, end []byte) (es Entries, err error
 		if len(es) == 0 {
 			return nil, ErrRangeScan
 		}
-		return es.processEntriesScanOnDisk(), nil
+		return es.ToCEntries(tx.db.opt.LessFunc).processEntriesScanOnDisk(), nil
 	}
 
 	if index, ok := tx.db.BPTreeIdx[bucket]; ok {
@@ -721,7 +721,7 @@ func (tx *Tx) prefixScanByHintBPTSparseIdx(bucket string, prefix []byte, offsetN
 		return nil, off, ErrPrefixScan
 	}
 
-	return es.processEntriesScanOnDisk(), off, nil
+	return es.ToCEntries(tx.db.opt.LessFunc).processEntriesScanOnDisk(), off, nil
 }
 
 func (tx *Tx) prefixSearchScanByHintBPTSparseIdx(bucket string, prefix []byte, reg string, offsetNum int, limitNum int) (es Entries, off int, err error) {
@@ -774,7 +774,7 @@ func (tx *Tx) prefixSearchScanByHintBPTSparseIdx(bucket string, prefix []byte, r
 		return nil, off, ErrPrefixSearchScan
 	}
 
-	return es.processEntriesScanOnDisk(), off, nil
+	return es.ToCEntries(tx.db.opt.LessFunc).processEntriesScanOnDisk(), off, nil
 }
 
 // PrefixScan iterates over a key prefix at given bucket, prefix and limitNum.

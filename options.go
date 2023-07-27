@@ -40,6 +40,8 @@ func (fn ErrorHandlerFunc) HandleError(err error) {
 	fn(err)
 }
 
+type LessFunc func(l, r string) bool
+
 // Options records params for creating DB object.
 type Options struct {
 	// Dir represents Open the database located in which dir.
@@ -87,6 +89,9 @@ type Options struct {
 	//     	   }
 	//     })
 	ErrorHandler ErrorHandler
+
+	// LessFunc is a function that sorts keys.
+	LessFunc LessFunc
 }
 
 const (
@@ -185,5 +190,11 @@ func WithErrorHandler(errorHandler ErrorHandler) Option {
 func WithCommitBufferSize(commitBufferSize int64) Option {
 	return func(opt *Options) {
 		opt.CommitBufferSize = commitBufferSize
+	}
+}
+
+func WithLessFunc(lessFunc LessFunc) Option {
+	return func(opt *Options) {
+		opt.LessFunc = lessFunc
 	}
 }
