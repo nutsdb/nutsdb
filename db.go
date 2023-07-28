@@ -526,6 +526,41 @@ func (db *DB) release() error {
 	return nil
 }
 
+func (db *DB) getValueByRecord(r *Record) ([]byte, error) {
+	if r.E != nil {
+		return r.E.Value, nil
+	}
+
+	e, err := db.getEntryByHint(r.H)
+	if err != nil {
+		return nil, err
+	}
+
+	return e.Value, nil
+}
+
+func (db *DB) getEntryByHint(h *Hint) (*Entry, error) {
+	dirPath := getDataPath(h.FileID, db.opt.Dir)
+	df, err := db.fm.getDataFile(dirPath, db.opt.SegmentSize)
+	if err != nil {
+		return nil, err
+	}
+	defer func(rwManager RWManager) {
+		err := rwManager.Release()
+		if err != nil {
+			return
+		}
+	}(df.rwManager)
+
+	payloadSize := h.Meta.PayloadSize()
+	item, err := df.ReadRecord(int(h.DataPos), payloadSize)
+	if err != nil {
+		return nil, fmt.Errorf("read err. pos %d, key %s, err %s", h.DataPos, string(h.Key), err)
+	}
+
+	return item, nil
+}
+
 // setActiveFile sets the ActiveFile (DataFile object).
 func (db *DB) setActiveFile() (err error) {
 	filepath := getDataPath(db.MaxFileID, db.opt.Dir)
