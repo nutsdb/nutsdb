@@ -185,9 +185,6 @@ type (
 		commitBuffer            *bytes.Buffer
 	}
 
-	// Entries represents entries
-	Entries []*Entry
-
 	// BucketMetasIdx represents the index of the bucket's meta-information
 	BucketMetasIdx map[string]*BucketMeta
 )

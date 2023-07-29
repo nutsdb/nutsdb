@@ -273,7 +273,7 @@ func (tx *Tx) RangeScan(bucket string, start, end []byte) (es Entries, err error
 		if len(es) == 0 {
 			return nil, ErrRangeScan
 		}
-		return processEntriesScanOnDisk(es), nil
+		return es.ToCEntries(tx.db.opt.LessFunc).processEntriesScanOnDisk(), nil
 	}
 
 	if index, ok := tx.db.BPTreeIdx[bucket]; ok {
@@ -399,25 +399,6 @@ func (tx *Tx) prefixSearchScanOnDisk(bucket string, prefix []byte, reg string, o
 	}
 
 	return result, off, nil
-}
-
-func processEntriesScanOnDisk(entriesTemp []*Entry) (result []*Entry) {
-	entriesMap := make(map[string]*Entry)
-
-	for _, entry := range entriesTemp {
-		if _, ok := entriesMap[string(entry.Key)]; !ok {
-			entriesMap[string(entry.Key)] = entry
-		}
-	}
-
-	keys, es := SortedEntryKeys(entriesMap)
-	for _, key := range keys {
-		if !IsExpired(es[key].Meta.TTL, es[key].Meta.Timestamp) && es[key].Meta.Flag != DataDeleteFlag {
-			result = append(result, es[key])
-		}
-	}
-
-	return result
 }
 
 func (tx *Tx) getStartIndexForFindPrefix(fID int64, curr *BinaryNode, prefix []byte) (uint16, error) {
@@ -740,7 +721,7 @@ func (tx *Tx) prefixScanByHintBPTSparseIdx(bucket string, prefix []byte, offsetN
 		return nil, off, ErrPrefixScan
 	}
 
-	return processEntriesScanOnDisk(es), off, nil
+	return es.ToCEntries(tx.db.opt.LessFunc).processEntriesScanOnDisk(), off, nil
 }
 
 func (tx *Tx) prefixSearchScanByHintBPTSparseIdx(bucket string, prefix []byte, reg string, offsetNum int, limitNum int) (es Entries, off int, err error) {
@@ -793,7 +774,7 @@ func (tx *Tx) prefixSearchScanByHintBPTSparseIdx(bucket string, prefix []byte, r
 		return nil, off, ErrPrefixSearchScan
 	}
 
-	return processEntriesScanOnDisk(es), off, nil
+	return es.ToCEntries(tx.db.opt.LessFunc).processEntriesScanOnDisk(), off, nil
 }
 
 // PrefixScan iterates over a key prefix at given bucket, prefix and limitNum.

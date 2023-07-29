@@ -74,3 +74,16 @@ func TestWithErrorHandler(t *testing.T) {
 
 	defer db.Close()
 }
+
+func TestWithLessFunc(t *testing.T) {
+	db, err = Open(DefaultOptions,
+		WithDir("/tmp/nutsdb"),
+		WithLessFunc(func(l, r string) bool {
+			return len(l) < len(r)
+		}),
+	)
+	assert.NoError(t, err)
+	assert.NotNil(t, db.opt.LessFunc)
+
+	defer db.Close()
+}
