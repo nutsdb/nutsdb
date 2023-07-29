@@ -284,6 +284,9 @@ func (l *List) LRemByIndex(key string, indexes []int) error {
 		if _, ok := idxes[iterator.Index()]; !ok {
 			items[i] = iterator.Value().(*Record)
 			i++
+			if i == len(idxes) {
+				break
+			}
 		}
 	}
 
