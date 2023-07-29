@@ -16,6 +16,7 @@ package nutsdb
 
 import (
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -36,6 +37,7 @@ func InitForList() {
 	}
 
 	opt = DefaultOptions
+	opt.EntryIdxMode = HintKeyAndRAMIdxMode
 	opt.Dir = fileDir
 	opt.SegmentSize = 8 * 1024
 	return
@@ -840,4 +842,56 @@ func TestTx_GetListTTL(t *testing.T) {
 
 	tx.Commit()
 
+}
+
+func TestTx_ListEntryIdxMode_HintKeyValAndRAMIdxMode(t *testing.T) {
+	bucket := "bucket"
+	key := GetTestBytes(0)
+
+	// HintKeyValAndRAMIdxMode
+	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		err := db.Update(func(tx *Tx) error {
+			err := tx.LPush(bucket, key, []byte("d"), []byte("c"), []byte("b"), []byte("a"))
+			require.NoError(t, err)
+
+			return nil
+		})
+		require.NoError(t, err)
+
+		listIdx := db.Index.getList(bucket)
+		item, _ := listIdx.Items[string(key)].Get(0)
+		r, ok := item.(*Record)
+		require.True(t, ok)
+		require.NotNil(t, r.E)
+		require.Equal(t, []byte("a"), r.E.Value)
+	})
+}
+
+func TestTx_ListEntryIdxMode_HintKeyAndRAMIdxMode(t *testing.T) {
+	bucket := "bucket"
+	key := GetTestBytes(0)
+
+	opts := &DefaultOptions
+	opts.EntryIdxMode = HintKeyAndRAMIdxMode
+
+	// HintKeyAndRAMIdxMode
+	runNutsDBTest(t, opts, func(t *testing.T, db *DB) {
+		err := db.Update(func(tx *Tx) error {
+			err := tx.LPush(bucket, key, []byte("d"), []byte("c"), []byte("b"), []byte("a"))
+			require.NoError(t, err)
+
+			return nil
+		})
+		//require.NoError(t, err)
+
+		listIdx := db.Index.getList(bucket)
+		item, _ := listIdx.Items[string(key)].Get(0)
+		r, ok := item.(*Record)
+		require.True(t, ok)
+		require.Nil(t, r.E)
+
+		val, err := db.getValueByRecord(r)
+		require.NoError(t, err)
+		require.Equal(t, []byte("a"), val)
+	})
 }

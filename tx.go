@@ -518,13 +518,17 @@ func (tx *Tx) buildListIdx(bucket string, entry *Entry, offset int64) {
 		return
 	}
 
-	var h *Hint
+	var (
+		h *Hint
+		e *Entry
+	)
 	if tx.db.opt.EntryIdxMode == HintKeyAndRAMIdxMode {
 		h = NewHint().WithFileId(tx.db.ActiveFile.fileID).WithKey(entry.Key).WithMeta(entry.Meta).WithDataPos(uint64(offset))
-		entry = nil
+	} else {
+		e = entry
 	}
 
-	r := NewRecord().WithBucket(bucket).WithEntry(entry).WithHint(h)
+	r := NewRecord().WithBucket(bucket).WithEntry(e).WithHint(h)
 
 	switch entry.Meta.Flag {
 	case DataExpireListFlag:
