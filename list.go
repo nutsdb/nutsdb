@@ -15,7 +15,6 @@
 package nutsdb
 
 import (
-	"bytes"
 	"errors"
 	dll "github.com/emirpasic/gods/lists/doublylinkedlist"
 	"time"
@@ -31,7 +30,6 @@ var (
 
 // List represents the list.
 type List struct {
-	db        *DB
 	Items     map[string]*dll.List
 	TTL       map[string]uint32
 	TimeStamp map[string]uint64
@@ -156,7 +154,7 @@ func (l *List) LRange(key string, start, end int) ([]*Record, error) {
 // count > 0: Remove elements equal to value moving from head to tail.
 // count < 0: Remove elements equal to value moving from tail to head.
 // count = 0: Remove all elements equal to value.
-func (l *List) LRem(key string, count int, value []byte) error {
+func (l *List) LRem(key string, count int, cmp func(r *Record) bool) error {
 	if l.IsExpire(key) {
 		return ErrListNotFound
 	}
@@ -178,12 +176,7 @@ func (l *List) LRem(key string, count int, value []byte) error {
 		for iterator.Next() && count > 0 {
 			r := iterator.Value().(*Record)
 
-			v, err := l.db.getValueByRecord(r)
-			if err != nil {
-				return err
-			}
-
-			if bytes.Equal(v, value) {
+			if cmp(r) {
 				list.Remove(iterator.Index())
 				count--
 			}
@@ -196,12 +189,7 @@ func (l *List) LRem(key string, count int, value []byte) error {
 		for iterator.Prev() && count < 0 {
 			r := iterator.Value().(*Record)
 
-			v, err := l.db.getValueByRecord(r)
-			if err != nil {
-				return err
-			}
-
-			if bytes.Equal(v, value) {
+			if cmp(r) {
 				list.Remove(iterator.Index())
 				count++
 			}
