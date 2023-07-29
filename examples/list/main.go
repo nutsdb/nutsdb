@@ -210,8 +210,7 @@ func testLRem() {
 	if err := db.Update(
 		func(tx *nutsdb.Tx) error {
 			key := []byte("myList")
-			num, err := tx.LRem(bucket, key, count, value)
-			fmt.Println("removed num: ", num)
+			err := tx.LRem(bucket, key, count, value)
 			return err
 		}); err != nil {
 		log.Fatal(err)
@@ -300,8 +299,7 @@ func testLRemByIndex() {
 	if err := db.Update(
 		func(tx *nutsdb.Tx) error {
 			key := []byte("myList")
-			removedNum, err := tx.LRemByIndex(bucket, key, 0)
-			fmt.Printf("removed num %d\n", removedNum)
+			err := tx.LRemByIndex(bucket, key, 0)
 			return err
 		}); err != nil {
 		log.Fatal(err)
