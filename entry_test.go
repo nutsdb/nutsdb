@@ -67,3 +67,65 @@ func (suite *EntryTestSuite) TestGetCrc() {
 func TestEntrySuit(t *testing.T) {
 	suite.Run(t, new(EntryTestSuite))
 }
+
+func TestEntries_processEntriesScanOnDisk(t *testing.T) {
+	tests := []struct {
+		name       string
+		e          Entries
+		wantResult []*Entry
+	}{
+		{
+			"sort",
+			Entries{
+				{
+					Key:  []byte("abc"),
+					Meta: NewMetaData().WithTTL(0).WithFlag(DataSetFlag),
+				},
+				{
+					Key:  []byte("z"),
+					Meta: NewMetaData().WithTTL(0).WithFlag(DataSetFlag),
+				},
+				{
+					Key:  []byte("abcd"),
+					Meta: NewMetaData().WithTTL(0).WithFlag(DataSetFlag),
+				},
+			},
+			[]*Entry{
+				{
+					Key:  []byte("abc"),
+					Meta: NewMetaData().WithTTL(0).WithFlag(DataSetFlag),
+				},
+				{
+					Key:  []byte("abcd"),
+					Meta: NewMetaData().WithTTL(0).WithFlag(DataSetFlag),
+				},
+				{
+					Key:  []byte("z"),
+					Meta: NewMetaData().WithTTL(0).WithFlag(DataSetFlag),
+				},
+			},
+		},
+		{
+			"expired",
+			Entries{
+				{
+					Key:  []byte("abc"),
+					Meta: NewMetaData().WithTTL(1),
+				},
+				{
+					Key:  []byte("abc"),
+					Meta: NewMetaData().WithTTL(0).WithFlag(DataDeleteFlag),
+				},
+			},
+			nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equalf(t, tt.wantResult, tt.e.processEntriesScanOnDisk(), "processEntriesScanOnDisk()")
+		})
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equalf(t, tt.wantResult, tt.e.ToCEntries(nil).processEntriesScanOnDisk(), "CEntries.processEntriesScanOnDisk()")
+		})
+	}
+}
