@@ -15,26 +15,40 @@
 package inmemory
 
 import (
+	"github.com/nutsdb/nutsdb/ds/list"
+	"github.com/nutsdb/nutsdb/ds/set"
+	"github.com/nutsdb/nutsdb/ds/zset"
 	"sync"
 
 	"github.com/nutsdb/nutsdb"
 )
 
+type BPTreeIdx map[string]*nutsdb.BPTree
+
+// SetIdx represents the set index
+type SetIdx map[string]*set.Set
+
+// SortedSetIdx represents the sorted set index
+type SortedSetIdx map[string]*zset.SortedSet
+
+// ListIdx represents the list index
+type ListIdx map[string]*list.List
+
 type ShardDB struct {
-	BPTreeIdx    nutsdb.BPTreeIdx // Hint Index
-	SetIdx       nutsdb.SetIdx
-	SortedSetIdx nutsdb.SortedSetIdx
-	ListIdx      nutsdb.ListIdx
+	BPTreeIdx    BPTreeIdx // Hint Index
+	SetIdx       SetIdx
+	SortedSetIdx SortedSetIdx
+	ListIdx      ListIdx
 	mu           sync.RWMutex
 	KeyCount     int
 }
 
 func InitShardDB() *ShardDB {
 	return &ShardDB{
-		BPTreeIdx:    make(nutsdb.BPTreeIdx),
-		SetIdx:       make(nutsdb.SetIdx),
-		SortedSetIdx: make(nutsdb.SortedSetIdx),
-		ListIdx:      make(nutsdb.ListIdx),
+		BPTreeIdx:    make(BPTreeIdx),
+		SetIdx:       make(SetIdx),
+		SortedSetIdx: make(SortedSetIdx),
+		ListIdx:      make(ListIdx),
 		mu:           sync.RWMutex{},
 		KeyCount:     0,
 	}
