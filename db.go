@@ -29,7 +29,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/nutsdb/nutsdb/ds/list"
 	"github.com/nutsdb/nutsdb/ds/set"
 	"github.com/nutsdb/nutsdb/ds/zset"
 	"github.com/xujiajun/utils/filesystem"
@@ -523,6 +522,45 @@ func (db *DB) release() error {
 	return nil
 }
 
+func (db *DB) getValueByRecord(r *Record) ([]byte, error) {
+	if r == nil {
+		return nil, errors.New("the record is nil")
+	}
+
+	if r.E != nil {
+		return r.E.Value, nil
+	}
+
+	e, err := db.getEntryByHint(r.H)
+	if err != nil {
+		return nil, err
+	}
+
+	return e.Value, nil
+}
+
+func (db *DB) getEntryByHint(h *Hint) (*Entry, error) {
+	dirPath := getDataPath(h.FileID, db.opt.Dir)
+	df, err := db.fm.getDataFile(dirPath, db.opt.SegmentSize)
+	if err != nil {
+		return nil, err
+	}
+	defer func(rwManager RWManager) {
+		err := rwManager.Release()
+		if err != nil {
+			return
+		}
+	}(df.rwManager)
+
+	payloadSize := h.Meta.PayloadSize()
+	item, err := df.ReadRecord(int(h.DataPos), payloadSize)
+	if err != nil {
+		return nil, fmt.Errorf("read err. pos %d, key %s, err %s", h.DataPos, string(h.Key), err)
+	}
+
+	return item, nil
+}
+
 // setActiveFile sets the ActiveFile (DataFile object).
 func (db *DB) setActiveFile() (err error) {
 	filepath := getDataPath(db.MaxFileID, db.opt.Dir)
@@ -955,15 +993,21 @@ func (db *DB) buildListIdx(bucket string, r *Record) error {
 		l.TTL[string(r.E.Key)] = ttl
 		l.TimeStamp[string(r.E.Key)] = r.E.Meta.Timestamp
 	case DataLPushFlag:
-		_, _ = l.LPush(string(r.E.Key), r.E.Value)
+		_ = l.LPush(string(r.E.Key), r)
 	case DataRPushFlag:
-		_, _ = l.RPush(string(r.E.Key), r.E.Value)
+		_ = l.RPush(string(r.E.Key), r)
 	case DataLRemFlag:
 		countAndValueIndex := strings.Split(string(r.E.Value), SeparatorForListKey)
 		count, _ := strconv2.StrToInt(countAndValueIndex[0])
 		value := []byte(countAndValueIndex[1])
 
-		if _, err := l.LRem(string(r.E.Key), count, value); err != nil {
+		if err := l.LRem(string(r.E.Key), count, func(r *Record) (bool, error) {
+			v, err := db.getValueByRecord(r)
+			if err != nil {
+				return false, err
+			}
+			return bytes.Equal(value, v), nil
+		}); err != nil {
 			return ErrWhenBuildListIdx(err)
 		}
 	case DataLPopFlag:
@@ -978,7 +1022,7 @@ func (db *DB) buildListIdx(bucket string, r *Record) error {
 		keyAndIndex := strings.Split(string(r.E.Key), SeparatorForListKey)
 		newKey := keyAndIndex[0]
 		index, _ := strconv2.StrToInt(keyAndIndex[1])
-		if err := l.LSet(newKey, index, r.E.Value); err != nil {
+		if err := l.LSet(newKey, index, r); err != nil {
 			return ErrWhenBuildListIdx(err)
 		}
 	case DataLTrimFlag:
@@ -986,7 +1030,7 @@ func (db *DB) buildListIdx(bucket string, r *Record) error {
 		newKey := keyAndStartIndex[0]
 		start, _ := strconv2.StrToInt(keyAndStartIndex[1])
 		end, _ := strconv2.StrToInt(string(r.E.Value))
-		if err := l.Ltrim(newKey, start, end); err != nil {
+		if err := l.LTrim(newKey, start, end); err != nil {
 			return ErrWhenBuildListIdx(err)
 		}
 	case DataLRemByIndex:
@@ -994,7 +1038,7 @@ func (db *DB) buildListIdx(bucket string, r *Record) error {
 		if err != nil {
 			return err
 		}
-		if _, err := l.LRemByIndex(string(r.E.Key), indexes); err != nil {
+		if err := l.LRemByIndex(string(r.E.Key), indexes); err != nil {
 			return ErrWhenBuildListIdx(err)
 		}
 	}
@@ -1116,7 +1160,8 @@ func (db *DB) getPendingMergeEntries(entry *Entry, pendingMergeEntries []*Entry)
 			ok := false
 			if entry.Meta.Flag == DataRPushFlag || entry.Meta.Flag == DataLPushFlag {
 				for _, item := range items {
-					if string(entry.Value) == string(item) {
+					v, _ := db.getValueByRecord(item)
+					if string(entry.Value) == string(v) {
 						ok = true
 						break
 					}
@@ -1176,7 +1221,7 @@ func (db *DB) getRecordFromKey(bucket, key []byte) (record *Record, err error) {
 }
 
 func (db *DB) checkListExpired() {
-	db.Index.rangeList(func(l *list.List) {
+	db.Index.rangeList(func(l *List) {
 		for key := range l.TTL {
 			l.IsExpire(key)
 		}

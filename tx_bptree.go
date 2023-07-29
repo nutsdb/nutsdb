@@ -165,25 +165,11 @@ func (tx *Tx) Get(bucket string, key []byte) (e *Entry, err error) {
 			}
 
 			if idxMode == HintKeyAndRAMIdxMode {
-				path := getDataPath(r.H.FileID, tx.db.opt.Dir)
-				df, err := tx.db.fm.getDataFile(path, tx.db.opt.SegmentSize)
+				e, err = tx.db.getEntryByHint(r.H)
 				if err != nil {
 					return nil, err
 				}
-				defer func(rwManager RWManager) {
-					err := rwManager.Release()
-					if err != nil {
-						return
-					}
-				}(df.rwManager)
-
-				payloadSize := r.H.Meta.PayloadSize()
-				item, err := df.ReadRecord(int(r.H.DataPos), payloadSize)
-				if err != nil {
-					return nil, fmt.Errorf("read err. pos %d, key %s, err %s", r.H.DataPos, string(key), err)
-				}
-
-				return item, nil
+				return e, nil
 			}
 		} else {
 			return nil, ErrNotFoundBucket

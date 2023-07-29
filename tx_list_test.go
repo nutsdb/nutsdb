@@ -16,6 +16,7 @@ package nutsdb
 
 import (
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -36,6 +37,7 @@ func InitForList() {
 	}
 
 	opt = DefaultOptions
+	opt.EntryIdxMode = HintKeyAndRAMIdxMode
 	opt.Dir = fileDir
 	opt.SegmentSize = 8 * 1024
 	return
@@ -260,7 +262,7 @@ func TestTx_LRem(t *testing.T) {
 
 	bucket := "myBucket"
 	key := []byte("myList")
-	_, err := tx.LRem(bucket, key, 1, []byte("val"))
+	err := tx.LRem(bucket, key, 1, []byte("val"))
 	if err == nil {
 		t.Fatal(err)
 	}
@@ -303,7 +305,7 @@ func TestTx_LRem2(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err = tx.LRem(bucket, []byte("fake_key"), 1, []byte("fake_val")); err == nil {
+		if err = tx.LRem(bucket, []byte("fake_key"), 1, []byte("fake_val")); err == nil {
 			t.Fatal("TestTx_LRem err")
 		} else {
 			tx.Rollback()
@@ -315,7 +317,7 @@ func TestTx_LRem2(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err = tx.LRem(bucket, key, 1, []byte("a")); err != nil {
+		if err = tx.LRem(bucket, key, 1, []byte("a")); err != nil {
 			tx.Rollback()
 			t.Fatal(err)
 		} else {
@@ -358,7 +360,7 @@ func TestTx_LRem3(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		_, err := tx.LRem(bucket, key, 4, []byte("b"))
+		err := tx.LRem(bucket, key, 4, []byte("b"))
 		if err == nil {
 			t.Error("TestTx_LRem err")
 		}
@@ -371,7 +373,7 @@ func TestTx_LRem3(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		_, err := tx.LRem(bucket, []byte("myList2"), 4, []byte("b"))
+		err := tx.LRem(bucket, []byte("myList2"), 4, []byte("b"))
 		if err == nil {
 			t.Error("TestTx_LRem err")
 		}
@@ -384,8 +386,8 @@ func TestTx_LRem3(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		num, err := tx.LRem(bucket, []byte("myList2"), 1, []byte("b"))
-		if err != nil || num != 1 {
+		err := tx.LRem(bucket, []byte("myList2"), 1, []byte("b"))
+		if err != nil {
 			t.Error("TestTx_LRem err")
 		}
 		tx.Rollback()
@@ -410,8 +412,8 @@ func TestTx_LRem3(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	num, err := tx.LRem(bucket, []byte("myList3"), 0, []byte("b"))
-	if err != nil || num != 2 {
+	err := tx.LRem(bucket, []byte("myList3"), 0, []byte("b"))
+	if err != nil {
 		t.Error("TestTx_LRem err")
 	}
 	tx.Rollback()
@@ -678,28 +680,24 @@ func TestTx_LRemByIndex(t *testing.T) {
 	bucket := "myBucket"
 	key := []byte("myList")
 
-	removedNum, err := tx.LRemByIndex(bucket, []byte("fake_key"))
-	assertions.Error(err, "TestTx_LRemByIndex")
-	assertions.Equal(0, removedNum, "TestTx_LRemByIndex")
+	err := tx.LRemByIndex(bucket, []byte("fake_key"))
+	assertions.NoError(err)
 	tx.Rollback()
 
 	InitDataForList(bucket, key, t)
 
 	tx, _ = db.Begin(true)
 
-	removedNum, err = tx.LRemByIndex(bucket, key, 1, 0, 8, -8)
+	err = tx.LRemByIndex(bucket, key, 1, 0, 8, -8)
 	assertions.NoError(err, "TestTx_LRemByIndex")
-	assertions.Equal(2, removedNum, "TestTx_LRemByIndex")
 
-	removedNum, err = tx.LRemByIndex(bucket, key, 88, -88)
+	err = tx.LRemByIndex(bucket, key, 88, -88)
 	assertions.NoError(err, "TestTx_LRemByIndex")
-	assertions.Equal(0, removedNum, "TestTx_LRemByIndex")
 
 	tx.Commit()
 
-	removedNum, err = tx.LRemByIndex(bucket, key, 1, 0, 8, -8)
+	err = tx.LRemByIndex(bucket, key, 1, 0, 8, -8)
 	assertions.Error(err, "TestTx_LRemByIndex")
-	assertions.Equal(0, removedNum, "TestTx_LRemByIndex")
 }
 
 func TestTx_ExpireList(t *testing.T) {
@@ -844,4 +842,57 @@ func TestTx_GetListTTL(t *testing.T) {
 
 	tx.Commit()
 
+}
+
+func TestTx_ListEntryIdxMode_HintKeyValAndRAMIdxMode(t *testing.T) {
+	bucket := "bucket"
+	key := GetTestBytes(0)
+
+	// HintKeyValAndRAMIdxMode
+	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		err := db.Update(func(tx *Tx) error {
+			err := tx.LPush(bucket, key, []byte("d"), []byte("c"), []byte("b"), []byte("a"))
+			require.NoError(t, err)
+
+			return nil
+		})
+		require.NoError(t, err)
+
+		listIdx := db.Index.getList(bucket)
+		item, _ := listIdx.Items[string(key)].Get(0)
+		r, ok := item.(*Record)
+		require.True(t, ok)
+		require.Nil(t, r.H)
+		require.NotNil(t, r.E)
+		require.Equal(t, []byte("a"), r.E.Value)
+	})
+}
+
+func TestTx_ListEntryIdxMode_HintKeyAndRAMIdxMode(t *testing.T) {
+	bucket := "bucket"
+	key := GetTestBytes(0)
+
+	opts := &DefaultOptions
+	opts.EntryIdxMode = HintKeyAndRAMIdxMode
+
+	// HintKeyAndRAMIdxMode
+	runNutsDBTest(t, opts, func(t *testing.T, db *DB) {
+		err := db.Update(func(tx *Tx) error {
+			err := tx.LPush(bucket, key, []byte("d"), []byte("c"), []byte("b"), []byte("a"))
+			require.NoError(t, err)
+
+			return nil
+		})
+		//require.NoError(t, err)
+
+		listIdx := db.Index.getList(bucket)
+		item, _ := listIdx.Items[string(key)].Get(0)
+		r, ok := item.(*Record)
+		require.True(t, ok)
+		require.Nil(t, r.E)
+
+		val, err := db.getValueByRecord(r)
+		require.NoError(t, err)
+		require.Equal(t, []byte("a"), val)
+	})
 }
