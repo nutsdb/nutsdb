@@ -218,8 +218,8 @@ func (l *List) LSet(key string, index int, r *Record) error {
 	return nil
 }
 
-// Ltrim trim an existing list so that it will contain only the specified range of elements specified.
-func (l *List) Ltrim(key string, start, end int) error {
+// LTrim trim an existing list so that it will contain only the specified range of elements specified.
+func (l *List) LTrim(key string, start, end int) error {
 	if l.IsExpire(key) {
 		return ErrListNotFound
 	}
@@ -235,7 +235,9 @@ func (l *List) Ltrim(key string, start, end int) error {
 	list := l.Items[key]
 
 	list.Clear()
-	list.Add(items)
+	for _, item := range items {
+		list.Append(item)
+	}
 
 	return nil
 }
@@ -268,16 +270,19 @@ func (l *List) LRemByIndex(key string, indexes []int) error {
 	iterator := list.Iterator()
 	iterator.Begin()
 
-	items := make([]*Record, list.Size()-len(indexes))
+	items := make([]*Record, list.Size()-len(idxes))
 	i := 0
 	for iterator.Next() {
 		if _, ok := idxes[iterator.Index()]; !ok {
 			items[i] = iterator.Value().(*Record)
+			i++
 		}
 	}
 
 	list.Clear()
-	list.Add(items)
+	for _, item := range items {
+		list.Append(item)
+	}
 
 	return nil
 }
