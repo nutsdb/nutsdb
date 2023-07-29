@@ -154,7 +154,7 @@ func (l *List) LRange(key string, start, end int) ([]*Record, error) {
 // count > 0: Remove elements equal to value moving from head to tail.
 // count < 0: Remove elements equal to value moving from tail to head.
 // count = 0: Remove all elements equal to value.
-func (l *List) LRem(key string, count int, cmp func(r *Record) bool) error {
+func (l *List) LRem(key string, count int, cmp func(r *Record) (bool, error)) error {
 	if l.IsExpire(key) {
 		return ErrListNotFound
 	}
@@ -176,7 +176,11 @@ func (l *List) LRem(key string, count int, cmp func(r *Record) bool) error {
 		for iterator.Next() && count > 0 {
 			r := iterator.Value().(*Record)
 
-			if cmp(r) {
+			ok, err := cmp(r)
+			if err != nil {
+				return err
+			}
+			if ok {
 				list.Remove(iterator.Index())
 				count--
 			}
@@ -189,7 +193,11 @@ func (l *List) LRem(key string, count int, cmp func(r *Record) bool) error {
 		for iterator.Prev() && count < 0 {
 			r := iterator.Value().(*Record)
 
-			if cmp(r) {
+			ok, err := cmp(r)
+			if err != nil {
+				return err
+			}
+			if ok {
 				list.Remove(iterator.Index())
 				count++
 			}

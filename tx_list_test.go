@@ -260,7 +260,7 @@ func TestTx_LRem(t *testing.T) {
 
 	bucket := "myBucket"
 	key := []byte("myList")
-	_, err := tx.LRem(bucket, key, 1, []byte("val"))
+	err := tx.LRem(bucket, key, 1, []byte("val"))
 	if err == nil {
 		t.Fatal(err)
 	}
@@ -303,7 +303,7 @@ func TestTx_LRem2(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err = tx.LRem(bucket, []byte("fake_key"), 1, []byte("fake_val")); err == nil {
+		if err = tx.LRem(bucket, []byte("fake_key"), 1, []byte("fake_val")); err == nil {
 			t.Fatal("TestTx_LRem err")
 		} else {
 			tx.Rollback()
@@ -315,7 +315,7 @@ func TestTx_LRem2(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err = tx.LRem(bucket, key, 1, []byte("a")); err != nil {
+		if err = tx.LRem(bucket, key, 1, []byte("a")); err != nil {
 			tx.Rollback()
 			t.Fatal(err)
 		} else {
@@ -358,7 +358,7 @@ func TestTx_LRem3(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		_, err := tx.LRem(bucket, key, 4, []byte("b"))
+		err := tx.LRem(bucket, key, 4, []byte("b"))
 		if err == nil {
 			t.Error("TestTx_LRem err")
 		}
@@ -371,7 +371,7 @@ func TestTx_LRem3(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		_, err := tx.LRem(bucket, []byte("myList2"), 4, []byte("b"))
+		err := tx.LRem(bucket, []byte("myList2"), 4, []byte("b"))
 		if err == nil {
 			t.Error("TestTx_LRem err")
 		}
@@ -384,8 +384,8 @@ func TestTx_LRem3(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		num, err := tx.LRem(bucket, []byte("myList2"), 1, []byte("b"))
-		if err != nil || num != 1 {
+		err := tx.LRem(bucket, []byte("myList2"), 1, []byte("b"))
+		if err != nil {
 			t.Error("TestTx_LRem err")
 		}
 		tx.Rollback()
@@ -410,8 +410,8 @@ func TestTx_LRem3(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	num, err := tx.LRem(bucket, []byte("myList3"), 0, []byte("b"))
-	if err != nil || num != 2 {
+	err := tx.LRem(bucket, []byte("myList3"), 0, []byte("b"))
+	if err != nil {
 		t.Error("TestTx_LRem err")
 	}
 	tx.Rollback()
@@ -678,28 +678,24 @@ func TestTx_LRemByIndex(t *testing.T) {
 	bucket := "myBucket"
 	key := []byte("myList")
 
-	removedNum, err := tx.LRemByIndex(bucket, []byte("fake_key"))
-	assertions.Error(err, "TestTx_LRemByIndex")
-	assertions.Equal(0, removedNum, "TestTx_LRemByIndex")
+	err := tx.LRemByIndex(bucket, []byte("fake_key"))
+	assertions.NoError(err)
 	tx.Rollback()
 
 	InitDataForList(bucket, key, t)
 
 	tx, _ = db.Begin(true)
 
-	removedNum, err = tx.LRemByIndex(bucket, key, 1, 0, 8, -8)
+	err = tx.LRemByIndex(bucket, key, 1, 0, 8, -8)
 	assertions.NoError(err, "TestTx_LRemByIndex")
-	assertions.Equal(2, removedNum, "TestTx_LRemByIndex")
 
-	removedNum, err = tx.LRemByIndex(bucket, key, 88, -88)
+	err = tx.LRemByIndex(bucket, key, 88, -88)
 	assertions.NoError(err, "TestTx_LRemByIndex")
-	assertions.Equal(0, removedNum, "TestTx_LRemByIndex")
 
 	tx.Commit()
 
-	removedNum, err = tx.LRemByIndex(bucket, key, 1, 0, 8, -8)
+	err = tx.LRemByIndex(bucket, key, 1, 0, 8, -8)
 	assertions.Error(err, "TestTx_LRemByIndex")
-	assertions.Equal(0, removedNum, "TestTx_LRemByIndex")
 }
 
 func TestTx_ExpireList(t *testing.T) {

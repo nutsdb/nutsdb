@@ -1,7 +1,6 @@
 package nutsdb
 
 import (
-	"github.com/nutsdb/nutsdb/ds/list"
 	"github.com/nutsdb/nutsdb/ds/set"
 	"github.com/nutsdb/nutsdb/ds/zset"
 )
@@ -16,7 +15,7 @@ type SetIdx map[string]*set.Set
 type SortedSetIdx map[string]*zset.SortedSet
 
 // ListIdx represents the list index
-type ListIdx map[string]*list.List
+type ListIdx map[string]*List
 
 type index struct {
 	list ListIdx
@@ -24,7 +23,7 @@ type index struct {
 
 func NewIndex() *index {
 	i := new(index)
-	i.list = map[string]*list.List{}
+	i.list = map[string]*List{}
 	return i
 }
 
@@ -33,16 +32,12 @@ func (i *index) existList(bucket string) bool {
 	return isExist
 }
 
-func (i *index) getList(bucket string) *list.List {
+func (i *index) getList(bucket string) *List {
 	l, isExist := i.list[bucket]
 	if isExist {
 		return l
 	}
-	l = &list.List{
-		Items:     map[string][][]byte{},
-		TTL:       map[string]uint32{},
-		TimeStamp: map[string]uint64{},
-	}
+	l = NewList()
 	i.list[bucket] = l
 	return l
 }
@@ -52,15 +47,11 @@ func (i *index) deleteList(bucket string) {
 }
 
 func (i *index) addList(bucket string) {
-	l := &list.List{
-		Items:     map[string][][]byte{},
-		TTL:       map[string]uint32{},
-		TimeStamp: map[string]uint64{},
-	}
+	l := NewList()
 	i.list[bucket] = l
 }
 
-func (i *index) rangeList(f func(l *list.List)) {
+func (i *index) rangeList(f func(l *List)) {
 	for _, l := range i.list {
 		f(l)
 	}

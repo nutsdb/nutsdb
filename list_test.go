@@ -125,8 +125,8 @@ func TestList_LRem(t *testing.T) {
 	// r1 r1 r1 r2 r1 r2
 	expectRecords := []*Record{records[0], records[0], records[0], records[1], records[0], records[1]}
 
-	cmp := func(r *Record) bool {
-		return bytes.Equal(r.E.Value, records[0].E.Value)
+	cmp := func(r *Record) (bool, error) {
+		return bytes.Equal(r.E.Value, records[0].E.Value), nil
 	}
 
 	// r1 r1 r1 r2 r2
@@ -141,8 +141,8 @@ func TestList_LRem(t *testing.T) {
 	expectRecords = expectRecords[2:]
 	ListCmp(t, list, key, expectRecords, false)
 
-	cmp = func(r *Record) bool {
-		return bytes.Equal(r.E.Value, records[1].E.Value)
+	cmp = func(r *Record) (bool, error) {
+		return bytes.Equal(r.E.Value, records[1].E.Value), nil
 	}
 
 	// r1
