@@ -862,6 +862,7 @@ func TestTx_ListEntryIdxMode_HintKeyValAndRAMIdxMode(t *testing.T) {
 		item, _ := listIdx.Items[string(key)].Get(0)
 		r, ok := item.(*Record)
 		require.True(t, ok)
+		require.Nil(t, r.H)
 		require.NotNil(t, r.E)
 		require.Equal(t, []byte("a"), r.E.Value)
 	})
