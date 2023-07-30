@@ -65,12 +65,19 @@ func (db *DB) merge() error {
 	}()
 
 	_, pendingMergeFIds = db.getMaxFileIDAndFileIDs()
-
-	db.mu.Unlock()
-
 	if len(pendingMergeFIds) < 2 {
+		db.mu.Unlock()
 		return errors.New("the number of files waiting to be merged is at least 2")
 	}
+
+	dataFile, err := db.fm.getDataFile(getDataPath(db.MaxFileID+1, db.opt.Dir), db.opt.SegmentSize)
+	if err != nil {
+		return err
+	}
+	db.ActiveFile = dataFile
+	db.MaxFileID++
+
+	db.mu.Unlock()
 
 	for _, pendingMergeFId := range pendingMergeFIds {
 		off = 0
@@ -246,28 +253,9 @@ func (db *DB) isPendingMergeEntry(entry *Entry) bool {
 	return false
 }
 
-func (db *DB) reWriteData(pendingMergeEntry *Entry) error {
-	tx, err := db.Begin(true)
-	if err != nil {
-		db.isMerging = false
-		return err
-	}
-
-	dataFile, err := db.fm.getDataFile(getDataPath(db.MaxFileID+1, db.opt.Dir), db.opt.SegmentSize)
-	if err != nil {
-		db.isMerging = false
-		return err
-	}
-	db.ActiveFile = dataFile
-	db.MaxFileID++
-
-	err = tx.put(string(pendingMergeEntry.Bucket), pendingMergeEntry.Key, pendingMergeEntry.Value, pendingMergeEntry.Meta.TTL,
-		pendingMergeEntry.Meta.Flag, pendingMergeEntry.Meta.Timestamp, pendingMergeEntry.Meta.Ds)
-	if err != nil {
-		tx.Rollback()
-		db.isMerging = false
-		return err
-	}
-	tx.Commit()
-	return nil
+func (db *DB) reWriteData(e *Entry) error {
+	return db.Update(func(tx *Tx) error {
+		return tx.put(
+			string(e.Bucket), e.Key, e.Value, e.Meta.TTL, e.Meta.Flag, e.Meta.Timestamp, e.Meta.Ds)
+	})
 }
