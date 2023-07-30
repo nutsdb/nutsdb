@@ -94,20 +94,7 @@ func (db *DB) merge() error {
 					break
 				}
 
-				var skipEntry bool
-
 				if entry.isFilter() {
-					skipEntry = true
-				}
-
-				// check if we have a new entry with same key and bucket
-				if r, _ := db.getRecordFromKey(entry.Bucket, entry.Key); r != nil && !skipEntry {
-					if r.E.Meta.TxID > entry.Meta.TxID {
-						skipEntry = true
-					}
-				}
-
-				if skipEntry {
 					off += entry.Size()
 					if off >= db.opt.SegmentSize {
 						break
@@ -115,11 +102,33 @@ func (db *DB) merge() error {
 					continue
 				}
 
-				if ok := db.isPendingMergeEntry(entry); ok {
-					if err := db.reWriteData(entry); err != nil {
-						_ = fr.release()
-						return err
+				// Due to the lack of concurrency safety in the index,
+				// there is a possibility that a race condition might occur when the merge goroutine reads the index,
+				// while a transaction is being committed, causing modifications to the index.
+				// To address this issue, we need to use a transaction to perform this operation.
+				err := db.Update(func(tx *Tx) error {
+					// check if we have a new entry with same key and bucket
+					if r, _ := db.getRecordFromKey(entry.Bucket, entry.Key); r != nil {
+						if r.E.Meta.TxID <= entry.Meta.TxID {
+							if ok := db.isPendingMergeEntry(entry); ok {
+								return tx.put(
+									string(entry.Bucket),
+									entry.Key,
+									entry.Value,
+									entry.Meta.TTL,
+									entry.Meta.Flag,
+									entry.Meta.Timestamp,
+									entry.Meta.Ds,
+								)
+							}
+						}
 					}
+					return nil
+				})
+
+				if err != nil {
+					_ = fr.release()
+					return err
 				}
 
 				off += entry.Size()
@@ -252,11 +261,4 @@ func (db *DB) isPendingMergeEntry(entry *Entry) bool {
 	}
 
 	return false
-}
-
-func (db *DB) reWriteData(e *Entry) error {
-	return db.Update(func(tx *Tx) error {
-		return tx.put(
-			string(e.Bucket), e.Key, e.Value, e.Meta.TTL, e.Meta.Flag, e.Meta.Timestamp, e.Meta.Ds)
-	})
 }
