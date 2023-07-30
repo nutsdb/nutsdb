@@ -615,6 +615,41 @@ func TestDB_DeleteBucket(t *testing.T) {
 	})
 }
 
+func TestDB_AutoMerge(t *testing.T) {
+	opts := DefaultOptions
+	opts.SegmentSize = 1024
+	opts.MergeInterval = 2 * time.Second
+
+	bucket := "bucket"
+
+	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
+		_, pendingMergeFileIds := db.getMaxFileIDAndFileIDs()
+		require.Len(t, pendingMergeFileIds, 1)
+
+		key := GetTestBytes(0)
+		value := GetRandomBytes(24)
+
+		for i := 0; i < 100; i++ {
+			txPut(t, db, bucket, key, value, Persistent, nil)
+		}
+
+		txGet(t, db, bucket, key, value, nil)
+
+		_, pendingMergeFileIds = db.getMaxFileIDAndFileIDs()
+		// this means that the merge can now be performed
+		require.Len(t, pendingMergeFileIds, 10)
+
+		// waiting for the merge work to be triggered.
+		time.Sleep(2 * time.Second)
+
+		_, pendingMergeFileIds = db.getMaxFileIDAndFileIDs()
+		// because there is only one valid entry, there will be only one data file after merging
+		require.Len(t, pendingMergeFileIds, 1)
+
+		txGet(t, db, bucket, key, value, nil)
+	})
+}
+
 func withDBOption(t *testing.T, opt Options, fn func(t *testing.T, db *DB)) {
 	db, err := Open(opt)
 	require.NoError(t, err)
