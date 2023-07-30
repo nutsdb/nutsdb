@@ -83,9 +83,9 @@ func TestDB_MergeWithTx(t *testing.T) {
 
 		wg := new(sync.WaitGroup)
 
+		wg.Add(1)
 		// this goroutine will run concurrently with the merge goroutine.
 		go func() {
-			wg.Add(1)
 
 			// Waiting for the merge to start.
 			time.Sleep(10 * time.Millisecond)
