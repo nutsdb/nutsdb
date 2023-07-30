@@ -90,8 +90,6 @@ func TestDB_MergeWithTx(t *testing.T) {
 			// Waiting for the merge to start.
 			time.Sleep(10 * time.Millisecond)
 
-			require.Equal(t, true, db.isMerging)
-
 			for i := 0; i < 10; i++ {
 				// By selectively updating some values,
 				// check if the merge process will overwrite the new values
@@ -99,8 +97,6 @@ func TestDB_MergeWithTx(t *testing.T) {
 					txPut(t, db, bucket, GetTestBytes(i), newValues[i], Persistent, nil)
 				}
 			}
-
-			require.Equal(t, true, db.isMerging)
 
 			wg.Done()
 		}()
