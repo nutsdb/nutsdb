@@ -185,6 +185,8 @@ type (
 		fm                      *fileManager
 		flock                   *flock.Flock
 		commitBuffer            *bytes.Buffer
+		mergeStartCh            chan struct{}
+		mergeEndCh              chan error
 	}
 
 	// BucketMetasIdx represents the index of the bucket's meta-information
@@ -208,6 +210,8 @@ func open(opt Options) (*DB, error) {
 		ActiveCommittedTxIdsIdx: NewTree(),
 		Index:                   NewIndex(),
 		fm:                      newFileManager(opt.RWMode, opt.MaxFdNumsInCache, opt.CleanFdsCacheThreshold),
+		mergeStartCh:            make(chan struct{}),
+		mergeEndCh:              make(chan error),
 	}
 
 	commitBuffer := new(bytes.Buffer)
@@ -259,6 +263,8 @@ func open(opt Options) (*DB, error) {
 	if err := db.buildIndexes(); err != nil {
 		return nil, fmt.Errorf("db.buildIndexes error: %s", err)
 	}
+
+	go db.mergeWorker()
 
 	return db, nil
 }

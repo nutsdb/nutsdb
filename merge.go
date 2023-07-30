@@ -18,11 +18,18 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"strings"
+	"time"
 )
 
-// Merge removes dirty data and reduce data redundancy,following these steps:
+func (db *DB) Merge() error {
+	db.mergeStartCh <- struct{}{}
+	return <-db.mergeEndCh
+}
+
+// merge removes dirty data and reduce data redundancy,following these steps:
 //
 // 1. Filter delete or expired entry.
 //
@@ -32,9 +39,9 @@ import (
 //
 // 4. At last remove the merged files.
 //
-// Caveat: Merge is Called means starting multiple write transactions, and it
+// Caveat: merge is Called means starting multiple write transactions, and it
 // will affect the other write request. so execute it at the appropriate time.
-func (db *DB) Merge() error {
+func (db *DB) merge() error {
 	var (
 		off              int64
 		pendingMergeFIds []int
@@ -141,11 +148,32 @@ func (db *DB) Merge() error {
 }
 
 func (db *DB) mergeWorker() {
+	var ticker *time.Ticker
 
+	if db.opt.MergeInterval != 0 {
+		ticker = time.NewTicker(db.opt.MergeInterval)
+	} else {
+		ticker = time.NewTicker(math.MaxInt)
+		ticker.Stop()
+	}
+
+	for {
+		select {
+		case <-db.mergeStartCh:
+			db.mergeEndCh <- db.merge()
+			// if automatic merging is enabled, then after a manual merge
+			// the timer needs to be reset.
+			if db.opt.MergeInterval != 0 {
+				ticker.Reset(db.opt.MergeInterval)
+			}
+		case <-ticker.C:
+			_ = db.merge()
+		}
+	}
 }
 
 // getRecordFromKey fetches Record for given key and bucket
-// this is a helper function used in Merge so it does not work if index mode is HintBPTSparseIdxMode
+// this is a helper function used in merge so it does not work if index mode is HintBPTSparseIdxMode
 func (db *DB) getRecordFromKey(bucket, key []byte) (record *Record, err error) {
 	idxMode := db.opt.EntryIdxMode
 	if !(idxMode == HintKeyValAndRAMIdxMode || idxMode == HintKeyAndRAMIdxMode) {

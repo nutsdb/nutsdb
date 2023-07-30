@@ -14,6 +14,8 @@
 
 package nutsdb
 
+import "time"
+
 // EntryIdxMode represents entry index mode.
 type EntryIdxMode int
 
@@ -92,6 +94,9 @@ type Options struct {
 
 	// LessFunc is a function that sorts keys.
 	LessFunc LessFunc
+
+	// MergeInterval represent the interval for automatic merges, with 0 meaning automatic merging is disabled.
+	MergeInterval time.Duration
 }
 
 const (
