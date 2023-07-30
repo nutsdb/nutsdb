@@ -198,8 +198,23 @@ MB，这个可以自己配置。但是一旦被设置，下次启动数据库也
 * StartFileLoadingMode RWMode
 
 `StartFileLoadingMode` 代表启动数据库的载入文件的方式。参数选项同`RWMode`。
-    
-    
+
+* GCWhenClose bool
+
+`GCWhenClose` 表示调用 ```db.Close()``` 时主动 GC。Nutsdb 预设不会立即在 ```db.Close()``` 时触发 GC.
+
+* CommitBufferSize int64
+
+`CommitBufferSize` 表示为事务预分配的内存大小。Nutsdb 将预分配内存以减少内存分配的次数。
+
+* ErrorHandler ErrorHandler
+
+`ErrorHandler` 处理事务执行期间发生的错误。
+
+* LessFunc LessFunc
+
+`LessFunc` 表示对 key 进行排序的函数。Nutsdb 默认按字典序对 key 进行排序。
+
 #### 默认选项
 
 推荐使用默认选项的方式。兼顾了持久化+快速的启动数据库。当然具体还要看你场景的要求。
