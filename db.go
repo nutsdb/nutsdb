@@ -62,6 +62,9 @@ var (
 
 	// ErrDirUnlocked is returned when the file lock already unlocked
 	ErrDirUnlocked = errors.New("the dir of db is unlocked")
+
+	// ErrIsMerging is returned when merge in progress
+	ErrIsMerging = errors.New("merge in progress")
 )
 
 const (

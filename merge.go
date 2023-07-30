@@ -44,12 +44,24 @@ func (db *DB) Merge() error {
 		return ErrNotSupportHintBPTSparseIdxMode
 	}
 
+	// to prevent the initiation of multiple merges simultaneously.
+	db.mu.Lock()
+
+	if db.isMerging {
+		db.mu.Unlock()
+		return ErrIsMerging
+	}
+
 	db.isMerging = true
+	defer func() {
+		db.isMerging = false
+	}()
 
 	_, pendingMergeFIds = db.getMaxFileIDAndFileIDs()
 
+	db.mu.Unlock()
+
 	if len(pendingMergeFIds) < 2 {
-		db.isMerging = false
 		return errors.New("the number of files waiting to be merged is at least 2")
 	}
 
@@ -58,7 +70,6 @@ func (db *DB) Merge() error {
 		path := getDataPath(int64(pendingMergeFId), db.opt.Dir)
 		fr, err := newFileRecovery(path, db.opt.BufferSizeOfRecovery)
 		if err != nil {
-			db.isMerging = false
 			return err
 		}
 
@@ -122,12 +133,15 @@ func (db *DB) Merge() error {
 			return err
 		}
 		if err := os.Remove(path); err != nil {
-			db.isMerging = false
 			return fmt.Errorf("when merge err: %s", err)
 		}
 	}
 
 	return nil
+}
+
+func (db *DB) mergeWorker() {
+
 }
 
 // getRecordFromKey fetches Record for given key and bucket
