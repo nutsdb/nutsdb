@@ -72,6 +72,7 @@ func (db *DB) merge() error {
 
 	dataFile, err := db.fm.getDataFile(getDataPath(db.MaxFileID+1, db.opt.Dir), db.opt.SegmentSize)
 	if err != nil {
+		db.mu.Unlock()
 		return err
 	}
 	db.ActiveFile = dataFile
