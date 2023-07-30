@@ -102,9 +102,7 @@ func (db *DB) merge() error {
 
 				// check if we have a new entry with same key and bucket
 				if r, _ := db.getRecordFromKey(entry.Bucket, entry.Key); r != nil && !skipEntry {
-					if r.H.FileID > int64(pendingMergeFId) {
-						skipEntry = true
-					} else if r.H.FileID == int64(pendingMergeFId) && r.H.DataPos > uint64(off) {
+					if r.E.Meta.TxID > entry.Meta.TxID {
 						skipEntry = true
 					}
 				}
