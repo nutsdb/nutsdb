@@ -187,6 +187,7 @@ type (
 		commitBuffer            *bytes.Buffer
 		mergeStartCh            chan struct{}
 		mergeEndCh              chan error
+		mergeWorkCloseCh        chan struct{}
 	}
 
 	// BucketMetasIdx represents the index of the bucket's meta-information
@@ -212,6 +213,7 @@ func open(opt Options) (*DB, error) {
 		fm:                      newFileManager(opt.RWMode, opt.MaxFdNumsInCache, opt.CleanFdsCacheThreshold),
 		mergeStartCh:            make(chan struct{}),
 		mergeEndCh:              make(chan error),
+		mergeWorkCloseCh:        make(chan struct{}),
 	}
 
 	commitBuffer := new(bytes.Buffer)
@@ -408,6 +410,8 @@ func (db *DB) release() error {
 	if err != nil {
 		return err
 	}
+
+	db.mergeWorkCloseCh <- struct{}{}
 
 	db.fm = nil
 

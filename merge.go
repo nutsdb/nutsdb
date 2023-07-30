@@ -174,6 +174,8 @@ func (db *DB) mergeWorker() {
 			}
 		case <-ticker.C:
 			_ = db.merge()
+		case <-db.mergeWorkCloseCh:
+			return
 		}
 	}
 }

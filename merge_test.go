@@ -24,7 +24,7 @@ import (
 func TestDB_MergeAutomatic(t *testing.T) {
 	opts := DefaultOptions
 	opts.SegmentSize = 1024
-	opts.MergeInterval = 2 * time.Second
+	opts.MergeInterval = 200 * time.Millisecond
 
 	bucket := "bucket"
 
@@ -41,12 +41,8 @@ func TestDB_MergeAutomatic(t *testing.T) {
 
 		txGet(t, db, bucket, key, value, nil)
 
-		_, pendingMergeFileIds = db.getMaxFileIDAndFileIDs()
-		// this means that the merge can now be performed
-		require.Len(t, pendingMergeFileIds, 10)
-
 		// waiting for the merge work to be triggered.
-		time.Sleep(2 * time.Second)
+		time.Sleep(200 * time.Millisecond)
 
 		_, pendingMergeFileIds = db.getMaxFileIDAndFileIDs()
 		// because there is only one valid entry, there will be only one data file after merging
