@@ -17,6 +17,7 @@ package nutsdb
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 	"sync/atomic"
@@ -89,6 +90,28 @@ type Tx struct {
 	ReservedStoreTxIDIdxes map[int64]*BPTree
 }
 
+type txnCb struct {
+	commit func() error
+	user   func(error)
+	err    error
+}
+
+func runTxnCallback(cb *txnCb) {
+	switch {
+	case cb == nil:
+		panic("txn callback is nil")
+	case cb.user == nil:
+		panic("Must have caught a nil callback for txn.CommitWith")
+	case cb.err != nil:
+		cb.user(cb.err)
+	case cb.commit != nil:
+		err := cb.commit()
+		cb.user(err)
+	default:
+		cb.user(nil)
+	}
+}
+
 // Begin opens a new transaction.
 // Multiple read-only transactions can be opened at the same time but there can
 // only be one read/write transaction at a time. Attempting to open a read/write
@@ -131,6 +154,41 @@ func newTx(db *DB, writable bool) (tx *Tx, err error) {
 	tx.id = txID
 
 	return
+}
+
+func (tx *Tx) CommitWith(cb func(error)) {
+	if cb == nil {
+		panic("Nil callback provided to CommitWith")
+	}
+
+	if len(tx.pendingWrites) == 0 {
+		// Do not run these callbacks from here, because the CommitWith and the
+		// callback might be acquiring the same locks. Instead run the callback
+		// from another goroutine.
+		go runTxnCallback(&txnCb{user: cb, err: nil})
+		return
+	}
+	defer tx.setStatusClosed()
+	commitCb, err := tx.commitAndSend()
+	if err != nil {
+		go runTxnCallback(&txnCb{user: cb, err: err})
+		return
+	}
+
+	go runTxnCallback(&txnCb{user: cb, commit: commitCb})
+	return
+}
+
+func (tx *Tx) commitAndSend() (func() error, error) {
+	req, err := tx.db.sendToWriteCh(tx)
+	if err != nil {
+		return nil, err
+	}
+	ret := func() error {
+		err := req.Wait()
+		return err
+	}
+	return ret, nil
 }
 
 // getTxID returns the tx id.
@@ -673,7 +731,11 @@ func (tx *Tx) writeData(data []byte) (n int, err error) {
 
 // Rollback closes the transaction.
 func (tx *Tx) Rollback() error {
+	if nil == tx {
+		fmt.Println("tx is nil")
+	}
 	if tx.db == nil {
+		fmt.Println("tx.db is nil")
 		tx.setStatusClosed()
 		return ErrDBClosed
 	}
@@ -696,6 +758,10 @@ func (tx *Tx) Rollback() error {
 
 // lock locks the database based on the transaction type.
 func (tx *Tx) lock() {
+	if tx.db == nil {
+		fmt.Println("db is nil")
+		return
+	}
 	if tx.writable {
 		tx.db.mu.Lock()
 	} else {
