@@ -121,6 +121,7 @@ var DefaultOptions = func() Options {
 		RWMode:           FileIO,
 		SyncEnable:       true,
 		CommitBufferSize: 4 * MB,
+		MergeInterval:    2 * time.Hour,
 	}
 }()
 
