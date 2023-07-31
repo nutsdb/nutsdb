@@ -201,21 +201,28 @@ memory and reducing the number of memory allocations.
   
 * LessFunc LessFunc  
   
-`LessFunc` represents func to sort keys. Nutsdb sorts keys in lexicographical order by default.          
+`LessFunc` represents func to sort keys. Nutsdb sorts keys in lexicographical order by default.
+
+* MergeInterval time.Duration
+
+`MergeInterval` represent the interval for automatic merges, with 0 meaning automatic merging is disabled. Default interval is 2 hours.
   
 #### Default Options
 
 Recommend to use the `DefaultOptions` . Unless you know what you're doing.
 
 ```
-var DefaultOptions = Options{
-    EntryIdxMode:         HintKeyValAndRAMIdxMode,
-    SegmentSize:          defaultSegmentSize,
-    NodeNum:              1,
-    RWMode:               FileIO,
-    SyncEnable:           true,
-    StartFileLoadingMode: MMap,
-}
+var DefaultOptions = func() Options {
+	return Options{
+		EntryIdxMode:     HintKeyValAndRAMIdxMode,
+		SegmentSize:      defaultSegmentSize,
+		NodeNum:          1,
+		RWMode:           FileIO,
+		SyncEnable:       true,
+		CommitBufferSize: 4 * MB,
+		MergeInterval:    2 * time.Hour,
+	}
+}()
 ```
 
 ### Transactions
