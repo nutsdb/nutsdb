@@ -62,6 +62,9 @@ var (
 
 	// ErrDirUnlocked is returned when the file lock already unlocked
 	ErrDirUnlocked = errors.New("the dir of db is unlocked")
+
+	// ErrIsMerging is returned when merge in progress
+	ErrIsMerging = errors.New("merge in progress")
 )
 
 const (
@@ -182,6 +185,9 @@ type (
 		fm                      *fileManager
 		flock                   *flock.Flock
 		commitBuffer            *bytes.Buffer
+		mergeStartCh            chan struct{}
+		mergeEndCh              chan error
+		mergeWorkCloseCh        chan struct{}
 	}
 
 	// BucketMetasIdx represents the index of the bucket's meta-information
@@ -205,6 +211,9 @@ func open(opt Options) (*DB, error) {
 		ActiveCommittedTxIdsIdx: NewTree(),
 		Index:                   NewIndex(),
 		fm:                      newFileManager(opt.RWMode, opt.MaxFdNumsInCache, opt.CleanFdsCacheThreshold),
+		mergeStartCh:            make(chan struct{}),
+		mergeEndCh:              make(chan error),
+		mergeWorkCloseCh:        make(chan struct{}),
 	}
 
 	commitBuffer := new(bytes.Buffer)
@@ -256,6 +265,8 @@ func open(opt Options) (*DB, error) {
 	if err := db.buildIndexes(); err != nil {
 		return nil, fmt.Errorf("db.buildIndexes error: %s", err)
 	}
+
+	go db.mergeWorker()
 
 	return db, nil
 }
@@ -321,117 +332,6 @@ func (db *DB) View(fn func(tx *Tx) error) error {
 	}
 
 	return db.managed(false, fn)
-}
-
-// Merge removes dirty data and reduce data redundancy,following these steps:
-//
-// 1. Filter delete or expired entry.
-//
-// 2. Write entry to activeFile if the key not exist，if exist miss this write operation.
-//
-// 3. Filter the entry which is committed.
-//
-// 4. At last remove the merged files.
-//
-// Caveat: Merge is Called means starting multiple write transactions, and it
-// will affect the other write request. so execute it at the appropriate time.
-func (db *DB) Merge() error {
-	var (
-		off                 int64
-		pendingMergeFIds    []int
-		pendingMergeEntries []*Entry
-	)
-
-	if db.opt.EntryIdxMode == HintBPTSparseIdxMode {
-		return ErrNotSupportHintBPTSparseIdxMode
-	}
-
-	db.isMerging = true
-
-	_, pendingMergeFIds = db.getMaxFileIDAndFileIDs()
-
-	if len(pendingMergeFIds) < 2 {
-		db.isMerging = false
-		return errors.New("the number of files waiting to be merged is at least 2")
-	}
-
-	for _, pendingMergeFId := range pendingMergeFIds {
-		off = 0
-		path := getDataPath(int64(pendingMergeFId), db.opt.Dir)
-		fr, err := newFileRecovery(path, db.opt.BufferSizeOfRecovery)
-		if err != nil {
-			db.isMerging = false
-			return err
-		}
-
-		pendingMergeEntries = []*Entry{}
-
-		for {
-			if entry, err := fr.readEntry(); err == nil {
-				if entry == nil {
-					break
-				}
-
-				var skipEntry bool
-
-				if entry.isFilter() {
-					skipEntry = true
-				}
-
-				// check if we have a new entry with same key and bucket
-				if r, _ := db.getRecordFromKey(entry.Bucket, entry.Key); r != nil && !skipEntry {
-					if r.H.FileID > int64(pendingMergeFId) {
-						skipEntry = true
-					} else if r.H.FileID == int64(pendingMergeFId) && r.H.DataPos > uint64(off) {
-						skipEntry = true
-					}
-				}
-
-				if skipEntry {
-					off += entry.Size()
-					if off >= db.opt.SegmentSize {
-						break
-					}
-					continue
-				}
-
-				pendingMergeEntries = db.getPendingMergeEntries(entry, pendingMergeEntries)
-
-				off += entry.Size()
-				if off >= db.opt.SegmentSize {
-					break
-				}
-
-			} else {
-				if err == io.EOF {
-					break
-				}
-				if err == ErrIndexOutOfBound {
-					break
-				}
-				if err == io.ErrUnexpectedEOF {
-					break
-				}
-				return fmt.Errorf("when merge operation build hintIndex readAt err: %s", err)
-			}
-		}
-
-		if err := db.reWriteData(pendingMergeEntries); err != nil {
-			_ = fr.release()
-			return err
-		}
-
-		err = fr.release()
-		if err != nil {
-			return err
-		}
-		if err := os.Remove(path); err != nil {
-			db.isMerging = false
-			return fmt.Errorf("when merge err: %s", err)
-		}
-	}
-
-	return nil
 }
 
 // Backup copies the database to file directory at the given dir.
@@ -510,6 +410,8 @@ func (db *DB) release() error {
 	if err != nil {
 		return err
 	}
+
+	db.mergeWorkCloseCh <- struct{}{}
 
 	db.fm = nil
 
@@ -1113,112 +1015,6 @@ func (db *DB) managed(writable bool, fn func(tx *Tx) error) (err error) {
 }
 
 const bptDir = "bpt"
-
-func (db *DB) getPendingMergeEntries(entry *Entry, pendingMergeEntries []*Entry) []*Entry {
-	if entry.Meta.Ds == DataStructureBPTree {
-		bptIdx, exist := db.BPTreeIdx[string(entry.Bucket)]
-		if exist {
-			r, err := bptIdx.Find(entry.Key)
-			if err == nil && r.H.Meta.Flag == DataSetFlag {
-				pendingMergeEntries = append(pendingMergeEntries, entry)
-			}
-		}
-	}
-
-	if entry.Meta.Ds == DataStructureSet {
-		setIdx, exist := db.SetIdx[string(entry.Bucket)]
-		if exist {
-			if setIdx.SIsMember(string(entry.Key), entry.Value) {
-				pendingMergeEntries = append(pendingMergeEntries, entry)
-			}
-		}
-	}
-
-	if entry.Meta.Ds == DataStructureSortedSet {
-		keyAndScore := strings.Split(string(entry.Key), SeparatorForZSetKey)
-		if len(keyAndScore) == 2 {
-			key := keyAndScore[0]
-			sortedSetIdx, exist := db.SortedSetIdx[string(entry.Bucket)]
-			if exist {
-				n := sortedSetIdx.GetByKey(key)
-				if n != nil {
-					pendingMergeEntries = append(pendingMergeEntries, entry)
-				}
-			}
-		}
-	}
-
-	if entry.Meta.Ds == DataStructureList {
-		//check the key of list is expired or not
-		//if expired, it will clear the items of index
-		//so that nutsdb can clear entry of expiring list in the function getPendingMergeEntries
-		db.checkListExpired()
-		listIdx := db.Index.getList(string(entry.Bucket))
-
-		if listIdx != nil {
-			items, _ := listIdx.LRange(string(entry.Key), 0, -1)
-			ok := false
-			if entry.Meta.Flag == DataRPushFlag || entry.Meta.Flag == DataLPushFlag {
-				for _, item := range items {
-					v, _ := db.getValueByRecord(item)
-					if string(entry.Value) == string(v) {
-						ok = true
-						break
-					}
-				}
-				if ok {
-					pendingMergeEntries = append(pendingMergeEntries, entry)
-				}
-			}
-		}
-	}
-
-	return pendingMergeEntries
-}
-
-func (db *DB) reWriteData(pendingMergeEntries []*Entry) error {
-	if len(pendingMergeEntries) == 0 {
-		return nil
-	}
-	tx, err := db.Begin(true)
-	if err != nil {
-		db.isMerging = false
-		return err
-	}
-
-	dataFile, err := db.fm.getDataFile(getDataPath(db.MaxFileID+1, db.opt.Dir), db.opt.SegmentSize)
-	if err != nil {
-		db.isMerging = false
-		return err
-	}
-	db.ActiveFile = dataFile
-	db.MaxFileID++
-
-	for _, e := range pendingMergeEntries {
-		err := tx.put(string(e.Bucket), e.Key, e.Value, e.Meta.TTL, e.Meta.Flag, e.Meta.Timestamp, e.Meta.Ds)
-		if err != nil {
-			tx.Rollback()
-			db.isMerging = false
-			return err
-		}
-	}
-	tx.Commit()
-	return nil
-}
-
-// getRecordFromKey fetches Record for given key and bucket
-// this is a helper function used in Merge so it does not work if index mode is HintBPTSparseIdxMode
-func (db *DB) getRecordFromKey(bucket, key []byte) (record *Record, err error) {
-	idxMode := db.opt.EntryIdxMode
-	if !(idxMode == HintKeyValAndRAMIdxMode || idxMode == HintKeyAndRAMIdxMode) {
-		return nil, errors.New("not implemented")
-	}
-	idx, ok := db.BPTreeIdx[string(bucket)]
-	if !ok {
-		return nil, ErrBucketNotFound
-	}
-	return idx.Find(key)
-}
 
 func (db *DB) checkListExpired() {
 	db.Index.rangeList(func(l *List) {
