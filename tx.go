@@ -96,7 +96,9 @@ type Tx struct {
 // the current read/write transaction is completed.
 // All transactions must be closed by calling Commit() or Rollback() when done.
 func (db *DB) Begin(writable bool) (tx *Tx, err error) {
-	tx, err = newTx(db, writable)
+	tx = db.TxPool.Get().(*Tx)
+	tx, err = tx.WithDB(db).
+		WithWritable(writable).Init()
 	if err != nil {
 		return nil, err
 	}
@@ -113,24 +115,32 @@ func (db *DB) Begin(writable bool) (tx *Tx, err error) {
 }
 
 // newTx returns a newly initialized Tx object at given writable.
-func newTx(db *DB, writable bool) (tx *Tx, err error) {
-	var txID uint64
+func NewTx() interface{} {
+	return &Tx{}
+}
 
-	tx = &Tx{
-		db:                     db,
-		writable:               writable,
-		pendingWrites:          []*Entry{},
-		ReservedStoreTxIDIdxes: make(map[int64]*BPTree),
-	}
+func (tx *Tx) WithDB(db *DB) *Tx {
+	tx.db = db
+	return tx
+}
 
-	txID, err = tx.getTxID()
+func (tx *Tx) WithWritable(writable bool) *Tx {
+	tx.writable = writable
+	return tx
+}
+
+func (tx *Tx) Init() (*Tx, error) {
+	txID, err := tx.getTxID()
 	if err != nil {
 		return nil, err
 	}
-
 	tx.id = txID
 
-	return
+	if tx.writable {
+		tx.pendingWrites = []*Entry{}
+		tx.ReservedStoreTxIDIdxes = make(map[int64]*BPTree)
+	}
+	return tx, nil
 }
 
 // getTxID returns the tx id.

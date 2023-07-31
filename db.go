@@ -173,6 +173,7 @@ type (
 		ActiveFile              *DataFile
 		ActiveBPTreeIdx         *BPTree
 		ActiveCommittedTxIdsIdx *BPTree
+		TxPool                  sync.Pool
 		committedTxIds          map[uint64]struct{}
 		MaxFileID               int64
 		mu                      sync.RWMutex
@@ -199,6 +200,7 @@ func open(opt Options) (*DB, error) {
 		opt:                     opt,
 		KeyCount:                0,
 		closed:                  false,
+		TxPool:                  sync.Pool{New: NewTx},
 		committedTxIds:          make(map[uint64]struct{}),
 		BPTreeKeyEntryPosMap:    make(map[string]int64),
 		bucketMetas:             make(map[string]*BucketMeta),
