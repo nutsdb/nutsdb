@@ -24,6 +24,10 @@ import (
 	"time"
 )
 
+var (
+	ErrDontNeedMerge = errors.New("the number of files waiting to be merged is at least 2")
+)
+
 func (db *DB) Merge() error {
 	db.mergeStartCh <- struct{}{}
 	return <-db.mergeEndCh
@@ -67,7 +71,7 @@ func (db *DB) merge() error {
 	_, pendingMergeFIds = db.getMaxFileIDAndFileIDs()
 	if len(pendingMergeFIds) < 2 {
 		db.mu.Unlock()
-		return errors.New("the number of files waiting to be merged is at least 2")
+		return ErrDontNeedMerge
 	}
 
 	dataFile, err := db.fm.getDataFile(getDataPath(db.MaxFileID+1, db.opt.Dir), db.opt.SegmentSize)
@@ -242,20 +246,16 @@ func (db *DB) isPendingMergeEntry(entry *Entry) bool {
 		//if expired, it will clear the items of index
 		//so that nutsdb can clear entry of expiring list in the function isPendingMergeEntry
 		db.checkListExpired()
-		listIdx := db.Index.getList(string(entry.Bucket))
 
-		if listIdx != nil {
+		if listIdx := db.Index.getList(string(entry.Bucket)); listIdx != nil {
 			items, _ := listIdx.LRange(string(entry.Key), 0, -1)
-			ok := false
 			if entry.Meta.Flag == DataRPushFlag || entry.Meta.Flag == DataLPushFlag {
 				for _, item := range items {
 					v, _ := db.getValueByRecord(item)
 					if string(entry.Value) == string(v) {
-						ok = true
-						break
+						return true
 					}
 				}
-				return ok
 			}
 		}
 	}
