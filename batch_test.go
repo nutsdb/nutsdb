@@ -45,7 +45,6 @@ func TestWriteBatch(t *testing.T) {
     }
     wb, err := db.NewWriteBatch()
     assert.NoError(t, err)
-    defer wb.Cancel()
 
     N := 500000
 
@@ -74,8 +73,7 @@ func TestWriteBatch(t *testing.T) {
     }
 
     fmt.Println("begin batch delete")
-    //err = wb.Reset()
-    wb, err = db.NewWriteBatch()
+    err = wb.Reset()
     assert.NoError(t, err)
     time2.Start()
     //require.NoError(t, wb.Delete(bucket, key(0)))

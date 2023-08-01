@@ -31,6 +31,7 @@ func (db *DB) NewWriteBatch() (*WriteBatch, error) {
 
     var err error
     wb.txn, err = newTx(db, true)
+    wb.txn.lock()
     return wb, err
 }
 
@@ -49,6 +50,7 @@ func (wb *WriteBatch) Cancel() error {
         return fmt.Errorf("WatchBatch.Cancel error while finishing: %v", err)
     }
     wb.txn.setStatusClosed()
+    wb.txn.unlock()
     return nil
 }
 
@@ -142,6 +144,7 @@ func (wb *WriteBatch) Flush() error {
     }
     wb.finished = true
     wb.txn.setStatusClosed()
+    wb.txn.unlock()
     wb.Unlock()
 
     if err := wb.throttle.Finish(); err != nil {
@@ -159,8 +162,11 @@ func (wb *WriteBatch) Reset() error {
     defer wb.Unlock()
     var err error
     wb.finished = false
-    //wb.err.Store(err)
     wb.txn, err = newTx(wb.db, true)
+    if err != nil {
+        return err
+    }
+    wb.txn.lock()
     wb.throttle = NewThrottle(16)
     return err
 }

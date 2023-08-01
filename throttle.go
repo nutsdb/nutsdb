@@ -1,7 +1,6 @@
 package nutsdb
 
 import (
-    "fmt"
     "sync"
 )
 
@@ -37,12 +36,7 @@ func (t *Throttle) Do() error {
             if err != nil {
                 return err
             }
-
-        default:
-            fmt.Println("default ")
-
         }
-        fmt.Println("Throttle do ")
     }
 }
 
