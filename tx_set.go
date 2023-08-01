@@ -136,7 +136,7 @@ func (tx *Tx) SHasKey(bucket string, key []byte) (bool, error) {
 	}
 
 	if set, ok := tx.db.SetIdx[bucket]; ok {
-		return set.SExist(string(key)), nil
+		return set.SHasKey(string(key)), nil
 	}
 
 	return false, ErrBucketNotFound
@@ -271,11 +271,11 @@ func (tx *Tx) SMoveByTwoBuckets(bucket1 string, key1 []byte, bucket2 string, key
 		return false, ErrBucketAndKey(bucket2, key1)
 	}
 
-	if !set1.SExist(string(key1)) {
+	if !set1.SHasKey(string(key1)) {
 		return false, ErrNotFoundKeyInBucket(bucket1, key1)
 	}
 
-	if !set2.SExist(string(key2)) {
+	if !set2.SHasKey(string(key2)) {
 		return false, ErrNotFoundKeyInBucket(bucket2, key2)
 	}
 
@@ -339,11 +339,11 @@ func (tx *Tx) SUnionByTwoBuckets(bucket1 string, key1 []byte, bucket2 string, ke
 		return nil, ErrBucketAndKey(bucket2, key1)
 	}
 
-	if !set1.SExist(string(key1)) {
+	if !set1.SHasKey(string(key1)) {
 		return nil, ErrNotFoundKeyInBucket(bucket1, key1)
 	}
 
-	if !set2.SExist(string(key2)) {
+	if !set2.SHasKey(string(key2)) {
 		return nil, ErrNotFoundKeyInBucket(bucket2, key2)
 	}
 

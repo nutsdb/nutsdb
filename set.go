@@ -83,8 +83,8 @@ func (s *Set) SRem(key string, values ...[]byte) error {
 	return nil
 }
 
-// SExist returns whether it has the set at given key.
-func (s *Set) SExist(key string) bool {
+// SHasKey returns whether it has the set at given key.
+func (s *Set) SHasKey(key string) bool {
 	if _, ok := s.M[key]; ok {
 		return true
 	}
@@ -93,7 +93,7 @@ func (s *Set) SExist(key string) bool {
 
 // SPop removes and returns one or more random elements from the set value store at key.
 func (s *Set) SPop(key string) *Record {
-	if !s.SExist(key) {
+	if !s.SHasKey(key) {
 		return nil
 	}
 
@@ -107,7 +107,7 @@ func (s *Set) SPop(key string) *Record {
 
 // SCard Returns the set cardinality (number of elements) of the set stored at key.
 func (s *Set) SCard(key string) int {
-	if !s.SExist(key) {
+	if !s.SHasKey(key) {
 		return 0
 	}
 
@@ -116,7 +116,7 @@ func (s *Set) SCard(key string) int {
 
 // SDiff Returns the members of the set resulting from the difference between the first set and all the successive sets.
 func (s *Set) SDiff(key1, key2 string) ([]*Record, error) {
-	if !s.SExist(key1) || !s.SExist(key2) {
+	if !s.SHasKey(key1) || !s.SHasKey(key2) {
 		return nil, ErrSetNotExist
 	}
 
@@ -132,7 +132,7 @@ func (s *Set) SDiff(key1, key2 string) ([]*Record, error) {
 
 // SInter Returns the members of the set resulting from the intersection of all the given sets.
 func (s *Set) SInter(key1, key2 string) ([]*Record, error) {
-	if !s.SExist(key1) || !s.SExist(key2) {
+	if !s.SHasKey(key1) || !s.SHasKey(key2) {
 		return nil, ErrSetNotExist
 	}
 
@@ -203,7 +203,7 @@ func (s *Set) SMembers(key string) ([]*Record, error) {
 
 // SMove moves member from the set at source to the set at destination.
 func (s *Set) SMove(key1, key2 string, value []byte) (bool, error) {
-	if !s.SExist(key1) || !s.SExist(key2) {
+	if !s.SHasKey(key1) || !s.SHasKey(key2) {
 		return false, ErrSetNotExist
 	}
 
@@ -240,7 +240,7 @@ func (s *Set) SMove(key1, key2 string, value []byte) (bool, error) {
 
 // SUnion returns the members of the set resulting from the union of all the given sets.
 func (s *Set) SUnion(key1, key2 string) ([]*Record, error) {
-	if !s.SExist(key1) || !s.SExist(key2) {
+	if !s.SHasKey(key1) || !s.SHasKey(key2) {
 		return nil, ErrSetNotExist
 	}
 
