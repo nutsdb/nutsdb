@@ -33,8 +33,6 @@ import (
     "github.com/nutsdb/nutsdb/ds/zset"
     "github.com/xujiajun/utils/filesystem"
     "github.com/xujiajun/utils/strconv2"
-    debug "runtime/debug"
-    "time"
 )
 
 var (
@@ -470,17 +468,13 @@ func (db *DB) getEntryByHint(h *Hint) (*Entry, error) {
     return item, nil
 }
 
-func (db *DB) commitTx(tx *Tx) error {
-    if nil == tx {
-        fmt.Println("tx is nil in commitTx")
-    }
+func (db *DB) commitTransaction(tx *Tx) error {
     var err error
     defer func() {
         var panicked bool
         if r := recover(); r != nil {
             // resume normal execution
             panicked = true
-            debug.PrintStack()
         }
         if panicked || err != nil {
             if errRollback := tx.Rollback(); errRollback != nil {
@@ -488,12 +482,12 @@ func (db *DB) commitTx(tx *Tx) error {
             }
         }
     }()
+
     // commit current tx
     tx.lock()
     tx.setStatusRunning()
     err = tx.Commit()
     if err != nil {
-        fmt.Println("tx commit fail, err=", err)
         return err
     }
 
@@ -515,7 +509,7 @@ func (db *DB) writeRequests(reqs []*request) error {
 
     for _, req := range reqs {
         tx := req.tx
-        cerr := db.commitTx(tx)
+        cerr := db.commitTransaction(tx)
         if cerr != nil {
             err = cerr
         }
@@ -525,36 +519,70 @@ func (db *DB) writeRequests(reqs []*request) error {
     return err
 }
 
+// MaxBatchCount returns max possible entries in batch
+func (db *DB) maxBatchCount() int64 {
+    return db.opt.MaxBatchCount
+}
+
+// MaxBatchSize returns max possible batch size
+func (db *DB) maxBatchSize() int64 {
+    return db.opt.maxBatchSize
+}
+
 func (db *DB) doWrites() {
+    pendingCh := make(chan struct{}, 1)
     writeRequests := func(reqs []*request) {
-        if err := db.writeRequests(reqs); err != nil {
-            //db.opt.Errorf("writeRequests: %v", err)
-        }
+        db.writeRequests(reqs)
+        <-pendingCh
     }
 
-    const batchSize = 100
-    requests := make([]*request, 0, 10)
-
+    reqs := make([]*request, 0, 10)
+    var r *request
+    var ok bool
     for {
         select {
-        case req, ok := <-db.writeCh:
+        case r, ok = <-db.writeCh:
             if !ok {
-                writeRequests(requests)
-                return
+                goto closedCase
             }
-            requests = append(requests, req)
-        default:
-            if len(requests) > 0 {
-                writeRequests(requests)
-                requests = make([]*request, 0, 10)
-            }
-            time.Sleep(time.Millisecond)
         }
 
-        if len(requests) >= batchSize {
-            writeRequests(requests)
-            requests = make([]*request, 0, 10)
+        for {
+            reqs = append(reqs, r)
+
+            if len(reqs) >= 3*KvWriteChCapacity {
+                pendingCh <- struct{}{} // blocking.
+                goto writeCase
+            }
+
+            select {
+            // Either push to pending, or continue to pick from writeCh.
+            case r, ok = <-db.writeCh:
+                if !ok {
+                    goto closedCase
+                }
+            case pendingCh <- struct{}{}:
+                goto writeCase
+            }
         }
+
+    closedCase:
+        // All the pending request are drained.
+        // Don't close the writeCh, because it has be used in several places.
+        for {
+            select {
+            case r = <-db.writeCh:
+                reqs = append(reqs, r)
+            default:
+                pendingCh <- struct{}{} // Push to pending before doing a write.
+                writeRequests(reqs)
+                return
+            }
+        }
+
+    writeCase:
+        go writeRequests(reqs)
+        reqs = make([]*request, 0, 10)
     }
 }
 

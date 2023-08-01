@@ -99,6 +99,7 @@ type Options struct {
     MergeInterval time.Duration
 
     MaxBatchCount int64 // max entries in batch
+    maxBatchSize  int64 // max batch size in bytes
 }
 
 const (
@@ -114,6 +115,9 @@ const (
 // defaultSegmentSize is default data file size.
 var defaultSegmentSize int64 = 256 * MB
 
+//opt.maxBatchSize = (15 * opt.MemTableSize) / 100
+//opt.maxBatchCount = opt.maxBatchSize / int64(skl.MaxNodeSize)
+
 // DefaultOptions represents the default options.
 var DefaultOptions = func() Options {
     return Options{
@@ -124,7 +128,8 @@ var DefaultOptions = func() Options {
         SyncEnable:       true,
         CommitBufferSize: 4 * MB,
         MergeInterval:    2 * time.Hour,
-        MaxBatchCount:    (15 * defaultSegmentSize / 100) / 100,
+        maxBatchSize:     (15 * defaultSegmentSize / 4) / 100,
+        MaxBatchCount:    (15 * defaultSegmentSize / 4) / 100 / 100,
     }
 }()
 
