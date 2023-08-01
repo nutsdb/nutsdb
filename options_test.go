@@ -17,6 +17,28 @@ func TestWithNodeNum(t *testing.T) {
 	assert.Equal(t, int64(1011), db.opt.NodeNum)
 }
 
+func TestWithMaxBatchCount(t *testing.T) {
+	InitOpt("", true)
+	db, err := Open(
+		opt,
+		WithMaxBatchCount(10),
+	)
+	defer db.Close()
+	assert.NoError(t, err)
+	assert.Equal(t, int64(10), db.maxBatchCount())
+}
+
+func TestWithMaxBatchSize(t *testing.T) {
+	InitOpt("", true)
+	db, err := Open(
+		opt,
+		WithMaxBatchSize(100),
+	)
+	defer db.Close()
+	assert.NoError(t, err)
+	assert.Equal(t, int64(100), db.maxBatchSize())
+}
+
 func TestWithRWMode(t *testing.T) {
 	db, err = Open(DefaultOptions,
 		WithDir("/tmp/nutsdb"),
