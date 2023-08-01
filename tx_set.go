@@ -285,10 +285,16 @@ func (tx *Tx) SMoveByTwoBuckets(bucket1 string, key1 []byte, bucket2 string, key
 	}
 
 	if r, ok := set2.M[string(key2)][hash]; !ok {
-		set2.SAdd(string(key2), [][]byte{item}, []*Record{r})
+		err := set2.SAdd(string(key2), [][]byte{item}, []*Record{r})
+		if err != nil {
+			return false, err
+		}
 	}
 
-	set1.SRem(string(key1), item)
+	err = set1.SRem(string(key1), item)
+	if err != nil {
+		return false, err
+	}
 
 	return true, nil
 }
