@@ -20,11 +20,14 @@ import (
 )
 
 var (
-	// ErrSetNotExist is returned when the key not exist.
-	ErrSetNotExist = errors.New("key not exist")
+	// ErrSetNotExist is returned when the key does not exist.
+	ErrSetNotExist = errors.New("set not exist")
 
-	// ErrItemEmpty is returned when the item received is nil
-	ErrItemEmpty = errors.New("item empty")
+	// ErrSetMemberNotExist is returned when the member of set does not exist
+	ErrSetMemberNotExist = errors.New("set member not exist")
+
+	// ErrMemberEmpty is returned when the item received is nil
+	ErrMemberEmpty = errors.New("item empty")
 )
 
 var fnvHash = fnv.New32a()
@@ -66,7 +69,7 @@ func (s *Set) SRem(key string, values ...[]byte) error {
 	}
 
 	if len(values) == 0 || values[0] == nil {
-		return ErrItemEmpty
+		return ErrMemberEmpty
 	}
 
 	for _, value := range values {
@@ -195,7 +198,7 @@ func (s *Set) SMembers(key string) ([]*Record, error) {
 		records = append(records, record)
 	}
 
-	return nil, nil
+	return records, nil
 }
 
 // SMove moves member from the set at source to the set at destination.
@@ -204,13 +207,24 @@ func (s *Set) SMove(key1, key2 string, value []byte) (bool, error) {
 		return false, ErrSetNotExist
 	}
 
+	set1, set2 := s.M[key1], s.M[key2]
+
 	hash, err := getFnv32(value)
 	if err != nil {
 		return false, err
 	}
 
-	if record, ok := s.M[key2][hash]; !ok {
-		err := s.SAdd(key2, [][]byte{value}, []*Record{record})
+	var (
+		member *Record
+		ok     bool
+	)
+
+	if member, ok = set1[hash]; !ok {
+		return false, ErrSetMemberNotExist
+	}
+
+	if _, ok = set2[hash]; !ok {
+		err = s.SAdd(key2, [][]byte{value}, []*Record{member})
 		if err != nil {
 			return false, err
 		}
