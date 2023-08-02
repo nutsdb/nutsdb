@@ -197,7 +197,7 @@ func (tx *Tx) commitAndSend() (func() error, error) {
 
 func (tx *Tx) checkSize() error {
     count := len(tx.pendingWrites)
-    if int64(count) >= tx.db.opt.MaxBatchCount || tx.size >= tx.db.opt.maxBatchSize {
+    if int64(count) >= tx.db.getMaxBatchCount() || tx.size >= tx.db.getMaxBatchSize() {
         return ErrTxnTooBig
     }
 
