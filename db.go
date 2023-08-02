@@ -29,7 +29,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/nutsdb/nutsdb/ds/set"
 	"github.com/nutsdb/nutsdb/ds/zset"
 	"github.com/xujiajun/utils/filesystem"
 	"github.com/xujiajun/utils/strconv2"
@@ -807,7 +806,7 @@ func (db *DB) deleteBucket(ds uint16, bucket string) {
 // buildSetIdx builds set index when opening the DB.
 func (db *DB) buildSetIdx(bucket string, r *Record) error {
 	if _, ok := db.SetIdx[bucket]; !ok {
-		db.SetIdx[bucket] = set.New()
+		db.SetIdx[bucket] = NewSet()
 	}
 
 	if r.E == nil {
@@ -815,7 +814,7 @@ func (db *DB) buildSetIdx(bucket string, r *Record) error {
 	}
 
 	if r.H.Meta.Flag == DataSetFlag {
-		if err := db.SetIdx[bucket].SAdd(string(r.E.Key), r.E.Value); err != nil {
+		if err := db.SetIdx[bucket].SAdd(string(r.E.Key), [][]byte{r.E.Value}, []*Record{r}); err != nil {
 			return fmt.Errorf("when build SetIdx SAdd index err: %s", err)
 		}
 	}
@@ -973,6 +972,20 @@ func (db *DB) buildIndexes() (err error) {
 
 	// build hint index
 	return db.buildHintIdx(dataFileIds)
+}
+
+func (db *DB) buildRecordByEntryAndOffset(entry *Entry, offset int64) *Record {
+	var (
+		h *Hint
+		e *Entry
+	)
+	if db.opt.EntryIdxMode == HintKeyAndRAMIdxMode {
+		h = NewHint().WithFileId(db.ActiveFile.fileID).WithKey(entry.Key).WithMeta(entry.Meta).WithDataPos(uint64(offset))
+	} else {
+		e = entry
+	}
+
+	return NewRecord().WithBucket(string(entry.Bucket)).WithEntry(e).WithHint(h)
 }
 
 // managed calls a block of code that is fully contained in a transaction.

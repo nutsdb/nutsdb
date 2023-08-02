@@ -221,7 +221,11 @@ func (db *DB) isPendingMergeEntry(entry *Entry) bool {
 	if entry.Meta.Ds == DataStructureSet {
 		setIdx, exist := db.SetIdx[string(entry.Bucket)]
 		if exist {
-			if setIdx.SIsMember(string(entry.Key), entry.Value) {
+			isMember, err := setIdx.SIsMember(string(entry.Key), entry.Value)
+			if err != nil {
+				return false
+			}
+			if isMember {
 				return true
 			}
 		}
