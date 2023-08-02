@@ -18,7 +18,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/gofrs/flock"
 	"io"
 	"io/ioutil"
 	"os"
@@ -28,6 +27,8 @@ import (
 	"sort"
 	"strings"
 	"sync"
+
+	"github.com/gofrs/flock"
 
 	"github.com/nutsdb/nutsdb/ds/list"
 	"github.com/nutsdb/nutsdb/ds/set"
@@ -192,6 +193,16 @@ type (
 	BucketMetasIdx map[string]*BucketMeta
 )
 
+// check path is Exist ,if not exist create it.
+func checkPathIsExist(path string) error {
+	if ok := filesystem.PathIsExist(path); !ok {
+		if err := os.MkdirAll(path, os.ModePerm); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // open returns a newly initialized DB object.
 func open(opt Options) (*DB, error) {
 	db := &DB{
@@ -236,24 +247,16 @@ func open(opt Options) (*DB, error) {
 
 	if opt.EntryIdxMode == HintBPTSparseIdxMode {
 		bptRootIdxDir := db.opt.Dir + "/" + bptDir + "/root"
-		if ok := filesystem.PathIsExist(bptRootIdxDir); !ok {
-			if err := os.MkdirAll(bptRootIdxDir, os.ModePerm); err != nil {
-				return nil, err
-			}
+		if err := checkPathIsExist(bptRootIdxDir); err != nil {
+			return nil, err
 		}
-
 		bptTxIDIdxDir := db.opt.Dir + "/" + bptDir + "/txid"
-		if ok := filesystem.PathIsExist(bptTxIDIdxDir); !ok {
-			if err := os.MkdirAll(bptTxIDIdxDir, os.ModePerm); err != nil {
-				return nil, err
-			}
+		if err := checkPathIsExist(bptTxIDIdxDir); err != nil {
+			return nil, err
 		}
-
 		bucketMetaDir := db.opt.Dir + "/meta/bucket"
-		if ok := filesystem.PathIsExist(bucketMetaDir); !ok {
-			if err := os.MkdirAll(bucketMetaDir, os.ModePerm); err != nil {
-				return nil, err
-			}
+		if err := checkPathIsExist(bucketMetaDir); err != nil {
+			return nil, err
 		}
 	}
 
