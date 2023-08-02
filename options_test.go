@@ -23,9 +23,10 @@ func TestWithMaxBatchCount(t *testing.T) {
         opt,
         WithMaxBatchCount(10),
     )
-    defer db.Close()
     assert.NoError(t, err)
     assert.Equal(t, int64(10), db.getMaxBatchCount())
+    err = db.Close()
+    assert.NoError(t, err)
 }
 
 func TestWithMaxBatchSize(t *testing.T) {
@@ -34,9 +35,10 @@ func TestWithMaxBatchSize(t *testing.T) {
         opt,
         WithMaxBatchSize(100),
     )
-    defer db.Close()
     assert.NoError(t, err)
     assert.Equal(t, int64(100), db.getMaxBatchSize())
+    err = db.Close()
+    assert.NoError(t, err)
 }
 
 func TestWithRWMode(t *testing.T) {

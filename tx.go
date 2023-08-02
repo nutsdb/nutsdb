@@ -179,7 +179,6 @@ func (tx *Tx) CommitWith(cb func(error)) {
     }
 
     go runTxnCallback(&txnCb{user: cb, commit: commitCb})
-    return
 }
 
 func (tx *Tx) commitAndSend() (func() error, error) {

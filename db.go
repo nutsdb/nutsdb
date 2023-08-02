@@ -21,6 +21,7 @@ import (
     "github.com/gofrs/flock"
     "io"
     "io/ioutil"
+    "log"
     "os"
     "path"
     "path/filepath"
@@ -532,7 +533,9 @@ func (db *DB) getMaxBatchSize() int64 {
 func (db *DB) doWrites() {
     pendingCh := make(chan struct{}, 1)
     writeRequests := func(reqs []*request) {
-        db.writeRequests(reqs)
+        if err := db.writeRequests(reqs); err != nil {
+            log.Fatal(err)
+        }
         <-pendingCh
     }
 
@@ -540,11 +543,9 @@ func (db *DB) doWrites() {
     var r *request
     var ok bool
     for {
-        select {
-        case r, ok = <-db.writeCh:
-            if !ok {
-                goto closedCase
-            }
+        r, ok = <-db.writeCh
+        if !ok {
+            goto closedCase
         }
 
         for {
@@ -605,8 +606,6 @@ func (db *DB) getMaxFileIDAndFileIDs() (maxFileID int64, dataFileIds []int) {
     if len(files) == 0 {
         return 0, nil
     }
-
-    maxFileID = 0
 
     for _, f := range files {
         id := f.Name()

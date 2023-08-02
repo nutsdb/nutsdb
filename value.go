@@ -12,8 +12,6 @@ type request struct {
     ref int32
 }
 
-type requests []*request
-
 var requestPool = sync.Pool{
     New: func() interface{} {
         return new(request)
@@ -46,16 +44,4 @@ func (req *request) Wait() error {
     err := req.Err
     req.DecrRef() // DecrRef after writing to DB.
     return err
-}
-
-func (reqs requests) DecrRef() {
-    for _, req := range reqs {
-        req.DecrRef()
-    }
-}
-
-func (reqs requests) IncrRef() {
-    for _, req := range reqs {
-        req.IncrRef()
-    }
 }
