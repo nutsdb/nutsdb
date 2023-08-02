@@ -184,20 +184,45 @@ if `SyncEnable` is true, slower but persistent.
 * StartFileLoadingMode RWMode
 
 `StartFileLoadingMode` represents when open a database which RWMode to load files.
-    
+
+* GCWhenClose bool  
+  
+`GCWhenClose` represents initiative GC when calling ```db.Close()```. Nutsdb doesn't  
+immediately trigger GC on ```db.Close()``` by default.
+
+* CommitBufferSize int64
+
+`CommitBufferSize` represent the size of memory preallocated for transaction. Nutsdb will preallocate
+memory and reducing the number of memory allocations.
+  
+* ErrorHandler ErrorHandler   
+  
+`ErrorHandler` handles an error that occur during transaction.     
+  
+* LessFunc LessFunc  
+  
+`LessFunc` represents func to sort keys. Nutsdb sorts keys in lexicographical order by default.
+
+* MergeInterval time.Duration
+
+`MergeInterval` represent the interval for automatic merges, with 0 meaning automatic merging is disabled. Default interval is 2 hours.
+  
 #### Default Options
 
 Recommend to use the `DefaultOptions` . Unless you know what you're doing.
 
 ```
-var DefaultOptions = Options{
-    EntryIdxMode:         HintKeyValAndRAMIdxMode,
-    SegmentSize:          defaultSegmentSize,
-    NodeNum:              1,
-    RWMode:               FileIO,
-    SyncEnable:           true,
-    StartFileLoadingMode: MMap,
-}
+var DefaultOptions = func() Options {
+	return Options{
+		EntryIdxMode:     HintKeyValAndRAMIdxMode,
+		SegmentSize:      defaultSegmentSize,
+		NodeNum:          1,
+		RWMode:           FileIO,
+		SyncEnable:       true,
+		CommitBufferSize: 4 * MB,
+		MergeInterval:    2 * time.Hour,
+	}
+}()
 ```
 
 ### Transactions

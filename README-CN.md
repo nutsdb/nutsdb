@@ -198,8 +198,27 @@ MB，这个可以自己配置。但是一旦被设置，下次启动数据库也
 * StartFileLoadingMode RWMode
 
 `StartFileLoadingMode` 代表启动数据库的载入文件的方式。参数选项同`RWMode`。
-    
-    
+
+* GCWhenClose bool
+
+`GCWhenClose` 表示调用 ```db.Close()``` 时主动 GC。Nutsdb 预设不会立即在 ```db.Close()``` 时触发 GC.
+
+* CommitBufferSize int64
+
+`CommitBufferSize` 表示为事务预分配的内存大小。Nutsdb 将预分配内存以减少内存分配的次数。
+
+* ErrorHandler ErrorHandler
+
+`ErrorHandler` 处理事务执行期间发生的错误。
+
+* LessFunc LessFunc
+
+`LessFunc` 表示对 key 进行排序的函数。Nutsdb 默认按字典序对 key 进行排序。
+
+* MergeInterval time.Duration
+
+`MergeInterval` 表示自动化 Merge 的间隔，0 表示不触发自动化 Merge，默认间隔为 2 小时。
+
 #### 默认选项
 
 推荐使用默认选项的方式。兼顾了持久化+快速的启动数据库。当然具体还要看你场景的要求。
@@ -208,14 +227,17 @@ MB，这个可以自己配置。但是一旦被设置，下次启动数据库也
 > 如果你对写性能要求比较高，可以设置SyncEnable等于false，RWMode改成MMap，写性能会得到极大提升，缺点是可能会丢数据（例如遇到断电或者系统奔溃）
 
 ```
-var DefaultOptions = Options{
-    EntryIdxMode:         HintKeyValAndRAMIdxMode,
-    SegmentSize:          defaultSegmentSize,
-    NodeNum:              1,
-    RWMode:               FileIO,
-    SyncEnable:           true,
-    StartFileLoadingMode: MMap,
-}
+var DefaultOptions = func() Options {
+	return Options{
+		EntryIdxMode:     HintKeyValAndRAMIdxMode,
+		SegmentSize:      defaultSegmentSize,
+		NodeNum:          1,
+		RWMode:           FileIO,
+		SyncEnable:       true,
+		CommitBufferSize: 4 * MB,
+		MergeInterval:    2 * time.Hour,
+	}
+}()
 ```
 
 ### 使用事务

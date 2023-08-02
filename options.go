@@ -14,6 +14,8 @@
 
 package nutsdb
 
+import "time"
+
 // EntryIdxMode represents entry index mode.
 type EntryIdxMode int
 
@@ -39,6 +41,8 @@ type ErrorHandlerFunc func(err error)
 func (fn ErrorHandlerFunc) HandleError(err error) {
 	fn(err)
 }
+
+type LessFunc func(l, r string) bool
 
 // Options records params for creating DB object.
 type Options struct {
@@ -87,6 +91,12 @@ type Options struct {
 	//     	   }
 	//     })
 	ErrorHandler ErrorHandler
+
+	// LessFunc is a function that sorts keys.
+	LessFunc LessFunc
+
+	// MergeInterval represent the interval for automatic merges, with 0 meaning automatic merging is disabled.
+	MergeInterval time.Duration
 }
 
 const (
@@ -111,6 +121,7 @@ var DefaultOptions = func() Options {
 		RWMode:           FileIO,
 		SyncEnable:       true,
 		CommitBufferSize: 4 * MB,
+		MergeInterval:    2 * time.Hour,
 	}
 }()
 
@@ -185,5 +196,11 @@ func WithErrorHandler(errorHandler ErrorHandler) Option {
 func WithCommitBufferSize(commitBufferSize int64) Option {
 	return func(opt *Options) {
 		opt.CommitBufferSize = commitBufferSize
+	}
+}
+
+func WithLessFunc(lessFunc LessFunc) Option {
+	return func(opt *Options) {
+		opt.LessFunc = lessFunc
 	}
 }
