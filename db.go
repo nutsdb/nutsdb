@@ -240,23 +240,12 @@ func open(opt Options) (*DB, error) {
 	}
 
 	if opt.EntryIdxMode == HintBPTSparseIdxMode {
-		bptRootIdxDir := db.opt.Dir + "/" + bptDir + "/root"
-		if ok := filesystem.PathIsExist(bptRootIdxDir); !ok {
-			if err := os.MkdirAll(bptRootIdxDir, os.ModePerm); err != nil {
-				return nil, err
-			}
-		}
-
-		bptTxIDIdxDir := db.opt.Dir + "/" + bptDir + "/txid"
-		if ok := filesystem.PathIsExist(bptTxIDIdxDir); !ok {
-			if err := os.MkdirAll(bptTxIDIdxDir, os.ModePerm); err != nil {
-				return nil, err
-			}
-		}
-
-		bucketMetaDir := db.opt.Dir + "/meta/bucket"
-		if ok := filesystem.PathIsExist(bucketMetaDir); !ok {
-			if err := os.MkdirAll(bucketMetaDir, os.ModePerm); err != nil {
+		for _, subDir := range []string{
+			path.Join(db.opt.Dir, bptDir, "root"),
+			path.Join(db.opt.Dir, bptDir, "txid"),
+			path.Join(db.opt.Dir, "meta/bucket"),
+		} {
+			if err := createDirIfNotExist(subDir); err != nil {
 				return nil, err
 			}
 		}
