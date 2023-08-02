@@ -48,7 +48,6 @@ func main() {
 
     fmt.Println("batch put data cost: ", time2.End())
 
-    fmt.Println("\n===============================================================\n")
     time2.Start()
     wb, err := db.NewWriteBatch()
     if err != nil {
