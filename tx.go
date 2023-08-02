@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/bwmarrin/snowflake"
-	"github.com/nutsdb/nutsdb/ds/set"
 	"github.com/nutsdb/nutsdb/ds/zset"
 	"github.com/xujiajun/utils/strconv2"
 )
@@ -342,6 +341,10 @@ func (tx *Tx) Commit() (err error) {
 			tx.buildListIdx(bucket, entry, offset)
 		}
 
+		if entry.Meta.Ds == DataStructureSet {
+			tx.buildSetIdx(bucket, entry, offset)
+		}
+
 		if entry.Meta.Ds == DataStructureNone && entry.Meta.Flag == DataBPTreeBucketDeleteFlag {
 			tx.db.deleteBucket(DataStructureBPTree, bucket)
 		}
@@ -488,17 +491,9 @@ func (tx *Tx) buildIdxes() {
 
 		bucket := string(entry.Bucket)
 
-		if entry.Meta.Ds == DataStructureSet {
-			tx.buildSetIdx(bucket, entry)
-		}
-
 		if entry.Meta.Ds == DataStructureSortedSet {
 			tx.buildSortedSetIdx(bucket, entry)
 		}
-
-		//if entry.Meta.Ds == DataStructureList {
-		//	tx.buildListIdx(bucket, entry)
-		//}
 
 		if entry.Meta.Ds == DataStructureNone {
 			if entry.Meta.Flag == DataSetBucketDeleteFlag {
@@ -542,9 +537,9 @@ func (tx *Tx) buildBPTreeIdx(bucket string, entry, e *Entry, offset int64, count
 	}
 }
 
-func (tx *Tx) buildSetIdx(bucket string, entry *Entry) {
+func (tx *Tx) buildSetIdx(bucket string, entry *Entry, offset int64) {
 	if _, ok := tx.db.SetIdx[bucket]; !ok {
-		tx.db.SetIdx[bucket] = set.New()
+		tx.db.SetIdx[bucket] = NewSet()
 	}
 
 	if entry.Meta.Flag == DataDeleteFlag {
@@ -552,7 +547,8 @@ func (tx *Tx) buildSetIdx(bucket string, entry *Entry) {
 	}
 
 	if entry.Meta.Flag == DataSetFlag {
-		_ = tx.db.SetIdx[bucket].SAdd(string(entry.Key), entry.Value)
+		r := tx.db.buildRecordByEntryAndOffset(entry, offset)
+		_ = tx.db.SetIdx[bucket].SAdd(string(entry.Key), [][]byte{entry.Value}, []*Record{r})
 	}
 }
 
@@ -588,18 +584,6 @@ func (tx *Tx) buildListIdx(bucket string, entry *Entry, offset int64) {
 		return
 	}
 
-	var (
-		h *Hint
-		e *Entry
-	)
-	if tx.db.opt.EntryIdxMode == HintKeyAndRAMIdxMode {
-		h = NewHint().WithFileId(tx.db.ActiveFile.fileID).WithKey(entry.Key).WithMeta(entry.Meta).WithDataPos(uint64(offset))
-	} else {
-		e = entry
-	}
-
-	r := NewRecord().WithBucket(bucket).WithEntry(e).WithHint(h)
-
 	switch entry.Meta.Flag {
 	case DataExpireListFlag:
 		t, _ := strconv2.StrToInt64(string(value))
@@ -607,8 +591,10 @@ func (tx *Tx) buildListIdx(bucket string, entry *Entry, offset int64) {
 		l.TTL[string(key)] = ttl
 		l.TimeStamp[string(key)] = entry.Meta.Timestamp
 	case DataLPushFlag:
+		r := tx.db.buildRecordByEntryAndOffset(entry, offset)
 		_ = l.LPush(string(key), r)
 	case DataRPushFlag:
+		r := tx.db.buildRecordByEntryAndOffset(entry, offset)
 		_ = l.RPush(string(key), r)
 	case DataLRemFlag:
 		countAndValue := strings.Split(string(value), SeparatorForListKey)
@@ -631,6 +617,7 @@ func (tx *Tx) buildListIdx(bucket string, entry *Entry, offset int64) {
 		keyAndIndex := strings.Split(string(key), SeparatorForListKey)
 		newKey := keyAndIndex[0]
 		index, _ := strconv2.StrToInt(keyAndIndex[1])
+		r := tx.db.buildRecordByEntryAndOffset(entry, offset)
 		_ = l.LSet(newKey, index, r)
 	case DataLTrimFlag:
 		keyAndStartIndex := strings.Split(string(key), SeparatorForListKey)

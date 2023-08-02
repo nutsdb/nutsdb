@@ -22,6 +22,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/xujiajun/utils/filesystem"
 	"github.com/xujiajun/utils/strconv2"
 )
 
@@ -134,4 +135,13 @@ func OneOfUint16Array(value uint16, array []uint16) bool {
 		}
 	}
 	return false
+}
+
+func createDirIfNotExist(dir string) error {
+	if ok := filesystem.PathIsExist(dir); !ok {
+		if err := os.MkdirAll(dir, os.ModePerm); err != nil {
+			return err
+		}
+	}
+	return nil
 }
