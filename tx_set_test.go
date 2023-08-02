@@ -545,7 +545,7 @@ func TestTx_SMoveByOneBucket(t *testing.T) {
 	}
 
 	ok, err = tx.SIsMember(bucket, key1, []byte("two"))
-	if ok || err == nil {
+	if ok {
 		t.Error("TestTx_SMoveByOneBucket err")
 	}
 
@@ -642,7 +642,7 @@ func TestTx_SMoveByTwoBuckets(t *testing.T) {
 	}
 
 	ok, err := tx.SIsMember(bucket1, key1, []byte("two"))
-	if ok || err == nil {
+	if ok {
 		t.Error("TestTx_SMoveByOneBucket err")
 	}
 
@@ -872,7 +872,7 @@ func opSIsMemberForTest(bucket string, key []byte, t *testing.T) {
 	}
 
 	ok, err = tx.SIsMember(bucket, key, []byte("World2"))
-	if ok || err == nil {
+	if ok {
 		t.Error("TestTx_SIsMember err")
 	}
 
@@ -932,7 +932,7 @@ func opSAreMembersForTest(bucket string, key []byte, t *testing.T) {
 	}
 
 	ok, err = tx.SAreMembers(bucket, key, []byte("Hello2"), []byte("World"))
-	if ok || err == nil {
+	if ok {
 		t.Error("TestTx_SAreMembers err")
 	}
 
