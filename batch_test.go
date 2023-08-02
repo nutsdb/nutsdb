@@ -84,6 +84,7 @@ func TestBatchWrite(t *testing.T) {
 		}
 		require.NoError(t, wb.Flush())
 		// fmt.Printf("Time taken via batch write %v keys: %v\n", N, time2.End())
+
 		time2.Start()
 		if err := db.View(
 			func(tx *Tx) error {
@@ -130,7 +131,6 @@ func TestBatchWrite(t *testing.T) {
 		WithDir(fileDir1),
 		WithEntryIdxMode(HintKeyValAndRAMIdxMode),
 	)
-
 	dbs[1], _ = Open(
 		DefaultOptions,
 		WithDir(fileDir2),
@@ -163,7 +163,7 @@ func TestBatchWrite(t *testing.T) {
 		DefaultOptions,
 		WithDir(fileDir7),
 		WithEntryIdxMode(HintKeyValAndRAMIdxMode),
-		WithMaxBatchSize(1000),
+		WithMaxBatchSize(1000), // change to 1000, unit test is not ok, 1000000 is ok
 	)
 	dbs[7], _ = Open(
 		DefaultOptions,
@@ -183,5 +183,26 @@ func TestBatchWrite(t *testing.T) {
 		testWrite(t, db)
 		testEmptyWrite(t, db)
 		TestFlushPanic(t, db)
+	}
+}
+
+func TestWriteBatch_SetMaxPendingTxns(t *testing.T) {
+	max := 10
+	db, err := Open(
+		DefaultOptions,
+		WithDir("/tmp"),
+	)
+	require.NoError(t, err)
+	wb, err := db.NewWriteBatch()
+	require.NoError(t, err)
+	wb.SetMaxPendingTxns(max)
+	if wb.throttle == nil {
+		t.Error("Expected throttle to be initialized, but it was nil")
+	}
+	if cap(wb.throttle.ch) != max {
+		t.Errorf("Expected channel length to be %d, but got %d", max, len(wb.throttle.ch))
+	}
+	if cap(wb.throttle.errCh) != max {
+		t.Errorf("Expected error channel length to be %d, but got %d", max, len(wb.throttle.errCh))
 	}
 }

@@ -170,7 +170,7 @@ func (tx *Tx) CommitWith(cb func(error)) {
 		go runTxnCallback(&txnCb{user: cb, err: nil})
 		return
 	}
-	defer tx.setStatusClosed()
+	//defer tx.setStatusClosed()  //must not add this code because another process is also accessing tx
 	commitCb, err := tx.commitAndSend()
 	if err != nil {
 		go runTxnCallback(&txnCb{user: cb, err: err})

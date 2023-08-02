@@ -29,7 +29,6 @@ import (
 	"strings"
 	"sync"
 
-
 	"github.com/gofrs/flock"
 	"github.com/nutsdb/nutsdb/ds/zset"
 	"github.com/xujiajun/utils/filesystem"
@@ -467,6 +466,7 @@ func (db *DB) commitTransaction(tx *Tx) error {
 			panicked = true
 		}
 		if panicked || err != nil {
+			//log.Fatal("panicked=", panicked, ", err=", err)
 			if errRollback := tx.Rollback(); errRollback != nil {
 				err = errRollback
 			}
@@ -478,6 +478,7 @@ func (db *DB) commitTransaction(tx *Tx) error {
 	tx.setStatusRunning()
 	err = tx.Commit()
 	if err != nil {
+		//log.Fatal("txCommit fail,err=", err)
 		return err
 	}
 
@@ -523,7 +524,7 @@ func (db *DB) doWrites() {
 	pendingCh := make(chan struct{}, 1)
 	writeRequests := func(reqs []*request) {
 		if err := db.writeRequests(reqs); err != nil {
-			log.Fatal(err)
+			log.Fatal("writeRequests fail, err=", err)
 		}
 		<-pendingCh
 	}
