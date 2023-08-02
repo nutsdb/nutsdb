@@ -28,9 +28,10 @@ const (
 )
 
 func init() {
+    bucket = "bucketForBatchWrite"
     files, err := ioutil.ReadDir(fileDir)
     if err != nil {
-        log.Fatal(err)
+        return
     }
     for _, f := range files {
         name := f.Name()
@@ -42,7 +43,7 @@ func init() {
             }
         }
     }
-    bucket = "bucketForBatchWrite"
+
 }
 
 func TestBatchWrite(t *testing.T) {
