@@ -1,184 +1,187 @@
 package nutsdb
 
 import (
-    "fmt"
-    "io/ioutil"
-    "log"
-    "os"
-    "testing"
+	"fmt"
+	"io/ioutil"
+	"log"
+	"os"
+	"testing"
 
-    "github.com/stretchr/testify/require"
-    "github.com/xujiajun/utils/time2"
+	"github.com/stretchr/testify/require"
+	"github.com/xujiajun/utils/time2"
 )
 
 var bucket string
 
 const (
-    fileDir  = "/tmp/nutsdb/"
-    fileDir1 = "/tmp/nutsdb/nutsdb_batch_write1"
-    fileDir2 = "/tmp/nutsdb/nutsdb_batch_write2"
-    fileDir3 = "/tmp/nutsdb/nutsdb_batch_write3"
-    fileDir4 = "/tmp/nutsdb/nutsdb_batch_write4"
-    fileDir5 = "/tmp/nutsdb/nutsdb_batch_write5"
-    fileDir6 = "/tmp/nutsdb/nutsdb_batch_write6"
-    fileDir7 = "/tmp/nutsdb/nutsdb_batch_write7"
-    fileDir8 = "/tmp/nutsdb/nutsdb_batch_write8"
-    fileDir9 = "/tmp/nutsdb/nutsdb_batch_write9"
-    N        = 10000
+	fileDir  = "/tmp/nutsdb/"
+	fileDir1 = "/tmp/nutsdb/nutsdb_batch_write1"
+	fileDir2 = "/tmp/nutsdb/nutsdb_batch_write2"
+	fileDir3 = "/tmp/nutsdb/nutsdb_batch_write3"
+	fileDir4 = "/tmp/nutsdb/nutsdb_batch_write4"
+	fileDir5 = "/tmp/nutsdb/nutsdb_batch_write5"
+	fileDir6 = "/tmp/nutsdb/nutsdb_batch_write6"
+	fileDir7 = "/tmp/nutsdb/nutsdb_batch_write7"
+	fileDir8 = "/tmp/nutsdb/nutsdb_batch_write8"
+	fileDir9 = "/tmp/nutsdb/nutsdb_batch_write9"
+	N        = 10000
 )
 
 func init() {
-    bucket = "bucketForBatchWrite"
-    files, err := ioutil.ReadDir(fileDir)
-    if err != nil {
-        return
-    }
-    for _, f := range files {
-        name := f.Name()
-        if name != "" {
-            filePath := fmt.Sprintf("%s/%s", fileDir, name)
-            err := os.RemoveAll(filePath)
-            if err != nil {
-                log.Fatal(err)
-            }
-        }
-    }
-
+	bucket = "bucketForBatchWrite"
+	files, err := ioutil.ReadDir(fileDir)
+	if err != nil {
+		return
+	}
+	for _, f := range files {
+		name := f.Name()
+		if name != "" {
+			filePath := fmt.Sprintf("%s/%s", fileDir, name)
+			err := os.RemoveAll(filePath)
+			if err != nil {
+				log.Fatal(err)
+			}
+		}
+	}
 }
 
 func TestBatchWrite(t *testing.T) {
-    TestFlushPanic := func(t *testing.T, db *DB) {
-        wb, err := db.NewWriteBatch()
-        require.NoError(t, err)
-        require.NoError(t, wb.Flush())
-        require.Error(t, ErrCommitAfterFinish, wb.Flush())
-        wb, err = db.NewWriteBatch()
-        require.NoError(t, err)
-        require.NoError(t, wb.Cancel())
-        require.Error(t, ErrCommitAfterFinish, wb.Flush())
-    }
+	TestFlushPanic := func(t *testing.T, db *DB) {
+		wb, err := db.NewWriteBatch()
+		require.NoError(t, err)
+		require.NoError(t, wb.Flush())
+		require.Error(t, ErrCommitAfterFinish, wb.Flush())
+		wb, err = db.NewWriteBatch()
+		require.NoError(t, err)
+		require.NoError(t, wb.Cancel())
+		require.Error(t, ErrCommitAfterFinish, wb.Flush())
+	}
 
-    testEmptyWrite := func(t *testing.T, db *DB) {
-        wb, err := db.NewWriteBatch()
-        require.NoError(t, err)
-        require.NoError(t, wb.Flush())
-        wb, err = db.NewWriteBatch()
-        require.NoError(t, err)
-        require.NoError(t, wb.Flush())
-        wb, err = db.NewWriteBatch()
-        require.NoError(t, err)
-        require.NoError(t, wb.Flush())
-    }
+	testEmptyWrite := func(t *testing.T, db *DB) {
+		wb, err := db.NewWriteBatch()
+		require.NoError(t, err)
+		require.NoError(t, wb.Flush())
+		wb, err = db.NewWriteBatch()
+		require.NoError(t, err)
+		require.NoError(t, wb.Flush())
+		wb, err = db.NewWriteBatch()
+		require.NoError(t, err)
+		require.NoError(t, wb.Flush())
+	}
 
-    testWrite := func(t *testing.T, db *DB) {
-        key := func(i int) []byte {
-            return []byte(fmt.Sprintf("%10d", i))
-        }
-        val := func(i int) []byte {
-            return []byte(fmt.Sprintf("%128d", i))
-        }
-        wb, err := db.NewWriteBatch()
-        require.NoError(t, err)
-        time2.Start()
-        for i := 0; i < N; i++ {
-            require.NoError(t, wb.Put(bucket, key(i), val(i), 0))
-        }
-        require.NoError(t, wb.Flush())
-        //fmt.Printf("Time taken via batch write %v keys: %v\n", N, time2.End())
-        time2.Start()
-        if err := db.View(
-            func(tx *Tx) error {
-                for i := 0; i < N; i++ {
-                    key := key(i)
-                    e, err := tx.Get(bucket, key)
-                    if err != nil {
-                        return err
-                    }
-                    require.Equal(t, val(i), e.Value)
-                }
-                return nil
-            }); err != nil {
-            log.Println(err)
-        }
-        //fmt.Printf("Time taken via db.View %v keys: %v\n", N, time2.End())
-        err = wb.Reset()
-        require.NoError(t, err)
-        time2.Start()
-        for i := 0; i < N; i++ {
-            require.NoError(t, wb.Delete(bucket, key(i)))
-        }
-        require.NoError(t, wb.Flush())
-        //fmt.Printf("Time taken via batch delete %v keys: %v\n", N, time2.End())
-        if err := db.View(
-            func(tx *Tx) error {
-                for i := 0; i < N; i++ {
-                    key := key(i)
-                    _, err := tx.Get(bucket, key)
-                    require.Error(t, ErrNotFoundKey, err)
-                }
-                return nil
-            }); err != nil {
-            log.Println(err)
-        }
-    }
+	testWrite := func(t *testing.T, db *DB) {
+		key := func(i int) []byte {
+			return []byte(fmt.Sprintf("%10d", i))
+		}
+		val := func(i int) []byte {
+			return []byte(fmt.Sprintf("%128d", i))
+		}
+		wb, err := db.NewWriteBatch()
+		require.NoError(t, err)
+		time2.Start()
+		for i := 0; i < N; i++ {
+			require.NoError(t, wb.Put(bucket, key(i), val(i), 0))
+		}
+		require.NoError(t, wb.Flush())
+		// fmt.Printf("Time taken via batch write %v keys: %v\n", N, time2.End())
+		time2.Start()
+		if err := db.View(
+			func(tx *Tx) error {
+				for i := 0; i < N; i++ {
+					key := key(i)
+					e, err := tx.Get(bucket, key)
+					if err != nil {
+						return err
+					}
+					require.Equal(t, val(i), e.Value)
+				}
+				return nil
+			}); err != nil {
+			log.Println(err)
+		}
 
-    dbs := make([]*DB, 9)
-    dbs[0], _ = Open(
-        DefaultOptions,
-        WithDir(fileDir1),
-        WithEntryIdxMode(HintKeyValAndRAMIdxMode),
-    )
-    dbs[1], _ = Open(
-        DefaultOptions,
-        WithDir(fileDir2),
-        WithEntryIdxMode(HintKeyAndRAMIdxMode),
-    )
-    dbs[2], _ = Open(
-        DefaultOptions,
-        WithDir(fileDir3),
-        WithEntryIdxMode(HintBPTSparseIdxMode),
-    )
-    dbs[3], _ = Open(
-        DefaultOptions,
-        WithDir(fileDir4),
-        WithEntryIdxMode(HintKeyValAndRAMIdxMode),
-        WithMaxBatchCount(195),
-    )
-    dbs[4], _ = Open(
-        DefaultOptions,
-        WithDir(fileDir5),
-        WithEntryIdxMode(HintKeyAndRAMIdxMode),
-        WithMaxBatchCount(195),
-    )
-    dbs[5], _ = Open(
-        DefaultOptions,
-        WithDir(fileDir6),
-        WithEntryIdxMode(HintBPTSparseIdxMode),
-        WithMaxBatchCount(195),
-    )
-    dbs[6], _ = Open(
-        DefaultOptions,
-        WithDir(fileDir7),
-        WithEntryIdxMode(HintKeyValAndRAMIdxMode),
-        WithMaxBatchSize(1000),
-    )
-    dbs[7], _ = Open(
-        DefaultOptions,
-        WithDir(fileDir8),
-        WithEntryIdxMode(HintKeyAndRAMIdxMode),
-        WithMaxBatchSize(1000),
-    )
-    dbs[8], _ = Open(
-        DefaultOptions,
-        WithDir(fileDir9),
-        WithEntryIdxMode(HintBPTSparseIdxMode),
-        WithMaxBatchSize(1000),
-    )
+		// fmt.Printf("Time taken via db.View %v keys: %v\n", N, time2.End())
+		// err = wb.Reset()
+		wb, err = db.NewWriteBatch()
+		require.NoError(t, err)
+		time2.Start()
+		for i := 0; i < N; i++ {
+			require.NoError(t, wb.Delete(bucket, key(i)))
+		}
+		require.NoError(t, wb.Flush())
+		// fmt.Printf("Time taken via batch delete %v keys: %v\n", N, time2.End())
 
-    for _, db := range dbs {
-        require.NotEqual(t, db, nil)
-        testWrite(t, db)
-        testEmptyWrite(t, db)
-        TestFlushPanic(t, db)
-    }
+		if err := db.View(
+			func(tx *Tx) error {
+				for i := 0; i < N; i++ {
+					key := key(i)
+					_, err := tx.Get(bucket, key)
+					require.Error(t, ErrNotFoundKey, err)
+				}
+				return nil
+			}); err != nil {
+			log.Println(err)
+		}
+	}
+
+	dbs := make([]*DB, 9)
+	dbs[0], _ = Open(
+		DefaultOptions,
+		WithDir(fileDir1),
+		WithEntryIdxMode(HintKeyValAndRAMIdxMode),
+	)
+
+	dbs[1], _ = Open(
+		DefaultOptions,
+		WithDir(fileDir2),
+		WithEntryIdxMode(HintKeyAndRAMIdxMode),
+	)
+	dbs[2], _ = Open(
+		DefaultOptions,
+		WithDir(fileDir3),
+		WithEntryIdxMode(HintBPTSparseIdxMode),
+	)
+	dbs[3], _ = Open(
+		DefaultOptions,
+		WithDir(fileDir4),
+		WithEntryIdxMode(HintKeyValAndRAMIdxMode),
+		WithMaxBatchCount(195),
+	)
+	dbs[4], _ = Open(
+		DefaultOptions,
+		WithDir(fileDir5),
+		WithEntryIdxMode(HintKeyAndRAMIdxMode),
+		WithMaxBatchCount(195),
+	)
+	dbs[5], _ = Open(
+		DefaultOptions,
+		WithDir(fileDir6),
+		WithEntryIdxMode(HintBPTSparseIdxMode),
+		WithMaxBatchCount(195),
+	)
+	dbs[6], _ = Open(
+		DefaultOptions,
+		WithDir(fileDir7),
+		WithEntryIdxMode(HintKeyValAndRAMIdxMode),
+		WithMaxBatchSize(1000),
+	)
+	dbs[7], _ = Open(
+		DefaultOptions,
+		WithDir(fileDir8),
+		WithEntryIdxMode(HintKeyAndRAMIdxMode),
+		WithMaxBatchSize(1000),
+	)
+	dbs[8], _ = Open(
+		DefaultOptions,
+		WithDir(fileDir9),
+		WithEntryIdxMode(HintBPTSparseIdxMode),
+		WithMaxBatchSize(1000),
+	)
+
+	for _, db := range dbs {
+		require.NotEqual(t, db, nil)
+		testWrite(t, db)
+		testEmptyWrite(t, db)
+		TestFlushPanic(t, db)
+	}
 }
