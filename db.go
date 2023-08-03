@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"os"
 	"path"
 	"path/filepath"
@@ -140,6 +141,8 @@ const (
 
 	// ScanNoLimit represents the data scan no limit flag
 	ScanNoLimit int = -1
+
+	KvWriteChCapacity = 1000
 )
 
 const (
@@ -187,6 +190,7 @@ type (
 		mergeStartCh            chan struct{}
 		mergeEndCh              chan error
 		mergeWorkCloseCh        chan struct{}
+		writeCh                 chan *request
 	}
 
 	// BucketMetasIdx represents the index of the bucket's meta-information
@@ -213,6 +217,7 @@ func open(opt Options) (*DB, error) {
 		mergeStartCh:            make(chan struct{}),
 		mergeEndCh:              make(chan error),
 		mergeWorkCloseCh:        make(chan struct{}),
+		writeCh:                 make(chan *request, KvWriteChCapacity),
 	}
 
 	commitBuffer := new(bytes.Buffer)
@@ -255,6 +260,7 @@ func open(opt Options) (*DB, error) {
 	}
 
 	go db.mergeWorker()
+	go db.doWrites()
 
 	return db, nil
 }
@@ -451,6 +457,126 @@ func (db *DB) getEntryByHint(h *Hint) (*Entry, error) {
 	return item, nil
 }
 
+func (db *DB) commitTransaction(tx *Tx) error {
+	var err error
+	defer func() {
+		var panicked bool
+		if r := recover(); r != nil {
+			// resume normal execution
+			panicked = true
+		}
+		if panicked || err != nil {
+			//log.Fatal("panicked=", panicked, ", err=", err)
+			if errRollback := tx.Rollback(); errRollback != nil {
+				err = errRollback
+			}
+		}
+	}()
+
+	// commit current tx
+	tx.lock()
+	tx.setStatusRunning()
+	err = tx.Commit()
+	if err != nil {
+		//log.Fatal("txCommit fail,err=", err)
+		return err
+	}
+
+	return err
+}
+
+func (db *DB) writeRequests(reqs []*request) error {
+	var err error
+	if len(reqs) == 0 {
+		return nil
+	}
+
+	done := func(err error) {
+		for _, r := range reqs {
+			r.Err = err
+			r.Wg.Done()
+		}
+	}
+
+	for _, req := range reqs {
+		tx := req.tx
+		cerr := db.commitTransaction(tx)
+		if cerr != nil {
+			err = cerr
+		}
+	}
+
+	done(err)
+	return err
+}
+
+// MaxBatchCount returns max possible entries in batch
+func (db *DB) getMaxBatchCount() int64 {
+	return db.opt.MaxBatchCount
+}
+
+// MaxBatchSize returns max possible batch size
+func (db *DB) getMaxBatchSize() int64 {
+	return db.opt.MaxBatchSize
+}
+
+func (db *DB) doWrites() {
+	pendingCh := make(chan struct{}, 1)
+	writeRequests := func(reqs []*request) {
+		if err := db.writeRequests(reqs); err != nil {
+			log.Fatal("writeRequests fail, err=", err)
+		}
+		<-pendingCh
+	}
+
+	reqs := make([]*request, 0, 10)
+	var r *request
+	var ok bool
+	for {
+		r, ok = <-db.writeCh
+		if !ok {
+			goto closedCase
+		}
+
+		for {
+			reqs = append(reqs, r)
+
+			if len(reqs) >= 3*KvWriteChCapacity {
+				pendingCh <- struct{}{} // blocking.
+				goto writeCase
+			}
+
+			select {
+			// Either push to pending, or continue to pick from writeCh.
+			case r, ok = <-db.writeCh:
+				if !ok {
+					goto closedCase
+				}
+			case pendingCh <- struct{}{}:
+				goto writeCase
+			}
+		}
+
+	closedCase:
+		// All the pending request are drained.
+		// Don't close the writeCh, because it has be used in several places.
+		for {
+			select {
+			case r = <-db.writeCh:
+				reqs = append(reqs, r)
+			default:
+				pendingCh <- struct{}{} // Push to pending before doing a write.
+				writeRequests(reqs)
+				return
+			}
+		}
+
+	writeCase:
+		go writeRequests(reqs)
+		reqs = make([]*request, 0, 10)
+	}
+}
+
 // setActiveFile sets the ActiveFile (DataFile object).
 func (db *DB) setActiveFile() (err error) {
 	filepath := getDataPath(db.MaxFileID, db.opt.Dir)
@@ -470,8 +596,6 @@ func (db *DB) getMaxFileIDAndFileIDs() (maxFileID int64, dataFileIds []int) {
 	if len(files) == 0 {
 		return 0, nil
 	}
-
-	maxFileID = 0
 
 	for _, f := range files {
 		id := f.Name()
@@ -524,9 +648,7 @@ func (db *DB) getActiveFileWriteOff() (off int64, err error) {
 }
 
 func (db *DB) parseDataFiles(dataFileIds []int) (unconfirmedRecords []*Record, committedTxIds map[uint64]struct{}, err error) {
-	var (
-		off int64
-	)
+	var off int64
 
 	committedTxIds = make(map[uint64]struct{})
 
@@ -1005,6 +1127,16 @@ func (db *DB) managed(writable bool, fn func(tx *Tx) error) (err error) {
 }
 
 const bptDir = "bpt"
+
+func (db *DB) sendToWriteCh(tx *Tx) (*request, error) {
+	req := requestPool.Get().(*request)
+	req.reset()
+	req.Wg.Add(1)
+	req.tx = tx
+	req.IncrRef()     // for db write
+	db.writeCh <- req // Handled in doWrites.
+	return req, nil
+}
 
 func (db *DB) checkListExpired() {
 	db.Index.rangeList(func(l *List) {

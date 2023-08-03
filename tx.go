@@ -76,6 +76,9 @@ var (
 
 	// ErrNotFoundBucket is returned when key not found int the bucket on an view function.
 	ErrNotFoundBucket = errors.New("bucket not found")
+
+	// ErrTxnTooBig is returned if too many writes are fit into a single transaction.
+	ErrTxnTooBig = errors.New("Txn is too big to fit into one request")
 )
 
 // Tx represents a transaction.
@@ -86,6 +89,29 @@ type Tx struct {
 	status                 atomic.Value
 	pendingWrites          []*Entry
 	ReservedStoreTxIDIdxes map[int64]*BPTree
+	size                   int64
+}
+
+type txnCb struct {
+	commit func() error
+	user   func(error)
+	err    error
+}
+
+func runTxnCallback(cb *txnCb) {
+	switch {
+	case cb == nil:
+		panic("txn callback is nil")
+	case cb.user == nil:
+		panic("Must have caught a nil callback for txn.CommitWith")
+	case cb.err != nil:
+		cb.user(cb.err)
+	case cb.commit != nil:
+		err := cb.commit()
+		cb.user(err)
+	default:
+		cb.user(nil)
+	}
 }
 
 // Begin opens a new transaction.
@@ -130,6 +156,50 @@ func newTx(db *DB, writable bool) (tx *Tx, err error) {
 	tx.id = txID
 
 	return
+}
+
+func (tx *Tx) CommitWith(cb func(error)) {
+	if cb == nil {
+		panic("Nil callback provided to CommitWith")
+	}
+
+	if len(tx.pendingWrites) == 0 {
+		// Do not run these callbacks from here, because the CommitWith and the
+		// callback might be acquiring the same locks. Instead run the callback
+		// from another goroutine.
+		go runTxnCallback(&txnCb{user: cb, err: nil})
+		return
+	}
+	//defer tx.setStatusClosed()  //must not add this code because another process is also accessing tx
+	commitCb, err := tx.commitAndSend()
+	if err != nil {
+		go runTxnCallback(&txnCb{user: cb, err: err})
+		return
+	}
+
+	go runTxnCallback(&txnCb{user: cb, commit: commitCb})
+}
+
+func (tx *Tx) commitAndSend() (func() error, error) {
+	req, err := tx.db.sendToWriteCh(tx)
+	if err != nil {
+		return nil, err
+	}
+	ret := func() error {
+		err := req.Wait()
+		return err
+	}
+
+	return ret, nil
+}
+
+func (tx *Tx) checkSize() error {
+	count := len(tx.pendingWrites)
+	if int64(count) >= tx.db.getMaxBatchCount() || tx.size >= tx.db.getMaxBatchSize() {
+		return ErrTxnTooBig
+	}
+
+	return nil
 }
 
 // getTxID returns the tx id.
@@ -350,7 +420,7 @@ func (tx *Tx) buildBucketMetaIdx(bucket string, key []byte, bucketMetaTemp Bucke
 	}
 
 	if updateFlag {
-		fd, err := os.OpenFile(getBucketMetaFilePath(bucket, tx.db.opt.Dir), os.O_CREATE|os.O_RDWR, 0644)
+		fd, err := os.OpenFile(getBucketMetaFilePath(bucket, tx.db.opt.Dir), os.O_CREATE|os.O_RDWR, 0o644)
 		if err != nil {
 			return err
 		}
@@ -743,6 +813,7 @@ func (tx *Tx) put(bucket string, key, value []byte, ttl uint32, flag uint16, tim
 		return err
 	}
 	tx.pendingWrites = append(tx.pendingWrites, e)
+	tx.size += e.Size()
 
 	return nil
 }
