@@ -563,7 +563,10 @@ func Test_Three_EntryIdexMode_RestartDB(t *testing.T) {
 
 		txGet(t, db, bucket, key, val, nil)
 	})
+
+	tmpdir2, _ := os.MkdirTemp("", "nutsdb2")
 	opt.EntryIdxMode = HintKeyAndRAMIdxMode
+	opt.Dir = tmpdir2
 
 	withDBOption(t, opt, func(t *testing.T, db *DB) {
 		bucket := "bucket"
@@ -579,7 +582,10 @@ func Test_Three_EntryIdexMode_RestartDB(t *testing.T) {
 
 		txGet(t, db, bucket, key, val, nil)
 	})
+
+	tmpdir3, _ := os.MkdirTemp("", "nutsdb3")
 	opt.EntryIdxMode = HintBPTSparseIdxMode
+	opt.Dir = tmpdir3
 
 	withDBOption(t, opt, func(t *testing.T, db *DB) {
 		bucket := "bucket"
