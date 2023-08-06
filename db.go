@@ -197,6 +197,16 @@ type (
 	BucketMetasIdx map[string]*BucketMeta
 )
 
+// check path is Exist ,if not exist create it.
+func checkPathIsExist(path string) error {
+	if ok := filesystem.PathIsExist(path); !ok {
+		if err := os.MkdirAll(path, os.ModePerm); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // open returns a newly initialized DB object.
 func open(opt Options) (*DB, error) {
 	db := &DB{
