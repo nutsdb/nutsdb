@@ -368,6 +368,32 @@ func TestTx_DeleteAndGet(t *testing.T) {
 
 }
 
+func TestTx_DeleteFromMemory(t *testing.T) {
+	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		bucket := "bucket"
+
+		for i := 0; i < 10; i++ {
+			txPut(t, db, bucket, GetTestBytes(i), GetTestBytes(i), Persistent, nil)
+		}
+
+		for i := 0; i < 10; i++ {
+			txGet(t, db, bucket, GetTestBytes(i), GetTestBytes(i), nil)
+		}
+
+		txDel(t, db, bucket, GetTestBytes(3), nil)
+
+		err := db.View(func(tx *Tx) error {
+			r, ok := tx.db.BTreeIdx[bucket].Find(GetTestBytes(3))
+			require.Nil(t, r)
+			require.False(t, ok)
+
+			return nil
+		})
+
+		require.NoError(t, err)
+	})
+}
+
 func TestTx_GetAndScansFromHintKey(t *testing.T) {
 
 	bucket := "bucket_get_test"
