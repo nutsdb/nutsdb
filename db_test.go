@@ -569,7 +569,7 @@ func Test_Three_EntryIdexMode_RestartDB(t *testing.T) {
 		bucket := "bucket"
 		key := GetTestBytes(0)
 		val := GetTestBytes(0)
-
+		txPut(t, db, bucket, key, val, Persistent, nil)
 		txGet(t, db, bucket, key, val, nil)
 
 		db.Close()
@@ -585,6 +585,7 @@ func Test_Three_EntryIdexMode_RestartDB(t *testing.T) {
 		bucket := "bucket"
 		key := GetTestBytes(0)
 		val := GetTestBytes(0)
+		txPut(t, db, bucket, key, val, Persistent, nil)
 		txGet(t, db, bucket, key, val, nil)
 
 		db.Close()
