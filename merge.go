@@ -113,7 +113,7 @@ func (db *DB) merge() error {
 				err := db.Update(func(tx *Tx) error {
 					// check if we have a new entry with same key and bucket
 					if r, _ := db.getRecordFromKey(entry.Bucket, entry.Key); r != nil {
-						if r.E.Meta.TxID <= entry.Meta.TxID {
+						if r.H.Meta.TxID <= entry.Meta.TxID {
 							if ok := db.isPendingMergeEntry(entry); ok {
 								return tx.put(
 									string(entry.Bucket),
@@ -213,6 +213,9 @@ func (db *DB) isPendingMergeEntry(entry *Entry) bool {
 		if exist {
 			r, ok := bptIdx.Find(entry.Key)
 			if ok && r.H.Meta.Flag == DataSetFlag {
+				if r.IsExpired() {
+					return false
+				}
 				return true
 			}
 		}
