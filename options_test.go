@@ -12,9 +12,34 @@ func TestWithNodeNum(t *testing.T) {
 		opt,
 		WithNodeNum(1011),
 	)
-	defer db.Close()
 	assert.NoError(t, err)
 	assert.Equal(t, int64(1011), db.opt.NodeNum)
+	err = db.Close()
+	assert.NoError(t, err)
+}
+
+func TestWithMaxBatchCount(t *testing.T) {
+	InitOpt("", true)
+	db, err := Open(
+		opt,
+		WithMaxBatchCount(10),
+	)
+	assert.NoError(t, err)
+	assert.Equal(t, int64(10), db.getMaxBatchCount())
+	err = db.Close()
+	assert.NoError(t, err)
+}
+
+func TestWithMaxBatchSize(t *testing.T) {
+	InitOpt("", true)
+	db, err := Open(
+		opt,
+		WithMaxBatchSize(100),
+	)
+	assert.NoError(t, err)
+	assert.Equal(t, int64(100), db.getMaxBatchSize())
+	err = db.Close()
+	assert.NoError(t, err)
 }
 
 func TestWithRWMode(t *testing.T) {
@@ -22,9 +47,10 @@ func TestWithRWMode(t *testing.T) {
 		WithDir("/tmp/nutsdb"),
 		WithRWMode(MMap),
 	)
-	defer db.Close()
 	assert.NoError(t, err)
 	assert.Equal(t, db.opt.RWMode, MMap)
+	err = db.Close()
+	assert.NoError(t, err)
 }
 
 func TestWithSyncEnable(t *testing.T) {
@@ -36,7 +62,8 @@ func TestWithSyncEnable(t *testing.T) {
 	assert.NoError(t, err)
 	assert.False(t, db.opt.SyncEnable)
 
-	defer db.Close()
+	err = db.Close()
+	assert.NoError(t, err)
 }
 
 func TestWithMaxFdNumsInCache(t *testing.T) {
@@ -48,7 +75,8 @@ func TestWithMaxFdNumsInCache(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, db.opt.MaxFdNumsInCache, 100)
 
-	defer db.Close()
+	err = db.Close()
+	assert.NoError(t, err)
 }
 
 func TestWithCleanFdsCacheThreshold(t *testing.T) {
@@ -60,7 +88,8 @@ func TestWithCleanFdsCacheThreshold(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, db.opt.CleanFdsCacheThreshold, 0.5)
 
-	defer db.Close()
+	err = db.Close()
+	assert.NoError(t, err)
 }
 
 func TestWithErrorHandler(t *testing.T) {
@@ -72,7 +101,8 @@ func TestWithErrorHandler(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, db.opt.ErrorHandler)
 
-	defer db.Close()
+	err = db.Close()
+	assert.NoError(t, err)
 }
 
 func TestWithLessFunc(t *testing.T) {
@@ -85,5 +115,6 @@ func TestWithLessFunc(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, db.opt.LessFunc)
 
-	defer db.Close()
+	err = db.Close()
+	assert.NoError(t, err)
 }

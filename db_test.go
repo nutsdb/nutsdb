@@ -514,7 +514,7 @@ func withDBOption(t *testing.T, opt Options, fn func(t *testing.T, db *DB)) {
 
 func withDefaultDB(t *testing.T, fn func(t *testing.T, db *DB)) {
 
-	tmpdir, _ := ioutil.TempDir("", "nutsdb")
+	tmpdir, _ := os.MkdirTemp("", "nutsdb")
 	opt := DefaultOptions
 	opt.Dir = tmpdir
 	opt.SegmentSize = 8 * 1024
@@ -523,7 +523,7 @@ func withDefaultDB(t *testing.T, fn func(t *testing.T, db *DB)) {
 }
 
 func withRAMIdxDB(t *testing.T, fn func(t *testing.T, db *DB)) {
-	tmpdir, _ := ioutil.TempDir("", "nutsdb")
+	tmpdir, _ := os.MkdirTemp("", "nutsdb")
 	opt := DefaultOptions
 	opt.Dir = tmpdir
 	opt.EntryIdxMode = HintKeyAndRAMIdxMode
@@ -532,10 +532,69 @@ func withRAMIdxDB(t *testing.T, fn func(t *testing.T, db *DB)) {
 }
 
 func withBPTSpareeIdxDB(t *testing.T, fn func(t *testing.T, db *DB)) {
-	tmpdir, _ := ioutil.TempDir("", "nutsdb")
+	tmpdir, _ := os.MkdirTemp("", "nutsdb")
 	opt := DefaultOptions
 	opt.Dir = tmpdir
 	opt.EntryIdxMode = HintKeyAndRAMIdxMode
 
 	withDBOption(t, opt, fn)
+}
+
+func Test_Three_EntryIdexMode_RestartDB(t *testing.T) {
+
+	tmpdir, _ := os.MkdirTemp("", "nutsdb")
+	opt := DefaultOptions
+	opt.Dir = tmpdir
+	opt.EntryIdxMode = HintKeyValAndRAMIdxMode
+	opt.SegmentSize = 8 * 1024
+
+	withDBOption(t, opt, func(t *testing.T, db *DB) {
+		bucket := "bucket"
+		key := GetTestBytes(0)
+		val := GetTestBytes(0)
+
+		txPut(t, db, bucket, key, val, Persistent, nil)
+		txGet(t, db, bucket, key, val, nil)
+
+		db.Close()
+
+		db, err := Open(db.opt)
+		require.NoError(t, err)
+
+		txGet(t, db, bucket, key, val, nil)
+	})
+	opt.EntryIdxMode = HintKeyAndRAMIdxMode
+
+	withDBOption(t, opt, func(t *testing.T, db *DB) {
+		bucket := "bucket"
+		key := GetTestBytes(0)
+		val := GetTestBytes(0)
+
+		txPut(t, db, bucket, key, val, Persistent, nil)
+		txGet(t, db, bucket, key, val, nil)
+
+		db.Close()
+
+		db, err := Open(db.opt)
+		require.NoError(t, err)
+
+		txGet(t, db, bucket, key, val, nil)
+	})
+	opt.EntryIdxMode = HintBPTSparseIdxMode
+
+	withDBOption(t, opt, func(t *testing.T, db *DB) {
+		bucket := "bucket"
+		key := GetTestBytes(0)
+		val := GetTestBytes(0)
+
+		txPut(t, db, bucket, key, val, Persistent, nil)
+		txGet(t, db, bucket, key, val, nil)
+
+		db.Close()
+
+		db, err := Open(db.opt)
+		require.NoError(t, err)
+
+		txGet(t, db, bucket, key, val, nil)
+	})
 }

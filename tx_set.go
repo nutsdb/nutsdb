@@ -17,30 +17,33 @@ package nutsdb
 import (
 	"time"
 
-	"github.com/nutsdb/nutsdb/ds/set"
 	"github.com/pkg/errors"
 )
 
-func (tx *Tx) sPut(bucket string, key []byte, dataFlag uint16, items ...[]byte) error {
+func (tx *Tx) sPut(bucket string, key []byte, dataFlag uint16, values ...[]byte) error {
 
 	if dataFlag == DataSetFlag {
 
-		filter := make(map[string]struct{})
+		filter := make(map[uint32]struct{})
 
 		if set, ok := tx.db.SetIdx[bucket]; ok {
 
 			if _, ok := set.M[string(key)]; ok {
-				for item := range set.M[string(key)] {
-					filter[item] = struct{}{}
+				for hash := range set.M[string(key)] {
+					filter[hash] = struct{}{}
 				}
 			}
 
 		}
 
-		for _, item := range items {
-			if _, ok := filter[string(item)]; !ok {
-				filter[string(item)] = struct{}{}
-				err := tx.put(bucket, key, item, Persistent, dataFlag, uint64(time.Now().Unix()), DataStructureSet)
+		for _, value := range values {
+			hash, err := getFnv32(value)
+			if err != nil {
+				return err
+			}
+			if _, ok := filter[hash]; !ok {
+				filter[hash] = struct{}{}
+				err := tx.put(bucket, key, value, Persistent, dataFlag, uint64(time.Now().Unix()), DataStructureSet)
 				if err != nil {
 					return err
 				}
@@ -48,9 +51,9 @@ func (tx *Tx) sPut(bucket string, key []byte, dataFlag uint16, items ...[]byte) 
 		}
 
 	} else {
-		for _, item := range items {
+		for _, value := range values {
 
-			err := tx.put(bucket, key, item, Persistent, dataFlag, uint64(time.Now().Unix()), DataStructureSet)
+			err := tx.put(bucket, key, value, Persistent, dataFlag, uint64(time.Now().Unix()), DataStructureSet)
 			if err != nil {
 				return err
 			}
@@ -91,23 +94,35 @@ func (tx *Tx) SIsMember(bucket string, key, item []byte) (bool, error) {
 	}
 
 	if set, ok := tx.db.SetIdx[bucket]; ok {
-		if !set.SIsMember(string(key), item) {
-			return false, ErrBucketNotFound
+		isMember, err := set.SIsMember(string(key), item)
+		if err != nil {
+			return false, err
 		}
-		return true, nil
+		return isMember, nil
 	}
 
 	return false, ErrBucketNotFound
 }
 
 // SMembers returns all the members of the set value stored int the bucket at given bucket and key.
-func (tx *Tx) SMembers(bucket string, key []byte) (list [][]byte, err error) {
+func (tx *Tx) SMembers(bucket string, key []byte) ([][]byte, error) {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return nil, err
 	}
 
 	if set, ok := tx.db.SetIdx[bucket]; ok {
-		return set.SMembers(string(key))
+		items, err := set.SMembers(string(key))
+		if err != nil {
+			return nil, err
+		}
+		values := make([][]byte, len(items))
+		for i, item := range items {
+			value, err := tx.db.getValueByRecord(item)
+			if err != nil {
+				return nil, err
+			}
+			values[i] = value
+		}
 	}
 
 	return nil, ErrBucketNotFound
@@ -134,8 +149,16 @@ func (tx *Tx) SPop(bucket string, key []byte) ([]byte, error) {
 	}
 
 	if _, ok := tx.db.SetIdx[bucket]; ok {
-		for item := range tx.db.SetIdx[bucket].M[string(key)] {
-			return []byte(item), tx.sPut(bucket, key, DataDeleteFlag, []byte(item))
+		for _, items := range tx.db.SetIdx[bucket].M[string(key)] {
+			value, err := tx.db.getValueByRecord(items)
+			if err != nil {
+				return nil, err
+			}
+			err = tx.sPut(bucket, key, DataDeleteFlag, value)
+			if err != nil {
+				return nil, err
+			}
+			return value, err
 		}
 	}
 
@@ -157,13 +180,25 @@ func (tx *Tx) SCard(bucket string, key []byte) (int, error) {
 
 // SDiffByOneBucket returns the members of the set resulting from the difference
 // between the first set and all the successive sets in one bucket.
-func (tx *Tx) SDiffByOneBucket(bucket string, key1, key2 []byte) (list [][]byte, err error) {
+func (tx *Tx) SDiffByOneBucket(bucket string, key1, key2 []byte) ([][]byte, error) {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return nil, err
 	}
 
 	if set, ok := tx.db.SetIdx[bucket]; ok {
-		return set.SDiff(string(key1), string(key2))
+		items, err := set.SDiff(string(key1), string(key2))
+		if err != nil {
+			return nil, err
+		}
+		values := make([][]byte, len(items))
+		for i, item := range items {
+			value, err := tx.db.getValueByRecord(item)
+			if err != nil {
+				return nil, err
+			}
+			values[i] = value
+		}
+		return values, nil
 	}
 
 	return nil, ErrBucketNotFound
@@ -171,13 +206,13 @@ func (tx *Tx) SDiffByOneBucket(bucket string, key1, key2 []byte) (list [][]byte,
 
 // SDiffByTwoBuckets returns the members of the set resulting from the difference
 // between the first set and all the successive sets in two buckets.
-func (tx *Tx) SDiffByTwoBuckets(bucket1 string, key1 []byte, bucket2 string, key2 []byte) (list [][]byte, err error) {
+func (tx *Tx) SDiffByTwoBuckets(bucket1 string, key1 []byte, bucket2 string, key2 []byte) ([][]byte, error) {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return nil, err
 	}
 
 	var (
-		set1, set2 *set.Set
+		set1, set2 *Set
 		ok         bool
 	)
 
@@ -189,13 +224,19 @@ func (tx *Tx) SDiffByTwoBuckets(bucket1 string, key1 []byte, bucket2 string, key
 		return nil, ErrBucketAndKey(bucket2, key2)
 	}
 
-	for item1 := range set1.M[string(key1)] {
-		if _, ok := set2.M[string(key2)][item1]; !ok {
-			list = append(list, []byte(item1))
+	values := make([][]byte, 0)
+
+	for hash, item := range set1.M[string(key1)] {
+		if _, ok := set2.M[string(key2)][hash]; !ok {
+			value, err := tx.db.getValueByRecord(item)
+			if err != nil {
+				return nil, err
+			}
+			values = append(values, value)
 		}
 	}
 
-	return
+	return values, nil
 }
 
 // SMoveByOneBucket moves member from the set at source to the set at destination in one bucket.
@@ -218,7 +259,7 @@ func (tx *Tx) SMoveByTwoBuckets(bucket1 string, key1 []byte, bucket2 string, key
 	}
 
 	var (
-		set1, set2 *set.Set
+		set1, set2 *Set
 		ok         bool
 	)
 
@@ -238,36 +279,61 @@ func (tx *Tx) SMoveByTwoBuckets(bucket1 string, key1 []byte, bucket2 string, key
 		return false, ErrNotFoundKeyInBucket(bucket2, key2)
 	}
 
-	if _, ok := set2.M[string(key2)][string(item)]; !ok {
-		set2.SAdd(string(key2), item)
+	hash, err := getFnv32(item)
+	if err != nil {
+		return false, err
 	}
 
-	set1.SRem(string(key1), item)
+	if r, ok := set2.M[string(key2)][hash]; !ok {
+		err := set2.SAdd(string(key2), [][]byte{item}, []*Record{r})
+		if err != nil {
+			return false, err
+		}
+	}
+
+	err = set1.SRem(string(key1), item)
+	if err != nil {
+		return false, err
+	}
 
 	return true, nil
 }
 
 // SUnionByOneBucket the members of the set resulting from the union of all the given sets in one bucket.
-func (tx *Tx) SUnionByOneBucket(bucket string, key1, key2 []byte) (list [][]byte, err error) {
+func (tx *Tx) SUnionByOneBucket(bucket string, key1, key2 []byte) ([][]byte, error) {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return nil, err
 	}
 
 	if set, ok := tx.db.SetIdx[bucket]; ok {
-		return set.SUnion(string(key1), string(key2))
+		items, err := set.SUnion(string(key1), string(key2))
+		if err != nil {
+			return nil, err
+		}
+
+		values := make([][]byte, len(items))
+
+		for i, item := range items {
+			value, err := tx.db.getValueByRecord(item)
+			if err != nil {
+				return nil, err
+			}
+			values[i] = value
+		}
+		return values, nil
 	}
 
 	return nil, ErrBucket
 }
 
 // SUnionByTwoBuckets the members of the set resulting from the union of all the given sets in two buckets.
-func (tx *Tx) SUnionByTwoBuckets(bucket1 string, key1 []byte, bucket2 string, key2 []byte) (list [][]byte, err error) {
+func (tx *Tx) SUnionByTwoBuckets(bucket1 string, key1 []byte, bucket2 string, key2 []byte) ([][]byte, error) {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return nil, err
 	}
 
 	var (
-		set1, set2 *set.Set
+		set1, set2 *Set
 		ok         bool
 	)
 
@@ -287,17 +353,27 @@ func (tx *Tx) SUnionByTwoBuckets(bucket1 string, key1 []byte, bucket2 string, ke
 		return nil, ErrNotFoundKeyInBucket(bucket2, key2)
 	}
 
-	for item1 := range set1.M[string(key1)] {
-		list = append(list, []byte(item1))
+	values := make([][]byte, 0)
+
+	for _, r := range set1.M[string(key1)] {
+		value, err := tx.db.getValueByRecord(r)
+		if err != nil {
+			return nil, err
+		}
+		values = append(values, value)
 	}
 
-	for item2 := range set2.M[string(key2)] {
-		if _, ok := set1.M[string(key1)][item2]; !ok {
-			list = append(list, []byte(item2))
+	for hash, r := range set2.M[string(key2)] {
+		if _, ok := set1.M[string(key1)][hash]; !ok {
+			value, err := tx.db.getValueByRecord(r)
+			if err != nil {
+				return nil, err
+			}
+			values = append(values, value)
 		}
 	}
 
-	return
+	return values, nil
 }
 
 // SKeys find all keys matching a given pattern

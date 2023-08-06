@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/bwmarrin/snowflake"
-	"github.com/nutsdb/nutsdb/ds/set"
 	"github.com/nutsdb/nutsdb/ds/zset"
 	"github.com/xujiajun/utils/strconv2"
 )
@@ -77,6 +76,9 @@ var (
 
 	// ErrNotFoundBucket is returned when key not found int the bucket on an view function.
 	ErrNotFoundBucket = errors.New("bucket not found")
+
+	// ErrTxnTooBig is returned if too many writes are fit into a single transaction.
+	ErrTxnTooBig = errors.New("Txn is too big to fit into one request")
 )
 
 // Tx represents a transaction.
@@ -87,6 +89,29 @@ type Tx struct {
 	status                 atomic.Value
 	pendingWrites          []*Entry
 	ReservedStoreTxIDIdxes map[int64]*BPTree
+	size                   int64
+}
+
+type txnCb struct {
+	commit func() error
+	user   func(error)
+	err    error
+}
+
+func runTxnCallback(cb *txnCb) {
+	switch {
+	case cb == nil:
+		panic("txn callback is nil")
+	case cb.user == nil:
+		panic("Must have caught a nil callback for txn.CommitWith")
+	case cb.err != nil:
+		cb.user(cb.err)
+	case cb.commit != nil:
+		err := cb.commit()
+		cb.user(err)
+	default:
+		cb.user(nil)
+	}
 }
 
 // Begin opens a new transaction.
@@ -131,6 +156,50 @@ func newTx(db *DB, writable bool) (tx *Tx, err error) {
 	tx.id = txID
 
 	return
+}
+
+func (tx *Tx) CommitWith(cb func(error)) {
+	if cb == nil {
+		panic("Nil callback provided to CommitWith")
+	}
+
+	if len(tx.pendingWrites) == 0 {
+		// Do not run these callbacks from here, because the CommitWith and the
+		// callback might be acquiring the same locks. Instead run the callback
+		// from another goroutine.
+		go runTxnCallback(&txnCb{user: cb, err: nil})
+		return
+	}
+	//defer tx.setStatusClosed()  //must not add this code because another process is also accessing tx
+	commitCb, err := tx.commitAndSend()
+	if err != nil {
+		go runTxnCallback(&txnCb{user: cb, err: err})
+		return
+	}
+
+	go runTxnCallback(&txnCb{user: cb, commit: commitCb})
+}
+
+func (tx *Tx) commitAndSend() (func() error, error) {
+	req, err := tx.db.sendToWriteCh(tx)
+	if err != nil {
+		return nil, err
+	}
+	ret := func() error {
+		err := req.Wait()
+		return err
+	}
+
+	return ret, nil
+}
+
+func (tx *Tx) checkSize() error {
+	count := len(tx.pendingWrites)
+	if int64(count) >= tx.db.getMaxBatchCount() || tx.size >= tx.db.getMaxBatchSize() {
+		return ErrTxnTooBig
+	}
+
+	return nil
 }
 
 // getTxID returns the tx id.
@@ -272,6 +341,10 @@ func (tx *Tx) Commit() (err error) {
 			tx.buildListIdx(bucket, entry, offset)
 		}
 
+		if entry.Meta.Ds == DataStructureSet {
+			tx.buildSetIdx(bucket, entry, offset)
+		}
+
 		if entry.Meta.Ds == DataStructureNone && entry.Meta.Flag == DataBPTreeBucketDeleteFlag {
 			tx.db.deleteBucket(DataStructureBPTree, bucket)
 		}
@@ -347,7 +420,7 @@ func (tx *Tx) buildBucketMetaIdx(bucket string, key []byte, bucketMetaTemp Bucke
 	}
 
 	if updateFlag {
-		fd, err := os.OpenFile(getBucketMetaFilePath(bucket, tx.db.opt.Dir), os.O_CREATE|os.O_RDWR, 0644)
+		fd, err := os.OpenFile(getBucketMetaFilePath(bucket, tx.db.opt.Dir), os.O_CREATE|os.O_RDWR, 0o644)
 		if err != nil {
 			return err
 		}
@@ -418,17 +491,9 @@ func (tx *Tx) buildIdxes() {
 
 		bucket := string(entry.Bucket)
 
-		if entry.Meta.Ds == DataStructureSet {
-			tx.buildSetIdx(bucket, entry)
-		}
-
 		if entry.Meta.Ds == DataStructureSortedSet {
 			tx.buildSortedSetIdx(bucket, entry)
 		}
-
-		//if entry.Meta.Ds == DataStructureList {
-		//	tx.buildListIdx(bucket, entry)
-		//}
 
 		if entry.Meta.Ds == DataStructureNone {
 			if entry.Meta.Flag == DataSetBucketDeleteFlag {
@@ -472,9 +537,9 @@ func (tx *Tx) buildBPTreeIdx(bucket string, entry, e *Entry, offset int64, count
 	}
 }
 
-func (tx *Tx) buildSetIdx(bucket string, entry *Entry) {
+func (tx *Tx) buildSetIdx(bucket string, entry *Entry, offset int64) {
 	if _, ok := tx.db.SetIdx[bucket]; !ok {
-		tx.db.SetIdx[bucket] = set.New()
+		tx.db.SetIdx[bucket] = NewSet()
 	}
 
 	if entry.Meta.Flag == DataDeleteFlag {
@@ -482,7 +547,8 @@ func (tx *Tx) buildSetIdx(bucket string, entry *Entry) {
 	}
 
 	if entry.Meta.Flag == DataSetFlag {
-		_ = tx.db.SetIdx[bucket].SAdd(string(entry.Key), entry.Value)
+		r := tx.db.buildRecordByEntryAndOffset(entry, offset)
+		_ = tx.db.SetIdx[bucket].SAdd(string(entry.Key), [][]byte{entry.Value}, []*Record{r})
 	}
 }
 
@@ -518,18 +584,6 @@ func (tx *Tx) buildListIdx(bucket string, entry *Entry, offset int64) {
 		return
 	}
 
-	var (
-		h *Hint
-		e *Entry
-	)
-	if tx.db.opt.EntryIdxMode == HintKeyAndRAMIdxMode {
-		h = NewHint().WithFileId(tx.db.ActiveFile.fileID).WithKey(entry.Key).WithMeta(entry.Meta).WithDataPos(uint64(offset))
-	} else {
-		e = entry
-	}
-
-	r := NewRecord().WithBucket(bucket).WithEntry(e).WithHint(h)
-
 	switch entry.Meta.Flag {
 	case DataExpireListFlag:
 		t, _ := strconv2.StrToInt64(string(value))
@@ -537,8 +591,10 @@ func (tx *Tx) buildListIdx(bucket string, entry *Entry, offset int64) {
 		l.TTL[string(key)] = ttl
 		l.TimeStamp[string(key)] = entry.Meta.Timestamp
 	case DataLPushFlag:
+		r := tx.db.buildRecordByEntryAndOffset(entry, offset)
 		_ = l.LPush(string(key), r)
 	case DataRPushFlag:
+		r := tx.db.buildRecordByEntryAndOffset(entry, offset)
 		_ = l.RPush(string(key), r)
 	case DataLRemFlag:
 		countAndValue := strings.Split(string(value), SeparatorForListKey)
@@ -561,6 +617,7 @@ func (tx *Tx) buildListIdx(bucket string, entry *Entry, offset int64) {
 		keyAndIndex := strings.Split(string(key), SeparatorForListKey)
 		newKey := keyAndIndex[0]
 		index, _ := strconv2.StrToInt(keyAndIndex[1])
+		r := tx.db.buildRecordByEntryAndOffset(entry, offset)
 		_ = l.LSet(newKey, index, r)
 	case DataLTrimFlag:
 		keyAndStartIndex := strings.Split(string(key), SeparatorForListKey)
@@ -756,6 +813,7 @@ func (tx *Tx) put(bucket string, key, value []byte, ttl uint32, flag uint16, tim
 		return err
 	}
 	tx.pendingWrites = append(tx.pendingWrites, e)
+	tx.size += e.Size()
 
 	return nil
 }
