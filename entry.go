@@ -181,8 +181,7 @@ func (e *Entry) isFilter() bool {
 		DataZPopMinFlag,
 		DataLRemByIndex,
 	}
-	if OneOfUint16Array(meta.Flag, filterDataSet) ||
-		IsExpired(meta.TTL, meta.Timestamp) {
+	if OneOfUint16Array(meta.Flag, filterDataSet) {
 		return true
 	}
 

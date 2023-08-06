@@ -99,6 +99,7 @@ func (db *DB) merge() error {
 				}
 
 				if entry.isFilter() {
+					fmt.Println(1)
 					off += entry.Size()
 					if off >= db.opt.SegmentSize {
 						break
@@ -112,7 +113,12 @@ func (db *DB) merge() error {
 				// To address this issue, we need to use a transaction to perform this operation.
 				err := db.Update(func(tx *Tx) error {
 					// check if we have a new entry with same key and bucket
-					if r, _ := db.getRecordFromKey(entry.Bucket, entry.Key); r != nil {
+					if r, ok := db.getRecordFromKey(entry.Bucket, entry.Key); ok {
+						if r.IsExpired() {
+							// When merging, only need to delete the expired data directly from the index without leaving records
+							tx.db.BTreeIdx[string(entry.Bucket)].Delete(entry.Key)
+							return nil
+						}
 						if r.H.Meta.TxID <= entry.Meta.TxID {
 							if ok := db.isPendingMergeEntry(entry); ok {
 								return tx.put(
@@ -213,9 +219,6 @@ func (db *DB) isPendingMergeEntry(entry *Entry) bool {
 		if exist {
 			r, ok := bptIdx.Find(entry.Key)
 			if ok && r.H.Meta.Flag == DataSetFlag {
-				if r.IsExpired() {
-					return false
-				}
 				return true
 			}
 		}

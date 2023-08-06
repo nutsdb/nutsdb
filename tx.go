@@ -334,7 +334,7 @@ func (tx *Tx) Commit() (err error) {
 		}
 
 		if entry.Meta.Ds == DataStructureTree {
-			tx.buildBPTreeIdx(bucket, entry, e, offset, countFlag)
+			tx.buildTreeIdx(bucket, entry, e, offset, countFlag)
 		}
 
 		if entry.Meta.Ds == DataStructureList {
@@ -511,7 +511,7 @@ func (tx *Tx) buildIdxes() {
 	}
 }
 
-func (tx *Tx) buildBPTreeIdx(bucket string, entry, e *Entry, offset int64, countFlag bool) {
+func (tx *Tx) buildTreeIdx(bucket string, entry, e *Entry, offset int64, countFlag bool) {
 	if tx.db.opt.EntryIdxMode == HintBPTSparseIdxMode {
 		newKey := getNewKey(bucket, entry.Key)
 		_ = tx.db.ActiveBPTreeIdx.Insert(newKey, e, &Hint{

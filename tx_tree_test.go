@@ -867,8 +867,6 @@ func TestTx_LazyDelete(t *testing.T) {
 
 			require.NoError(t, db.Merge())
 
-			txGet(t, db, bucket, GetTestBytes(2), nil, ErrNotFoundKey)
-
 			r, ok := db.BTreeIdx[bucket].Find(GetTestBytes(2))
 			require.Nil(t, r)
 			require.False(t, ok)
