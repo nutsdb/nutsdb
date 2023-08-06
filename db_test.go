@@ -149,7 +149,7 @@ func TestDB_Basic(t *testing.T) {
 
 		// del
 		txDel(t, db, bucket, key0, nil)
-		txGet(t, db, bucket, key0, val1, ErrNotFoundKey)
+		txGet(t, db, bucket, key0, val1, ErrKeyNotFound)
 	})
 }
 
@@ -489,14 +489,14 @@ func TestDB_DeleteBucket(t *testing.T) {
 		key := GetTestBytes(0)
 		val := GetTestBytes(0)
 
-		txDeleteBucket(t, db, DataStructureBPTree, bucket, ErrBucketNotFound)
+		txDeleteBucket(t, db, DataStructureTree, bucket, ErrBucketNotFound)
 
 		txPut(t, db, bucket, key, val, Persistent, nil)
 		txGet(t, db, bucket, key, val, nil)
 
-		txDeleteBucket(t, db, DataStructureBPTree, bucket, nil)
+		txDeleteBucket(t, db, DataStructureTree, bucket, nil)
 		txGet(t, db, bucket, key, nil, ErrBucketNotFound)
-		txDeleteBucket(t, db, DataStructureBPTree, bucket, ErrBucketNotFound)
+		txDeleteBucket(t, db, DataStructureTree, bucket, ErrBucketNotFound)
 	})
 }
 

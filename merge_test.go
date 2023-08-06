@@ -30,7 +30,7 @@ func TestDB_MergeForString(t *testing.T) {
 		txPut(t, db, bucket, GetTestBytes(0), GetRandomBytes(24), Persistent, nil)
 		txPut(t, db, bucket, GetTestBytes(1), GetRandomBytes(24), Persistent, nil)
 		txDel(t, db, bucket, GetTestBytes(1), nil)
-		txGet(t, db, bucket, GetTestBytes(1), nil, ErrNotFoundKey)
+		txGet(t, db, bucket, GetTestBytes(1), nil, ErrKeyNotFound)
 		require.NoError(t, db.Merge())
 	})
 }

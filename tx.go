@@ -101,9 +101,9 @@ type txnCb struct {
 func runTxnCallback(cb *txnCb) {
 	switch {
 	case cb == nil:
-		panic("txn callback is nil")
+		panic("tx callback is nil")
 	case cb.user == nil:
-		panic("Must have caught a nil callback for txn.CommitWith")
+		panic("Must have caught a nil callback for tx.CommitWith")
 	case cb.err != nil:
 		cb.user(cb.err)
 	case cb.commit != nil:
@@ -291,7 +291,7 @@ func (tx *Tx) Commit() (err error) {
 
 		offset := tx.db.ActiveFile.writeOff + int64(buff.Len())
 
-		if entry.Meta.Ds == DataStructureBPTree {
+		if entry.Meta.Ds == DataStructureTree {
 			tx.db.BPTreeKeyEntryPosMap[string(getNewKey(string(entry.Bucket), entry.Key))] = offset
 		}
 
@@ -333,7 +333,7 @@ func (tx *Tx) Commit() (err error) {
 			e = entry
 		}
 
-		if entry.Meta.Ds == DataStructureBPTree {
+		if entry.Meta.Ds == DataStructureTree {
 			tx.buildBPTreeIdx(bucket, entry, e, offset, countFlag)
 		}
 
@@ -346,7 +346,7 @@ func (tx *Tx) Commit() (err error) {
 		}
 
 		if entry.Meta.Ds == DataStructureNone && entry.Meta.Flag == DataBPTreeBucketDeleteFlag {
-			tx.db.deleteBucket(DataStructureBPTree, bucket)
+			tx.db.deleteBucket(DataStructureTree, bucket)
 		}
 	}
 
@@ -525,12 +525,16 @@ func (tx *Tx) buildBPTreeIdx(bucket string, entry, e *Entry, offset int64, count
 			tx.db.BTreeIdx[bucket] = NewBTree()
 		}
 
-		_ = tx.db.BTreeIdx[bucket].Insert(entry.Key, e, &Hint{
-			FileID:  tx.db.ActiveFile.fileID,
-			Key:     entry.Key,
-			Meta:    entry.Meta,
-			DataPos: uint64(offset),
-		})
+		if entry.Meta.Flag == DataSetFlag {
+			tx.db.BTreeIdx[bucket].Insert(entry.Key, e, &Hint{
+				FileID:  tx.db.ActiveFile.fileID,
+				Key:     entry.Key,
+				Meta:    entry.Meta,
+				DataPos: uint64(offset),
+			})
+		} else if entry.Meta.Flag == DataDeleteFlag {
+			tx.db.BTreeIdx[bucket].Delete(entry.Key)
+		}
 	}
 }
 
@@ -773,13 +777,13 @@ func (tx *Tx) handleErr(err error) {
 }
 
 func (tx *Tx) PutWithTimestamp(bucket string, key, value []byte, ttl uint32, timestamp uint64) error {
-	return tx.put(bucket, key, value, ttl, DataSetFlag, timestamp, DataStructureBPTree)
+	return tx.put(bucket, key, value, ttl, DataSetFlag, timestamp, DataStructureTree)
 }
 
 // Put sets the value for a key in the bucket.
 // a wrapper of the function put.
 func (tx *Tx) Put(bucket string, key, value []byte, ttl uint32) error {
-	return tx.put(bucket, key, value, ttl, DataSetFlag, uint64(time.Now().Unix()), DataStructureBPTree)
+	return tx.put(bucket, key, value, ttl, DataSetFlag, uint64(time.Now().Unix()), DataStructureTree)
 }
 
 func (tx *Tx) checkTxIsClosed() error {

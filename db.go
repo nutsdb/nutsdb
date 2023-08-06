@@ -152,8 +152,8 @@ const (
 	// DataStructureSortedSet represents the data structure sorted set flag
 	DataStructureSortedSet
 
-	// DataStructureBPTree represents the data structure b+ tree flag
-	DataStructureBPTree
+	// DataStructureTree represents the data structure b+ tree or b tree flag
+	DataStructureTree
 
 	// DataStructureList represents the data structure list flag
 	DataStructureList
@@ -167,8 +167,7 @@ const FLockName = "nutsdb-flock"
 type (
 	// DB represents a collection of buckets that persist on disk.
 	DB struct {
-		opt Options // the database options
-		//BPTreeIdx               BPTreeIdx // Hint Index
+		opt                     Options // the database options
 		BTreeIdx                BTreeIdx
 		BPTreeRootIdxes         []*BPTreeRootIdx
 		BPTreeKeyEntryPosMap    map[string]int64 // key = bucket+key  val = EntryPos
@@ -700,7 +699,6 @@ func (db *DB) parseDataFiles(dataFileIds []int) (unconfirmedRecords []*Record, c
 					return nil, nil, fmt.Errorf("can not ingest the hint obj to ActiveCommittedTxIdsIdx, err: %s", err.Error())
 				}
 			}
-
 			h := NewHint().WithKey(entry.Key).WithFileId(fID).WithMeta(entry.Meta).WithDataPos(uint64(off))
 			r := NewRecord().WithHint(h).WithEntry(e).WithBucket(entry.GetBucketString())
 			unconfirmedRecords = append(unconfirmedRecords, r)
@@ -762,17 +760,11 @@ func (db *DB) buildBTreeIdx(bucket string, r *Record) {
 		db.BTreeIdx[bucket] = NewBTree()
 	}
 
-	key := r.E.Key
+	key := r.H.Key
 
 	if r.E.Meta.Flag == DataDeleteFlag {
 		db.BTreeIdx[bucket].Delete(key)
 	} else {
-		if db.opt.EntryIdxMode == HintKeyAndRAMIdxMode {
-			r.E = nil
-		} else {
-			r.H = nil
-		}
-
 		db.BTreeIdx[bucket].Insert(key, r.E, r.H)
 	}
 }
@@ -858,7 +850,7 @@ func (db *DB) buildHintIdx(dataFileIds []int) error {
 		if _, ok := db.committedTxIds[r.H.Meta.TxID]; ok {
 			bucket := r.Bucket
 
-			if r.H.Meta.Ds == DataStructureBPTree {
+			if r.H.Meta.Ds == DataStructureTree {
 				r.H.Meta.Status = Committed
 
 				if db.opt.EntryIdxMode == HintBPTSparseIdxMode {
@@ -899,7 +891,7 @@ func (db *DB) buildNotDSIdxes(bucket string, r *Record) {
 		db.deleteBucket(DataStructureSortedSet, bucket)
 	}
 	if r.H.Meta.Flag == DataBPTreeBucketDeleteFlag {
-		db.deleteBucket(DataStructureBPTree, bucket)
+		db.deleteBucket(DataStructureTree, bucket)
 	}
 	if r.H.Meta.Flag == DataListBucketDeleteFlag {
 		db.deleteBucket(DataStructureList, bucket)
@@ -913,7 +905,7 @@ func (db *DB) deleteBucket(ds uint16, bucket string) {
 	if ds == DataStructureSortedSet {
 		delete(db.SortedSetIdx, bucket)
 	}
-	if ds == DataStructureBPTree {
+	if ds == DataStructureTree {
 		delete(db.BTreeIdx, bucket)
 	}
 	if ds == DataStructureList {

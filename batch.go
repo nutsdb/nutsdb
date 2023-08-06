@@ -17,7 +17,7 @@ const (
 // WriteBatch holds the necessary info to perform batched writes.
 type WriteBatch struct {
 	sync.Mutex
-	txn      *Tx
+	tx       *Tx
 	db       *DB
 	throttle *Throttle
 	err      atomic.Value
@@ -31,7 +31,7 @@ func (db *DB) NewWriteBatch() (*WriteBatch, error) {
 	}
 
 	var err error
-	wb.txn, err = newTx(db, true)
+	wb.tx, err = newTx(db, true)
 	return wb, err
 }
 
@@ -45,7 +45,7 @@ func (wb *WriteBatch) SetMaxPendingTxns(max int) {
 func (wb *WriteBatch) Cancel() error {
 	wb.Lock()
 	wb.finished = true
-	wb.txn.setStatusClosed()
+	wb.tx.setStatusClosed()
 	wb.Unlock()
 
 	if err := wb.throttle.Finish(); err != nil {
@@ -59,19 +59,19 @@ func (wb *WriteBatch) Put(bucket string, key, value []byte, ttl uint32) error {
 	wb.Lock()
 	defer wb.Unlock()
 
-	wb.txn.lock()
-	err := wb.txn.Put(bucket, key, value, ttl)
+	wb.tx.lock()
+	err := wb.tx.Put(bucket, key, value, ttl)
 	if err != nil {
-		wb.txn.unlock()
+		wb.tx.unlock()
 		return err
 	}
 
-	if nil == wb.txn.checkSize() {
-		wb.txn.unlock()
+	if nil == wb.tx.checkSize() {
+		wb.tx.unlock()
 		return err
 	}
 
-	wb.txn.unlock()
+	wb.tx.unlock()
 	if cerr := wb.commit(); cerr != nil {
 		return cerr
 	}
@@ -84,19 +84,19 @@ func (wb *WriteBatch) Delete(bucket string, key []byte) error {
 	wb.Lock()
 	defer wb.Unlock()
 
-	wb.txn.lock()
-	err := wb.txn.Delete(bucket, key)
+	wb.tx.lock()
+	err := wb.tx.Delete(bucket, key)
 	if err != nil {
-		wb.txn.unlock()
+		wb.tx.unlock()
 		return err
 	}
 
-	if nil == wb.txn.checkSize() {
-		wb.txn.unlock()
+	if nil == wb.tx.checkSize() {
+		wb.tx.unlock()
 		return err
 	}
 
-	wb.txn.unlock()
+	wb.tx.unlock()
 	if cerr := wb.commit(); cerr != nil {
 		return cerr
 	}
@@ -118,11 +118,11 @@ func (wb *WriteBatch) commit() error {
 		return err
 	}
 
-	wb.txn.CommitWith(wb.callback)
+	wb.tx.CommitWith(wb.callback)
 
 	// new a new tx
 	var err error
-	wb.txn, err = newTx(wb.db, true)
+	wb.tx, err = newTx(wb.db, true)
 	if err != nil {
 		return err
 	}
@@ -151,7 +151,7 @@ func (wb *WriteBatch) Flush() error {
 		return err
 	}
 	wb.finished = true
-	wb.txn.setStatusClosed()
+	wb.tx.setStatusClosed()
 	wb.Unlock()
 	if err := wb.throttle.Finish(); err != nil {
 		if wb.Error() != nil {
@@ -168,7 +168,7 @@ func (wb *WriteBatch) Reset() error {
 	defer wb.Unlock()
 	var err error
 	wb.finished = false
-	wb.txn, err = newTx(wb.db, true)
+	wb.tx, err = newTx(wb.db, true)
 	if err != nil {
 		return err
 	}

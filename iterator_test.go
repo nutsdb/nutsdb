@@ -75,6 +75,8 @@ func TestIterator_Reverse(t *testing.T) {
 }
 
 func TestIterator_Seek(t *testing.T) {
+	bucket := "bucket"
+
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		for i := 0; i < 100; i++ {
 			txPut(t, db, bucket, GetTestBytes(i), GetTestBytes(i), Persistent, nil)

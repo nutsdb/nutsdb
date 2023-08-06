@@ -156,8 +156,8 @@ func (tx *Tx) Get(bucket string, key []byte) (e *Entry, err error) {
 				return nil, ErrNotFoundKey
 			}
 
-			if r.H.Meta.Flag == DataDeleteFlag || r.IsExpired() {
-				return nil, ErrNotFoundKey
+			if r.IsExpired() {
+				return nil, tx.put(bucket, key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureTree)
 			}
 
 			if idxMode == HintKeyValAndRAMIdxMode {
@@ -844,23 +844,24 @@ func (tx *Tx) Delete(bucket string, key []byte) error {
 			return ErrNotFoundKey
 		}
 
-		if r.H.Meta.Flag == DataDeleteFlag || r.IsExpired() {
+		if r.IsExpired() {
+			_ = tx.put(bucket, key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureTree)
 			return ErrNotFoundKey
 		}
 	} else {
 		return ErrNotFoundBucket
 	}
 
-	return tx.put(bucket, key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureBPTree)
+	return tx.put(bucket, key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureTree)
 }
 
 // getHintIdxDataItemsWrapper returns wrapped entries when prefix scanning or range scanning.
 func (tx *Tx) getHintIdxDataItemsWrapper(records Records, limitNum int, es Entries, scanMode string) (Entries, error) {
 	for _, r := range records {
-		if r.H.Meta.Flag == DataDeleteFlag || r.IsExpired() {
+		if r.IsExpired() {
+			_ = tx.put(r.Bucket, r.H.Key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureTree)
 			continue
 		}
-
 		if limitNum > 0 && len(es) < limitNum || limitNum == ScanNoLimit {
 			idxMode := tx.db.opt.EntryIdxMode
 			if idxMode == HintKeyAndRAMIdxMode {
@@ -883,9 +884,7 @@ func (tx *Tx) getHintIdxDataItemsWrapper(records Records, limitNum int, es Entri
 				if err != nil {
 					return nil, err
 				}
-			}
-
-			if idxMode == HintKeyValAndRAMIdxMode {
+			} else {
 				es = append(es, r.E)
 			}
 		}

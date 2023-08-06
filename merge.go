@@ -208,7 +208,7 @@ func (db *DB) getRecordFromKey(bucket, key []byte) (*Record, bool) {
 }
 
 func (db *DB) isPendingMergeEntry(entry *Entry) bool {
-	if entry.Meta.Ds == DataStructureBPTree {
+	if entry.Meta.Ds == DataStructureTree {
 		bptIdx, exist := db.BTreeIdx[string(entry.Bucket)]
 		if exist {
 			r, ok := bptIdx.Find(entry.Key)
