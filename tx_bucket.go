@@ -51,7 +51,7 @@ func (tx *Tx) IterateBuckets(ds uint16, pattern string, f func(key string) bool)
 		}
 	}
 	if ds == DataStructureBPTree {
-		for bucket := range tx.db.BPTreeIdx {
+		for bucket := range tx.db.BTreeIdx {
 			if end, err := MatchForRange(pattern, bucket, f); end || err != nil {
 				return err
 			}
@@ -101,7 +101,7 @@ func (tx *Tx) ExistBucket(ds uint16, bucket string) (bool, error) {
 	case DataStructureSortedSet:
 		_, ok = tx.db.SortedSetIdx[bucket]
 	case DataStructureBPTree:
-		_, ok = tx.db.BPTreeIdx[bucket]
+		_, ok = tx.db.BTreeIdx[bucket]
 	case DataStructureList:
 		ok = tx.db.Index.existList(bucket)
 	default:

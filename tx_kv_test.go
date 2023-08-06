@@ -16,51 +16,12 @@ package nutsdb
 
 import (
 	"fmt"
-	"io/ioutil"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/xujiajun/utils/strconv2"
 )
-
-func Init() {
-	fileDir := "/tmp/nutsdbtesttx"
-	files, _ := ioutil.ReadDir(fileDir)
-	for _, f := range files {
-		name := f.Name()
-		if name != "" {
-			err := os.RemoveAll(fileDir + "/" + name)
-			if err != nil {
-				panic(err)
-			}
-		}
-	}
-
-	opt = DefaultOptions
-	opt.Dir = fileDir
-	opt.SegmentSize = 8 * 1024
-}
-
-func InitForBPTSparseIdxMode() {
-	fileDir := "/tmp/nutsdbtesttx2"
-	files, _ := ioutil.ReadDir(fileDir)
-	for _, f := range files {
-		name := f.Name()
-		if name != "" {
-			err := os.RemoveAll(fileDir + "/" + name)
-			if err != nil {
-				panic(err)
-			}
-		}
-	}
-
-	opt = DefaultOptions
-	opt.Dir = fileDir
-	opt.SegmentSize = 1024
-	opt.EntryIdxMode = HintBPTSparseIdxMode
-}
 
 func TestTx_PutAndGet(t *testing.T) {
 
@@ -301,7 +262,7 @@ func TestTx_PrefixScan(t *testing.T) {
 			)
 
 			prefix := []byte("key1_")
-			entries, _, err := tx.PrefixScan(bucket, prefix, offset, limit)
+			entries, err := tx.PrefixScan(bucket, prefix, offset, limit)
 			assert.NoError(t, err)
 
 			assert.NoError(t, tx.Commit())
@@ -349,7 +310,7 @@ func TestTx_PrefixSearchScan(t *testing.T) {
 		require.NoError(t, err)
 
 		prefix := []byte("key_")
-		entries, _, err := tx.PrefixSearchScan(bucket, prefix, regs, 0, 1)
+		entries, err := tx.PrefixSearchScan(bucket, prefix, regs, 0, 1)
 		assert.NoError(t, err)
 
 		assert.NoError(t, tx.Commit()) // tx commit
@@ -519,7 +480,7 @@ func TestTx_PrefixScan_NotFound(t *testing.T) {
 			assert.NoError(t, err)
 
 			prefix := []byte("key_")
-			entries, _, err := tx.PrefixScan("foobucket", prefix, 0, 10)
+			entries, err := tx.PrefixScan("foobucket", prefix, 0, 10)
 			assert.Error(t, err)
 			assert.Empty(t, entries)
 
@@ -551,7 +512,7 @@ func TestTx_PrefixScan_NotFound(t *testing.T) {
 				require.NoError(t, err)
 
 				prefix := []byte("key_foo")
-				entries, _, err := tx.PrefixScan(bucket, prefix, 0, 10)
+				entries, err := tx.PrefixScan(bucket, prefix, 0, 10)
 				assert.Error(t, err)
 				assert.NoError(t, tx.Commit())
 
@@ -562,7 +523,7 @@ func TestTx_PrefixScan_NotFound(t *testing.T) {
 				tx, err = db.Begin(false)
 				require.NoError(t, err)
 
-				entries, _, err := tx.PrefixScan(bucket, []byte("key_"), 0, 10)
+				entries, err := tx.PrefixScan(bucket, []byte("key_"), 0, 10)
 				assert.NoError(t, err)
 				assert.NoError(t, tx.Commit())
 
@@ -571,7 +532,7 @@ func TestTx_PrefixScan_NotFound(t *testing.T) {
 			}
 
 			{ // scan by closed tx
-				entries, _, err := tx.PrefixScan(bucket, []byte("key_"), 0, 10)
+				entries, err := tx.PrefixScan(bucket, []byte("key_"), 0, 10)
 				assert.Error(t, err)
 				if len(entries) > 0 || err == nil {
 					t.Error("err TestTx_PrefixScan_NotFound")
@@ -592,7 +553,7 @@ func TestTx_PrefixSearchScan_NotFound(t *testing.T) {
 			require.NoError(t, err)
 
 			prefix := []byte("key_")
-			_, _, err = tx.PrefixSearchScan("foobucket", prefix, regs, 0, 10)
+			_, err = tx.PrefixSearchScan("foobucket", prefix, regs, 0, 10)
 			assert.Error(t, err)
 
 			assert.NoError(t, tx.Commit())
@@ -622,7 +583,7 @@ func TestTx_PrefixSearchScan_NotFound(t *testing.T) {
 				require.NoError(t, err)
 
 				prefix := []byte("key_foo")
-				_, _, err = tx.PrefixSearchScan(bucket, prefix, regs, 0, 10)
+				_, err = tx.PrefixSearchScan(bucket, prefix, regs, 0, 10)
 				assert.Error(t, err)
 
 				assert.NoError(t, tx.Rollback())
@@ -634,7 +595,7 @@ func TestTx_PrefixSearchScan_NotFound(t *testing.T) {
 
 				assert.NoError(t, tx.Commit())
 
-				_, _, err = tx.PrefixSearchScan(bucket, []byte("key_"), regs, 0, 10)
+				_, err = tx.PrefixSearchScan(bucket, []byte("key_"), regs, 0, 10)
 				assert.Error(t, err)
 			}
 		})
@@ -738,7 +699,7 @@ func TestTx_SCan_For_BPTSparseIdxMode(t *testing.T) {
 			require.NoError(t, err)
 
 			limit := 5
-			es, _, err := tx.PrefixScan(bucket, []byte("key_"), 0, limit)
+			es, err := tx.PrefixScan(bucket, []byte("key_"), 0, limit)
 			assert.NoError(t, err)
 
 			assert.NoError(t, tx.Commit())
@@ -753,7 +714,7 @@ func TestTx_SCan_For_BPTSparseIdxMode(t *testing.T) {
 			require.NoError(t, err)
 
 			limit := 5
-			es, _, err := tx.PrefixSearchScan(bucket, []byte("key_"), regs, 0, limit)
+			es, err := tx.PrefixSearchScan(bucket, []byte("key_"), regs, 0, limit)
 			assert.NoError(t, tx.Commit())
 			assert.NoError(t, err)
 			assert.Equal(t, limit, len(es))
@@ -781,7 +742,7 @@ func TestTx_Notfound_For_BPTSparseIdxMode(t *testing.T) {
 			tx, err = db.Begin(false)
 			require.NoError(t, err)
 
-			es, _, err := tx.PrefixScan(bucket, []byte("key_prefix_fake"), 0, 10)
+			es, err := tx.PrefixScan(bucket, []byte("key_prefix_fake"), 0, 10)
 			assert.Error(t, err)
 			assert.NoError(t, tx.Commit())
 
@@ -795,7 +756,7 @@ func TestTx_Notfound_For_BPTSparseIdxMode(t *testing.T) {
 			tx, err := db.Begin(false)
 			require.NoError(t, err)
 
-			es, _, err := tx.PrefixSearchScan(bucket, []byte("key_prefix_fake"), regs, 0, 10)
+			es, err := tx.PrefixSearchScan(bucket, []byte("key_prefix_fake"), regs, 0, 10)
 			assert.Error(t, err)
 			assert.NoError(t, tx.Commit())
 

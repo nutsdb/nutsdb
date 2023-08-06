@@ -181,7 +181,7 @@ func TestDB_DeleteANonExistKey(t *testing.T) {
 		testBucket := "test_bucket"
 		txDel(t, db, testBucket, GetTestBytes(0), ErrNotFoundBucket)
 		txPut(t, db, testBucket, GetTestBytes(1), GetRandomBytes(24), Persistent, nil)
-		txDel(t, db, testBucket, GetTestBytes(0), ErrKeyNotFound)
+		txDel(t, db, testBucket, GetTestBytes(0), ErrNotFoundKey)
 	})
 }
 
@@ -352,15 +352,15 @@ func TestDB_GetRecordFromKey(t *testing.T) {
 		key := []byte("hello")
 		val := []byte("world")
 
-		_, err := db.getRecordFromKey(bucket, key)
-		require.Equal(t, ErrBucketNotFound, err)
+		_, ok := db.getRecordFromKey(bucket, key)
+		require.False(t, ok)
 
 		for i := 0; i < 10; i++ {
 			txPut(t, db, string(bucket), key, val, Persistent, nil)
 		}
 
-		r, err := db.getRecordFromKey(bucket, key)
-		require.NoError(t, err)
+		r, ok := db.getRecordFromKey(bucket, key)
+		require.True(t, ok)
 
 		require.Equal(t, 58, int(r.H.DataPos))
 		require.Equal(t, int64(4), r.H.FileID)

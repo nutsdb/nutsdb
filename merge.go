@@ -195,24 +195,24 @@ func (db *DB) mergeWorker() {
 
 // getRecordFromKey fetches Record for given key and bucket
 // this is a helper function used in merge so it does not work if index mode is HintBPTSparseIdxMode
-func (db *DB) getRecordFromKey(bucket, key []byte) (record *Record, err error) {
+func (db *DB) getRecordFromKey(bucket, key []byte) (*Record, bool) {
 	idxMode := db.opt.EntryIdxMode
-	if !(idxMode == HintKeyValAndRAMIdxMode || idxMode == HintKeyAndRAMIdxMode) {
-		return nil, errors.New("not implemented")
+	if idxMode == HintBPTSparseIdxMode {
+		return nil, false
 	}
-	idx, ok := db.BPTreeIdx[string(bucket)]
+	idx, ok := db.BTreeIdx[string(bucket)]
 	if !ok {
-		return nil, ErrBucketNotFound
+		return nil, false
 	}
 	return idx.Find(key)
 }
 
 func (db *DB) isPendingMergeEntry(entry *Entry) bool {
 	if entry.Meta.Ds == DataStructureBPTree {
-		bptIdx, exist := db.BPTreeIdx[string(entry.Bucket)]
+		bptIdx, exist := db.BTreeIdx[string(entry.Bucket)]
 		if exist {
-			r, err := bptIdx.Find(entry.Key)
-			if err == nil && r.H.Meta.Flag == DataSetFlag {
+			r, ok := bptIdx.Find(entry.Key)
+			if ok && r.H.Meta.Flag == DataSetFlag {
 				return true
 			}
 		}

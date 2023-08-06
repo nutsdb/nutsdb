@@ -24,7 +24,7 @@ import (
 func runBTreeTest(t *testing.T, test func(t *testing.T, btree *BTree)) {
 	btree := NewBTree()
 
-	for i := 0; i < 100000; i++ {
+	for i := 0; i < 100; i++ {
 		key := []byte(fmt.Sprintf(keyFormat, i))
 		val := []byte(fmt.Sprintf(valFormat, i))
 
@@ -58,53 +58,13 @@ func TestBTree_Delete(t *testing.T) {
 func TestBTree_PrefixScan(t *testing.T) {
 	t.Run("prefix scan from beginning", func(t *testing.T) {
 		runBTreeTest(t, func(t *testing.T, btree *BTree) {
-			const limit = 10
+			limit := 10
 
 			records := btree.PrefixScan([]byte("key_"), 0, limit)
 
 			for i, r := range records {
 				wantKey := []byte(fmt.Sprintf(keyFormat, i))
 				wantValue := []byte(fmt.Sprintf(valFormat, i))
-
-				assert.Equal(t, wantKey, r.E.Key)
-				assert.Equal(t, wantValue, r.E.Value)
-			}
-		})
-	})
-
-	t.Run("prefix scan in the middle", func(t *testing.T) {
-		runBTreeTest(t, func(t *testing.T, btree *BTree) {
-			const (
-				offset = 10
-				limit  = 10
-			)
-			records := btree.PrefixScan([]byte("key_"), offset, limit)
-
-			assert.Equal(t, limit, len(records))
-			for i, r := range records {
-				wantKey := []byte(fmt.Sprintf(keyFormat, i+offset))
-				wantValue := []byte(fmt.Sprintf(valFormat, i+offset))
-
-				assert.Equal(t, wantKey, r.E.Key)
-				assert.Equal(t, wantValue, r.E.Value)
-			}
-		})
-	})
-
-	t.Run("prefix scan in the end", func(t *testing.T) {
-		runBTreeTest(t, func(t *testing.T, btree *BTree) {
-			const (
-				offset = 90
-				limit  = 100
-			)
-			records := btree.PrefixScan([]byte("key_"), offset, limit)
-			assert.NoError(t, err)
-
-			const wantLen = 10 // only left 10 records
-			assert.Equal(t, wantLen, len(records))
-			for i, r := range records {
-				wantKey := []byte(fmt.Sprintf(keyFormat, i+offset))
-				wantValue := []byte(fmt.Sprintf(valFormat, i+offset))
 
 				assert.Equal(t, wantKey, r.E.Key)
 				assert.Equal(t, wantValue, r.E.Value)

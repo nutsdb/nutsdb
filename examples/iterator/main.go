@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-
 	"github.com/nutsdb/nutsdb"
 )
 
@@ -47,14 +46,14 @@ func forwardIteration() {
 	fmt.Println("--------begin forwardIteration--------")
 	tx, err := db.Begin(false)
 	iterator := nutsdb.NewIterator(tx, bucket, nutsdb.IteratorOptions{Reverse: false})
-	i := 0
-	for i < 10 {
-		ok, err := iterator.SetNext()
-		fmt.Println("ok, err", ok, err)
-		fmt.Println("Key: ", string(iterator.Entry().Key))
-		fmt.Println("Value: ", string(iterator.Entry().Value))
+	for {
+		value, _ := iterator.Value()
+		fmt.Println("Key: ", string(iterator.Key()))
+		fmt.Println("Value: ", string(value))
 		fmt.Println()
-		i++
+		if !iterator.Next() {
+			break
+		}
 	}
 	err = tx.Commit()
 	if err != nil {
@@ -67,14 +66,14 @@ func reverseIterative() {
 	fmt.Println("--------start reverseIterative--------")
 	tx, err := db.Begin(false)
 	iterator := nutsdb.NewIterator(tx, bucket, nutsdb.IteratorOptions{Reverse: true})
-	i := 0
-	for i < 10 {
-		ok, err := iterator.SetNext()
-		fmt.Println("ok, err", ok, err)
-		fmt.Println("Key: ", string(iterator.Entry().Key))
-		fmt.Println("Value: ", string(iterator.Entry().Value))
+	for {
+		value, _ := iterator.Value()
+		fmt.Println("Key: ", string(iterator.Key()))
+		fmt.Println("Value: ", string(value))
 		fmt.Println()
-		i++
+		if !iterator.Next() {
+			break
+		}
 	}
 	err = tx.Commit()
 	if err != nil {

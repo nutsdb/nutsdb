@@ -167,8 +167,9 @@ const FLockName = "nutsdb-flock"
 type (
 	// DB represents a collection of buckets that persist on disk.
 	DB struct {
-		opt                     Options   // the database options
-		BPTreeIdx               BPTreeIdx // Hint Index
+		opt Options // the database options
+		//BPTreeIdx               BPTreeIdx // Hint Index
+		BTreeIdx                BTreeIdx
 		BPTreeRootIdxes         []*BPTreeRootIdx
 		BPTreeKeyEntryPosMap    map[string]int64 // key = bucket+key  val = EntryPos
 		bucketMetas             BucketMetasIdx
@@ -200,7 +201,8 @@ type (
 // open returns a newly initialized DB object.
 func open(opt Options) (*DB, error) {
 	db := &DB{
-		BPTreeIdx:               make(BPTreeIdx),
+		//BPTreeIdx:               make(BPTreeIdx),
+		BTreeIdx:                make(BTreeIdx),
 		SetIdx:                  make(SetIdx),
 		SortedSetIdx:            make(SortedSetIdx),
 		ActiveBPTreeIdx:         NewTree(),
@@ -370,7 +372,7 @@ func (db *DB) release() error {
 		return err
 	}
 
-	db.BPTreeIdx = nil
+	db.BTreeIdx = nil
 
 	db.BPTreeKeyEntryPosMap = nil
 
@@ -755,16 +757,24 @@ func (db *DB) buildBPTreeRootIdxes(dataFileIds []int) error {
 	return nil
 }
 
-func (db *DB) buildBPTreeIdx(bucket string, r *Record) error {
-	if _, ok := db.BPTreeIdx[bucket]; !ok {
-		db.BPTreeIdx[bucket] = NewTree()
+func (db *DB) buildBTreeIdx(bucket string, r *Record) {
+	if _, ok := db.BTreeIdx[bucket]; !ok {
+		db.BTreeIdx[bucket] = NewBTree()
 	}
 
-	if err := db.BPTreeIdx[bucket].Insert(r.H.Key, r.E, r.H, CountFlagEnabled); err != nil {
-		return fmt.Errorf("when build BPTreeIdx insert index err: %s", err)
-	}
+	key := r.E.Key
 
-	return nil
+	if r.E.Meta.Flag == DataDeleteFlag {
+		db.BTreeIdx[bucket].Delete(key)
+	} else {
+		if db.opt.EntryIdxMode == HintKeyAndRAMIdxMode {
+			r.E = nil
+		} else {
+			r.H = nil
+		}
+
+		db.BTreeIdx[bucket].Insert(key, r.E, r.H)
+	}
 }
 
 func (db *DB) buildActiveBPTreeIdx(r *Record) error {
@@ -856,18 +866,16 @@ func (db *DB) buildHintIdx(dataFileIds []int) error {
 						return err
 					}
 				} else {
-					if err = db.buildBPTreeIdx(bucket, r); err != nil {
-						return err
-					}
+					db.buildBTreeIdx(bucket, r)
 				}
-			}
+			} else {
+				if err = db.buildOtherIdxes(bucket, r); err != nil {
+					return err
+				}
 
-			if err = db.buildOtherIdxes(bucket, r); err != nil {
-				return err
-			}
-
-			if r.H.Meta.Ds == DataStructureNone {
-				db.buildNotDSIdxes(bucket, r)
+				if r.H.Meta.Ds == DataStructureNone {
+					db.buildNotDSIdxes(bucket, r)
+				}
 			}
 
 			db.KeyCount++
@@ -906,7 +914,7 @@ func (db *DB) deleteBucket(ds uint16, bucket string) {
 		delete(db.SortedSetIdx, bucket)
 	}
 	if ds == DataStructureBPTree {
-		delete(db.BPTreeIdx, bucket)
+		delete(db.BTreeIdx, bucket)
 	}
 	if ds == DataStructureList {
 		db.Index.deleteList(bucket)

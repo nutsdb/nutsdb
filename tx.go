@@ -521,19 +521,16 @@ func (tx *Tx) buildBPTreeIdx(bucket string, entry, e *Entry, offset int64, count
 			DataPos: uint64(offset),
 		}, countFlag)
 	} else {
-		if _, ok := tx.db.BPTreeIdx[bucket]; !ok {
-			tx.db.BPTreeIdx[bucket] = NewTree()
+		if _, ok := tx.db.BTreeIdx[bucket]; !ok {
+			tx.db.BTreeIdx[bucket] = NewBTree()
 		}
 
-		if tx.db.BPTreeIdx[bucket] == nil {
-			tx.db.BPTreeIdx[bucket] = NewTree()
-		}
-		_ = tx.db.BPTreeIdx[bucket].Insert(entry.Key, e, &Hint{
+		_ = tx.db.BTreeIdx[bucket].Insert(entry.Key, e, &Hint{
 			FileID:  tx.db.ActiveFile.fileID,
 			Key:     entry.Key,
 			Meta:    entry.Meta,
 			DataPos: uint64(offset),
-		}, countFlag)
+		})
 	}
 }
 
