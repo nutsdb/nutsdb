@@ -60,7 +60,7 @@ func (fdm *fdManager) getFd(path string) (fd *os.File, err error) {
 	defer fdm.lock.Unlock()
 	cleanPath := filepath.Clean(path)
 	if fdInfo := fdm.cache[cleanPath]; fdInfo == nil {
-		fd, err = os.OpenFile(cleanPath, os.O_CREATE|os.O_RDWR, 0o644)
+		fd, err = os.OpenFile(cleanPath, os.O_CREATE|os.O_RDWR, os.ModePerm)
 		if err == nil {
 			// if the numbers of fd in cache larger than the cleanThreshold in config, we will clean useless fd in cache
 			if fdm.size >= fdm.cleanThresholdNums {
@@ -82,7 +82,7 @@ func (fdm *fdManager) getFd(path string) (fd *os.File, err error) {
 					return nil, err
 				}
 				// try open this file again，if it still returns err, we will show this error to user
-				fd, err = os.OpenFile(cleanPath, os.O_CREATE|os.O_RDWR, 0o644)
+				fd, err = os.OpenFile(cleanPath, os.O_CREATE|os.O_RDWR, os.ModePerm)
 				if err != nil {
 					return nil, err
 				}
