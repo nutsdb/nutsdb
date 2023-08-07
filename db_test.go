@@ -540,7 +540,7 @@ func withBPTSpareeIdxDB(t *testing.T, fn func(t *testing.T, db *DB)) {
 	withDBOption(t, opt, fn)
 }
 
-func Test_HintKeyValAndRAMIdxMode_RestartDB(t *testing.T) {
+func TestDB_HintKeyValAndRAMIdxMode_RestartDB(t *testing.T) {
 
 	opts := DefaultOptions
 	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
@@ -559,7 +559,7 @@ func Test_HintKeyValAndRAMIdxMode_RestartDB(t *testing.T) {
 	})
 }
 
-func Test_HintKeyAndRAMIdxMode_RestartDB(t *testing.T) {
+func TestDB_HintKeyAndRAMIdxMode_RestartDB(t *testing.T) {
 	opts := DefaultOptions
 	opts.EntryIdxMode = HintKeyAndRAMIdxMode
 	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
@@ -578,7 +578,7 @@ func Test_HintKeyAndRAMIdxMode_RestartDB(t *testing.T) {
 	})
 }
 
-func Test_HintBPTSparseIdxMode_RestartDB(t *testing.T) {
+func TestDB_HintBPTSparseIdxMode_RestartDB(t *testing.T) {
 	opts := DefaultOptions
 	opts.EntryIdxMode = HintBPTSparseIdxMode
 	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {

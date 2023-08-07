@@ -766,7 +766,7 @@ func (db *DB) buildBTreeIdx(bucket string, r *Record) {
 
 	key := r.H.Key
 
-	if r.E.Meta.Flag == DataDeleteFlag {
+	if r.H.Meta.Flag == DataDeleteFlag {
 		db.BTreeIdx[bucket].Delete(key)
 	} else {
 		db.BTreeIdx[bucket].Insert(key, r.E, r.H)
