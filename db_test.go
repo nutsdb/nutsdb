@@ -540,7 +540,7 @@ func withBPTSpareeIdxDB(t *testing.T, fn func(t *testing.T, db *DB)) {
 	withDBOption(t, opt, fn)
 }
 
-func Test_Three_EntryIdexMode_RestartDB(t *testing.T) {
+func Test_HintKeyValAndRAMIdxMode_RestartDB(t *testing.T) {
 
 	opts := DefaultOptions
 	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
@@ -556,20 +556,43 @@ func Test_Three_EntryIdexMode_RestartDB(t *testing.T) {
 		db, err := Open(db.opt)
 		require.NoError(t, err)
 		txGet(t, db, bucket, key, val, nil)
+	})
+}
+
+func Test_HintKeyAndRAMIdxMode_RestartDB(t *testing.T) {
+	opts := DefaultOptions
+	opts.EntryIdxMode = HintKeyAndRAMIdxMode
+	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
+		bucket := "bucket"
+		key := GetTestBytes(0)
+		val := GetTestBytes(0)
+
+		txPut(t, db, bucket, key, val, Persistent, nil)
+		txGet(t, db, bucket, key, val, nil)
 		db.Close()
 
 		// restart db with HintKeyAndRAMIdxMode EntryIdxMode
-		db.opt.EntryIdxMode = HintKeyAndRAMIdxMode
-		db, err2 := Open(db.opt)
-		require.NoError(t, err2)
+		db, err := Open(db.opt)
+		require.NoError(t, err)
+		txGet(t, db, bucket, key, val, nil)
+	})
+}
+
+func Test_HintBPTSparseIdxMode_RestartDB(t *testing.T) {
+	opts := DefaultOptions
+	opts.EntryIdxMode = HintBPTSparseIdxMode
+	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
+		bucket := "bucket"
+		key := GetTestBytes(0)
+		val := GetTestBytes(0)
+
+		txPut(t, db, bucket, key, val, Persistent, nil)
 		txGet(t, db, bucket, key, val, nil)
 		db.Close()
 
 		// restart db with HintBPTSparseIdxMode EntryIdxMode
-		db.opt.EntryIdxMode = HintBPTSparseIdxMode
-		db, err3 := Open(db.opt)
-		require.NoError(t, err3)
+		db, err := Open(db.opt)
+		require.NoError(t, err)
 		txGet(t, db, bucket, key, val, nil)
-		db.Close()
 	})
 }
