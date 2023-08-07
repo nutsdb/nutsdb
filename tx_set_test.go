@@ -183,6 +183,7 @@ func TestTx_SMembers(t *testing.T) {
 	}
 
 	if list, err := tx.SMembers(bucket, key); err != nil {
+		t.Fatal(err)
 		tx.Rollback()
 	} else {
 		if len(list) != 2 {

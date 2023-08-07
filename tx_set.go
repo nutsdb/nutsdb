@@ -123,6 +123,8 @@ func (tx *Tx) SMembers(bucket string, key []byte) ([][]byte, error) {
 			}
 			values[i] = value
 		}
+
+		return values, nil
 	}
 
 	return nil, ErrBucketNotFound
