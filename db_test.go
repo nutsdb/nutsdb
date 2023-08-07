@@ -542,13 +542,8 @@ func withBPTSpareeIdxDB(t *testing.T, fn func(t *testing.T, db *DB)) {
 
 func Test_Three_EntryIdexMode_RestartDB(t *testing.T) {
 
-	tmpdir, _ := os.MkdirTemp("", "nutsdb")
-	opt := DefaultOptions
-	opt.Dir = tmpdir
-	opt.EntryIdxMode = HintKeyValAndRAMIdxMode
-	opt.SegmentSize = 8 * 1024
-
-	withDBOption(t, opt, func(t *testing.T, db *DB) {
+	opts := DefaultOptions
+	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
 		bucket := "bucket"
 		key := GetTestBytes(0)
 		val := GetTestBytes(0)
@@ -557,48 +552,24 @@ func Test_Three_EntryIdexMode_RestartDB(t *testing.T) {
 		txGet(t, db, bucket, key, val, nil)
 
 		db.Close()
-
+		// restart db with HintKeyValAndRAMIdxMode EntryIdxMode
 		db, err := Open(db.opt)
 		require.NoError(t, err)
-
 		txGet(t, db, bucket, key, val, nil)
-	})
-
-	tmpdir2, _ := os.MkdirTemp("", "nutsdb2")
-	opt.EntryIdxMode = HintKeyAndRAMIdxMode
-	opt.Dir = tmpdir2
-
-	withDBOption(t, opt, func(t *testing.T, db *DB) {
-		bucket := "bucket"
-		key := GetTestBytes(0)
-		val := GetTestBytes(0)
-		txPut(t, db, bucket, key, val, Persistent, nil)
-		txGet(t, db, bucket, key, val, nil)
-
 		db.Close()
 
-		db, err := Open(db.opt)
-		require.NoError(t, err)
-
+		// restart db with HintKeyAndRAMIdxMode EntryIdxMode
+		db.opt.EntryIdxMode = HintKeyAndRAMIdxMode
+		db, err2 := Open(db.opt)
+		require.NoError(t, err2)
 		txGet(t, db, bucket, key, val, nil)
-	})
-
-	tmpdir3, _ := os.MkdirTemp("", "nutsdb3")
-	opt.EntryIdxMode = HintBPTSparseIdxMode
-	opt.Dir = tmpdir3
-
-	withDBOption(t, opt, func(t *testing.T, db *DB) {
-		bucket := "bucket"
-		key := GetTestBytes(0)
-		val := GetTestBytes(0)
-		txPut(t, db, bucket, key, val, Persistent, nil)
-		txGet(t, db, bucket, key, val, nil)
-
 		db.Close()
 
-		db, err := Open(db.opt)
-		require.NoError(t, err)
-
+		// restart db with HintBPTSparseIdxMode EntryIdxMode
+		db.opt.EntryIdxMode = HintBPTSparseIdxMode
+		db, err3 := Open(db.opt)
+		require.NoError(t, err3)
 		txGet(t, db, bucket, key, val, nil)
+		db.Close()
 	})
 }

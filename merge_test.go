@@ -15,12 +15,11 @@
 package nutsdb
 
 import (
+    "github.com/stretchr/testify/require"
+	"github.com/xujiajun/utils/strconv2"
 	"sync"
 	"testing"
 	"time"
-
-	"github.com/stretchr/testify/require"
-	"github.com/xujiajun/utils/strconv2"
 )
 
 func TestDB_MergeForString(t *testing.T) {
