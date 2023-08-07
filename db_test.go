@@ -32,7 +32,7 @@ var (
 	err error
 )
 
-const NutsDBTestDirPath = "/tmp/nutsdb-test"
+const NutsDBTestDirPath = "nutsdb-test"
 
 func assertErr(t *testing.T, err error, expectErr error) {
 	if expectErr != nil {
