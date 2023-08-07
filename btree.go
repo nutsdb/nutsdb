@@ -97,11 +97,7 @@ func (bt *BTree) PrefixScan(prefix []byte, offset, limitNum int) []*Record {
 		records = append(records, item.r)
 
 		limitNum--
-		if limitNum == 0 {
-			return false
-		}
-
-		return true
+		return limitNum != 0
 	})
 
 	return records
@@ -129,11 +125,7 @@ func (bt *BTree) PrefixSearchScan(prefix []byte, reg string, offset, limitNum in
 		records = append(records, item.r)
 
 		limitNum--
-		if limitNum == 0 {
-			return false
-		}
-
-		return true
+		return limitNum != 0
 	})
 
 	return records
