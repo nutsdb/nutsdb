@@ -99,7 +99,6 @@ func (db *DB) merge() error {
 				}
 
 				if entry.isFilter() {
-					fmt.Println(1)
 					off += entry.Size()
 					if off >= db.opt.SegmentSize {
 						break
