@@ -96,14 +96,14 @@ func (suite *TxBucketTestSuite) TestA_IterateBuckets() {
 	})
 	assert.Nil(suite.T(), err)
 
-	err = tx.IterateBuckets(DataStructureBPTree, "*", func(bucket string) bool {
+	err = tx.IterateBuckets(DataStructureTree, "*", func(bucket string) bool {
 		assert.Equal(suite.T(), "string_bucket", bucket)
 		return true
 	})
 	assert.Nil(suite.T(), err)
 
 	matched := false
-	_ = tx.IterateBuckets(DataStructureBPTree, "str*", func(bucket string) bool {
+	_ = tx.IterateBuckets(DataStructureTree, "str*", func(bucket string) bool {
 		matched = true
 		return true
 	})
@@ -138,7 +138,7 @@ func (suite *TxBucketTestSuite) TestB_DeleteBucket() {
 	err = tx.DeleteBucket(DataStructureList, "list_bucket")
 	assert.Nil(suite.T(), err)
 
-	err = tx.DeleteBucket(DataStructureBPTree, "string_bucket")
+	err = tx.DeleteBucket(DataStructureTree, "string_bucket")
 	assert.Nil(suite.T(), err)
 
 	err = tx.DeleteBucket(DataStructureNone, "none_bucket")

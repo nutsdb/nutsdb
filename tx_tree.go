@@ -146,17 +146,18 @@ func (tx *Tx) Get(bucket string, key []byte) (e *Entry, err error) {
 	}
 
 	if idxMode == HintKeyValAndRAMIdxMode || idxMode == HintKeyAndRAMIdxMode {
-		if idx, ok := tx.db.BPTreeIdx[bucket]; ok {
-			r, err := idx.Find(key)
-			if err != nil {
-				return nil, err
+		if idx, ok := tx.db.BTreeIdx[bucket]; ok {
+			r, found := idx.Find(key)
+			if !found {
+				return nil, ErrKeyNotFound
 			}
 
 			if _, ok := tx.db.committedTxIds[r.H.Meta.TxID]; !ok {
 				return nil, ErrNotFoundKey
 			}
 
-			if r.H.Meta.Flag == DataDeleteFlag || r.IsExpired() {
+			if r.IsExpired() {
+				tx.lazyDeletion(bucket, key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureTree)
 				return nil, ErrNotFoundKey
 			}
 
@@ -194,9 +195,9 @@ func (tx *Tx) GetAll(bucket string) (entries Entries, err error) {
 	}
 
 	if idxMode == HintKeyValAndRAMIdxMode || idxMode == HintKeyAndRAMIdxMode {
-		if index, ok := tx.db.BPTreeIdx[bucket]; ok {
-			records, err := index.All()
-			if err != nil {
+		if index, ok := tx.db.BTreeIdx[bucket]; ok {
+			records := index.All()
+			if len(records) == 0 {
 				return nil, ErrBucketEmpty
 			}
 
@@ -262,8 +263,8 @@ func (tx *Tx) RangeScan(bucket string, start, end []byte) (es Entries, err error
 		return es.ToCEntries(tx.db.opt.LessFunc).processEntriesScanOnDisk(), nil
 	}
 
-	if index, ok := tx.db.BPTreeIdx[bucket]; ok {
-		records, err := index.Range(start, end)
+	if index, ok := tx.db.BTreeIdx[bucket]; ok {
+		records := index.Range(start, end)
 		if err != nil {
 			return nil, ErrRangeScan
 		}
@@ -765,35 +766,27 @@ func (tx *Tx) prefixSearchScanByHintBPTSparseIdx(bucket string, prefix []byte, r
 
 // PrefixScan iterates over a key prefix at given bucket, prefix and limitNum.
 // LimitNum will limit the number of entries return.
-func (tx *Tx) PrefixScan(bucket string, prefix []byte, offsetNum int, limitNum int) (es Entries, off int, err error) {
+func (tx *Tx) PrefixScan(bucket string, prefix []byte, offsetNum int, limitNum int) (es Entries, err error) {
 
 	if err := tx.checkTxIsClosed(); err != nil {
-		return nil, off, err
+		return nil, err
 	}
 
 	if tx.db.opt.EntryIdxMode == HintBPTSparseIdxMode {
-		return tx.prefixScanByHintBPTSparseIdx(bucket, prefix, offsetNum, limitNum)
+		entries, _, err := tx.prefixScanByHintBPTSparseIdx(bucket, prefix, offsetNum, limitNum)
+		return entries, err
 	}
 
-	if idx, ok := tx.db.BPTreeIdx[bucket]; ok {
-		records, voff, err := idx.PrefixScan(prefix, offsetNum, limitNum)
-		if err != nil {
-			off = voff
-			return nil, off, ErrPrefixScan
-		}
-
+	if idx, ok := tx.db.BTreeIdx[bucket]; ok {
+		records := idx.PrefixScan(prefix, offsetNum, limitNum)
 		es, err = tx.getHintIdxDataItemsWrapper(records, limitNum, es, PrefixScan)
 		if err != nil {
-			off = voff
-			return nil, off, ErrPrefixScan
+			return nil, ErrPrefixScan
 		}
-
-		off = voff
-
 	}
 
 	if len(es) == 0 {
-		return nil, off, ErrPrefixScan
+		return nil, ErrPrefixScan
 	}
 
 	return
@@ -801,35 +794,27 @@ func (tx *Tx) PrefixScan(bucket string, prefix []byte, offsetNum int, limitNum i
 
 // PrefixSearchScan iterates over a key prefix at given bucket, prefix, match regular expression and limitNum.
 // LimitNum will limit the number of entries return.
-func (tx *Tx) PrefixSearchScan(bucket string, prefix []byte, reg string, offsetNum int, limitNum int) (es Entries, off int, err error) {
+func (tx *Tx) PrefixSearchScan(bucket string, prefix []byte, reg string, offsetNum int, limitNum int) (es Entries, err error) {
 
 	if err := tx.checkTxIsClosed(); err != nil {
-		return nil, off, err
+		return nil, err
 	}
 
 	if tx.db.opt.EntryIdxMode == HintBPTSparseIdxMode {
-		return tx.prefixSearchScanByHintBPTSparseIdx(bucket, prefix, reg, offsetNum, limitNum)
+		entries, _, err := tx.prefixSearchScanByHintBPTSparseIdx(bucket, prefix, reg, offsetNum, limitNum)
+		return entries, err
 	}
 
-	if idx, ok := tx.db.BPTreeIdx[bucket]; ok {
-		records, voff, err := idx.PrefixSearchScan(prefix, reg, offsetNum, limitNum)
-		if err != nil {
-			off = voff
-			return nil, off, ErrPrefixSearchScan
-		}
-
+	if idx, ok := tx.db.BTreeIdx[bucket]; ok {
+		records := idx.PrefixSearchScan(prefix, reg, offsetNum, limitNum)
 		es, err = tx.getHintIdxDataItemsWrapper(records, limitNum, es, PrefixSearchScan)
 		if err != nil {
-			off = voff
-			return nil, off, ErrPrefixSearchScan
+			return nil, ErrPrefixSearchScan
 		}
-
-		off = voff
-
 	}
 
 	if len(es) == 0 {
-		return nil, off, ErrPrefixSearchScan
+		return nil, ErrPrefixSearchScan
 	}
 
 	return
@@ -847,39 +832,37 @@ func (tx *Tx) Delete(bucket string, key []byte) error {
 		if e == nil || err == ErrNotFoundKey {
 			return ErrNotFoundKey
 		}
+		return nil
 	}
 
-	if idxMode == HintKeyValAndRAMIdxMode || idxMode == HintKeyAndRAMIdxMode {
-		if idx, ok := tx.db.BPTreeIdx[bucket]; ok {
-			r, err := idx.Find(key)
-			if err != nil {
-				return err
-			}
-			if r == nil {
-				return ErrNotFoundKey
-			}
-			if _, ok := tx.db.committedTxIds[r.H.Meta.TxID]; !ok {
-				return ErrNotFoundKey
-			}
-
-			if r.H.Meta.Flag == DataDeleteFlag || r.IsExpired() {
-				return ErrNotFoundKey
-			}
-		} else {
-			return ErrNotFoundBucket
+	if idx, ok := tx.db.BTreeIdx[bucket]; ok {
+		r, found := idx.Find(key)
+		if !found {
+			return ErrNotFoundKey
 		}
+
+		if _, ok := tx.db.committedTxIds[r.H.Meta.TxID]; !ok {
+			return ErrNotFoundKey
+		}
+
+		if r.IsExpired() {
+			tx.lazyDeletion(bucket, key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureTree)
+			return ErrNotFoundKey
+		}
+	} else {
+		return ErrNotFoundBucket
 	}
 
-	return tx.put(bucket, key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureBPTree)
+	return tx.put(bucket, key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureTree)
 }
 
 // getHintIdxDataItemsWrapper returns wrapped entries when prefix scanning or range scanning.
 func (tx *Tx) getHintIdxDataItemsWrapper(records Records, limitNum int, es Entries, scanMode string) (Entries, error) {
 	for _, r := range records {
-		if r.H.Meta.Flag == DataDeleteFlag || r.IsExpired() {
+		if r.IsExpired() {
+			tx.lazyDeletion(r.Bucket, r.H.Key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureTree)
 			continue
 		}
-
 		if limitNum > 0 && len(es) < limitNum || limitNum == ScanNoLimit {
 			idxMode := tx.db.opt.EntryIdxMode
 			if idxMode == HintKeyAndRAMIdxMode {
@@ -902,9 +885,7 @@ func (tx *Tx) getHintIdxDataItemsWrapper(records Records, limitNum int, es Entri
 				if err != nil {
 					return nil, err
 				}
-			}
-
-			if idxMode == HintKeyValAndRAMIdxMode {
+			} else {
 				es = append(es, r.E)
 			}
 		}

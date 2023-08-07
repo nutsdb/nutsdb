@@ -133,10 +133,10 @@ func TestTx_Close(t *testing.T) {
 		_, err = tx.RangeScan(bucket, []byte("foo0"), []byte("foo1"))
 		assert.Errorf(t, err, "err TestTx_Close")
 
-		_, _, err = tx.PrefixScan(bucket, []byte("foo"), 0, 1)
+		_, err = tx.PrefixScan(bucket, []byte("foo"), 0, 1)
 		assert.Errorf(t, err, "err TestTx_Close")
 
-		_, _, err = tx.PrefixSearchScan(bucket, []byte("f"), "oo", 0, 1)
+		_, err = tx.PrefixSearchScan(bucket, []byte("f"), "oo", 0, 1)
 		assert.Errorf(t, err, "err TestTx_Close")
 	})
 }

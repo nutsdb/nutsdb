@@ -16,51 +16,13 @@ package nutsdb
 
 import (
 	"fmt"
-	"io/ioutil"
-	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/xujiajun/utils/strconv2"
 )
-
-func Init() {
-	fileDir := "/tmp/nutsdbtesttx"
-	files, _ := ioutil.ReadDir(fileDir)
-	for _, f := range files {
-		name := f.Name()
-		if name != "" {
-			err := os.RemoveAll(fileDir + "/" + name)
-			if err != nil {
-				panic(err)
-			}
-		}
-	}
-
-	opt = DefaultOptions
-	opt.Dir = fileDir
-	opt.SegmentSize = 8 * 1024
-}
-
-func InitForBPTSparseIdxMode() {
-	fileDir := "/tmp/nutsdbtesttx2"
-	files, _ := ioutil.ReadDir(fileDir)
-	for _, f := range files {
-		name := f.Name()
-		if name != "" {
-			err := os.RemoveAll(fileDir + "/" + name)
-			if err != nil {
-				panic(err)
-			}
-		}
-	}
-
-	opt = DefaultOptions
-	opt.Dir = fileDir
-	opt.SegmentSize = 1024
-	opt.EntryIdxMode = HintBPTSparseIdxMode
-}
 
 func TestTx_PutAndGet(t *testing.T) {
 
@@ -301,7 +263,7 @@ func TestTx_PrefixScan(t *testing.T) {
 			)
 
 			prefix := []byte("key1_")
-			entries, _, err := tx.PrefixScan(bucket, prefix, offset, limit)
+			entries, err := tx.PrefixScan(bucket, prefix, offset, limit)
 			assert.NoError(t, err)
 
 			assert.NoError(t, tx.Commit())
@@ -349,7 +311,7 @@ func TestTx_PrefixSearchScan(t *testing.T) {
 		require.NoError(t, err)
 
 		prefix := []byte("key_")
-		entries, _, err := tx.PrefixSearchScan(bucket, prefix, regs, 0, 1)
+		entries, err := tx.PrefixSearchScan(bucket, prefix, regs, 0, 1)
 		assert.NoError(t, err)
 
 		assert.NoError(t, tx.Commit()) // tx commit
@@ -405,6 +367,32 @@ func TestTx_DeleteAndGet(t *testing.T) {
 		}
 	})
 
+}
+
+func TestTx_DeleteFromMemory(t *testing.T) {
+	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		bucket := "bucket"
+
+		for i := 0; i < 10; i++ {
+			txPut(t, db, bucket, GetTestBytes(i), GetTestBytes(i), Persistent, nil)
+		}
+
+		for i := 0; i < 10; i++ {
+			txGet(t, db, bucket, GetTestBytes(i), GetTestBytes(i), nil)
+		}
+
+		txDel(t, db, bucket, GetTestBytes(3), nil)
+
+		err := db.View(func(tx *Tx) error {
+			r, ok := tx.db.BTreeIdx[bucket].Find(GetTestBytes(3))
+			require.Nil(t, r)
+			require.False(t, ok)
+
+			return nil
+		})
+
+		require.NoError(t, err)
+	})
 }
 
 func TestTx_GetAndScansFromHintKey(t *testing.T) {
@@ -519,7 +507,7 @@ func TestTx_PrefixScan_NotFound(t *testing.T) {
 			assert.NoError(t, err)
 
 			prefix := []byte("key_")
-			entries, _, err := tx.PrefixScan("foobucket", prefix, 0, 10)
+			entries, err := tx.PrefixScan("foobucket", prefix, 0, 10)
 			assert.Error(t, err)
 			assert.Empty(t, entries)
 
@@ -551,7 +539,7 @@ func TestTx_PrefixScan_NotFound(t *testing.T) {
 				require.NoError(t, err)
 
 				prefix := []byte("key_foo")
-				entries, _, err := tx.PrefixScan(bucket, prefix, 0, 10)
+				entries, err := tx.PrefixScan(bucket, prefix, 0, 10)
 				assert.Error(t, err)
 				assert.NoError(t, tx.Commit())
 
@@ -562,7 +550,7 @@ func TestTx_PrefixScan_NotFound(t *testing.T) {
 				tx, err = db.Begin(false)
 				require.NoError(t, err)
 
-				entries, _, err := tx.PrefixScan(bucket, []byte("key_"), 0, 10)
+				entries, err := tx.PrefixScan(bucket, []byte("key_"), 0, 10)
 				assert.NoError(t, err)
 				assert.NoError(t, tx.Commit())
 
@@ -571,7 +559,7 @@ func TestTx_PrefixScan_NotFound(t *testing.T) {
 			}
 
 			{ // scan by closed tx
-				entries, _, err := tx.PrefixScan(bucket, []byte("key_"), 0, 10)
+				entries, err := tx.PrefixScan(bucket, []byte("key_"), 0, 10)
 				assert.Error(t, err)
 				if len(entries) > 0 || err == nil {
 					t.Error("err TestTx_PrefixScan_NotFound")
@@ -592,7 +580,7 @@ func TestTx_PrefixSearchScan_NotFound(t *testing.T) {
 			require.NoError(t, err)
 
 			prefix := []byte("key_")
-			_, _, err = tx.PrefixSearchScan("foobucket", prefix, regs, 0, 10)
+			_, err = tx.PrefixSearchScan("foobucket", prefix, regs, 0, 10)
 			assert.Error(t, err)
 
 			assert.NoError(t, tx.Commit())
@@ -622,7 +610,7 @@ func TestTx_PrefixSearchScan_NotFound(t *testing.T) {
 				require.NoError(t, err)
 
 				prefix := []byte("key_foo")
-				_, _, err = tx.PrefixSearchScan(bucket, prefix, regs, 0, 10)
+				_, err = tx.PrefixSearchScan(bucket, prefix, regs, 0, 10)
 				assert.Error(t, err)
 
 				assert.NoError(t, tx.Rollback())
@@ -634,7 +622,7 @@ func TestTx_PrefixSearchScan_NotFound(t *testing.T) {
 
 				assert.NoError(t, tx.Commit())
 
-				_, _, err = tx.PrefixSearchScan(bucket, []byte("key_"), regs, 0, 10)
+				_, err = tx.PrefixSearchScan(bucket, []byte("key_"), regs, 0, 10)
 				assert.Error(t, err)
 			}
 		})
@@ -738,7 +726,7 @@ func TestTx_SCan_For_BPTSparseIdxMode(t *testing.T) {
 			require.NoError(t, err)
 
 			limit := 5
-			es, _, err := tx.PrefixScan(bucket, []byte("key_"), 0, limit)
+			es, err := tx.PrefixScan(bucket, []byte("key_"), 0, limit)
 			assert.NoError(t, err)
 
 			assert.NoError(t, tx.Commit())
@@ -753,7 +741,7 @@ func TestTx_SCan_For_BPTSparseIdxMode(t *testing.T) {
 			require.NoError(t, err)
 
 			limit := 5
-			es, _, err := tx.PrefixSearchScan(bucket, []byte("key_"), regs, 0, limit)
+			es, err := tx.PrefixSearchScan(bucket, []byte("key_"), regs, 0, limit)
 			assert.NoError(t, tx.Commit())
 			assert.NoError(t, err)
 			assert.Equal(t, limit, len(es))
@@ -781,7 +769,7 @@ func TestTx_Notfound_For_BPTSparseIdxMode(t *testing.T) {
 			tx, err = db.Begin(false)
 			require.NoError(t, err)
 
-			es, _, err := tx.PrefixScan(bucket, []byte("key_prefix_fake"), 0, 10)
+			es, err := tx.PrefixScan(bucket, []byte("key_prefix_fake"), 0, 10)
 			assert.Error(t, err)
 			assert.NoError(t, tx.Commit())
 
@@ -795,7 +783,7 @@ func TestTx_Notfound_For_BPTSparseIdxMode(t *testing.T) {
 			tx, err := db.Begin(false)
 			require.NoError(t, err)
 
-			es, _, err := tx.PrefixSearchScan(bucket, []byte("key_prefix_fake"), regs, 0, 10)
+			es, err := tx.PrefixSearchScan(bucket, []byte("key_prefix_fake"), regs, 0, 10)
 			assert.Error(t, err)
 			assert.NoError(t, tx.Commit())
 
@@ -812,5 +800,76 @@ func TestTx_Notfound_For_BPTSparseIdxMode(t *testing.T) {
 
 			assert.Nil(t, es)
 		}
+	})
+}
+
+func TestTx_LazyDelete(t *testing.T) {
+	bucket := "bucket"
+
+	t.Run("lazy deletion when Get", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			txPut(t, db, bucket, GetTestBytes(0), GetTestBytes(0), 1, nil)
+			txGet(t, db, bucket, GetTestBytes(0), GetTestBytes(0), nil)
+
+			time.Sleep(1100 * time.Millisecond)
+
+			// this entry will be lazy deleted
+			txGet(t, db, bucket, GetTestBytes(0), nil, ErrNotFoundKey)
+
+			r, ok := db.BTreeIdx[bucket].Find(GetTestBytes(0))
+			require.Nil(t, r)
+			require.False(t, ok)
+		})
+	})
+
+	t.Run("lazy deletion when Delete", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			txPut(t, db, bucket, GetTestBytes(0), GetTestBytes(0), 1, nil)
+			txGet(t, db, bucket, GetTestBytes(0), GetTestBytes(0), nil)
+
+			time.Sleep(1100 * time.Millisecond)
+
+			// this entry will be lazy deleted
+			txDel(t, db, bucket, GetTestBytes(0), ErrNotFoundKey)
+
+			r, ok := db.BTreeIdx[bucket].Find(GetTestBytes(0))
+			require.Nil(t, r)
+			require.False(t, ok)
+		})
+	})
+
+	t.Run("lazy deletion when open", func(t *testing.T) {
+		opts := DefaultOptions
+		runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
+			txPut(t, db, bucket, GetTestBytes(0), GetTestBytes(0), 1, nil)
+			require.NoError(t, db.Close())
+
+			time.Sleep(1100 * time.Millisecond)
+
+			db, err := Open(opts)
+			require.NoError(t, err)
+
+			// because this entry is expired, so the index of this bucket is not exist
+			require.Nil(t, db.BTreeIdx[bucket])
+		})
+	})
+
+	t.Run("lazy deletion when merge", func(t *testing.T) {
+		opts := DefaultOptions
+		opts.SegmentSize = 1 * 100
+		runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
+			bucket := "bucket"
+			txPut(t, db, bucket, GetTestBytes(0), GetTestBytes(0), Persistent, nil)
+			txPut(t, db, bucket, GetTestBytes(1), GetTestBytes(1), Persistent, nil)
+			txPut(t, db, bucket, GetTestBytes(2), GetTestBytes(2), 1, nil)
+
+			time.Sleep(1100 * time.Millisecond)
+
+			require.NoError(t, db.Merge())
+
+			r, ok := db.BTreeIdx[bucket].Find(GetTestBytes(2))
+			require.Nil(t, r)
+			require.False(t, ok)
+		})
 	})
 }

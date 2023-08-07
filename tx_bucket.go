@@ -50,8 +50,8 @@ func (tx *Tx) IterateBuckets(ds uint16, pattern string, f func(key string) bool)
 			return err
 		}
 	}
-	if ds == DataStructureBPTree {
-		for bucket := range tx.db.BPTreeIdx {
+	if ds == DataStructureTree {
+		for bucket := range tx.db.BTreeIdx {
 			if end, err := MatchForRange(pattern, bucket, f); end || err != nil {
 				return err
 			}
@@ -83,7 +83,7 @@ func (tx *Tx) DeleteBucket(ds uint16, bucket string) error {
 	if ds == DataStructureSortedSet {
 		return tx.put(bucket, []byte("1"), nil, Persistent, DataSortedSetBucketDeleteFlag, uint64(time.Now().Unix()), DataStructureNone)
 	}
-	if ds == DataStructureBPTree {
+	if ds == DataStructureTree {
 		return tx.put(bucket, []byte("2"), nil, Persistent, DataBPTreeBucketDeleteFlag, uint64(time.Now().Unix()), DataStructureNone)
 	}
 	if ds == DataStructureList {
@@ -100,8 +100,8 @@ func (tx *Tx) ExistBucket(ds uint16, bucket string) (bool, error) {
 		_, ok = tx.db.SetIdx[bucket]
 	case DataStructureSortedSet:
 		_, ok = tx.db.SortedSetIdx[bucket]
-	case DataStructureBPTree:
-		_, ok = tx.db.BPTreeIdx[bucket]
+	case DataStructureTree:
+		_, ok = tx.db.BTreeIdx[bucket]
 	case DataStructureList:
 		ok = tx.db.Index.existList(bucket)
 	default:

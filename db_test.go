@@ -149,7 +149,7 @@ func TestDB_Basic(t *testing.T) {
 
 		// del
 		txDel(t, db, bucket, key0, nil)
-		txGet(t, db, bucket, key0, val1, ErrNotFoundKey)
+		txGet(t, db, bucket, key0, val1, ErrKeyNotFound)
 	})
 }
 
@@ -181,7 +181,7 @@ func TestDB_DeleteANonExistKey(t *testing.T) {
 		testBucket := "test_bucket"
 		txDel(t, db, testBucket, GetTestBytes(0), ErrNotFoundBucket)
 		txPut(t, db, testBucket, GetTestBytes(1), GetRandomBytes(24), Persistent, nil)
-		txDel(t, db, testBucket, GetTestBytes(0), ErrKeyNotFound)
+		txDel(t, db, testBucket, GetTestBytes(0), ErrNotFoundKey)
 	})
 }
 
@@ -352,15 +352,15 @@ func TestDB_GetRecordFromKey(t *testing.T) {
 		key := []byte("hello")
 		val := []byte("world")
 
-		_, err := db.getRecordFromKey(bucket, key)
-		require.Equal(t, ErrBucketNotFound, err)
+		_, ok := db.getRecordFromKey(bucket, key)
+		require.False(t, ok)
 
 		for i := 0; i < 10; i++ {
 			txPut(t, db, string(bucket), key, val, Persistent, nil)
 		}
 
-		r, err := db.getRecordFromKey(bucket, key)
-		require.NoError(t, err)
+		r, ok := db.getRecordFromKey(bucket, key)
+		require.True(t, ok)
 
 		require.Equal(t, 58, int(r.H.DataPos))
 		require.Equal(t, int64(4), r.H.FileID)
@@ -489,14 +489,14 @@ func TestDB_DeleteBucket(t *testing.T) {
 		key := GetTestBytes(0)
 		val := GetTestBytes(0)
 
-		txDeleteBucket(t, db, DataStructureBPTree, bucket, ErrBucketNotFound)
+		txDeleteBucket(t, db, DataStructureTree, bucket, ErrBucketNotFound)
 
 		txPut(t, db, bucket, key, val, Persistent, nil)
 		txGet(t, db, bucket, key, val, nil)
 
-		txDeleteBucket(t, db, DataStructureBPTree, bucket, nil)
+		txDeleteBucket(t, db, DataStructureTree, bucket, nil)
 		txGet(t, db, bucket, key, nil, ErrBucketNotFound)
-		txDeleteBucket(t, db, DataStructureBPTree, bucket, ErrBucketNotFound)
+		txDeleteBucket(t, db, DataStructureTree, bucket, ErrBucketNotFound)
 	})
 }
 
@@ -540,7 +540,7 @@ func withBPTSpareeIdxDB(t *testing.T, fn func(t *testing.T, db *DB)) {
 	withDBOption(t, opt, fn)
 }
 
-func Test_HintKeyValAndRAMIdxMode_RestartDB(t *testing.T) {
+func TestDB_HintKeyValAndRAMIdxMode_RestartDB(t *testing.T) {
 
 	opts := DefaultOptions
 	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
@@ -559,7 +559,7 @@ func Test_HintKeyValAndRAMIdxMode_RestartDB(t *testing.T) {
 	})
 }
 
-func Test_HintKeyAndRAMIdxMode_RestartDB(t *testing.T) {
+func TestDB_HintKeyAndRAMIdxMode_RestartDB(t *testing.T) {
 	opts := DefaultOptions
 	opts.EntryIdxMode = HintKeyAndRAMIdxMode
 	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
@@ -578,7 +578,7 @@ func Test_HintKeyAndRAMIdxMode_RestartDB(t *testing.T) {
 	})
 }
 
-func Test_HintBPTSparseIdxMode_RestartDB(t *testing.T) {
+func TestDB_HintBPTSparseIdxMode_RestartDB(t *testing.T) {
 	opts := DefaultOptions
 	opts.EntryIdxMode = HintBPTSparseIdxMode
 	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {

@@ -99,6 +99,7 @@ func (db *DB) merge() error {
 				}
 
 				if entry.isFilter() {
+					fmt.Println(1)
 					off += entry.Size()
 					if off >= db.opt.SegmentSize {
 						break
@@ -112,8 +113,13 @@ func (db *DB) merge() error {
 				// To address this issue, we need to use a transaction to perform this operation.
 				err := db.Update(func(tx *Tx) error {
 					// check if we have a new entry with same key and bucket
-					if r, _ := db.getRecordFromKey(entry.Bucket, entry.Key); r != nil {
-						if r.E.Meta.TxID <= entry.Meta.TxID {
+					if r, ok := db.getRecordFromKey(entry.Bucket, entry.Key); ok {
+						if r.IsExpired() {
+							// When merging, only need to delete the expired data directly from the index without leaving records
+							tx.db.BTreeIdx[string(entry.Bucket)].Delete(entry.Key)
+							return nil
+						}
+						if r.H.Meta.TxID <= entry.Meta.TxID {
 							if ok := db.isPendingMergeEntry(entry); ok {
 								return tx.put(
 									string(entry.Bucket),
@@ -195,24 +201,24 @@ func (db *DB) mergeWorker() {
 
 // getRecordFromKey fetches Record for given key and bucket
 // this is a helper function used in merge so it does not work if index mode is HintBPTSparseIdxMode
-func (db *DB) getRecordFromKey(bucket, key []byte) (record *Record, err error) {
+func (db *DB) getRecordFromKey(bucket, key []byte) (*Record, bool) {
 	idxMode := db.opt.EntryIdxMode
-	if !(idxMode == HintKeyValAndRAMIdxMode || idxMode == HintKeyAndRAMIdxMode) {
-		return nil, errors.New("not implemented")
+	if idxMode == HintBPTSparseIdxMode {
+		return nil, false
 	}
-	idx, ok := db.BPTreeIdx[string(bucket)]
+	idx, ok := db.BTreeIdx[string(bucket)]
 	if !ok {
-		return nil, ErrBucketNotFound
+		return nil, false
 	}
 	return idx.Find(key)
 }
 
 func (db *DB) isPendingMergeEntry(entry *Entry) bool {
-	if entry.Meta.Ds == DataStructureBPTree {
-		bptIdx, exist := db.BPTreeIdx[string(entry.Bucket)]
+	if entry.Meta.Ds == DataStructureTree {
+		bptIdx, exist := db.BTreeIdx[string(entry.Bucket)]
 		if exist {
-			r, err := bptIdx.Find(entry.Key)
-			if err == nil && r.H.Meta.Flag == DataSetFlag {
+			r, ok := bptIdx.Find(entry.Key)
+			if ok && r.H.Meta.Flag == DataSetFlag {
 				return true
 			}
 		}

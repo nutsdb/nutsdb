@@ -181,12 +181,7 @@ func (e *Entry) isFilter() bool {
 		DataZPopMinFlag,
 		DataLRemByIndex,
 	}
-	if OneOfUint16Array(meta.Flag, filterDataSet) ||
-		IsExpired(meta.TTL, meta.Timestamp) {
-		return true
-	}
-
-	return false
+	return OneOfUint16Array(meta.Flag, filterDataSet)
 }
 
 // valid check the entry fields valid or not

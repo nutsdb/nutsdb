@@ -152,8 +152,8 @@ const (
 	// DataStructureSortedSet represents the data structure sorted set flag
 	DataStructureSortedSet
 
-	// DataStructureBPTree represents the data structure b+ tree flag
-	DataStructureBPTree
+	// DataStructureTree represents the data structure b+ tree or b tree flag
+	DataStructureTree
 
 	// DataStructureList represents the data structure list flag
 	DataStructureList
@@ -167,8 +167,8 @@ const FLockName = "nutsdb-flock"
 type (
 	// DB represents a collection of buckets that persist on disk.
 	DB struct {
-		opt                     Options   // the database options
-		BPTreeIdx               BPTreeIdx // Hint Index
+		opt                     Options // the database options
+		BTreeIdx                BTreeIdx
 		BPTreeRootIdxes         []*BPTreeRootIdx
 		BPTreeKeyEntryPosMap    map[string]int64 // key = bucket+key  val = EntryPos
 		bucketMetas             BucketMetasIdx
@@ -200,7 +200,8 @@ type (
 // open returns a newly initialized DB object.
 func open(opt Options) (*DB, error) {
 	db := &DB{
-		BPTreeIdx:               make(BPTreeIdx),
+		//BPTreeIdx:               make(BPTreeIdx),
+		BTreeIdx:                make(BTreeIdx),
 		SetIdx:                  make(SetIdx),
 		SortedSetIdx:            make(SortedSetIdx),
 		ActiveBPTreeIdx:         NewTree(),
@@ -370,7 +371,7 @@ func (db *DB) release() error {
 		return err
 	}
 
-	db.BPTreeIdx = nil
+	db.BTreeIdx = nil
 
 	db.BPTreeKeyEntryPosMap = nil
 
@@ -698,7 +699,6 @@ func (db *DB) parseDataFiles(dataFileIds []int) (unconfirmedRecords []*Record, c
 					return nil, nil, fmt.Errorf("can not ingest the hint obj to ActiveCommittedTxIdsIdx, err: %s", err.Error())
 				}
 			}
-
 			h := NewHint().WithKey(entry.Key).WithFileId(fID).WithMeta(entry.Meta).WithDataPos(uint64(off))
 			r := NewRecord().WithHint(h).WithEntry(e).WithBucket(entry.GetBucketString())
 			unconfirmedRecords = append(unconfirmedRecords, r)
@@ -755,16 +755,22 @@ func (db *DB) buildBPTreeRootIdxes(dataFileIds []int) error {
 	return nil
 }
 
-func (db *DB) buildBPTreeIdx(bucket string, r *Record) error {
-	if _, ok := db.BPTreeIdx[bucket]; !ok {
-		db.BPTreeIdx[bucket] = NewTree()
+func (db *DB) buildBTreeIdx(bucket string, r *Record) {
+	if r.IsExpired() {
+		return
 	}
 
-	if err := db.BPTreeIdx[bucket].Insert(r.H.Key, r.E, r.H, CountFlagEnabled); err != nil {
-		return fmt.Errorf("when build BPTreeIdx insert index err: %s", err)
+	if _, ok := db.BTreeIdx[bucket]; !ok {
+		db.BTreeIdx[bucket] = NewBTree()
 	}
 
-	return nil
+	key := r.H.Key
+
+	if r.H.Meta.Flag == DataDeleteFlag {
+		db.BTreeIdx[bucket].Delete(key)
+	} else {
+		db.BTreeIdx[bucket].Insert(key, r.E, r.H)
+	}
 }
 
 func (db *DB) buildActiveBPTreeIdx(r *Record) error {
@@ -848,7 +854,7 @@ func (db *DB) buildHintIdx(dataFileIds []int) error {
 		if _, ok := db.committedTxIds[r.H.Meta.TxID]; ok {
 			bucket := r.Bucket
 
-			if r.H.Meta.Ds == DataStructureBPTree {
+			if r.H.Meta.Ds == DataStructureTree {
 				r.H.Meta.Status = Committed
 
 				if db.opt.EntryIdxMode == HintBPTSparseIdxMode {
@@ -856,18 +862,16 @@ func (db *DB) buildHintIdx(dataFileIds []int) error {
 						return err
 					}
 				} else {
-					if err = db.buildBPTreeIdx(bucket, r); err != nil {
-						return err
-					}
+					db.buildBTreeIdx(bucket, r)
 				}
-			}
+			} else {
+				if err = db.buildOtherIdxes(bucket, r); err != nil {
+					return err
+				}
 
-			if err = db.buildOtherIdxes(bucket, r); err != nil {
-				return err
-			}
-
-			if r.H.Meta.Ds == DataStructureNone {
-				db.buildNotDSIdxes(bucket, r)
+				if r.H.Meta.Ds == DataStructureNone {
+					db.buildNotDSIdxes(bucket, r)
+				}
 			}
 
 			db.KeyCount++
@@ -891,7 +895,7 @@ func (db *DB) buildNotDSIdxes(bucket string, r *Record) {
 		db.deleteBucket(DataStructureSortedSet, bucket)
 	}
 	if r.H.Meta.Flag == DataBPTreeBucketDeleteFlag {
-		db.deleteBucket(DataStructureBPTree, bucket)
+		db.deleteBucket(DataStructureTree, bucket)
 	}
 	if r.H.Meta.Flag == DataListBucketDeleteFlag {
 		db.deleteBucket(DataStructureList, bucket)
@@ -905,8 +909,8 @@ func (db *DB) deleteBucket(ds uint16, bucket string) {
 	if ds == DataStructureSortedSet {
 		delete(db.SortedSetIdx, bucket)
 	}
-	if ds == DataStructureBPTree {
-		delete(db.BPTreeIdx, bucket)
+	if ds == DataStructureTree {
+		delete(db.BTreeIdx, bucket)
 	}
 	if ds == DataStructureList {
 		db.Index.deleteList(bucket)
@@ -1106,11 +1110,11 @@ func (db *DB) managed(writable bool, fn func(tx *Tx) error) (err error) {
 	if err != nil {
 		return err
 	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("panic when executing tx, err is %+v", r)
-		}
-	}()
+	//defer func() {
+	//	if r := recover(); r != nil {
+	//		err = fmt.Errorf("panic when executing tx, err is %+v", r)
+	//	}
+	//}()
 
 	if err = fn(tx); err == nil {
 		err = tx.Commit()

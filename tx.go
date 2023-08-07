@@ -101,9 +101,9 @@ type txnCb struct {
 func runTxnCallback(cb *txnCb) {
 	switch {
 	case cb == nil:
-		panic("txn callback is nil")
+		panic("tx callback is nil")
 	case cb.user == nil:
-		panic("Must have caught a nil callback for txn.CommitWith")
+		panic("Must have caught a nil callback for tx.CommitWith")
 	case cb.err != nil:
 		cb.user(cb.err)
 	case cb.commit != nil:
@@ -291,7 +291,7 @@ func (tx *Tx) Commit() (err error) {
 
 		offset := tx.db.ActiveFile.writeOff + int64(buff.Len())
 
-		if entry.Meta.Ds == DataStructureBPTree {
+		if entry.Meta.Ds == DataStructureTree {
 			tx.db.BPTreeKeyEntryPosMap[string(getNewKey(string(entry.Bucket), entry.Key))] = offset
 		}
 
@@ -333,8 +333,8 @@ func (tx *Tx) Commit() (err error) {
 			e = entry
 		}
 
-		if entry.Meta.Ds == DataStructureBPTree {
-			tx.buildBPTreeIdx(bucket, entry, e, offset, countFlag)
+		if entry.Meta.Ds == DataStructureTree {
+			tx.buildTreeIdx(bucket, entry, e, offset, countFlag)
 		}
 
 		if entry.Meta.Ds == DataStructureList {
@@ -346,7 +346,7 @@ func (tx *Tx) Commit() (err error) {
 		}
 
 		if entry.Meta.Ds == DataStructureNone && entry.Meta.Flag == DataBPTreeBucketDeleteFlag {
-			tx.db.deleteBucket(DataStructureBPTree, bucket)
+			tx.db.deleteBucket(DataStructureTree, bucket)
 		}
 	}
 
@@ -511,7 +511,7 @@ func (tx *Tx) buildIdxes() {
 	}
 }
 
-func (tx *Tx) buildBPTreeIdx(bucket string, entry, e *Entry, offset int64, countFlag bool) {
+func (tx *Tx) buildTreeIdx(bucket string, entry, e *Entry, offset int64, countFlag bool) {
 	if tx.db.opt.EntryIdxMode == HintBPTSparseIdxMode {
 		newKey := getNewKey(bucket, entry.Key)
 		_ = tx.db.ActiveBPTreeIdx.Insert(newKey, e, &Hint{
@@ -521,19 +521,20 @@ func (tx *Tx) buildBPTreeIdx(bucket string, entry, e *Entry, offset int64, count
 			DataPos: uint64(offset),
 		}, countFlag)
 	} else {
-		if _, ok := tx.db.BPTreeIdx[bucket]; !ok {
-			tx.db.BPTreeIdx[bucket] = NewTree()
+		if _, ok := tx.db.BTreeIdx[bucket]; !ok {
+			tx.db.BTreeIdx[bucket] = NewBTree()
 		}
 
-		if tx.db.BPTreeIdx[bucket] == nil {
-			tx.db.BPTreeIdx[bucket] = NewTree()
+		if entry.Meta.Flag == DataSetFlag {
+			tx.db.BTreeIdx[bucket].Insert(entry.Key, e, &Hint{
+				FileID:  tx.db.ActiveFile.fileID,
+				Key:     entry.Key,
+				Meta:    entry.Meta,
+				DataPos: uint64(offset),
+			})
+		} else if entry.Meta.Flag == DataDeleteFlag {
+			tx.db.BTreeIdx[bucket].Delete(entry.Key)
 		}
-		_ = tx.db.BPTreeIdx[bucket].Insert(entry.Key, e, &Hint{
-			FileID:  tx.db.ActiveFile.fileID,
-			Key:     entry.Key,
-			Meta:    entry.Meta,
-			DataPos: uint64(offset),
-		}, countFlag)
 	}
 }
 
@@ -776,13 +777,13 @@ func (tx *Tx) handleErr(err error) {
 }
 
 func (tx *Tx) PutWithTimestamp(bucket string, key, value []byte, ttl uint32, timestamp uint64) error {
-	return tx.put(bucket, key, value, ttl, DataSetFlag, timestamp, DataStructureBPTree)
+	return tx.put(bucket, key, value, ttl, DataSetFlag, timestamp, DataStructureTree)
 }
 
 // Put sets the value for a key in the bucket.
 // a wrapper of the function put.
 func (tx *Tx) Put(bucket string, key, value []byte, ttl uint32) error {
-	return tx.put(bucket, key, value, ttl, DataSetFlag, uint64(time.Now().Unix()), DataStructureBPTree)
+	return tx.put(bucket, key, value, ttl, DataSetFlag, uint64(time.Now().Unix()), DataStructureTree)
 }
 
 func (tx *Tx) checkTxIsClosed() error {
@@ -816,6 +817,15 @@ func (tx *Tx) put(bucket string, key, value []byte, ttl uint32, flag uint16, tim
 	tx.size += e.Size()
 
 	return nil
+}
+
+func (tx *Tx) lazyDeletion(bucket string, key, value []byte, ttl uint32, flag uint16, timestamp uint64, ds uint16) {
+	meta := NewMetaData().WithTimeStamp(timestamp).WithKeySize(uint32(len(key))).WithValueSize(uint32(len(value))).WithFlag(flag).
+		WithTTL(ttl).WithBucketSize(uint32(len(bucket))).WithStatus(UnCommitted).WithDs(ds).WithTxID(tx.id)
+
+	e := NewEntry().WithKey(key).WithBucket([]byte(bucket)).WithMeta(meta).WithValue(value)
+	tx.pendingWrites = append(tx.pendingWrites, e)
+	tx.size += e.Size()
 }
 
 // setStatusCommitting will change the tx status to txStatusCommitting
