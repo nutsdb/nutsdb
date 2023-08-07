@@ -15,7 +15,7 @@
 package nutsdb
 
 import (
-    "github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/require"
 	"github.com/xujiajun/utils/strconv2"
 	"sync"
 	"testing"
