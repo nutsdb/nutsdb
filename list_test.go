@@ -77,6 +77,35 @@ func TestList_LPush(t *testing.T) {
 	ListCmp(t, list, key, expectRecords, true)
 }
 
+func TestList_LRange(t *testing.T) {
+	list := NewList()
+	expectRecords := generateRecords(5)
+	key := string(GetTestBytes(0))
+
+	for i := 0; i < len(expectRecords); i++ {
+		ListPush(t, list, key, expectRecords[i], true, nil)
+	}
+
+	// range [start, end]
+	records, err := list.LRange(key, 0, -1)
+	require.NoError(t, err)
+	require.ElementsMatch(t, expectRecords, records)
+
+	// range [1, 3]
+	records, err = list.LRange(key, 1, 3)
+	require.NoError(t, err)
+	require.ElementsMatch(t, expectRecords[1:4], records)
+
+	// range [3, 3]
+	records, err = list.LRange(key, -2, 3)
+	require.NoError(t, err)
+	require.ElementsMatch(t, expectRecords[1:2], records)
+
+	records, err = list.LRange(key, 5, -1)
+	require.Nil(t, records)
+	require.Error(t, err)
+}
+
 func TestList_RPush(t *testing.T) {
 	list := NewList()
 	expectRecords := generateRecords(5)
