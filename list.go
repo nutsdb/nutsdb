@@ -24,6 +24,8 @@ var (
 	// ErrListNotFound is returned when the list not found.
 	ErrListNotFound = errors.New("the list not found")
 
+	ErrListIsEmpty = errors.New("the list is empty")
+
 	// ErrIndexOutOfRange is returned when use LSet function set index out of range.
 	ErrIndexOutOfRange = errors.New("index out of range")
 )
@@ -109,17 +111,21 @@ func (l *List) peek(key string, isLeft bool) (*Record, error) {
 		return nil, ErrListNotFound
 	}
 
+	iterator := list.Iterator()
+
 	if isLeft {
-		if r, ok := list.Get(0); ok {
-			return r.(*Record), nil
+		iterator.Begin()
+		if r, ok := iterator.Value().(*Record); ok {
+			return r, nil
 		}
 	} else {
-		if r, ok := list.Get(l.Items[key].Size() - 1); ok {
-			return r.(*Record), nil
+		iterator.End()
+		if r, ok := iterator.Value().(*Record); ok {
+			return r, nil
 		}
 	}
 
-	return nil, nil
+	return nil, ErrListIsEmpty
 }
 
 // LRange returns the specified elements of the list stored at key [start,end]
