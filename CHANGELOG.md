@@ -155,3 +155,70 @@
 * [UnitTest] Add test for bucket in errors.go Add test for bucket in errors.go #278 @ShawnHXH
 * [UnitTest] add test for rwmanger_mmap.Release add test for rwmanger_mmap.Release #283 @vegetabledogdog
 * [UnitTest] test: add tests for IsDBClosed, IsPrefixScan and IsPrefixSearchScan test: add tests for IsDBClosed, IsPrefixScan and IsPrefixSearchScan #290 @CodePrometheus
+
+## v0.12.1（2023-05-19）
+* [Bug Fix] fix delete non exist will not raise error bug by @elliotchenzichang in #331
+* [Bug Fix] issue #306 - added a MAX_SIZE const that fits 32 and 64bit arch by @hivenet-philippe in #308
+* [New Feature] add GetListTTL by @wangxuanni in #316
+* [Refactor] delete a repeat error validation logic by @elliotchenzichang in #324
+* [Refactor] make bucket value as a property in entry by @elliotchenzichang in #323
+* [Refactor] move crc property into meta struct by @elliotchenzichang in #325
+* [Refactor] delete the position property of entry struct by @elliotchenzichang in #326
+* [Refactor] Refactor-actor method isFilterEntry by @elliotchenzichang in #327
+* [Refactor] add function return the status of DB by @elliotchenzichang in #329
+* [Refactor] add status management by @elliotchenzichang in #330
+* [Refactor] rebuild the status management code by @elliotchenzichang in #332
+* [Refactor] delete the param of writelen by @elliotchenzichang in #333
+* [Refactor] Refactor entry length check by @elliotchenzichang in #334
+* [Test] Add test for PutWithTimestamp in tx.go by @rayz in #307
+* [Docs] docs(readme): format code by @rfyiamcool in #319
+
+## v0.12.2（2023-05-21）
+* [Bug Fix] fix ignore bucket when db recovering by @elliotchenzichang in #336
+
+## v0.12.3（2023-06-23）
+* [Bug Fix] fix the bucket issue by @elliotchenzichang in #337
+* [Bug Fix] fix: err desc for ErrWhenBuildListIdx by @xujiajun in #338
+* [Bug Fix] fix: r.E.Bucket err by @xujiajun in #341
+
+## v0.12.4（2023-07-25）
+* [Bug Fix] fix: remove unnecessary null checks when writing to a list. by @bigboss2063 in #353
+* [Bug Fix] fix the bug of nil entry by @elliotchenzichang in #377
+* [Bug Fix] bug fix, add defer function to release lock to avoid deadlock by @elliotchenzichang in #356
+* [Bug Fix] Fix the bug of nil entry by @elliotchenzichang in #380
+* [Bug Fix] fix: deadlock caused by error by @lyl156 in #371
+* [New Feature] feature: make all objects set to nil after the user calls the close f… by @tobehardest in #374
+* [New Feature] feat: implement file lock by @bigboss2063 in #372
+* [Refactor] just move the index structure in a rightful space by @elliotchenzichang in #343
+* [Refactor] fix some issue in go mod config by @elliotchenzichang in #345
+* [Refactor] rebuild the index module for index struct by @elliotchenzichang in #346
+* [Refactor] rebuild the add function in list index by @elliotchenzichang in #350
+* [Refactor] use bytes.Equal instead bytes.Compare by @testwill in #355
+* [Refactor] rebuild the way to create hint object by @elliotchenzichang in #357
+* [Refactor] rebuild isFilter function by @elliotchenzichang in #358
+* [Refactor] rebuild the way to new Entry Object by @elliotchenzichang in #359
+* [Refactor] add comments in entry file by @elliotchenzichang in #362
+* [Refactor] rebuilt the way to new Record object by @elliotchenzichang in #365
+* [Refactor] rebuild part of recovery logic by @elliotchenzichang in #366
+* [Refactor] refactor: use a const to replace magic string by @bigboss2063 in #376
+* [Test] Add test WithNodeNum in nutsdb/options.go by @dongzhiwei-git in #361
+* [Test] test: test WithRWMode by @JingchenZhang in #368
+* [Test] test: test rw manager mmap by @lyl156 in #363
+* [Test] add test case for ErrWhenBuildListIdx func in db.go and optimize enqueue func in bptree.go and add test case by @damotiansheng in #370
+* [Test] test with ReadNode ,WithCleanFdsCacheThreshold,WithMaxFdNumsInCache,WithSyncEnable by @JingchenZhang in #369
+* [Test] test: rebuild unit tests in db_test.go(issue#374, task 4) by @bigboss2063 in #375
+* [Chore] chore: remove element in cache on closing fd manager by @lyl156 in #364
+
+## v0.12.6（2023-07-26）
+* [Refactor] refactor: refactoring the initialization way of the MetaData by @bigboss2063 in #381
+* [Refactor] Small scope refactoring code:move some util func to utils.go from db.go by @damotiansheng in #379
+
+## v0.13.0（2023-08-01）
+* [Bug Fix] fix: fix the bug that allows deletion of a non-existent bucket. by @bigboss2063 in #388
+* [Perf] pref: remove sync.Pool and prev allocate buffer for small tx by @bigboss2063 in #384
+* [New Feature] feat: implement automatic merging by @bigboss2063 in #393
+* [New Feature] feat: add custom comparator by @lyl156 in #389
+* [New Feature] feat: refactor list data structure by using doubly linked list and support HintKeyAndRAMIdxMode by @bigboss2063 in #390
+* [Docs] doc: update options doc by @lyl156 in #391
+* [Docs] doc: add a new option and update the default option by @bigboss2063 in #396
+* [Chore] chore: add error handler for error occurred during transaction by @lyl156 in #383
