@@ -163,10 +163,10 @@
 * [Refactor] delete a repeat error validation logic by @elliotchenzichang in #324
 * [Refactor] make bucket value as a property in entry by @elliotchenzichang in #323
 * [Refactor] move crc property into meta struct by @elliotchenzichang in #325
-* [Refactor] detele the position porperty of entry struct by @elliotchenzichang in #326
-* [Refactor] Refactoractor method isFilterEntry by @elliotchenzichang in #327
+* [Refactor] delete the position property of entry struct by @elliotchenzichang in #326
+* [Refactor] Refactor-actor method isFilterEntry by @elliotchenzichang in #327
 * [Refactor] add function return the status of DB by @elliotchenzichang in #329
-* [Refactor] add status managerment by @elliotchenzichang in #330
+* [Refactor] add status management by @elliotchenzichang in #330
 * [Refactor] rebuild the status management code by @elliotchenzichang in #332
 * [Refactor] delete the param of writelen by @elliotchenzichang in #333
 * [Refactor] Refactor entry length check by @elliotchenzichang in #334
@@ -191,7 +191,7 @@
 * [New Feature] feat: implement file lock by @bigboss2063 in #372
 * [Refactor] just move the index structure in a rightful space by @elliotchenzichang in #343
 * [Refactor] fix some issue in go mod config by @elliotchenzichang in #345
-* [Refactor] rebuild the index moudle for index struct by @elliotchenzichang in #346
+* [Refactor] rebuild the index module for index struct by @elliotchenzichang in #346
 * [Refactor] rebuild the add function in list index by @elliotchenzichang in #350
 * [Refactor] use bytes.Equal instead bytes.Compare by @testwill in #355
 * [Refactor] rebuild the way to create hint object by @elliotchenzichang in #357
@@ -201,9 +201,9 @@
 * [Refactor] rebuilt the way to new Record object by @elliotchenzichang in #365
 * [Refactor] rebuild part of recovery logic by @elliotchenzichang in #366
 * [Refactor] refactor: use a const to replace magic string by @bigboss2063 in #376
-* [Test] Add test WithNodeNum in nutsdb/optins.go by @dongzhiwei-git in #361
+* [Test] Add test WithNodeNum in nutsdb/options.go by @dongzhiwei-git in #361
 * [Test] test: test WithRWMode by @JingchenZhang in #368
-* [Test] test: test rwmanager mmap by @lyl156 in #363
+* [Test] test: test rw manager mmap by @lyl156 in #363
 * [Test] add test case for ErrWhenBuildListIdx func in db.go and optimize enqueue func in bptree.go and add test case by @damotiansheng in #370
 * [Test] test with ReadNode ,WithCleanFdsCacheThreshold,WithMaxFdNumsInCache,WithSyncEnable by @JingchenZhang in #369
 * [Test] test: rebuild unit tests in db_test.go(issue#374, task 4) by @bigboss2063 in #375
