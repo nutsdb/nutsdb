@@ -235,9 +235,9 @@ func txZAdd(t *testing.T, db *DB, bucket string, key, value []byte, score float6
 	require.NoError(t, err)
 }
 
-func txZRem(t *testing.T, db *DB, bucket string, key []byte, expectErr error) {
+func txZRem(t *testing.T, db *DB, bucket string, key, value []byte, expectErr error) {
 	err := db.Update(func(tx *Tx) error {
-		err := tx.ZRem(bucket, string(key))
+		err := tx.ZRem(bucket, string(key), value)
 		assertErr(t, err, expectErr)
 		return nil
 	})
@@ -257,11 +257,11 @@ func txZCard(t *testing.T, db *DB, bucket string, key []byte, expectLength int, 
 	require.NoError(t, err)
 }
 
-func txZScore(t *testing.T, db *DB, bucket, key string, value []byte, expectScore float64, expectErr error) {
+func txZScore(t *testing.T, db *DB, bucket string, key, value []byte, expectScore float64, expectErr error) {
 	err := db.View(func(tx *Tx) error {
-		score, err := tx.ZScore(bucket, key, value)
+		score, err := tx.ZScore(bucket, string(key), value)
 		if err != nil {
-			require.NoError(t, err)
+			require.Equal(t, expectErr, err)
 		} else {
 			require.Equal(t, expectScore, score)
 		}
@@ -274,6 +274,29 @@ func txZRangeByRank(t *testing.T, db *DB, bucket, key string, start, end int) {
 	err := db.Update(func(tx *Tx) error {
 		err := tx.ZRemRangeByRank(bucket, key, start, end)
 		require.NoError(t, err)
+		return nil
+	})
+	require.NoError(t, err)
+}
+
+func txZPop(t *testing.T, db *DB, bucket, key string, isMax bool, expectVal []byte, expectScore float64, expectErr error) {
+	err := db.Update(func(tx *Tx) error {
+		var (
+			member *ZSetMember
+			err    error
+		)
+		if isMax {
+			member, err = tx.ZPopMax(bucket, key)
+		} else {
+			member, err = tx.ZPopMin(bucket, key)
+		}
+
+		if expectErr != nil {
+			require.Equal(t, expectErr, err)
+		} else {
+			require.Equal(t, expectVal, member.Value)
+			require.Equal(t, expectScore, member.Score)
+		}
 		return nil
 	})
 	require.NoError(t, err)

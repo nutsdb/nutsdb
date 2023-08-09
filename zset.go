@@ -197,20 +197,14 @@ func (z *ZSet) ZRem(key string, value []byte) (*Record, error) {
 	return nil, ErrZSetNotFound
 }
 
-func (z *ZSet) ZRemRangeByRank(key string, start int, end int) (map[*Record]SCORE, error) {
+func (z *ZSet) ZRemRangeByRank(key string, start int, end int) error {
 	if zset, ok := z.M[key]; ok {
 
-		nodes := zset.GetByRankRange(start, end, true)
-
-		members := make(map[*Record]SCORE, len(nodes))
-		for _, node := range nodes {
-			members[node.record] = node.score
-		}
-
-		return members, nil
+		_ = zset.GetByRankRange(start, end, true)
+		return nil
 	}
 
-	return nil, ErrZSetNotFound
+	return ErrZSetNotFound
 }
 
 func (z *ZSet) ZRank(key string, value []byte) (int, error) {
@@ -252,6 +246,18 @@ func (z *ZSet) ZScore(key string, value []byte) (float64, error) {
 		return 0, ErrZSetMemberNotExist
 	}
 	return 0, ErrZSetNotFound
+}
+
+func (z *ZSet) ZExist(key string, value []byte) (bool, error) {
+	if zset, ok := z.M[key]; ok {
+		hash, err := getFnv32(value)
+		if err != nil {
+			return false, err
+		}
+		_, ok := zset.dict[hash]
+		return ok, nil
+	}
+	return false, ErrZSetNotFound
 }
 
 // SCORE represents the score type.

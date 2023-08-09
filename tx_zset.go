@@ -230,12 +230,21 @@ func (tx *Tx) ZRangeByRank(bucket, key string, start, end int) ([]*ZSetMember, e
 }
 
 // ZRem removes the specified members from the sorted set stored in one bucket at given bucket and key.
-func (tx *Tx) ZRem(bucket, key string) error {
+func (tx *Tx) ZRem(bucket, key string, value []byte) error {
 	if err := tx.ZCheck(bucket); err != nil {
 		return err
 	}
 
-	return tx.put(bucket, []byte(key), []byte(""), Persistent, DataZRemFlag, uint64(time.Now().Unix()), DataStructureSortedSet)
+	exist, err := tx.db.SortedSetIdx[bucket].ZExist(key, value)
+	if err != nil {
+		return err
+	}
+
+	if !exist {
+		return ErrZSetMemberNotExist
+	}
+
+	return tx.put(bucket, []byte(key), value, Persistent, DataZRemFlag, uint64(time.Now().Unix()), DataStructureSortedSet)
 }
 
 // ZRemRangeByRank removes all elements in the sorted set stored in one bucket at given bucket with rank between start and end.

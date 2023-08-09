@@ -96,21 +96,21 @@ func TestDB_MergeForZSet(t *testing.T) {
 
 		for i := 0; i < 100; i++ {
 			score, _ := strconv2.IntToFloat64(i)
-			txZScore(t, db, bucket, string(key), GetTestBytes(i), score, nil)
+			txZScore(t, db, bucket, key, GetTestBytes(i), score, nil)
 		}
 
 		for i := 0; i < 50; i++ {
-			txZRem(t, db, bucket, GetTestBytes(i), nil)
+			txZRem(t, db, bucket, GetTestBytes(i), GetTestBytes(i), nil)
 		}
 
 		for i := 0; i < 50; i++ {
 			score, _ := strconv2.IntToFloat64(i)
-			txZScore(t, db, bucket, string(key), GetTestBytes(i), score, ErrZSetMemberNotExist)
+			txZScore(t, db, bucket, key, GetTestBytes(i), score, ErrZSetMemberNotExist)
 		}
 
 		for i := 50; i < 100; i++ {
 			score, _ := strconv2.IntToFloat64(i)
-			txZScore(t, db, bucket, string(key), GetTestBytes(i), score, nil)
+			txZScore(t, db, bucket, key, GetTestBytes(i), score, nil)
 		}
 
 		txZRangeByRank(t, db, bucket, string(key), 20, 30)
@@ -119,7 +119,7 @@ func TestDB_MergeForZSet(t *testing.T) {
 
 		for i := 50; i < 100; i++ {
 			score, _ := strconv2.IntToFloat64(i)
-			txZScore(t, db, bucket, string(key), GetTestBytes(i), score, nil)
+			txZScore(t, db, bucket, key, GetTestBytes(i), score, nil)
 		}
 	})
 }
