@@ -20,8 +20,8 @@ import (
 )
 
 var (
-	// ErrSetNotExist is returned when the key does not exist.
-	ErrSetNotExist = errors.New("set not exist")
+	// ErrSetNotFound is returned when the key does not exist.
+	ErrSetNotFound = errors.New("set not exist")
 
 	// ErrSetMemberNotExist is returned when the member of set does not exist
 	ErrSetMemberNotExist = errors.New("set member not exist")
@@ -65,7 +65,7 @@ func (s *Set) SAdd(key string, values [][]byte, records []*Record) error {
 func (s *Set) SRem(key string, values ...[]byte) error {
 	set, ok := s.M[key]
 	if !ok {
-		return ErrKeyNotFound
+		return ErrSetNotFound
 	}
 
 	if len(values) == 0 || values[0] == nil {
@@ -117,7 +117,7 @@ func (s *Set) SCard(key string) int {
 // SDiff Returns the members of the set resulting from the difference between the first set and all the successive sets.
 func (s *Set) SDiff(key1, key2 string) ([]*Record, error) {
 	if !s.SHasKey(key1) || !s.SHasKey(key2) {
-		return nil, ErrSetNotExist
+		return nil, ErrSetNotFound
 	}
 
 	records := make([]*Record, 0)
@@ -133,7 +133,7 @@ func (s *Set) SDiff(key1, key2 string) ([]*Record, error) {
 // SInter Returns the members of the set resulting from the intersection of all the given sets.
 func (s *Set) SInter(key1, key2 string) ([]*Record, error) {
 	if !s.SHasKey(key1) || !s.SHasKey(key2) {
-		return nil, ErrSetNotExist
+		return nil, ErrSetNotFound
 	}
 
 	records := make([]*Record, 0)
@@ -149,7 +149,7 @@ func (s *Set) SInter(key1, key2 string) ([]*Record, error) {
 // SIsMember Returns if member is a member of the set stored at key.
 func (s *Set) SIsMember(key string, value []byte) (bool, error) {
 	if _, ok := s.M[key]; !ok {
-		return false, ErrSetNotExist
+		return false, ErrSetNotFound
 	}
 
 	hash, err := getFnv32(value)
@@ -168,7 +168,7 @@ func (s *Set) SIsMember(key string, value []byte) (bool, error) {
 // For multiple items it returns true only if all the items exist.
 func (s *Set) SAreMembers(key string, values ...[]byte) (bool, error) {
 	if _, ok := s.M[key]; !ok {
-		return false, ErrSetNotExist
+		return false, ErrSetNotFound
 	}
 
 	for _, value := range values {
@@ -189,7 +189,7 @@ func (s *Set) SAreMembers(key string, values ...[]byte) (bool, error) {
 // SMembers returns all the members of the set value stored at key.
 func (s *Set) SMembers(key string) ([]*Record, error) {
 	if _, ok := s.M[key]; !ok {
-		return nil, ErrSetNotExist
+		return nil, ErrSetNotFound
 	}
 
 	records := make([]*Record, 0)
@@ -204,7 +204,7 @@ func (s *Set) SMembers(key string) ([]*Record, error) {
 // SMove moves member from the set at source to the set at destination.
 func (s *Set) SMove(key1, key2 string, value []byte) (bool, error) {
 	if !s.SHasKey(key1) || !s.SHasKey(key2) {
-		return false, ErrSetNotExist
+		return false, ErrSetNotFound
 	}
 
 	set1, set2 := s.M[key1], s.M[key2]
@@ -241,7 +241,7 @@ func (s *Set) SMove(key1, key2 string, value []byte) (bool, error) {
 // SUnion returns the members of the set resulting from the union of all the given sets.
 func (s *Set) SUnion(key1, key2 string) ([]*Record, error) {
 	if !s.SHasKey(key1) || !s.SHasKey(key2) {
-		return nil, ErrSetNotExist
+		return nil, ErrSetNotFound
 	}
 
 	records, err := s.SMembers(key1)

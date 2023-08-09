@@ -268,8 +268,8 @@ func TestSet_SMove(t *testing.T) {
 	}{
 		{"normal SMove", args{key1, key2, values[1]}, set, expectRecords[0:1], expectRecords[1:], nil},
 		{"not exist member SMove", args{key1, key2, values[2]}, set, nil, nil, ErrSetMemberNotExist},
-		{"fake key SMove1", args{"fake key", key2, values[2]}, set, nil, nil, ErrSetNotExist},
-		{"fake key SMove", args{key1, "fake key", values[2]}, set, nil, nil, ErrSetNotExist},
+		{"fake key SMove1", args{"fake key", key2, values[2]}, set, nil, nil, ErrSetNotFound},
+		{"fake key SMove", args{key1, "fake key", values[2]}, set, nil, nil, ErrSetNotFound},
 	}
 
 	for _, tt := range tests {
@@ -342,7 +342,7 @@ func TestSet_SIsMember(t *testing.T) {
 	}{
 		{key, values[0], true, nil},
 		{key, GetRandomBytes(24), false, nil},
-		{"fake key", GetRandomBytes(24), false, ErrSetNotExist},
+		{"fake key", GetRandomBytes(24), false, ErrSetNotFound},
 	}
 	for _, tt := range tests {
 		ok, err := set.SIsMember(tt.key, tt.val)
@@ -376,7 +376,7 @@ func TestSet_SAreMembers(t *testing.T) {
 		{key, values[2:], true, nil},
 		{key, values, true, nil},
 		{key, [][]byte{GetRandomBytes(24)}, false, nil},
-		{"fake key", values, true, ErrSetNotExist},
+		{"fake key", values, true, ErrSetNotFound},
 	}
 	for _, tt := range tests {
 		ok, err := set.SAreMembers(tt.key, tt.val...)
