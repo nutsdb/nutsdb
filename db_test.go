@@ -244,18 +244,35 @@ func txZRem(t *testing.T, db *DB, bucket string, key []byte, expectErr error) {
 	require.NoError(t, err)
 }
 
-func txZGetByKey(t *testing.T, db *DB, bucket string, key []byte, expectErr error) {
+func txZCard(t *testing.T, db *DB, bucket string, key []byte, expectLength int, expectErr error) {
 	err := db.View(func(tx *Tx) error {
-		_, err := tx.ZGetByKey(bucket, key)
-		assertErr(t, err, expectErr)
+		length, err := tx.ZCard(bucket, string(key))
+		if expectErr != nil {
+			require.NoError(t, err)
+		} else {
+			require.Equal(t, expectLength, length)
+		}
 		return nil
 	})
 	require.NoError(t, err)
 }
 
-func txZRangeByRank(t *testing.T, db *DB, bucket string, start, end int) {
+func txZScore(t *testing.T, db *DB, bucket, key string, value []byte, expectScore float64, expectErr error) {
+	err := db.View(func(tx *Tx) error {
+		score, err := tx.ZScore(bucket, key, value)
+		if err != nil {
+			require.NoError(t, err)
+		} else {
+			require.Equal(t, expectScore, score)
+		}
+		return nil
+	})
+	require.NoError(t, err)
+}
+
+func txZRangeByRank(t *testing.T, db *DB, bucket, key string, start, end int) {
 	err := db.Update(func(tx *Tx) error {
-		err := tx.ZRemRangeByRank(bucket, start, end)
+		err := tx.ZRemRangeByRank(bucket, key, start, end)
 		require.NoError(t, err)
 		return nil
 	})

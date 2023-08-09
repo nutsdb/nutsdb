@@ -17,6 +17,7 @@ package nutsdb
 import (
 	"errors"
 	"fmt"
+	"github.com/xujiajun/utils/strconv2"
 	"io"
 	"math"
 	"os"
@@ -240,10 +241,11 @@ func (db *DB) isPendingMergeEntry(entry *Entry) bool {
 		keyAndScore := strings.Split(string(entry.Key), SeparatorForZSetKey)
 		if len(keyAndScore) == 2 {
 			key := keyAndScore[0]
+			score, _ := strconv2.StrToFloat64(keyAndScore[1])
 			sortedSetIdx, exist := db.SortedSetIdx[string(entry.Bucket)]
 			if exist {
-				n := sortedSetIdx.GetByKey(key)
-				if n != nil {
+				n, err := sortedSetIdx.ZScore(key, entry.Value)
+				if err != nil && n == score {
 					return true
 				}
 			}

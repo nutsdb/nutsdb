@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/bwmarrin/snowflake"
-	"github.com/nutsdb/nutsdb/ds/zset"
 	"github.com/xujiajun/utils/strconv2"
 )
 
@@ -345,6 +344,10 @@ func (tx *Tx) Commit() (err error) {
 			tx.buildSetIdx(bucket, entry, offset)
 		}
 
+		if entry.Meta.Ds == DataStructureSortedSet {
+			tx.buildSortedSetIdx(bucket, entry, offset)
+		}
+
 		if entry.Meta.Ds == DataStructureNone && entry.Meta.Flag == DataBPTreeBucketDeleteFlag {
 			tx.db.deleteBucket(DataStructureTree, bucket)
 		}
@@ -491,10 +494,6 @@ func (tx *Tx) buildIdxes() {
 
 		bucket := string(entry.Bucket)
 
-		if entry.Meta.Ds == DataStructureSortedSet {
-			tx.buildSortedSetIdx(bucket, entry)
-		}
-
 		if entry.Meta.Ds == DataStructureNone {
 			if entry.Meta.Flag == DataSetBucketDeleteFlag {
 				tx.db.deleteBucket(DataStructureSet, bucket)
@@ -553,9 +552,9 @@ func (tx *Tx) buildSetIdx(bucket string, entry *Entry, offset int64) {
 	}
 }
 
-func (tx *Tx) buildSortedSetIdx(bucket string, entry *Entry) {
+func (tx *Tx) buildSortedSetIdx(bucket string, entry *Entry, offset int64) {
 	if _, ok := tx.db.SortedSetIdx[bucket]; !ok {
-		tx.db.SortedSetIdx[bucket] = zset.New()
+		tx.db.SortedSetIdx[bucket] = NewZSet(tx.db)
 	}
 
 	switch entry.Meta.Flag {
@@ -563,17 +562,19 @@ func (tx *Tx) buildSortedSetIdx(bucket string, entry *Entry) {
 		keyAndScore := strings.Split(string(entry.Key), SeparatorForZSetKey)
 		key := keyAndScore[0]
 		score, _ := strconv2.StrToFloat64(keyAndScore[1])
-		_ = tx.db.SortedSetIdx[bucket].Put(key, zset.SCORE(score), entry.Value)
+		r := tx.db.buildRecordByEntryAndOffset(entry, offset)
+		_ = tx.db.SortedSetIdx[bucket].ZAdd(key, SCORE(score), entry.Value, r)
 	case DataZRemFlag:
-		_ = tx.db.SortedSetIdx[bucket].Remove(string(entry.Key))
+		_, _ = tx.db.SortedSetIdx[bucket].ZRem(string(entry.Key), entry.Value)
 	case DataZRemRangeByRankFlag:
-		start, _ := strconv2.StrToInt(string(entry.Key))
-		end, _ := strconv2.StrToInt(string(entry.Value))
-		_ = tx.db.SortedSetIdx[bucket].GetByRankRange(start, end, true)
+		startAndEnd := strings.Split(string(entry.Value), SeparatorForZSetKey)
+		start, _ := strconv2.StrToInt(startAndEnd[0])
+		end, _ := strconv2.StrToInt(startAndEnd[1])
+		_, _ = tx.db.SortedSetIdx[bucket].ZRemRangeByRank(string(entry.Key), start, end)
 	case DataZPopMaxFlag:
-		_ = tx.db.SortedSetIdx[bucket].PopMax()
+		_, _, _ = tx.db.SortedSetIdx[bucket].ZPopMax(string(entry.Key))
 	case DataZPopMinFlag:
-		_ = tx.db.SortedSetIdx[bucket].PopMin()
+		_, _, _ = tx.db.SortedSetIdx[bucket].ZPopMin(string(entry.Key))
 	}
 }
 
