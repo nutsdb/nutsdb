@@ -115,13 +115,17 @@ func (l *List) peek(key string, isLeft bool) (*Record, error) {
 
 	if isLeft {
 		iterator.Begin()
-		if r, ok := iterator.Value().(*Record); ok {
-			return r, nil
+		if iterator.Next() {
+			if r, ok := iterator.Value().(*Record); ok {
+				return r, nil
+			}
 		}
 	} else {
 		iterator.End()
-		if r, ok := iterator.Value().(*Record); ok {
-			return r, nil
+		if iterator.Prev() {
+			if r, ok := iterator.Value().(*Record); ok {
+				return r, nil
+			}
 		}
 	}
 
