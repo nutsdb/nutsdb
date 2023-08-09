@@ -52,12 +52,11 @@ func NewZSet(db *DB) *ZSet {
 func (z *ZSet) ZAdd(key string, score SCORE, value []byte, record *Record) error {
 	zset, ok := z.M[key]
 	if !ok {
-		z.M[key] = newSkipList(zset.db)
+		z.M[key] = newSkipList(z.db)
 		zset = z.M[key]
 	}
-	skipList := z.M[key]
 
-	return skipList.Put(score, value, record)
+	return zset.Put(score, value, record)
 }
 
 func (z *ZSet) ZMembers(key string) (map[*Record]SCORE, error) {
@@ -217,8 +216,11 @@ func (z *ZSet) ZRevRank(key string, value []byte) (int, error) {
 	return 0, ErrZSetNotFound
 }
 
-func (z *ZSet) ZGetByValue(key string, value []byte) *SkipListNode {
-	return z.M[key].GetByValue(value)
+func (z *ZSet) ZGetScoreByValue(key string, value []byte) (float64, error) {
+	if zset, ok := z.M[key]; ok {
+		return float64(zset.GetByValue(value).score), nil
+	}
+	return 0, ErrZSetNotFound
 }
 
 // SCORE represents the score type.
