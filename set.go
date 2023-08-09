@@ -201,6 +201,23 @@ func (s *Set) SMembers(key string) ([]*Record, error) {
 	return records, nil
 }
 
+func (s *Set) SMember(key string, value []byte) (*Record, error) {
+	if _, ok := s.M[key]; !ok {
+		return nil, ErrSetNotFound
+	}
+
+	hash, err := getFnv32(value)
+	if err != nil {
+		return nil, err
+	}
+
+	if r, ok := s.M[key][hash]; ok {
+		return r, nil
+	}
+
+	return nil, ErrSetMemberNotExist
+}
+
 // SMove moves member from the set at source to the set at destination.
 func (s *Set) SMove(key1, key2 string, value []byte) (bool, error) {
 	if !s.SHasKey(key1) || !s.SHasKey(key2) {

@@ -570,7 +570,7 @@ func (tx *Tx) buildSortedSetIdx(bucket string, entry *Entry, offset int64) {
 		startAndEnd := strings.Split(string(entry.Value), SeparatorForZSetKey)
 		start, _ := strconv2.StrToInt(startAndEnd[0])
 		end, _ := strconv2.StrToInt(startAndEnd[1])
-		_, _ = tx.db.SortedSetIdx[bucket].ZRemRangeByRank(string(entry.Key), start, end)
+		_ = tx.db.SortedSetIdx[bucket].ZRemRangeByRank(string(entry.Key), start, end)
 	case DataZPopMaxFlag:
 		_, _, _ = tx.db.SortedSetIdx[bucket].ZPopMax(string(entry.Key))
 	case DataZPopMinFlag:
@@ -603,13 +603,7 @@ func (tx *Tx) buildListIdx(bucket string, entry *Entry, offset int64) {
 		count, _ := strconv2.StrToInt(countAndValue[0])
 		newValue := countAndValue[1]
 
-		_ = l.LRem(string(key), count, func(r *Record) (bool, error) {
-			v, err := tx.db.getValueByRecord(r)
-			if err != nil {
-				return false, err
-			}
-			return bytes.Equal([]byte(newValue), v), nil
-		})
+		_ = l.LRem(string(key), count, []byte(newValue))
 
 	case DataLPopFlag:
 		_, _ = l.LPop(string(key))

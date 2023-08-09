@@ -212,13 +212,14 @@ func open(opt Options) (*DB, error) {
 		BPTreeKeyEntryPosMap:    make(map[string]int64),
 		bucketMetas:             make(map[string]*BucketMeta),
 		ActiveCommittedTxIdsIdx: NewTree(),
-		Index:                   NewIndex(),
 		fm:                      newFileManager(opt.RWMode, opt.MaxFdNumsInCache, opt.CleanFdsCacheThreshold),
 		mergeStartCh:            make(chan struct{}),
 		mergeEndCh:              make(chan error),
 		mergeWorkCloseCh:        make(chan struct{}),
 		writeCh:                 make(chan *request, KvWriteChCapacity),
 	}
+
+	db.Index = newIndex(db)
 
 	commitBuffer := new(bytes.Buffer)
 	commitBuffer.Grow(int(db.opt.CommitBufferSize))
@@ -432,7 +433,11 @@ func (db *DB) getValueByRecord(r *Record) ([]byte, error) {
 		return nil, err
 	}
 
-	return e.Value, nil
+	if e != nil {
+		return e.Value, nil
+	}
+
+	return nil, nil
 }
 
 func (db *DB) getEntryByHint(h *Hint) (*Entry, error) {
@@ -684,11 +689,6 @@ func (db *DB) parseDataFiles(dataFileIds []int) (unconfirmedRecords []*Record, c
 				break
 			}
 
-			var e *Entry
-			if db.opt.EntryIdxMode == HintKeyValAndRAMIdxMode {
-				e = NewEntry().WithKey(entry.Key).WithValue(entry.Value).WithBucket(entry.Bucket).WithMeta(entry.Meta)
-			}
-
 			if entry.Meta.Status == Committed {
 				committedTxIds[entry.Meta.TxID] = struct{}{}
 				meta := NewMetaData().WithFlag(DataSetFlag)
@@ -699,7 +699,7 @@ func (db *DB) parseDataFiles(dataFileIds []int) (unconfirmedRecords []*Record, c
 				}
 			}
 			h := NewHint().WithKey(entry.Key).WithFileId(fID).WithMeta(entry.Meta).WithDataPos(uint64(off))
-			r := NewRecord().WithHint(h).WithEntry(e).WithBucket(entry.GetBucketString())
+			r := NewRecord().WithHint(h).WithEntry(entry).WithBucket(entry.GetBucketString())
 			unconfirmedRecords = append(unconfirmedRecords, r)
 
 			if db.opt.EntryIdxMode == HintBPTSparseIdxMode {
@@ -768,6 +768,9 @@ func (db *DB) buildBTreeIdx(bucket string, r *Record) {
 	if r.H.Meta.Flag == DataDeleteFlag {
 		db.BTreeIdx[bucket].Delete(key)
 	} else {
+		if db.opt.EntryIdxMode == HintKeyAndRAMIdxMode {
+			r.E = nil
+		}
 		db.BTreeIdx[bucket].Insert(key, r.E, r.H)
 	}
 }
@@ -922,12 +925,10 @@ func (db *DB) buildSetIdx(bucket string, r *Record) error {
 		db.SetIdx[bucket] = NewSet()
 	}
 
-	if r.E == nil {
-		return ErrEntryIdxModeOpt
-	}
-
 	if r.H.Meta.Flag == DataSetFlag {
-		if err := db.SetIdx[bucket].SAdd(string(r.E.Key), [][]byte{r.E.Value}, []*Record{r}); err != nil {
+		key, value := r.E.Key, r.E.Value
+		db.setRecordByMode(r)
+		if err := db.SetIdx[bucket].SAdd(string(key), [][]byte{value}, []*Record{r}); err != nil {
 			return fmt.Errorf("when build SetIdx SAdd index err: %s", err)
 		}
 	}
@@ -947,19 +948,14 @@ func (db *DB) buildSortedSetIdx(bucket string, r *Record) error {
 		db.SortedSetIdx[bucket] = NewZSet(db)
 	}
 
-	if r.E == nil {
-		return ErrEntryIdxModeOpt
-	}
-
 	if r.H.Meta.Flag == DataZAddFlag {
 		keyAndScore := strings.Split(string(r.E.Key), SeparatorForZSetKey)
 		if len(keyAndScore) == 2 {
 			key := keyAndScore[0]
 			score, _ := strconv2.StrToFloat64(keyAndScore[1])
-			if r.E == nil {
-				return ErrEntryIdxModeOpt
-			}
-			_ = db.SortedSetIdx[bucket].ZAdd(key, SCORE(score), r.E.Value, r)
+			value := r.E.Value
+			db.setRecordByMode(r)
+			_ = db.SortedSetIdx[bucket].ZAdd(key, SCORE(score), value, r)
 		}
 	}
 	if r.H.Meta.Flag == DataZRemFlag {
@@ -969,7 +965,7 @@ func (db *DB) buildSortedSetIdx(bucket string, r *Record) error {
 		startAndEnd := strings.Split(string(r.E.Value), SeparatorForZSetKey)
 		start, _ := strconv2.StrToInt(startAndEnd[0])
 		end, _ := strconv2.StrToInt(startAndEnd[1])
-		_, _ = db.SortedSetIdx[bucket].ZRemRangeByRank(string(r.E.Key), start, end)
+		_ = db.SortedSetIdx[bucket].ZRemRangeByRank(string(r.E.Key), start, end)
 	}
 	if r.H.Meta.Flag == DataZPopMaxFlag {
 		_, _, _ = db.SortedSetIdx[bucket].ZPopMax(string(r.E.Key))
@@ -985,9 +981,6 @@ func (db *DB) buildSortedSetIdx(bucket string, r *Record) error {
 func (db *DB) buildListIdx(bucket string, r *Record) error {
 	l := db.Index.getList(bucket)
 
-	if r.E == nil {
-		return ErrEntryIdxModeOpt
-	}
 	if IsExpired(r.E.Meta.TTL, r.E.Meta.Timestamp) {
 		return nil
 	}
@@ -1001,21 +994,17 @@ func (db *DB) buildListIdx(bucket string, r *Record) error {
 		l.TTL[string(r.E.Key)] = ttl
 		l.TimeStamp[string(r.E.Key)] = r.E.Meta.Timestamp
 	case DataLPushFlag:
+		db.setRecordByMode(r)
 		_ = l.LPush(string(r.E.Key), r)
 	case DataRPushFlag:
+		db.setRecordByMode(r)
 		_ = l.RPush(string(r.E.Key), r)
 	case DataLRemFlag:
 		countAndValueIndex := strings.Split(string(r.E.Value), SeparatorForListKey)
 		count, _ := strconv2.StrToInt(countAndValueIndex[0])
 		value := []byte(countAndValueIndex[1])
 
-		if err := l.LRem(string(r.E.Key), count, func(r *Record) (bool, error) {
-			v, err := db.getValueByRecord(r)
-			if err != nil {
-				return false, err
-			}
-			return bytes.Equal(value, v), nil
-		}); err != nil {
+		if err := l.LRem(string(r.E.Key), count, value); err != nil {
 			return ErrWhenBuildListIdx(err)
 		}
 	case DataLPopFlag:
@@ -1052,6 +1041,14 @@ func (db *DB) buildListIdx(bucket string, r *Record) error {
 	}
 
 	return nil
+}
+
+func (db *DB) setRecordByMode(r *Record) {
+	if db.opt.EntryIdxMode == HintKeyAndRAMIdxMode {
+		r.E = nil
+	} else {
+		r.H = nil
+	}
 }
 
 // ErrWhenBuildListIdx returns err when build listIdx
@@ -1157,4 +1154,11 @@ func (db *DB) checkListExpired() {
 // IsClose return the value that represents the status of DB
 func (db *DB) IsClose() bool {
 	return db.closed
+}
+
+func (db *DB) getMetaByRecord(r *Record) *MetaData {
+	if db.opt.EntryIdxMode == HintKeyValAndRAMIdxMode {
+		return r.E.Meta
+	}
+	return r.H.Meta
 }

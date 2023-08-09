@@ -113,8 +113,6 @@ func TestDB_MergeForZSet(t *testing.T) {
 			txZScore(t, db, bucket, key, GetTestBytes(i), score, nil)
 		}
 
-		txZRangeByRank(t, db, bucket, string(key), 20, 30)
-
 		require.NoError(t, db.Merge())
 
 		for i := 50; i < 100; i++ {

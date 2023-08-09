@@ -16,11 +16,13 @@ type SortedSetIdx map[string]*ZSet
 type ListIdx map[string]*List
 
 type index struct {
+	db   *DB
 	list ListIdx
 }
 
-func NewIndex() *index {
+func newIndex(db *DB) *index {
 	i := new(index)
+	i.db = db
 	i.list = map[string]*List{}
 	return i
 }
@@ -35,7 +37,7 @@ func (i *index) getList(bucket string) *List {
 	if isExist {
 		return l
 	}
-	l = NewList()
+	l = NewList(i.db)
 	i.list[bucket] = l
 	return l
 }
@@ -45,7 +47,7 @@ func (i *index) deleteList(bucket string) {
 }
 
 func (i *index) addList(bucket string) {
-	l := NewList()
+	l := NewList(i.db)
 	i.list[bucket] = l
 }
 

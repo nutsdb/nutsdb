@@ -848,8 +848,11 @@ func TestTx_ListEntryIdxMode_HintKeyValAndRAMIdxMode(t *testing.T) {
 	bucket := "bucket"
 	key := GetTestBytes(0)
 
+	opts := DefaultOptions
+
 	// HintKeyValAndRAMIdxMode
-	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+	opts.EntryIdxMode = HintKeyValAndRAMIdxMode
+	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
 		err := db.Update(func(tx *Tx) error {
 			err := tx.LPush(bucket, key, []byte("d"), []byte("c"), []byte("b"), []byte("a"))
 			require.NoError(t, err)
@@ -872,18 +875,17 @@ func TestTx_ListEntryIdxMode_HintKeyAndRAMIdxMode(t *testing.T) {
 	bucket := "bucket"
 	key := GetTestBytes(0)
 
-	opts := &DefaultOptions
-	opts.EntryIdxMode = HintKeyAndRAMIdxMode
-
 	// HintKeyAndRAMIdxMode
-	runNutsDBTest(t, opts, func(t *testing.T, db *DB) {
+	opts := DefaultOptions
+	opts.EntryIdxMode = HintKeyAndRAMIdxMode
+	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
 		err := db.Update(func(tx *Tx) error {
 			err := tx.LPush(bucket, key, []byte("d"), []byte("c"), []byte("b"), []byte("a"))
 			require.NoError(t, err)
 
 			return nil
 		})
-		//require.NoError(t, err)
+		require.NoError(t, err)
 
 		listIdx := db.Index.getList(bucket)
 		item, _ := listIdx.Items[string(key)].Get(0)

@@ -16,6 +16,7 @@ package nutsdb
 import (
 	"fmt"
 	"math/rand"
+	"time"
 )
 
 const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
@@ -30,4 +31,45 @@ func GetRandomBytes(length int) []byte {
 		b[i] = charset[rand.Intn(len(charset))]
 	}
 	return b
+}
+
+func generateRecords(count int) []*Record {
+	bucket := []byte("bucket")
+	rand.Seed(time.Now().UnixNano())
+	records := make([]*Record, count)
+	for i := 0; i < count; i++ {
+		key := GetTestBytes(i)
+		val := GetRandomBytes(24)
+
+		metaData := &MetaData{
+			KeySize:    uint32(len(key)),
+			ValueSize:  uint32(len(val)),
+			Timestamp:  uint64(time.Now().Unix()),
+			TTL:        uint32(rand.Intn(3600)),
+			Flag:       uint16(rand.Intn(2)),
+			BucketSize: uint32(len(bucket)),
+			TxID:       uint64(rand.Intn(1000)),
+			Status:     uint16(rand.Intn(2)),
+			Ds:         uint16(rand.Intn(3)),
+			Crc:        rand.Uint32(),
+		}
+
+		record := &Record{
+			H: &Hint{
+				Key:     key,
+				FileID:  int64(i),
+				Meta:    metaData,
+				DataPos: uint64(rand.Uint32()),
+			},
+			E: &Entry{
+				Key:    key,
+				Value:  val,
+				Bucket: bucket,
+				Meta:   metaData,
+			},
+			Bucket: string(bucket),
+		}
+		records[i] = record
+	}
+	return records
 }

@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -36,9 +35,9 @@ const NutsDBTestDirPath = "/tmp/nutsdb-test"
 
 func assertErr(t *testing.T, err error, expectErr error) {
 	if expectErr != nil {
-		require.Equal(t, expectErr, err)
+		assert.Equal(t, expectErr, err)
 	} else {
-		require.NoError(t, err)
+		assert.NoError(t, err)
 	}
 }
 
@@ -57,10 +56,10 @@ func runNutsDBTest(t *testing.T, opts *Options, test func(t *testing.T, db *DB))
 	}
 	defer removeDir(opts.Dir)
 	db, err := Open(*opts)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 	defer func() {
 		if !db.IsClose() {
-			require.NoError(t, db.Close())
+			assert.NoError(t, db.Close())
 		}
 	}()
 	test(t, db)
@@ -72,21 +71,21 @@ func txPut(t *testing.T, db *DB, bucket string, key, value []byte, ttl uint32, e
 		assertErr(t, err, expectErr)
 		return nil
 	})
-	require.NoError(t, err)
+	assert.NoError(t, err)
 }
 
 func txGet(t *testing.T, db *DB, bucket string, key []byte, expectVal []byte, expectErr error) {
 	err := db.View(func(tx *Tx) error {
 		e, err := tx.Get(bucket, key)
 		if expectErr != nil {
-			require.Equal(t, expectErr, err)
+			assert.Equal(t, expectErr, err)
 		} else {
-			require.NoError(t, err)
-			require.EqualValuesf(t, expectVal, e.Value, "err Tx Get. got %s want %s", string(e.Value), string(expectVal))
+			assert.NoError(t, err)
+			assert.EqualValuesf(t, expectVal, e.Value, "err Tx Get. got %s want %s", string(e.Value), string(expectVal))
 		}
 		return nil
 	})
-	require.NoError(t, err)
+	assert.NoError(t, err)
 }
 
 func txDel(t *testing.T, db *DB, bucket string, key []byte, expectErr error) {
@@ -95,7 +94,7 @@ func txDel(t *testing.T, db *DB, bucket string, key []byte, expectErr error) {
 		assertErr(t, err, expectErr)
 		return nil
 	})
-	require.NoError(t, err)
+	assert.NoError(t, err)
 }
 
 func txDeleteBucket(t *testing.T, db *DB, ds uint16, bucket string, expectErr error) {
@@ -104,7 +103,7 @@ func txDeleteBucket(t *testing.T, db *DB, ds uint16, bucket string, expectErr er
 		assertErr(t, err, expectErr)
 		return nil
 	})
-	require.NoError(t, err)
+	assert.NoError(t, err)
 }
 
 func InitOpt(fileDir string, isRemoveFiles bool) {
@@ -156,23 +155,23 @@ func TestDB_Basic(t *testing.T) {
 func TestDB_Flock(t *testing.T) {
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		db2, err := Open(db.opt)
-		require.Nil(t, db2)
-		require.Equal(t, ErrDirLocked, err)
+		assert.Nil(t, db2)
+		assert.Equal(t, ErrDirLocked, err)
 
 		err = db.Close()
-		require.NoError(t, err)
+		assert.NoError(t, err)
 
 		db2, err = Open(db.opt)
-		require.NoError(t, err)
-		require.NotNil(t, db2)
+		assert.NoError(t, err)
+		assert.NotNil(t, db2)
 
 		err = db2.flock.Unlock()
-		require.NoError(t, err)
-		require.False(t, db2.flock.Locked())
+		assert.NoError(t, err)
+		assert.False(t, db2.flock.Locked())
 
 		err = db2.Close()
-		require.Error(t, err)
-		require.Equal(t, ErrDirUnlocked, err)
+		assert.Error(t, err)
+		assert.Equal(t, ErrDirUnlocked, err)
 	})
 }
 
@@ -205,16 +204,16 @@ func txSAdd(t *testing.T, db *DB, bucket string, key, value []byte, expectErr er
 		assertErr(t, err, expectErr)
 		return nil
 	})
-	require.NoError(t, err)
+	assert.NoError(t, err)
 }
 
 func txSIsMember(t *testing.T, db *DB, bucket string, key, value []byte, expect bool) {
 	err := db.View(func(tx *Tx) error {
 		ok, _ := tx.SIsMember(bucket, key, value)
-		require.Equal(t, expect, ok)
+		assert.Equal(t, expect, ok)
 		return nil
 	})
-	require.NoError(t, err)
+	assert.NoError(t, err)
 }
 
 func txSRem(t *testing.T, db *DB, bucket string, key, value []byte, expectErr error) {
@@ -223,7 +222,7 @@ func txSRem(t *testing.T, db *DB, bucket string, key, value []byte, expectErr er
 		assertErr(t, err, expectErr)
 		return nil
 	})
-	require.NoError(t, err)
+	assert.NoError(t, err)
 }
 
 func txZAdd(t *testing.T, db *DB, bucket string, key, value []byte, score float64, expectErr error) {
@@ -232,7 +231,7 @@ func txZAdd(t *testing.T, db *DB, bucket string, key, value []byte, score float6
 		assertErr(t, err, expectErr)
 		return nil
 	})
-	require.NoError(t, err)
+	assert.NoError(t, err)
 }
 
 func txZRem(t *testing.T, db *DB, bucket string, key, value []byte, expectErr error) {
@@ -241,42 +240,54 @@ func txZRem(t *testing.T, db *DB, bucket string, key, value []byte, expectErr er
 		assertErr(t, err, expectErr)
 		return nil
 	})
-	require.NoError(t, err)
+	assert.NoError(t, err)
 }
 
 func txZCard(t *testing.T, db *DB, bucket string, key []byte, expectLength int, expectErr error) {
 	err := db.View(func(tx *Tx) error {
 		length, err := tx.ZCard(bucket, string(key))
 		if expectErr != nil {
-			require.NoError(t, err)
+			assert.NoError(t, err)
 		} else {
-			require.Equal(t, expectLength, length)
+			assert.Equal(t, expectLength, length)
 		}
 		return nil
 	})
-	require.NoError(t, err)
+	assert.NoError(t, err)
 }
 
 func txZScore(t *testing.T, db *DB, bucket string, key, value []byte, expectScore float64, expectErr error) {
 	err := db.View(func(tx *Tx) error {
 		score, err := tx.ZScore(bucket, string(key), value)
 		if err != nil {
-			require.Equal(t, expectErr, err)
+			assert.Equal(t, expectErr, err)
 		} else {
-			require.Equal(t, expectScore, score)
+			assert.Equal(t, expectScore, score)
 		}
 		return nil
 	})
-	require.NoError(t, err)
+	assert.NoError(t, err)
 }
 
-func txZRangeByRank(t *testing.T, db *DB, bucket, key string, start, end int) {
-	err := db.Update(func(tx *Tx) error {
-		err := tx.ZRemRangeByRank(bucket, key, start, end)
-		require.NoError(t, err)
+func txZRank(t *testing.T, db *DB, bucket, key string, value []byte, isRev bool, expectRank int, expectErr error) {
+	err := db.View(func(tx *Tx) error {
+		var (
+			rank int
+			err  error
+		)
+		if isRev {
+			rank, err = tx.ZRevRank(bucket, key, value)
+		} else {
+			rank, err = tx.ZRank(bucket, key, value)
+		}
+		if expectErr != nil {
+			assert.Equal(t, expectErr, err)
+		} else {
+			assert.Equal(t, expectRank, rank)
+		}
 		return nil
 	})
-	require.NoError(t, err)
+	assert.NoError(t, err)
 }
 
 func txZPop(t *testing.T, db *DB, bucket, key string, isMax bool, expectVal []byte, expectScore float64, expectErr error) {
@@ -292,14 +303,14 @@ func txZPop(t *testing.T, db *DB, bucket, key string, isMax bool, expectVal []by
 		}
 
 		if expectErr != nil {
-			require.Equal(t, expectErr, err)
+			assert.Equal(t, expectErr, err)
 		} else {
-			require.Equal(t, expectVal, member.Value)
-			require.Equal(t, expectScore, member.Score)
+			assert.Equal(t, expectVal, member.Value)
+			assert.Equal(t, expectScore, member.Score)
 		}
 		return nil
 	})
-	require.NoError(t, err)
+	assert.NoError(t, err)
 }
 
 func txPop(t *testing.T, db *DB, bucket string, key, expectVal []byte, expectErr error, isLeft bool) {
@@ -314,14 +325,14 @@ func txPop(t *testing.T, db *DB, bucket string, key, expectVal []byte, expectErr
 		}
 
 		if expectErr != nil {
-			require.Equal(t, expectErr, err)
+			assert.Equal(t, expectErr, err)
 		} else {
-			require.Equal(t, expectVal, item)
+			assert.Equal(t, expectVal, item)
 		}
 
 		return nil
 	})
-	require.NoError(t, err)
+	assert.NoError(t, err)
 }
 
 func txPush(t *testing.T, db *DB, bucket string, key, val []byte, expectErr error, isLeft bool) {
@@ -338,17 +349,17 @@ func txPush(t *testing.T, db *DB, bucket string, key, val []byte, expectErr erro
 
 		return nil
 	})
-	require.NoError(t, err)
+	assert.NoError(t, err)
 }
 
 func txRange(t *testing.T, db *DB, bucket string, key []byte, start, end, expectLen int) {
 	err := db.View(func(tx *Tx) error {
 		list, err := tx.LRange(bucket, key, start, end)
-		require.NoError(t, err)
-		require.Equal(t, expectLen, len(list))
+		assert.NoError(t, err)
+		assert.Equal(t, expectLen, len(list))
 		return nil
 	})
-	require.NoError(t, err)
+	assert.NoError(t, err)
 }
 
 func TestDB_GetKeyNotFound(t *testing.T) {
@@ -363,7 +374,7 @@ func TestDB_GetKeyNotFound(t *testing.T) {
 func TestDB_Backup(t *testing.T) {
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		backUpDir := "/tmp/nutsdb-backup"
-		require.NoError(t, db.Backup(backUpDir))
+		assert.NoError(t, db.Backup(backUpDir))
 	})
 }
 
@@ -371,15 +382,15 @@ func TestDB_BackupTarGZ(t *testing.T) {
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		backUpFile := "/tmp/nutsdb-backup/backup.tar.gz"
 		f, err := os.Create(backUpFile)
-		require.NoError(t, err)
-		require.NoError(t, db.BackupTarGZ(f))
+		assert.NoError(t, err)
+		assert.NoError(t, db.BackupTarGZ(f))
 	})
 }
 
 func TestDB_Close(t *testing.T) {
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		require.NoError(t, db.Close())
-		require.Equal(t, ErrDBClosed, db.Close())
+		assert.NoError(t, db.Close())
+		assert.Equal(t, ErrDBClosed, db.Close())
 	})
 }
 
@@ -393,17 +404,17 @@ func TestDB_GetRecordFromKey(t *testing.T) {
 		val := []byte("world")
 
 		_, ok := db.getRecordFromKey(bucket, key)
-		require.False(t, ok)
+		assert.False(t, ok)
 
 		for i := 0; i < 10; i++ {
 			txPut(t, db, string(bucket), key, val, Persistent, nil)
 		}
 
 		r, ok := db.getRecordFromKey(bucket, key)
-		require.True(t, ok)
+		assert.True(t, ok)
 
-		require.Equal(t, 58, int(r.H.DataPos))
-		require.Equal(t, int64(4), r.H.FileID)
+		assert.Equal(t, 58, int(r.H.DataPos))
+		assert.Equal(t, int64(4), r.H.FileID)
 	})
 }
 
@@ -435,7 +446,7 @@ func TestDB_ErrThenReadWrite(t *testing.T) {
 			func(tx *Tx) error {
 				return fmt.Errorf("err happened")
 			})
-		require.NotNil(t, err)
+		assert.NotNil(t, err)
 
 		err = db.View(
 			func(tx *Tx) error {
@@ -447,7 +458,7 @@ func TestDB_ErrThenReadWrite(t *testing.T) {
 
 				return nil
 			})
-		require.NotNil(t, err)
+		assert.NotNil(t, err)
 
 		notice := make(chan struct{})
 		go func() {
@@ -457,7 +468,7 @@ func TestDB_ErrThenReadWrite(t *testing.T) {
 
 					return nil
 				})
-			require.NoError(t, err)
+			assert.NoError(t, err)
 		}()
 
 		select {
@@ -480,8 +491,8 @@ func TestDB_ErrorHandler(t *testing.T) {
 			func(tx *Tx) error {
 				return fmt.Errorf("err happened")
 			})
-		require.NotNil(t, err)
-		require.Equal(t, handleErrCalled, true)
+		assert.NotNil(t, err)
+		assert.Equal(t, handleErrCalled, true)
 	})
 }
 
@@ -491,35 +502,35 @@ func TestDB_CommitBuffer(t *testing.T) {
 	opts := DefaultOptions
 	opts.CommitBufferSize = 8 * MB
 	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
-		require.Equal(t, int64(8*MB), db.opt.CommitBufferSize)
+		assert.Equal(t, int64(8*MB), db.opt.CommitBufferSize)
 		// When the database starts, the commit buffer should be allocated with the size of CommitBufferSize.
-		require.Equal(t, 0, db.commitBuffer.Len())
-		require.Equal(t, db.opt.CommitBufferSize, int64(db.commitBuffer.Cap()))
+		assert.Equal(t, 0, db.commitBuffer.Len())
+		assert.Equal(t, db.opt.CommitBufferSize, int64(db.commitBuffer.Cap()))
 
 		txPut(t, db, bucket, GetTestBytes(0), GetRandomBytes(24), Persistent, nil)
 
 		// When tx is committed, content of commit buffer should be empty, but do not release memory
-		require.Equal(t, 0, db.commitBuffer.Len())
-		require.Equal(t, db.opt.CommitBufferSize, int64(db.commitBuffer.Cap()))
+		assert.Equal(t, 0, db.commitBuffer.Len())
+		assert.Equal(t, db.opt.CommitBufferSize, int64(db.commitBuffer.Cap()))
 	})
 
 	opts = DefaultOptions
 	opts.CommitBufferSize = 1 * KB
 	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
-		require.Equal(t, int64(1*KB), db.opt.CommitBufferSize)
+		assert.Equal(t, int64(1*KB), db.opt.CommitBufferSize)
 
 		err := db.Update(func(tx *Tx) error {
 			// making this tx big enough, it should not use the commit buffer
 			for i := 0; i < 1000; i++ {
 				err := tx.Put(bucket, GetTestBytes(i), GetRandomBytes(1024), Persistent)
-				require.NoError(t, err)
+				assert.NoError(t, err)
 			}
 			return nil
 		})
-		require.NoError(t, err)
+		assert.NoError(t, err)
 
-		require.Equal(t, 0, db.commitBuffer.Len())
-		require.Equal(t, db.opt.CommitBufferSize, int64(db.commitBuffer.Cap()))
+		assert.Equal(t, 0, db.commitBuffer.Len())
+		assert.Equal(t, db.opt.CommitBufferSize, int64(db.commitBuffer.Cap()))
 	})
 }
 
@@ -542,7 +553,7 @@ func TestDB_DeleteBucket(t *testing.T) {
 
 func withDBOption(t *testing.T, opt Options, fn func(t *testing.T, db *DB)) {
 	db, err := Open(opt)
-	require.NoError(t, err)
+	assert.NoError(t, err)
 
 	defer func() {
 		os.RemoveAll(db.opt.Dir)
@@ -594,7 +605,7 @@ func TestDB_HintKeyValAndRAMIdxMode_RestartDB(t *testing.T) {
 		db.Close()
 		// restart db with HintKeyValAndRAMIdxMode EntryIdxMode
 		db, err := Open(db.opt)
-		require.NoError(t, err)
+		assert.NoError(t, err)
 		txGet(t, db, bucket, key, val, nil)
 	})
 }
@@ -613,7 +624,7 @@ func TestDB_HintKeyAndRAMIdxMode_RestartDB(t *testing.T) {
 
 		// restart db with HintKeyAndRAMIdxMode EntryIdxMode
 		db, err := Open(db.opt)
-		require.NoError(t, err)
+		assert.NoError(t, err)
 		txGet(t, db, bucket, key, val, nil)
 	})
 }
@@ -632,7 +643,7 @@ func TestDB_HintBPTSparseIdxMode_RestartDB(t *testing.T) {
 
 		// restart db with HintBPTSparseIdxMode EntryIdxMode
 		db, err := Open(db.opt)
-		require.NoError(t, err)
+		assert.NoError(t, err)
 		txGet(t, db, bucket, key, val, nil)
 	})
 }

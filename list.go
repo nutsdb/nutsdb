@@ -15,6 +15,7 @@
 package nutsdb
 
 import (
+	"bytes"
 	"errors"
 	dll "github.com/emirpasic/gods/lists/doublylinkedlist"
 	"time"
@@ -32,13 +33,15 @@ var (
 
 // List represents the list.
 type List struct {
+	db        *DB
 	Items     map[string]*dll.List
 	TTL       map[string]uint32
 	TimeStamp map[string]uint64
 }
 
-func NewList() *List {
+func NewList(db *DB) *List {
 	return &List{
+		db:        db,
 		Items:     make(map[string]*dll.List),
 		TTL:       make(map[string]uint32),
 		TimeStamp: make(map[string]uint64),
@@ -111,19 +114,15 @@ func (l *List) peek(key string, isLeft bool) (*Record, error) {
 		return nil, ErrListNotFound
 	}
 
-	iterator := list.Iterator()
-
 	if isLeft {
-		iterator.Begin()
-		if iterator.Next() {
-			if r, ok := iterator.Value().(*Record); ok {
+		if item, ok := list.Get(0); ok {
+			if r, ok := item.(*Record); ok {
 				return r, nil
 			}
 		}
 	} else {
-		iterator.End()
-		if iterator.Prev() {
-			if r, ok := iterator.Value().(*Record); ok {
+		if item, ok := list.Get(list.Size() - 1); ok {
+			if r, ok := item.(*Record); ok {
 				return r, nil
 			}
 		}
@@ -159,12 +158,21 @@ func (l *List) LRange(key string, start, end int) ([]*Record, error) {
 	return items, nil
 }
 
+func (l *List) cmp(r *Record, v []byte) (bool, error) {
+	v1, err := l.db.getValueByRecord(r)
+	if err != nil {
+		return false, err
+	}
+
+	return bytes.Equal(v, v1), nil
+}
+
 // LRem removes the first count occurrences of elements equal to value from the list stored at key.
 // The count argument influences the operation in the following ways:
 // count > 0: Remove elements equal to value moving from head to tail.
 // count < 0: Remove elements equal to value moving from tail to head.
 // count = 0: Remove all elements equal to value.
-func (l *List) LRem(key string, count int, cmp func(r *Record) (bool, error)) error {
+func (l *List) LRem(key string, count int, value []byte) error {
 	if l.IsExpire(key) {
 		return ErrListNotFound
 	}
@@ -186,7 +194,7 @@ func (l *List) LRem(key string, count int, cmp func(r *Record) (bool, error)) er
 		for iterator.Next() && count > 0 {
 			r := iterator.Value().(*Record)
 
-			ok, err := cmp(r)
+			ok, err := l.cmp(r, value)
 			if err != nil {
 				return err
 			}
@@ -203,7 +211,7 @@ func (l *List) LRem(key string, count int, cmp func(r *Record) (bool, error)) er
 		for iterator.Prev() && count < 0 {
 			r := iterator.Value().(*Record)
 
-			ok, err := cmp(r)
+			ok, err := l.cmp(r, value)
 			if err != nil {
 				return err
 			}
