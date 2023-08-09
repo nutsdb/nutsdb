@@ -100,7 +100,7 @@ func TestDB_MergeForZSet(t *testing.T) {
 		}
 
 		for i := 0; i < 50; i++ {
-			txZRem(t, db, bucket, GetTestBytes(i), GetTestBytes(i), nil)
+			txZRem(t, db, bucket, key, GetTestBytes(i), nil)
 		}
 
 		for i := 0; i < 50; i++ {
