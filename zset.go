@@ -27,6 +27,10 @@ import (
 
 var (
 	ErrZSetNotFound = errors.New("the zset does not exist")
+
+	ErrZSetMemberNotExist = errors.New("the member of zset does not exist")
+
+	ErrZSetIsEmpty = errors.New("the zset if empty")
 )
 
 const (
@@ -94,7 +98,10 @@ func (z *ZSet) ZCount(key string, start SCORE, end SCORE, opts *GetByScoreRangeO
 func (z *ZSet) ZPeekMax(key string) (*Record, SCORE, error) {
 	if zset, ok := z.M[key]; ok {
 		node := zset.PeekMax()
-		return node.record, node.score, nil
+		if node != nil {
+			return node.record, node.score, nil
+		}
+		return nil, 0, ErrZSetIsEmpty
 	}
 
 	return nil, 0, ErrZSetNotFound
@@ -103,7 +110,10 @@ func (z *ZSet) ZPeekMax(key string) (*Record, SCORE, error) {
 func (z *ZSet) ZPopMax(key string) (*Record, SCORE, error) {
 	if zset, ok := z.M[key]; ok {
 		node := zset.PopMax()
-		return node.record, node.score, nil
+		if node != nil {
+			return node.record, node.score, nil
+		}
+		return nil, 0, ErrZSetIsEmpty
 	}
 
 	return nil, 0, ErrZSetNotFound
@@ -112,7 +122,10 @@ func (z *ZSet) ZPopMax(key string) (*Record, SCORE, error) {
 func (z *ZSet) ZPeekMin(key string) (*Record, SCORE, error) {
 	if zset, ok := z.M[key]; ok {
 		node := zset.PeekMin()
-		return node.record, node.score, nil
+		if node != nil {
+			return node.record, node.score, nil
+		}
+		return nil, 0, ErrZSetIsEmpty
 	}
 
 	return nil, 0, ErrZSetNotFound
@@ -121,7 +134,10 @@ func (z *ZSet) ZPeekMin(key string) (*Record, SCORE, error) {
 func (z *ZSet) ZPopMin(key string) (*Record, SCORE, error) {
 	if zset, ok := z.M[key]; ok {
 		node := zset.PopMin()
-		return node.record, node.score, nil
+		if node != nil {
+			return node.record, node.score, nil
+		}
+		return nil, 0, ErrZSetIsEmpty
 	}
 
 	return nil, 0, ErrZSetNotFound
@@ -171,8 +187,11 @@ func (z *ZSet) ZRem(key string, value []byte) (*Record, error) {
 		if err != nil {
 			return nil, err
 		}
-		record := zset.Remove(hash).record
-		return record, nil
+		node := zset.Remove(hash)
+		if node != nil {
+			return node.record, nil
+		}
+		return nil, ErrZSetMemberNotExist
 	}
 
 	return nil, ErrZSetNotFound
@@ -200,7 +219,11 @@ func (z *ZSet) ZRank(key string, value []byte) (int, error) {
 		if err != nil {
 			return 0, err
 		}
-		return zset.FindRank(hash), nil
+		rank := zset.FindRank(hash)
+		if rank == 0 {
+			return 0, ErrZSetMemberNotExist
+		}
+		return rank, nil
 	}
 	return 0, ErrZSetNotFound
 }
@@ -211,14 +234,22 @@ func (z *ZSet) ZRevRank(key string, value []byte) (int, error) {
 		if err != nil {
 			return 0, err
 		}
-		return zset.FindRevRank(hash), nil
+		rank := zset.FindRevRank(hash)
+		if rank == 0 {
+			return 0, ErrZSetMemberNotExist
+		}
+		return rank, nil
 	}
 	return 0, ErrZSetNotFound
 }
 
-func (z *ZSet) ZGetScoreByValue(key string, value []byte) (float64, error) {
+func (z *ZSet) ZScore(key string, value []byte) (float64, error) {
 	if zset, ok := z.M[key]; ok {
-		return float64(zset.GetByValue(value).score), nil
+		node := zset.GetByValue(value)
+		if node != nil {
+			return float64(zset.GetByValue(value).score), nil
+		}
+		return 0, ErrZSetMemberNotExist
 	}
 	return 0, ErrZSetNotFound
 }
