@@ -380,3 +380,22 @@ func (c CEntries) processEntriesScanOnDisk() (result []*Entry) {
 
 	return result
 }
+
+type dataInTx struct {
+	es       Entries
+	txId     uint64
+	startOff int64
+}
+
+func (dt *dataInTx) isSameTx(e *Entry) bool {
+	return dt.txId == e.Meta.TxID
+}
+
+func (dt *dataInTx) appendEntry(e *Entry) {
+	dt.es = append(dt.es, e)
+}
+
+func (dt *dataInTx) reset() {
+	dt.es = make(Entries, 0)
+	dt.txId = 0
+}

@@ -637,7 +637,7 @@ func (db *DB) getActiveFileWriteOff() (off int64, err error) {
 			if err == io.EOF {
 				break
 			}
-			if err == ErrIndexOutOfBound {
+			if errors.Is(err, ErrIndexOutOfBound) {
 				break
 			}
 
@@ -650,12 +650,89 @@ func (db *DB) getActiveFileWriteOff() (off int64, err error) {
 
 func (db *DB) parseDataFiles(dataFileIds []int) (unconfirmedRecords []*Record, committedTxIds map[uint64]struct{}, err error) {
 	var (
-		off int64
-		f   *fileRecovery
-		fID int64
+		off      int64
+		f        *fileRecovery
+		fID      int64
+		dataInTx dataInTx
 	)
-
 	committedTxIds = make(map[uint64]struct{})
+
+	parseDataInTx := func() error {
+		for _, entry := range dataInTx.es {
+			var e *Entry
+			off := dataInTx.startOff
+			if db.opt.EntryIdxMode == HintKeyValAndRAMIdxMode {
+				e = NewEntry().WithKey(entry.Key).WithValue(entry.Value).WithBucket(entry.Bucket).WithMeta(entry.Meta)
+			}
+
+			if entry.Meta.Status == Committed {
+				committedTxIds[entry.Meta.TxID] = struct{}{}
+				meta := NewMetaData().WithFlag(DataSetFlag)
+				h := NewHint().WithMeta(meta)
+				err := db.ActiveCommittedTxIdsIdx.Insert(entry.GetTxIDBytes(), nil, h, CountFlagEnabled)
+				if err != nil {
+					return fmt.Errorf("can not ingest the hint obj to ActiveCommittedTxIdsIdx, err: %s", err.Error())
+				}
+			}
+			h := NewHint().WithKey(entry.Key).WithFileId(fID).WithMeta(entry.Meta).WithDataPos(uint64(off))
+			r := NewRecord().WithHint(h).WithEntry(e).WithBucket(entry.GetBucketString())
+			unconfirmedRecords = append(unconfirmedRecords, r)
+
+			if db.opt.EntryIdxMode == HintBPTSparseIdxMode {
+				db.BPTreeKeyEntryPosMap[string(getNewKey(string(entry.Bucket), entry.Key))] = off
+			}
+			off += entry.Size()
+		}
+		return nil
+	}
+
+	var readEntriesFromFile = func() error {
+		for {
+			entry, err := f.readEntry()
+			if err != nil {
+				// whatever which logic branch it will choose, we will release the fd.
+				_ = f.release()
+				if errors.Is(err, io.EOF) || errors.Is(err, ErrIndexOutOfBound) || errors.Is(err, io.ErrUnexpectedEOF) {
+					break
+				}
+				if off >= db.opt.SegmentSize {
+					break
+				}
+
+				return err
+			}
+
+			if entry == nil {
+				break
+			}
+
+			if dataInTx.txId == 0 {
+				dataInTx.appendEntry(entry)
+				dataInTx.txId = entry.Meta.TxID
+				dataInTx.startOff = off
+			} else if dataInTx.isSameTx(entry) {
+				dataInTx.appendEntry(entry)
+			}
+
+			if entry.Meta.Status == Committed {
+				err := parseDataInTx()
+				if err != nil {
+					return err
+				}
+				dataInTx.reset()
+				dataInTx.startOff = off
+			}
+
+			if !dataInTx.isSameTx(entry) {
+				dataInTx.reset()
+				dataInTx.startOff = off
+			}
+			
+			off += entry.Size()
+
+		}
+		return nil
+	}
 
 	if db.opt.EntryIdxMode == HintBPTSparseIdxMode {
 		dataFileIds = dataFileIds[len(dataFileIds)-1:]
@@ -669,52 +746,10 @@ func (db *DB) parseDataFiles(dataFileIds []int) (unconfirmedRecords []*Record, c
 		if err != nil {
 			return nil, nil, err
 		}
-		goto ReadEntriesFromFile
-	}
-
-ReadEntriesFromFile:
-	for {
-		entry, err := f.readEntry()
+		err := readEntriesFromFile()
 		if err != nil {
-			// whatever which logic branch it will choose, we will release the fd.
-			_ = f.release()
-			if errors.Is(err, io.EOF) || errors.Is(err, ErrIndexOutOfBound) || errors.Is(err, io.ErrUnexpectedEOF) {
-				break
-			}
-			if off >= db.opt.SegmentSize {
-				break
-			}
-
 			return nil, nil, err
 		}
-
-		if entry == nil {
-			break
-		}
-
-		var e *Entry
-		if db.opt.EntryIdxMode == HintKeyValAndRAMIdxMode {
-			e = NewEntry().WithKey(entry.Key).WithValue(entry.Value).WithBucket(entry.Bucket).WithMeta(entry.Meta)
-		}
-
-		if entry.Meta.Status == Committed {
-			committedTxIds[entry.Meta.TxID] = struct{}{}
-			meta := NewMetaData().WithFlag(DataSetFlag)
-			h := NewHint().WithMeta(meta)
-			err := db.ActiveCommittedTxIdsIdx.Insert(entry.GetTxIDBytes(), nil, h, CountFlagEnabled)
-			if err != nil {
-				return nil, nil, fmt.Errorf("can not ingest the hint obj to ActiveCommittedTxIdsIdx, err: %s", err.Error())
-			}
-		}
-		h := NewHint().WithKey(entry.Key).WithFileId(fID).WithMeta(entry.Meta).WithDataPos(uint64(off))
-		r := NewRecord().WithHint(h).WithEntry(e).WithBucket(entry.GetBucketString())
-		unconfirmedRecords = append(unconfirmedRecords, r)
-
-		if db.opt.EntryIdxMode == HintBPTSparseIdxMode {
-			db.BPTreeKeyEntryPosMap[string(getNewKey(string(entry.Bucket), entry.Key))] = off
-		}
-
-		off += entry.Size()
 	}
 
 	return
