@@ -848,8 +848,11 @@ func TestTx_ListEntryIdxMode_HintKeyValAndRAMIdxMode(t *testing.T) {
 	bucket := "bucket"
 	key := GetTestBytes(0)
 
+	opts := DefaultOptions
+	opts.EntryIdxMode = HintKeyValAndRAMIdxMode
+
 	// HintKeyValAndRAMIdxMode
-	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
 		err := db.Update(func(tx *Tx) error {
 			err := tx.LPush(bucket, key, []byte("d"), []byte("c"), []byte("b"), []byte("a"))
 			require.NoError(t, err)

@@ -100,7 +100,9 @@ func (db *DB) merge() error {
 
 	db.mu.Unlock()
 
-	for _, pendingMergeFId := range pendingMergeFIds {
+	mergingPath := make([]string, len(pendingMergeFIds))
+
+	for i, pendingMergeFId := range pendingMergeFIds {
 		off = 0
 		path := getDataPath(int64(pendingMergeFId), db.opt.Dir)
 		fr, err := newFileRecovery(path, db.opt.BufferSizeOfRecovery)
@@ -170,7 +172,14 @@ func (db *DB) merge() error {
 		if err != nil {
 			return err
 		}
-		if err := os.Remove(path); err != nil {
+		mergingPath[i] = path
+	}
+
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	for i := 0; i < len(mergingPath); i++ {
+		if err := os.Remove(mergingPath[i]); err != nil {
 			return fmt.Errorf("when merge err: %s", err)
 		}
 	}
