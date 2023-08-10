@@ -187,6 +187,9 @@ type (
 		fm                      *fileManager
 		flock                   *flock.Flock
 		commitBuffer            *bytes.Buffer
+		mergeStartCh            chan struct{}
+		mergeEndCh              chan error
+		mergeWorkCloseCh        chan struct{}
 		writeCh                 chan *request
 	}
 
@@ -212,6 +215,9 @@ func open(opt Options) (*DB, error) {
 		ActiveCommittedTxIdsIdx: NewTree(),
 		Index:                   NewIndex(),
 		fm:                      newFileManager(opt.RWMode, opt.MaxFdNumsInCache, opt.CleanFdsCacheThreshold),
+		mergeStartCh:            make(chan struct{}),
+		mergeEndCh:              make(chan error),
+		mergeWorkCloseCh:        make(chan struct{}),
 		writeCh:                 make(chan *request, KvWriteChCapacity),
 	}
 
@@ -254,6 +260,7 @@ func open(opt Options) (*DB, error) {
 		return nil, fmt.Errorf("db.buildIndexes error: %s", err)
 	}
 
+	go db.mergeWorker()
 	go db.doWrites()
 
 	return db, nil
@@ -389,6 +396,8 @@ func (db *DB) release() error {
 	if err != nil {
 		return err
 	}
+
+	db.mergeWorkCloseCh <- struct{}{}
 
 	if !db.flock.Locked() {
 		return ErrDirUnlocked

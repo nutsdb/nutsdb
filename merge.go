@@ -18,13 +18,20 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"strings"
+	"time"
 )
 
 var (
 	ErrDontNeedMerge = errors.New("the number of files waiting to be merged is at least 2")
 )
+
+func (db *DB) Merge() error {
+	db.mergeStartCh <- struct{}{}
+	return <-db.mergeEndCh
+}
 
 // Merge removes dirty data and reduce data redundancy,following these steps:
 //
@@ -38,7 +45,7 @@ var (
 //
 // Caveat: merge is Called means starting multiple write transactions, and it
 // will affect the other write request. so execute it at the appropriate time.
-func (db *DB) Merge() error {
+func (db *DB) merge() error {
 	var (
 		off              int64
 		pendingMergeFIds []int
@@ -171,18 +178,31 @@ func (db *DB) Merge() error {
 	return nil
 }
 
-// getRecordFromKey fetches Record for given key and bucket
-// this is a helper function used in merge so it does not work if index mode is HintBPTSparseIdxMode
-func (db *DB) getRecordFromKey(bucket, key []byte) (*Record, bool) {
-	idxMode := db.opt.EntryIdxMode
-	if idxMode == HintBPTSparseIdxMode {
-		return nil, false
+func (db *DB) mergeWorker() {
+	var ticker *time.Ticker
+
+	if db.opt.MergeInterval != 0 {
+		ticker = time.NewTicker(db.opt.MergeInterval)
+	} else {
+		ticker = time.NewTicker(math.MaxInt)
+		ticker.Stop()
 	}
-	idx, ok := db.BTreeIdx[string(bucket)]
-	if !ok {
-		return nil, false
+
+	for {
+		select {
+		case <-db.mergeStartCh:
+			db.mergeEndCh <- db.merge()
+			// if automatic merging is enabled, then after a manual merge
+			// the timer needs to be reset.
+			if db.opt.MergeInterval != 0 {
+				ticker.Reset(db.opt.MergeInterval)
+			}
+		case <-ticker.C:
+			_ = db.merge()
+		case <-db.mergeWorkCloseCh:
+			return
+		}
 	}
-	return idx.Find(key)
 }
 
 func (db *DB) isPendingMergeEntry(entry *Entry) bool {
