@@ -397,6 +397,8 @@ func (db *DB) release() error {
 		return err
 	}
 
+	db.mergeWorkCloseCh <- struct{}{}
+
 	if !db.flock.Locked() {
 		return ErrDirUnlocked
 	}
@@ -405,8 +407,6 @@ func (db *DB) release() error {
 	if err != nil {
 		return err
 	}
-
-	db.mergeWorkCloseCh <- struct{}{}
 
 	db.fm = nil
 

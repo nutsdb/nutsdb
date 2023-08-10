@@ -33,7 +33,7 @@ func (db *DB) Merge() error {
 	return <-db.mergeEndCh
 }
 
-// merge removes dirty data and reduce data redundancy,following these steps:
+// Merge removes dirty data and reduce data redundancy,following these steps:
 //
 // 1. Filter delete or expired entry.
 //
@@ -74,17 +74,35 @@ func (db *DB) merge() error {
 		return ErrDontNeedMerge
 	}
 
-	dataFile, err := db.fm.getDataFile(getDataPath(db.MaxFileID+1, db.opt.Dir), db.opt.SegmentSize)
+	db.MaxFileID++
+
+	if !db.opt.SyncEnable && db.opt.RWMode == MMap {
+		if err := db.ActiveFile.rwManager.Sync(); err != nil {
+			db.mu.Unlock()
+			return err
+		}
+	}
+
+	if err := db.ActiveFile.rwManager.Release(); err != nil {
+		db.mu.Unlock()
+		return err
+	}
+
+	var err error
+	path := getDataPath(db.MaxFileID, db.opt.Dir)
+	db.ActiveFile, err = db.fm.getDataFile(path, db.opt.SegmentSize)
 	if err != nil {
 		db.mu.Unlock()
 		return err
 	}
-	db.ActiveFile = dataFile
-	db.MaxFileID++
+
+	db.ActiveFile.fileID = db.MaxFileID
 
 	db.mu.Unlock()
 
-	for _, pendingMergeFId := range pendingMergeFIds {
+	mergingPath := make([]string, len(pendingMergeFIds))
+
+	for i, pendingMergeFId := range pendingMergeFIds {
 		off = 0
 		path := getDataPath(int64(pendingMergeFId), db.opt.Dir)
 		fr, err := newFileRecovery(path, db.opt.BufferSizeOfRecovery)
@@ -112,25 +130,16 @@ func (db *DB) merge() error {
 				// To address this issue, we need to use a transaction to perform this operation.
 				err := db.Update(func(tx *Tx) error {
 					// check if we have a new entry with same key and bucket
-					if r, ok := db.getRecordFromKey(entry.Bucket, entry.Key); ok {
-						if r.IsExpired() {
-							// When merging, only need to delete the expired data directly from the index without leaving records
-							tx.db.BTreeIdx[string(entry.Bucket)].Delete(entry.Key)
-							return nil
-						}
-						if r.H.Meta.TxID <= entry.Meta.TxID {
-							if ok := db.isPendingMergeEntry(entry); ok {
-								return tx.put(
-									string(entry.Bucket),
-									entry.Key,
-									entry.Value,
-									entry.Meta.TTL,
-									entry.Meta.Flag,
-									entry.Meta.Timestamp,
-									entry.Meta.Ds,
-								)
-							}
-						}
+					if ok := db.isPendingMergeEntry(entry); ok {
+						return tx.put(
+							string(entry.Bucket),
+							entry.Key,
+							entry.Value,
+							entry.Meta.TTL,
+							entry.Meta.Flag,
+							entry.Meta.Timestamp,
+							entry.Meta.Ds,
+						)
 					}
 					return nil
 				})
@@ -163,7 +172,14 @@ func (db *DB) merge() error {
 		if err != nil {
 			return err
 		}
-		if err := os.Remove(path); err != nil {
+		mergingPath[i] = path
+	}
+
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	for i := 0; i < len(mergingPath); i++ {
+		if err := os.Remove(mergingPath[i]); err != nil {
 			return fmt.Errorf("when merge err: %s", err)
 		}
 	}
@@ -198,26 +214,19 @@ func (db *DB) mergeWorker() {
 	}
 }
 
-// getRecordFromKey fetches Record for given key and bucket
-// this is a helper function used in merge so it does not work if index mode is HintBPTSparseIdxMode
-func (db *DB) getRecordFromKey(bucket, key []byte) (*Record, bool) {
-	idxMode := db.opt.EntryIdxMode
-	if idxMode == HintBPTSparseIdxMode {
-		return nil, false
-	}
-	idx, ok := db.BTreeIdx[string(bucket)]
-	if !ok {
-		return nil, false
-	}
-	return idx.Find(key)
-}
-
 func (db *DB) isPendingMergeEntry(entry *Entry) bool {
 	if entry.Meta.Ds == DataStructureTree {
 		bptIdx, exist := db.BTreeIdx[string(entry.Bucket)]
 		if exist {
 			r, ok := bptIdx.Find(entry.Key)
 			if ok && r.H.Meta.Flag == DataSetFlag {
+				if r.IsExpired() {
+					db.BTreeIdx[string(entry.Bucket)].Delete(entry.Key)
+					return false
+				}
+				if r.H.Meta.TxID > entry.Meta.TxID {
+					return false
+				}
 				return true
 			}
 		}
@@ -250,24 +259,24 @@ func (db *DB) isPendingMergeEntry(entry *Entry) bool {
 		}
 	}
 
-	if entry.Meta.Ds == DataStructureList {
-		//check the key of list is expired or not
-		//if expired, it will clear the items of index
-		//so that nutsdb can clear entry of expiring list in the function isPendingMergeEntry
-		db.checkListExpired()
-
-		if listIdx := db.Index.getList(string(entry.Bucket)); listIdx != nil {
-			items, _ := listIdx.LRange(string(entry.Key), 0, -1)
-			if entry.Meta.Flag == DataRPushFlag || entry.Meta.Flag == DataLPushFlag {
-				for _, item := range items {
-					v, _ := db.getValueByRecord(item)
-					if string(entry.Value) == string(v) {
-						return true
-					}
-				}
-			}
-		}
-	}
+	//if entry.Meta.Ds == DataStructureList {
+	//	//check the key of list is expired or not
+	//	//if expired, it will clear the items of index
+	//	//so that nutsdb can clear entry of expiring list in the function isPendingMergeEntry
+	//	db.checkListExpired()
+	//
+	//	if listIdx := db.Index.getList(string(entry.Bucket)); listIdx != nil {
+	//		items, _ := listIdx.LRange(string(entry.Key), 0, -1)
+	//		if entry.Meta.Flag == DataRPushFlag || entry.Meta.Flag == DataLPushFlag {
+	//			for _, item := range items {
+	//				v, _ := db.getValueByRecord(item)
+	//				if string(entry.Value) == string(v) {
+	//					return true
+	//				}
+	//			}
+	//		}
+	//	}
+	//}
 
 	return false
 }

@@ -343,30 +343,6 @@ func TestDB_Close(t *testing.T) {
 	})
 }
 
-func TestDB_GetRecordFromKey(t *testing.T) {
-	opts := DefaultOptions
-	opts.SegmentSize = 120
-	opts.EntryIdxMode = HintKeyAndRAMIdxMode
-	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
-		bucket := []byte("bucket")
-		key := []byte("hello")
-		val := []byte("world")
-
-		_, ok := db.getRecordFromKey(bucket, key)
-		require.False(t, ok)
-
-		for i := 0; i < 10; i++ {
-			txPut(t, db, string(bucket), key, val, Persistent, nil)
-		}
-
-		r, ok := db.getRecordFromKey(bucket, key)
-		require.True(t, ok)
-
-		require.Equal(t, 58, int(r.H.DataPos))
-		require.Equal(t, int64(4), r.H.FileID)
-	})
-}
-
 func TestDB_ErrWhenBuildListIdx(t *testing.T) {
 	ts := []struct {
 		err     error
