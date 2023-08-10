@@ -178,7 +178,6 @@ type (
 		ActiveFile              *DataFile
 		ActiveBPTreeIdx         *BPTree
 		ActiveCommittedTxIdsIdx *BPTree
-		committedTxIds          map[uint64]struct{}
 		MaxFileID               int64
 		mu                      sync.RWMutex
 		KeyCount                int // total key number ,include expired, deleted, repeated.
@@ -209,7 +208,6 @@ func open(opt Options) (*DB, error) {
 		opt:                     opt,
 		KeyCount:                0,
 		closed:                  false,
-		committedTxIds:          make(map[uint64]struct{}),
 		BPTreeKeyEntryPosMap:    make(map[string]int64),
 		bucketMetas:             make(map[string]*BucketMeta),
 		ActiveCommittedTxIdsIdx: NewTree(),
@@ -388,8 +386,6 @@ func (db *DB) release() error {
 	db.ActiveBPTreeIdx = nil
 
 	db.ActiveCommittedTxIdsIdx = nil
-
-	db.committedTxIds = nil
 
 	err = db.fm.close()
 
@@ -648,14 +644,13 @@ func (db *DB) getActiveFileWriteOff() (off int64, err error) {
 	return
 }
 
-func (db *DB) parseDataFiles(dataFileIds []int) (unconfirmedRecords []*Record, committedTxIds map[uint64]struct{}, err error) {
+func (db *DB) parseDataFiles(dataFileIds []int) (unconfirmedRecords []*Record, err error) {
 	var (
 		off      int64
 		f        *fileRecovery
 		fID      int64
 		dataInTx dataInTx
 	)
-	committedTxIds = make(map[uint64]struct{})
 
 	parseDataInTx := func() error {
 		for _, entry := range dataInTx.es {
@@ -666,7 +661,6 @@ func (db *DB) parseDataFiles(dataFileIds []int) (unconfirmedRecords []*Record, c
 			}
 
 			if entry.Meta.Status == Committed {
-				committedTxIds[entry.Meta.TxID] = struct{}{}
 				meta := NewMetaData().WithFlag(DataSetFlag)
 				h := NewHint().WithMeta(meta)
 				err := db.ActiveCommittedTxIdsIdx.Insert(entry.GetTxIDBytes(), nil, h, CountFlagEnabled)
@@ -744,11 +738,11 @@ func (db *DB) parseDataFiles(dataFileIds []int) (unconfirmedRecords []*Record, c
 		dataPath := getDataPath(fID, db.opt.Dir)
 		f, err = newFileRecovery(dataPath, db.opt.BufferSizeOfRecovery)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		err := readEntriesFromFile()
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 	}
 
@@ -790,8 +784,6 @@ func (db *DB) buildBPTreeRootIdxes(dataFileIds []int) error {
 
 		fd.Close()
 	}
-
-	db.committedTxIds = nil
 
 	return nil
 }
@@ -880,8 +872,7 @@ func (db *DB) buildOtherIdxes(bucket string, r *Record) error {
 
 // buildHintIdx builds the Hint Indexes.
 func (db *DB) buildHintIdx(dataFileIds []int) error {
-	unconfirmedRecords, committedTxIds, err := db.parseDataFiles(dataFileIds)
-	db.committedTxIds = committedTxIds
+	unconfirmedRecords, err := db.parseDataFiles(dataFileIds)
 
 	if err != nil {
 		return err
@@ -892,31 +883,29 @@ func (db *DB) buildHintIdx(dataFileIds []int) error {
 	}
 
 	for _, r := range unconfirmedRecords {
-		if _, ok := db.committedTxIds[r.H.Meta.TxID]; ok {
-			bucket := r.Bucket
+		bucket := r.Bucket
 
-			if r.H.Meta.Ds == DataStructureTree {
-				r.H.Meta.Status = Committed
+		if r.H.Meta.Ds == DataStructureTree {
+			r.H.Meta.Status = Committed
 
-				if db.opt.EntryIdxMode == HintBPTSparseIdxMode {
-					if err = db.buildActiveBPTreeIdx(r); err != nil {
-						return err
-					}
-				} else {
-					db.buildBTreeIdx(bucket, r)
-				}
-			} else {
-				if err = db.buildOtherIdxes(bucket, r); err != nil {
+			if db.opt.EntryIdxMode == HintBPTSparseIdxMode {
+				if err = db.buildActiveBPTreeIdx(r); err != nil {
 					return err
 				}
-
-				if r.H.Meta.Ds == DataStructureNone {
-					db.buildNotDSIdxes(bucket, r)
-				}
+			} else {
+				db.buildBTreeIdx(bucket, r)
+			}
+		} else {
+			if err = db.buildOtherIdxes(bucket, r); err != nil {
+				return err
 			}
 
-			db.KeyCount++
+			if r.H.Meta.Ds == DataStructureNone {
+				db.buildNotDSIdxes(bucket, r)
+			}
 		}
+
+		db.KeyCount++
 	}
 
 	if HintBPTSparseIdxMode == db.opt.EntryIdxMode {

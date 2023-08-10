@@ -174,11 +174,6 @@ func TestTx_CommittedStatus(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equalf(t, Committed, entry2.Meta.Status, "the last entry should be committed")
 
-			// check committedTxIds
-			txID := entry1.Meta.TxID
-			_, ok := tx.db.committedTxIds[txID]
-			assert.True(t, ok)
-
 			err = tx.Commit()
 			assert.NoError(t, err)
 		}
