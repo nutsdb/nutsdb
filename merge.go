@@ -121,25 +121,16 @@ func (db *DB) Merge() error {
 				// To address this issue, we need to use a transaction to perform this operation.
 				err := db.Update(func(tx *Tx) error {
 					// check if we have a new entry with same key and bucket
-					if r, ok := db.getRecordFromKey(entry.Bucket, entry.Key); ok {
-						if r.IsExpired() {
-							// When merging, only need to delete the expired data directly from the index without leaving records
-							tx.db.BTreeIdx[string(entry.Bucket)].Delete(entry.Key)
-							return nil
-						}
-						if r.H.Meta.TxID <= entry.Meta.TxID {
-							if ok := db.isPendingMergeEntry(entry); ok {
-								return tx.put(
-									string(entry.Bucket),
-									entry.Key,
-									entry.Value,
-									entry.Meta.TTL,
-									entry.Meta.Flag,
-									entry.Meta.Timestamp,
-									entry.Meta.Ds,
-								)
-							}
-						}
+					if ok := db.isPendingMergeEntry(entry); ok {
+						return tx.put(
+							string(entry.Bucket),
+							entry.Key,
+							entry.Value,
+							entry.Meta.TTL,
+							entry.Meta.Flag,
+							entry.Meta.Timestamp,
+							entry.Meta.Ds,
+						)
 					}
 					return nil
 				})
@@ -200,6 +191,13 @@ func (db *DB) isPendingMergeEntry(entry *Entry) bool {
 		if exist {
 			r, ok := bptIdx.Find(entry.Key)
 			if ok && r.H.Meta.Flag == DataSetFlag {
+				if r.IsExpired() {
+					db.BTreeIdx[string(entry.Bucket)].Delete(entry.Key)
+					return false
+				}
+				if r.H.Meta.TxID > entry.Meta.TxID {
+					return false
+				}
 				return true
 			}
 		}
@@ -232,24 +230,24 @@ func (db *DB) isPendingMergeEntry(entry *Entry) bool {
 		}
 	}
 
-	if entry.Meta.Ds == DataStructureList {
-		//check the key of list is expired or not
-		//if expired, it will clear the items of index
-		//so that nutsdb can clear entry of expiring list in the function isPendingMergeEntry
-		db.checkListExpired()
-
-		if listIdx := db.Index.getList(string(entry.Bucket)); listIdx != nil {
-			items, _ := listIdx.LRange(string(entry.Key), 0, -1)
-			if entry.Meta.Flag == DataRPushFlag || entry.Meta.Flag == DataLPushFlag {
-				for _, item := range items {
-					v, _ := db.getValueByRecord(item)
-					if string(entry.Value) == string(v) {
-						return true
-					}
-				}
-			}
-		}
-	}
+	//if entry.Meta.Ds == DataStructureList {
+	//	//check the key of list is expired or not
+	//	//if expired, it will clear the items of index
+	//	//so that nutsdb can clear entry of expiring list in the function isPendingMergeEntry
+	//	db.checkListExpired()
+	//
+	//	if listIdx := db.Index.getList(string(entry.Bucket)); listIdx != nil {
+	//		items, _ := listIdx.LRange(string(entry.Key), 0, -1)
+	//		if entry.Meta.Flag == DataRPushFlag || entry.Meta.Flag == DataLPushFlag {
+	//			for _, item := range items {
+	//				v, _ := db.getValueByRecord(item)
+	//				if string(entry.Value) == string(v) {
+	//					return true
+	//				}
+	//			}
+	//		}
+	//	}
+	//}
 
 	return false
 }
