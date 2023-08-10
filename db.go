@@ -644,7 +644,7 @@ func (db *DB) getActiveFileWriteOff() (off int64, err error) {
 	return
 }
 
-func (db *DB) parseDataFiles(dataFileIds []int) (unconfirmedRecords []*Record, err error) {
+func (db *DB) parseDataFiles(dataFileIds []int) (err error) {
 	var (
 		off      int64
 		f        *fileRecovery
@@ -670,11 +670,35 @@ func (db *DB) parseDataFiles(dataFileIds []int) (unconfirmedRecords []*Record, e
 			}
 			h := NewHint().WithKey(entry.Key).WithFileId(fID).WithMeta(entry.Meta).WithDataPos(uint64(off))
 			r := NewRecord().WithHint(h).WithEntry(e).WithBucket(entry.GetBucketString())
-			unconfirmedRecords = append(unconfirmedRecords, r)
 
 			if db.opt.EntryIdxMode == HintBPTSparseIdxMode {
 				db.BPTreeKeyEntryPosMap[string(getNewKey(string(entry.Bucket), entry.Key))] = off
 			}
+
+			bucket := r.Bucket
+
+			if r.H.Meta.Ds == DataStructureTree {
+				r.H.Meta.Status = Committed
+
+				if db.opt.EntryIdxMode == HintBPTSparseIdxMode {
+					if err = db.buildActiveBPTreeIdx(r); err != nil {
+						return err
+					}
+				} else {
+					db.buildBTreeIdx(bucket, r)
+				}
+			} else {
+				if err = db.buildOtherIdxes(bucket, r); err != nil {
+					return err
+				}
+
+				if r.H.Meta.Ds == DataStructureNone {
+					db.buildNotDSIdxes(bucket, r)
+				}
+			}
+
+			db.KeyCount++
+
 			off += entry.Size()
 		}
 		return nil
@@ -738,11 +762,17 @@ func (db *DB) parseDataFiles(dataFileIds []int) (unconfirmedRecords []*Record, e
 		dataPath := getDataPath(fID, db.opt.Dir)
 		f, err = newFileRecovery(dataPath, db.opt.BufferSizeOfRecovery)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		err := readEntriesFromFile()
 		if err != nil {
-			return nil, err
+			return err
+		}
+	}
+
+	if HintBPTSparseIdxMode == db.opt.EntryIdxMode {
+		if err = db.buildBPTreeRootIdxes(dataFileIds); err != nil {
+			return err
 		}
 	}
 
@@ -863,53 +893,6 @@ func (db *DB) buildOtherIdxes(bucket string, r *Record) error {
 
 	if r.H.Meta.Ds == DataStructureList {
 		if err := db.buildListIdx(bucket, r); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// buildHintIdx builds the Hint Indexes.
-func (db *DB) buildHintIdx(dataFileIds []int) error {
-	unconfirmedRecords, err := db.parseDataFiles(dataFileIds)
-
-	if err != nil {
-		return err
-	}
-
-	if len(unconfirmedRecords) == 0 {
-		return nil
-	}
-
-	for _, r := range unconfirmedRecords {
-		bucket := r.Bucket
-
-		if r.H.Meta.Ds == DataStructureTree {
-			r.H.Meta.Status = Committed
-
-			if db.opt.EntryIdxMode == HintBPTSparseIdxMode {
-				if err = db.buildActiveBPTreeIdx(r); err != nil {
-					return err
-				}
-			} else {
-				db.buildBTreeIdx(bucket, r)
-			}
-		} else {
-			if err = db.buildOtherIdxes(bucket, r); err != nil {
-				return err
-			}
-
-			if r.H.Meta.Ds == DataStructureNone {
-				db.buildNotDSIdxes(bucket, r)
-			}
-		}
-
-		db.KeyCount++
-	}
-
-	if HintBPTSparseIdxMode == db.opt.EntryIdxMode {
-		if err = db.buildBPTreeRootIdxes(dataFileIds); err != nil {
 			return err
 		}
 	}
@@ -1115,7 +1098,7 @@ func (db *DB) buildIndexes() (err error) {
 	}
 
 	// build hint index
-	return db.buildHintIdx(dataFileIds)
+	return db.parseDataFiles(dataFileIds)
 }
 
 func (db *DB) buildRecordByEntryAndOffset(entry *Entry, offset int64) *Record {
