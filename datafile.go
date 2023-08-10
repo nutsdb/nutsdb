@@ -27,6 +27,8 @@ var (
 
 	// ErrCapacity is returned when capacity is error.
 	ErrCapacity = errors.New("capacity error")
+
+	ErrEntryZero = errors.New("entry is zero ")
 )
 
 const (
@@ -112,7 +114,7 @@ func (df *DataFile) ReadRecord(off int, payloadSize int64) (e *Entry, err error)
 	}
 
 	if e.IsZero() {
-		return nil, nil
+		return nil, ErrEntryZero
 	}
 
 	if err := e.checkPayloadSize(payloadSize); err != nil {

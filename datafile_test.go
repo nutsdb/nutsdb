@@ -80,9 +80,8 @@ func TestDataFile1(t *testing.T) {
 
 	payloadSize := entry.Meta.PayloadSize()
 	e, err = df.ReadRecord(n, payloadSize)
-	if e != nil || err != nil {
-		t.Error("err TestDataFile_All ReadAt")
-	}
+	assert.Nil(t, e)
+	assert.Error(t, err, ErrEntryZero)
 
 	e, err = df.ReadRecord(0, payloadSize)
 	if err != nil || string(e.Key) != "key_0001" || string(e.Value) != "val_0001" || e.Meta.Timestamp != 1547707905 {
