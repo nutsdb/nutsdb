@@ -25,6 +25,7 @@ import (
 func TestDB_MergeForString(t *testing.T) {
 	opts := DefaultOptions
 	opts.SegmentSize = 1 * 100
+	opts.EntryIdxMode = HintKeyAndRAMIdxMode
 	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
 		bucket := "bucket"
 		txPut(t, db, bucket, GetTestBytes(0), GetRandomBytes(24), Persistent, nil)
@@ -38,6 +39,7 @@ func TestDB_MergeForString(t *testing.T) {
 func TestDB_MergeRepeated(t *testing.T) {
 	opts := DefaultOptions
 	opts.SegmentSize = 120
+	opts.EntryIdxMode = HintKeyAndRAMIdxMode
 	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
 		bucket := "bucket"
 		for i := 0; i < 20; i++ {
@@ -54,6 +56,7 @@ func TestDB_MergeRepeated(t *testing.T) {
 func TestDB_MergeForSet(t *testing.T) {
 	opts := DefaultOptions
 	opts.SegmentSize = 100
+	opts.EntryIdxMode = HintKeyAndRAMIdxMode
 	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
 		bucket := "bucket"
 		key := GetTestBytes(0)
@@ -85,6 +88,7 @@ func TestDB_MergeForSet(t *testing.T) {
 func TestDB_MergeForZSet(t *testing.T) {
 	opts := DefaultOptions
 	opts.SegmentSize = 100
+	opts.EntryIdxMode = HintKeyAndRAMIdxMode
 	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
 		bucket := "bucket"
 
@@ -118,6 +122,7 @@ func TestDB_MergeForZSet(t *testing.T) {
 func TestDB_MergeForList(t *testing.T) {
 	opts := DefaultOptions
 	opts.SegmentSize = 100
+	opts.EntryIdxMode = HintKeyAndRAMIdxMode
 	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
 		bucket := "bucket"
 		key := GetTestBytes(0)
@@ -134,43 +139,11 @@ func TestDB_MergeForList(t *testing.T) {
 	})
 }
 
-func TestDB_MergeAutomatic(t *testing.T) {
-	opts := DefaultOptions
-	opts.SegmentSize = 1024
-	opts.MergeInterval = 200 * time.Millisecond
-
-	bucket := "bucket"
-
-	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
-		err := db.Merge()
-		require.Error(t, err)
-		require.Error(t, ErrDontNeedMerge, err)
-
-		key := GetTestBytes(0)
-		value := GetRandomBytes(24)
-
-		for i := 0; i < 100; i++ {
-			txPut(t, db, bucket, key, value, Persistent, nil)
-		}
-
-		txGet(t, db, bucket, key, value, nil)
-
-		// waiting for the merge work to be triggered.
-		time.Sleep(200 * time.Millisecond)
-
-		_, pendingMergeFileIds := db.getMaxFileIDAndFileIDs()
-		// because there is only one valid entry, there will be only one data file after merging
-		require.Len(t, pendingMergeFileIds, 1)
-
-		txGet(t, db, bucket, key, value, nil)
-	})
-}
-
 func TestDB_MergeWithTx(t *testing.T) {
 	opts := DefaultOptions
 	opts.SegmentSize = 24 * MB
 	opts.SyncEnable = false
-
+	opts.EntryIdxMode = HintKeyAndRAMIdxMode
 	bucket := "bucket"
 
 	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {

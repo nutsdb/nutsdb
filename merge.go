@@ -18,22 +18,15 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math"
 	"os"
 	"strings"
-	"time"
 )
 
 var (
 	ErrDontNeedMerge = errors.New("the number of files waiting to be merged is at least 2")
 )
 
-func (db *DB) Merge() error {
-	db.mergeStartCh <- struct{}{}
-	return <-db.mergeEndCh
-}
-
-// merge removes dirty data and reduce data redundancy,following these steps:
+// Merge removes dirty data and reduce data redundancy,following these steps:
 //
 // 1. Filter delete or expired entry.
 //
@@ -45,7 +38,7 @@ func (db *DB) Merge() error {
 //
 // Caveat: merge is Called means starting multiple write transactions, and it
 // will affect the other write request. so execute it at the appropriate time.
-func (db *DB) merge() error {
+func (db *DB) Merge() error {
 	var (
 		off              int64
 		pendingMergeFIds []int
@@ -74,13 +67,29 @@ func (db *DB) merge() error {
 		return ErrDontNeedMerge
 	}
 
-	dataFile, err := db.fm.getDataFile(getDataPath(db.MaxFileID+1, db.opt.Dir), db.opt.SegmentSize)
+	db.MaxFileID++
+
+	if !db.opt.SyncEnable && db.opt.RWMode == MMap {
+		if err := db.ActiveFile.rwManager.Sync(); err != nil {
+			db.mu.Unlock()
+			return err
+		}
+	}
+
+	if err := db.ActiveFile.rwManager.Release(); err != nil {
+		db.mu.Unlock()
+		return err
+	}
+
+	var err error
+	path := getDataPath(db.MaxFileID, db.opt.Dir)
+	db.ActiveFile, err = db.fm.getDataFile(path, db.opt.SegmentSize)
 	if err != nil {
 		db.mu.Unlock()
 		return err
 	}
-	db.ActiveFile = dataFile
-	db.MaxFileID++
+
+	db.ActiveFile.fileID = db.MaxFileID
 
 	db.mu.Unlock()
 
@@ -169,33 +178,6 @@ func (db *DB) merge() error {
 	}
 
 	return nil
-}
-
-func (db *DB) mergeWorker() {
-	var ticker *time.Ticker
-
-	if db.opt.MergeInterval != 0 {
-		ticker = time.NewTicker(db.opt.MergeInterval)
-	} else {
-		ticker = time.NewTicker(math.MaxInt)
-		ticker.Stop()
-	}
-
-	for {
-		select {
-		case <-db.mergeStartCh:
-			db.mergeEndCh <- db.merge()
-			// if automatic merging is enabled, then after a manual merge
-			// the timer needs to be reset.
-			if db.opt.MergeInterval != 0 {
-				ticker.Reset(db.opt.MergeInterval)
-			}
-		case <-ticker.C:
-			_ = db.merge()
-		case <-db.mergeWorkCloseCh:
-			return
-		}
-	}
 }
 
 // getRecordFromKey fetches Record for given key and bucket
