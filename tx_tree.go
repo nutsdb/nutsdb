@@ -152,10 +152,6 @@ func (tx *Tx) Get(bucket string, key []byte) (e *Entry, err error) {
 				return nil, ErrKeyNotFound
 			}
 
-			if _, ok := tx.db.committedTxIds[r.H.Meta.TxID]; !ok {
-				return nil, ErrNotFoundKey
-			}
-
 			if r.IsExpired() {
 				tx.lazyDeletion(bucket, key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureTree)
 				return nil, ErrNotFoundKey
@@ -838,10 +834,6 @@ func (tx *Tx) Delete(bucket string, key []byte) error {
 	if idx, ok := tx.db.BTreeIdx[bucket]; ok {
 		r, found := idx.Find(key)
 		if !found {
-			return ErrNotFoundKey
-		}
-
-		if _, ok := tx.db.committedTxIds[r.H.Meta.TxID]; !ok {
 			return ErrNotFoundKey
 		}
 

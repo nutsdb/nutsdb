@@ -323,8 +323,6 @@ func (tx *Tx) Commit() (err error) {
 				if err := tx.buildBucketMetaIdx(bucket, entry.Key, bucketMetaTemp); err != nil {
 					return err
 				}
-			} else {
-				tx.db.committedTxIds[txID] = struct{}{}
 			}
 		}
 
