@@ -222,3 +222,21 @@
 * [Docs] doc: update options doc by @lyl156 in #391
 * [Docs] doc: add a new option and update the default option by @bigboss2063 in #396
 * [Chore] chore: add error handler for error occurred during transaction by @lyl156 in #383
+
+## v0.13.1 (2023-8-11)
+* [Refactor] create dir if not exist by @moyrne in #399
+* [New Feature] feat: make Set support HintKeyAndRAMIdxMode by @bigboss2063 in #397
+* [Refactor] optimize parseDataFiles error check by @moyrne in #401
+* [New Feature] add batch write by @damotiansheng in #398
+* [Bug Fix] repair tx.SMembers bug by @damotiansheng in #404
+* [Test] Restart the database using three modes by @JingchenZhang in #406
+* [Chore] chore: update ci.yml by @bigboss2063 in #409
+* [Bug Fix] fix: fixed the issue where deletion did not actually remove the record from memory. by @bigboss2063 in #407
+* [Style] style: remove useless code by @bigboss2063 in #411
+* [Chore] chore: add change log by @xujiajun in #412
+* [Refactor] ref: use goto refactor recovery logic by @elliotchenzichang in #414
+* [Bug Fix] fix: fix dead lock during merging by @bigboss2063 in #417
+* [Bug Fix] Add tx data handle logic in recovery by @elliotchenzichang in #418
+* [Bug Fix] add skip entry zero error when recovery by @elliotchenzichang in #420
+* [Refactor] delete the map db.committedTxIds, it will not needed any more by @elliotchenzichang in #421
+* [Refactor] rebuild the recovery logic, and delete the unconfirmedRecordList by @elliotchenzichang in #422
