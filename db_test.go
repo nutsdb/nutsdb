@@ -572,3 +572,87 @@ func TestDB_HintBPTSparseIdxMode_RestartDB(t *testing.T) {
 		txGet(t, db, bucket, key, val, nil)
 	})
 }
+
+func TestDB_ChangeMode_RestartDB(t *testing.T) {
+	changeModeRestart := func(firstMode EntryIdxMode, secondMode EntryIdxMode) {
+		opts := DefaultOptions
+		opts.EntryIdxMode = firstMode
+
+		runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
+			bucket := "bucket"
+
+			// k-v
+			for i := 0; i < 10; i++ {
+				txPut(t, db, bucket, GetTestBytes(i), GetTestBytes(i), Persistent, nil)
+			}
+
+			// list
+			for i := 0; i < 10; i++ {
+				txPush(t, db, bucket, GetTestBytes(0), GetTestBytes(i), nil, true)
+			}
+
+			for i := 0; i < 2; i++ {
+				txPop(t, db, bucket, GetTestBytes(0), GetTestBytes(9-i), nil, true)
+			}
+
+			for i := 0; i < 2; i++ {
+				txPop(t, db, bucket, GetTestBytes(0), GetTestBytes(i), nil, false)
+			}
+
+			// set
+			for i := 0; i < 10; i++ {
+				txSAdd(t, db, bucket, GetTestBytes(0), GetTestBytes(i), nil)
+			}
+
+			for i := 0; i < 3; i++ {
+				txSRem(t, db, bucket, GetTestBytes(0), GetTestBytes(i), nil)
+			}
+
+			// zset
+			for i := 0; i < 10; i++ {
+				txZAdd(t, db, bucket, GetTestBytes(i), GetTestBytes(i), float64(i), nil)
+			}
+
+			for i := 0; i < 3; i++ {
+				txZRem(t, db, bucket, GetTestBytes(i), nil)
+			}
+
+			require.NoError(t, db.Close())
+
+			var err error
+			opts.EntryIdxMode = secondMode
+			db, err = Open(opts)
+			require.NoError(t, err)
+
+			// k-v
+			for i := 0; i < 10; i++ {
+				txGet(t, db, bucket, GetTestBytes(i), GetTestBytes(i), nil)
+			}
+
+			// list
+			txPop(t, db, bucket, GetTestBytes(0), GetTestBytes(7), nil, true)
+			txPop(t, db, bucket, GetTestBytes(0), GetTestBytes(2), nil, false)
+
+			// set
+			for i := 0; i < 3; i++ {
+				txSIsMember(t, db, bucket, GetTestBytes(0), GetTestBytes(i), false)
+			}
+
+			for i := 3; i < 10; i++ {
+				txSIsMember(t, db, bucket, GetTestBytes(0), GetTestBytes(i), true)
+			}
+
+			// zset
+			for i := 0; i < 3; i++ {
+				txZGetByKey(t, db, bucket, GetTestBytes(i), ErrNotFoundKey)
+			}
+
+			for i := 3; i < 10; i++ {
+				txZGetByKey(t, db, bucket, GetTestBytes(i), nil)
+			}
+		})
+	}
+
+	changeModeRestart(HintKeyValAndRAMIdxMode, HintKeyAndRAMIdxMode)
+	changeModeRestart(HintKeyAndRAMIdxMode, HintKeyValAndRAMIdxMode)
+}
