@@ -654,11 +654,7 @@ func (db *DB) parseDataFiles(dataFileIds []int) (err error) {
 
 	parseDataInTx := func() error {
 		for _, entry := range dataInTx.es {
-			var e *Entry
 			off := dataInTx.startOff
-			if db.opt.EntryIdxMode == HintKeyValAndRAMIdxMode {
-				e = NewEntry().WithKey(entry.Key).WithValue(entry.Value).WithBucket(entry.Bucket).WithMeta(entry.Meta)
-			}
 
 			if entry.Meta.Status == Committed {
 				meta := NewMetaData().WithFlag(DataSetFlag)
@@ -668,8 +664,9 @@ func (db *DB) parseDataFiles(dataFileIds []int) (err error) {
 					return fmt.Errorf("can not ingest the hint obj to ActiveCommittedTxIdsIdx, err: %s", err.Error())
 				}
 			}
+
 			h := NewHint().WithKey(entry.Key).WithFileId(fID).WithMeta(entry.Meta).WithDataPos(uint64(off))
-			r := NewRecord().WithHint(h).WithEntry(e).WithBucket(entry.GetBucketString())
+			r := NewRecord().WithHint(h).WithEntry(entry).WithBucket(entry.GetBucketString())
 
 			if db.opt.EntryIdxMode == HintBPTSparseIdxMode {
 				db.BPTreeKeyEntryPosMap[string(getNewKey(string(entry.Bucket), entry.Key))] = off
@@ -678,6 +675,10 @@ func (db *DB) parseDataFiles(dataFileIds []int) (err error) {
 			bucket := r.Bucket
 
 			if r.H.Meta.Ds == DataStructureTree {
+				if db.opt.EntryIdxMode == HintKeyAndRAMIdxMode {
+					r.E = nil
+				}
+
 				r.H.Meta.Status = Committed
 
 				if db.opt.EntryIdxMode == HintBPTSparseIdxMode {
@@ -688,12 +689,12 @@ func (db *DB) parseDataFiles(dataFileIds []int) (err error) {
 					db.buildBTreeIdx(bucket, r)
 				}
 			} else {
-				if err = db.buildOtherIdxes(bucket, r); err != nil {
-					return err
-				}
-
 				if r.H.Meta.Ds == DataStructureNone {
 					db.buildNotDSIdxes(bucket, r)
+				} else {
+					if err = db.buildOtherIdxes(bucket, r); err != nil {
+						return err
+					}
 				}
 			}
 
@@ -883,15 +884,11 @@ func (db *DB) buildOtherIdxes(bucket string, r *Record) error {
 		if err := db.buildSetIdx(bucket, r); err != nil {
 			return err
 		}
-	}
-
-	if r.H.Meta.Ds == DataStructureSortedSet {
+	} else if r.H.Meta.Ds == DataStructureSortedSet {
 		if err := db.buildSortedSetIdx(bucket, r); err != nil {
 			return err
 		}
-	}
-
-	if r.H.Meta.Ds == DataStructureList {
+	} else if r.H.Meta.Ds == DataStructureList {
 		if err := db.buildListIdx(bucket, r); err != nil {
 			return err
 		}
@@ -936,18 +933,17 @@ func (db *DB) buildSetIdx(bucket string, r *Record) error {
 		db.SetIdx[bucket] = NewSet()
 	}
 
-	if r.E == nil {
-		return ErrEntryIdxModeOpt
-	}
+	key, val, meta := r.E.Key, r.E.Value, r.E.Meta
+	db.resetRecordByMode(r)
 
-	if r.H.Meta.Flag == DataSetFlag {
-		if err := db.SetIdx[bucket].SAdd(string(r.E.Key), [][]byte{r.E.Value}, []*Record{r}); err != nil {
+	if meta.Flag == DataSetFlag {
+		if err := db.SetIdx[bucket].SAdd(string(key), [][]byte{val}, []*Record{r}); err != nil {
 			return fmt.Errorf("when build SetIdx SAdd index err: %s", err)
 		}
 	}
 
-	if r.H.Meta.Flag == DataDeleteFlag {
-		if err := db.SetIdx[bucket].SRem(string(r.E.Key), r.E.Value); err != nil {
+	if meta.Flag == DataDeleteFlag {
+		if err := db.SetIdx[bucket].SRem(string(key), val); err != nil {
 			return fmt.Errorf("when build SetIdx SRem index err: %s", err)
 		}
 	}
@@ -961,29 +957,28 @@ func (db *DB) buildSortedSetIdx(bucket string, r *Record) error {
 		db.SortedSetIdx[bucket] = zset.New()
 	}
 
-	if r.H.Meta.Flag == DataZAddFlag {
-		keyAndScore := strings.Split(string(r.E.Key), SeparatorForZSetKey)
+	key, val, meta := r.E.Key, r.E.Value, r.E.Meta
+
+	if meta.Flag == DataZAddFlag {
+		keyAndScore := strings.Split(string(key), SeparatorForZSetKey)
 		if len(keyAndScore) == 2 {
 			key := keyAndScore[0]
 			score, _ := strconv2.StrToFloat64(keyAndScore[1])
-			if r.E == nil {
-				return ErrEntryIdxModeOpt
-			}
-			_ = db.SortedSetIdx[bucket].Put(key, zset.SCORE(score), r.E.Value)
+			_ = db.SortedSetIdx[bucket].Put(key, zset.SCORE(score), val)
 		}
 	}
-	if r.H.Meta.Flag == DataZRemFlag {
-		_ = db.SortedSetIdx[bucket].Remove(string(r.E.Key))
+	if meta.Flag == DataZRemFlag {
+		_ = db.SortedSetIdx[bucket].Remove(string(key))
 	}
-	if r.H.Meta.Flag == DataZRemRangeByRankFlag {
-		start, _ := strconv2.StrToInt(string(r.E.Key))
-		end, _ := strconv2.StrToInt(string(r.E.Value))
+	if meta.Flag == DataZRemRangeByRankFlag {
+		start, _ := strconv2.StrToInt(string(key))
+		end, _ := strconv2.StrToInt(string(val))
 		_ = db.SortedSetIdx[bucket].GetByRankRange(start, end, true)
 	}
-	if r.H.Meta.Flag == DataZPopMaxFlag {
+	if meta.Flag == DataZPopMaxFlag {
 		_ = db.SortedSetIdx[bucket].PopMax()
 	}
-	if r.H.Meta.Flag == DataZPopMinFlag {
+	if meta.Flag == DataZPopMinFlag {
 		_ = db.SortedSetIdx[bucket].PopMin()
 	}
 
@@ -994,31 +989,32 @@ func (db *DB) buildSortedSetIdx(bucket string, r *Record) error {
 func (db *DB) buildListIdx(bucket string, r *Record) error {
 	l := db.Index.getList(bucket)
 
-	if r.E == nil {
-		return ErrEntryIdxModeOpt
-	}
-	if IsExpired(r.E.Meta.TTL, r.E.Meta.Timestamp) {
+	key, val, meta := r.E.Key, r.E.Value, r.E.Meta
+	db.resetRecordByMode(r)
+
+	if IsExpired(meta.TTL, meta.Timestamp) {
 		return nil
 	}
-	switch r.H.Meta.Flag {
+
+	switch meta.Flag {
 	case DataExpireListFlag:
-		t, err := strconv2.StrToInt64(string(r.E.Value))
+		t, err := strconv2.StrToInt64(string(val))
 		if err != nil {
 			return err
 		}
 		ttl := uint32(t)
-		l.TTL[string(r.E.Key)] = ttl
-		l.TimeStamp[string(r.E.Key)] = r.E.Meta.Timestamp
+		l.TTL[string(key)] = ttl
+		l.TimeStamp[string(key)] = meta.Timestamp
 	case DataLPushFlag:
-		_ = l.LPush(string(r.E.Key), r)
+		_ = l.LPush(string(key), r)
 	case DataRPushFlag:
-		_ = l.RPush(string(r.E.Key), r)
+		_ = l.RPush(string(key), r)
 	case DataLRemFlag:
-		countAndValueIndex := strings.Split(string(r.E.Value), SeparatorForListKey)
+		countAndValueIndex := strings.Split(string(val), SeparatorForListKey)
 		count, _ := strconv2.StrToInt(countAndValueIndex[0])
 		value := []byte(countAndValueIndex[1])
 
-		if err := l.LRem(string(r.E.Key), count, func(r *Record) (bool, error) {
+		if err := l.LRem(string(key), count, func(r *Record) (bool, error) {
 			v, err := db.getValueByRecord(r)
 			if err != nil {
 				return false, err
@@ -1028,34 +1024,34 @@ func (db *DB) buildListIdx(bucket string, r *Record) error {
 			return ErrWhenBuildListIdx(err)
 		}
 	case DataLPopFlag:
-		if _, err := l.LPop(string(r.E.Key)); err != nil {
+		if _, err := l.LPop(string(key)); err != nil {
 			return ErrWhenBuildListIdx(err)
 		}
 	case DataRPopFlag:
-		if _, err := l.RPop(string(r.E.Key)); err != nil {
+		if _, err := l.RPop(string(key)); err != nil {
 			return ErrWhenBuildListIdx(err)
 		}
 	case DataLSetFlag:
-		keyAndIndex := strings.Split(string(r.E.Key), SeparatorForListKey)
+		keyAndIndex := strings.Split(string(key), SeparatorForListKey)
 		newKey := keyAndIndex[0]
 		index, _ := strconv2.StrToInt(keyAndIndex[1])
 		if err := l.LSet(newKey, index, r); err != nil {
 			return ErrWhenBuildListIdx(err)
 		}
 	case DataLTrimFlag:
-		keyAndStartIndex := strings.Split(string(r.E.Key), SeparatorForListKey)
+		keyAndStartIndex := strings.Split(string(key), SeparatorForListKey)
 		newKey := keyAndStartIndex[0]
 		start, _ := strconv2.StrToInt(keyAndStartIndex[1])
-		end, _ := strconv2.StrToInt(string(r.E.Value))
+		end, _ := strconv2.StrToInt(string(val))
 		if err := l.LTrim(newKey, start, end); err != nil {
 			return ErrWhenBuildListIdx(err)
 		}
 	case DataLRemByIndex:
-		indexes, err := UnmarshalInts(r.E.Value)
+		indexes, err := UnmarshalInts(val)
 		if err != nil {
 			return err
 		}
-		if err := l.LRemByIndex(string(r.E.Key), indexes); err != nil {
+		if err := l.LRemByIndex(string(key), indexes); err != nil {
 			return ErrWhenBuildListIdx(err)
 		}
 	}
@@ -1113,6 +1109,14 @@ func (db *DB) buildRecordByEntryAndOffset(entry *Entry, offset int64) *Record {
 	}
 
 	return NewRecord().WithBucket(string(entry.Bucket)).WithEntry(e).WithHint(h)
+}
+
+func (db *DB) resetRecordByMode(record *Record) {
+	if db.opt.EntryIdxMode == HintKeyValAndRAMIdxMode {
+		record.H = nil
+	} else {
+		record.E = nil
+	}
 }
 
 // managed calls a block of code that is fully contained in a transaction.

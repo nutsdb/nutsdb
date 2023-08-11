@@ -653,6 +653,8 @@ func TestDB_ChangeMode_RestartDB(t *testing.T) {
 		})
 	}
 
+	// HintKeyValAndRAMIdxMode to HintKeyAndRAMIdxMode
 	changeModeRestart(HintKeyValAndRAMIdxMode, HintKeyAndRAMIdxMode)
+	// HintKeyAndRAMIdxMode to HintKeyValAndRAMIdxMode
 	changeModeRestart(HintKeyAndRAMIdxMode, HintKeyValAndRAMIdxMode)
 }
