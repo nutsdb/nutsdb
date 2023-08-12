@@ -232,34 +232,86 @@ func txZAdd(t *testing.T, db *DB, bucket string, key, value []byte, score float6
 		assertErr(t, err, expectErr)
 		return nil
 	})
-	require.NoError(t, err)
+	assert.NoError(t, err)
 }
 
-func txZRem(t *testing.T, db *DB, bucket string, key []byte, expectErr error) {
+func txZRem(t *testing.T, db *DB, bucket string, key, value []byte, expectErr error) {
 	err := db.Update(func(tx *Tx) error {
-		err := tx.ZRem(bucket, string(key))
+		err := tx.ZRem(bucket, string(key), value)
 		assertErr(t, err, expectErr)
 		return nil
 	})
-	require.NoError(t, err)
+	assert.NoError(t, err)
 }
 
-func txZGetByKey(t *testing.T, db *DB, bucket string, key []byte, expectErr error) {
+func txZCard(t *testing.T, db *DB, bucket string, key []byte, expectLength int, expectErr error) {
 	err := db.View(func(tx *Tx) error {
-		_, err := tx.ZGetByKey(bucket, key)
-		assertErr(t, err, expectErr)
+		length, err := tx.ZCard(bucket, string(key))
+		if expectErr != nil {
+			assert.NoError(t, err)
+		} else {
+			assert.Equal(t, expectLength, length)
+		}
 		return nil
 	})
-	require.NoError(t, err)
+	assert.NoError(t, err)
 }
 
-func txZRangeByRank(t *testing.T, db *DB, bucket string, start, end int) {
-	err := db.Update(func(tx *Tx) error {
-		err := tx.ZRemRangeByRank(bucket, start, end)
-		require.NoError(t, err)
+func txZScore(t *testing.T, db *DB, bucket string, key, value []byte, expectScore float64, expectErr error) {
+	err := db.View(func(tx *Tx) error {
+		score, err := tx.ZScore(bucket, string(key), value)
+		if err != nil {
+			assert.Equal(t, expectErr, err)
+		} else {
+			assert.Equal(t, expectScore, score)
+		}
 		return nil
 	})
-	require.NoError(t, err)
+	assert.NoError(t, err)
+}
+
+func txZRank(t *testing.T, db *DB, bucket, key string, value []byte, isRev bool, expectRank int, expectErr error) {
+	err := db.View(func(tx *Tx) error {
+		var (
+			rank int
+			err  error
+		)
+		if isRev {
+			rank, err = tx.ZRevRank(bucket, key, value)
+		} else {
+			rank, err = tx.ZRank(bucket, key, value)
+		}
+		if expectErr != nil {
+			assert.Equal(t, expectErr, err)
+		} else {
+			assert.Equal(t, expectRank, rank)
+		}
+		return nil
+	})
+	assert.NoError(t, err)
+}
+
+func txZPop(t *testing.T, db *DB, bucket, key string, isMax bool, expectVal []byte, expectScore float64, expectErr error) {
+	err := db.Update(func(tx *Tx) error {
+		var (
+			member *SortedSetMember
+			err    error
+		)
+		if isMax {
+			member, err = tx.ZPopMax(bucket, key)
+		} else {
+			member, err = tx.ZPopMin(bucket, key)
+		}
+
+		if expectErr != nil {
+			assert.Equal(t, expectErr, err)
+		} else {
+			assert.Equal(t, expectVal, member.Value)
+			assert.Equal(t, expectScore, member.Score)
+		}
+		return nil
+	})
+	assert.NoError(t, err)
 }
 
 func txPop(t *testing.T, db *DB, bucket string, key, expectVal []byte, expectErr error, isLeft bool) {
@@ -610,11 +662,11 @@ func TestDB_ChangeMode_RestartDB(t *testing.T) {
 
 			// zset
 			for i := 0; i < 10; i++ {
-				txZAdd(t, db, bucket, GetTestBytes(i), GetTestBytes(i), float64(i), nil)
+				txZAdd(t, db, bucket, GetTestBytes(0), GetTestBytes(i), float64(i), nil)
 			}
 
 			for i := 0; i < 3; i++ {
-				txZRem(t, db, bucket, GetTestBytes(i), nil)
+				txZRem(t, db, bucket, GetTestBytes(0), GetTestBytes(i), nil)
 			}
 
 			require.NoError(t, db.Close())
@@ -644,11 +696,11 @@ func TestDB_ChangeMode_RestartDB(t *testing.T) {
 
 			// zset
 			for i := 0; i < 3; i++ {
-				txZGetByKey(t, db, bucket, GetTestBytes(i), ErrNotFoundKey)
+				txZScore(t, db, bucket, GetTestBytes(0), GetTestBytes(i), float64(i), ErrSortedSetMemberNotExist)
 			}
 
 			for i := 3; i < 10; i++ {
-				txZGetByKey(t, db, bucket, GetTestBytes(i), nil)
+				txZScore(t, db, bucket, GetTestBytes(0), GetTestBytes(i), float64(i), nil)
 			}
 		})
 	}

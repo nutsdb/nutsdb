@@ -21,11 +21,11 @@ import (
 )
 
 var (
-	ErrZSetNotFound = errors.New("the zset does not exist")
+	ErrSortedSetNotFound = errors.New("the sortedSet does not exist")
 
-	ErrZSetMemberNotExist = errors.New("the member of zset does not exist")
+	ErrSortedSetMemberNotExist = errors.New("the member of sortedSet does not exist")
 
-	ErrZSetIsEmpty = errors.New("the zset if empty")
+	ErrSortedSetIsEmpty = errors.New("the sortedSet if empty")
 )
 
 const (
@@ -36,36 +36,36 @@ const (
 	SkipListP = 0.25
 )
 
-type ZSet struct {
+type SortedSet struct {
 	db *DB
 	M  map[string]*SkipList
 }
 
-func NewZSet(db *DB) *ZSet {
-	return &ZSet{
+func NewSortedSet(db *DB) *SortedSet {
+	return &SortedSet{
 		db: db,
 		M:  map[string]*SkipList{},
 	}
 }
 
-func (z *ZSet) ZAdd(key string, score SCORE, value []byte, record *Record) error {
-	zset, ok := z.M[key]
+func (z *SortedSet) ZAdd(key string, score SCORE, value []byte, record *Record) error {
+	sortedSet, ok := z.M[key]
 	if !ok {
 		z.M[key] = newSkipList(z.db)
-		zset = z.M[key]
+		sortedSet = z.M[key]
 	}
 
-	return zset.Put(score, value, record)
+	return sortedSet.Put(score, value, record)
 }
 
-func (z *ZSet) ZMembers(key string) (map[*Record]SCORE, error) {
-	zset, ok := z.M[key]
+func (z *SortedSet) ZMembers(key string) (map[*Record]SCORE, error) {
+	sortedSet, ok := z.M[key]
 
 	if !ok {
-		return nil, ErrZSetNotFound
+		return nil, ErrSortedSetNotFound
 	}
 
-	nodes := zset.dict
+	nodes := sortedSet.dict
 
 	members := make(map[*Record]SCORE, len(nodes))
 	for _, node := range nodes {
@@ -75,73 +75,73 @@ func (z *ZSet) ZMembers(key string) (map[*Record]SCORE, error) {
 	return members, nil
 }
 
-func (z *ZSet) ZCard(key string) (int, error) {
-	if zset, ok := z.M[key]; ok {
-		return int(zset.length), nil
+func (z *SortedSet) ZCard(key string) (int, error) {
+	if sortedSet, ok := z.M[key]; ok {
+		return int(sortedSet.length), nil
 	}
 
-	return 0, ErrZSetNotFound
+	return 0, ErrSortedSetNotFound
 }
 
-func (z *ZSet) ZCount(key string, start SCORE, end SCORE, opts *GetByScoreRangeOptions) (int, error) {
-	if zset, ok := z.M[key]; ok {
-		return len(zset.GetByScoreRange(start, end, opts)), nil
+func (z *SortedSet) ZCount(key string, start SCORE, end SCORE, opts *GetByScoreRangeOptions) (int, error) {
+	if sortedSet, ok := z.M[key]; ok {
+		return len(sortedSet.GetByScoreRange(start, end, opts)), nil
 	}
-	return 0, ErrZSetNotFound
+	return 0, ErrSortedSetNotFound
 }
 
-func (z *ZSet) ZPeekMax(key string) (*Record, SCORE, error) {
-	if zset, ok := z.M[key]; ok {
-		node := zset.PeekMax()
+func (z *SortedSet) ZPeekMax(key string) (*Record, SCORE, error) {
+	if sortedSet, ok := z.M[key]; ok {
+		node := sortedSet.PeekMax()
 		if node != nil {
 			return node.record, node.score, nil
 		}
-		return nil, 0, ErrZSetIsEmpty
+		return nil, 0, ErrSortedSetIsEmpty
 	}
 
-	return nil, 0, ErrZSetNotFound
+	return nil, 0, ErrSortedSetNotFound
 }
 
-func (z *ZSet) ZPopMax(key string) (*Record, SCORE, error) {
-	if zset, ok := z.M[key]; ok {
-		node := zset.PopMax()
+func (z *SortedSet) ZPopMax(key string) (*Record, SCORE, error) {
+	if sortedSet, ok := z.M[key]; ok {
+		node := sortedSet.PopMax()
 		if node != nil {
 			return node.record, node.score, nil
 		}
-		return nil, 0, ErrZSetIsEmpty
+		return nil, 0, ErrSortedSetIsEmpty
 	}
 
-	return nil, 0, ErrZSetNotFound
+	return nil, 0, ErrSortedSetNotFound
 }
 
-func (z *ZSet) ZPeekMin(key string) (*Record, SCORE, error) {
-	if zset, ok := z.M[key]; ok {
-		node := zset.PeekMin()
+func (z *SortedSet) ZPeekMin(key string) (*Record, SCORE, error) {
+	if sortedSet, ok := z.M[key]; ok {
+		node := sortedSet.PeekMin()
 		if node != nil {
 			return node.record, node.score, nil
 		}
-		return nil, 0, ErrZSetIsEmpty
+		return nil, 0, ErrSortedSetIsEmpty
 	}
 
-	return nil, 0, ErrZSetNotFound
+	return nil, 0, ErrSortedSetNotFound
 }
 
-func (z *ZSet) ZPopMin(key string) (*Record, SCORE, error) {
-	if zset, ok := z.M[key]; ok {
-		node := zset.PopMin()
+func (z *SortedSet) ZPopMin(key string) (*Record, SCORE, error) {
+	if sortedSet, ok := z.M[key]; ok {
+		node := sortedSet.PopMin()
 		if node != nil {
 			return node.record, node.score, nil
 		}
-		return nil, 0, ErrZSetIsEmpty
+		return nil, 0, ErrSortedSetIsEmpty
 	}
 
-	return nil, 0, ErrZSetNotFound
+	return nil, 0, ErrSortedSetNotFound
 }
 
-func (z *ZSet) ZRangeByScore(key string, start SCORE, end SCORE, opts *GetByScoreRangeOptions) ([]*Record, []float64, error) {
-	if zset, ok := z.M[key]; ok {
+func (z *SortedSet) ZRangeByScore(key string, start SCORE, end SCORE, opts *GetByScoreRangeOptions) ([]*Record, []float64, error) {
+	if sortedSet, ok := z.M[key]; ok {
 
-		nodes := zset.GetByScoreRange(start, end, opts)
+		nodes := sortedSet.GetByScoreRange(start, end, opts)
 
 		records := make([]*Record, len(nodes))
 		scores := make([]float64, len(nodes))
@@ -154,13 +154,13 @@ func (z *ZSet) ZRangeByScore(key string, start SCORE, end SCORE, opts *GetByScor
 		return records, scores, nil
 	}
 
-	return nil, nil, ErrZSetNotFound
+	return nil, nil, ErrSortedSetNotFound
 }
 
-func (z *ZSet) ZRangeByRank(key string, start int, end int) ([]*Record, []float64, error) {
-	if zset, ok := z.M[key]; ok {
+func (z *SortedSet) ZRangeByRank(key string, start int, end int) ([]*Record, []float64, error) {
+	if sortedSet, ok := z.M[key]; ok {
 
-		nodes := zset.GetByRankRange(start, end, false)
+		nodes := sortedSet.GetByRankRange(start, end, false)
 
 		records := make([]*Record, len(nodes))
 		scores := make([]float64, len(nodes))
@@ -173,86 +173,86 @@ func (z *ZSet) ZRangeByRank(key string, start int, end int) ([]*Record, []float6
 		return records, scores, nil
 	}
 
-	return nil, nil, ErrZSetNotFound
+	return nil, nil, ErrSortedSetNotFound
 }
 
-func (z *ZSet) ZRem(key string, value []byte) (*Record, error) {
-	if zset, ok := z.M[key]; ok {
+func (z *SortedSet) ZRem(key string, value []byte) (*Record, error) {
+	if sortedSet, ok := z.M[key]; ok {
 		hash, err := getFnv32(value)
 		if err != nil {
 			return nil, err
 		}
-		node := zset.Remove(hash)
+		node := sortedSet.Remove(hash)
 		if node != nil {
 			return node.record, nil
 		}
-		return nil, ErrZSetMemberNotExist
+		return nil, ErrSortedSetMemberNotExist
 	}
 
-	return nil, ErrZSetNotFound
+	return nil, ErrSortedSetNotFound
 }
 
-func (z *ZSet) ZRemRangeByRank(key string, start int, end int) error {
-	if zset, ok := z.M[key]; ok {
+func (z *SortedSet) ZRemRangeByRank(key string, start int, end int) error {
+	if sortedSet, ok := z.M[key]; ok {
 
-		_ = zset.GetByRankRange(start, end, true)
+		_ = sortedSet.GetByRankRange(start, end, true)
 		return nil
 	}
 
-	return ErrZSetNotFound
+	return ErrSortedSetNotFound
 }
 
-func (z *ZSet) ZRank(key string, value []byte) (int, error) {
-	if zset, ok := z.M[key]; ok {
+func (z *SortedSet) ZRank(key string, value []byte) (int, error) {
+	if sortedSet, ok := z.M[key]; ok {
 		hash, err := getFnv32(value)
 		if err != nil {
 			return 0, err
 		}
-		rank := zset.FindRank(hash)
+		rank := sortedSet.FindRank(hash)
 		if rank == 0 {
-			return 0, ErrZSetMemberNotExist
+			return 0, ErrSortedSetMemberNotExist
 		}
 		return rank, nil
 	}
-	return 0, ErrZSetNotFound
+	return 0, ErrSortedSetNotFound
 }
 
-func (z *ZSet) ZRevRank(key string, value []byte) (int, error) {
-	if zset, ok := z.M[key]; ok {
+func (z *SortedSet) ZRevRank(key string, value []byte) (int, error) {
+	if sortedSet, ok := z.M[key]; ok {
 		hash, err := getFnv32(value)
 		if err != nil {
 			return 0, err
 		}
-		rank := zset.FindRevRank(hash)
+		rank := sortedSet.FindRevRank(hash)
 		if rank == 0 {
-			return 0, ErrZSetMemberNotExist
+			return 0, ErrSortedSetMemberNotExist
 		}
 		return rank, nil
 	}
-	return 0, ErrZSetNotFound
+	return 0, ErrSortedSetNotFound
 }
 
-func (z *ZSet) ZScore(key string, value []byte) (float64, error) {
-	if zset, ok := z.M[key]; ok {
-		node := zset.GetByValue(value)
+func (z *SortedSet) ZScore(key string, value []byte) (float64, error) {
+	if sortedSet, ok := z.M[key]; ok {
+		node := sortedSet.GetByValue(value)
 		if node != nil {
-			return float64(zset.GetByValue(value).score), nil
+			return float64(sortedSet.GetByValue(value).score), nil
 		}
-		return 0, ErrZSetMemberNotExist
+		return 0, ErrSortedSetMemberNotExist
 	}
-	return 0, ErrZSetNotFound
+	return 0, ErrSortedSetNotFound
 }
 
-func (z *ZSet) ZExist(key string, value []byte) (bool, error) {
-	if zset, ok := z.M[key]; ok {
+func (z *SortedSet) ZExist(key string, value []byte) (bool, error) {
+	if sortedSet, ok := z.M[key]; ok {
 		hash, err := getFnv32(value)
 		if err != nil {
 			return false, err
 		}
-		_, ok := zset.dict[hash]
+		_, ok := sortedSet.dict[hash]
 		return ok, nil
 	}
-	return false, ErrZSetNotFound
+	return false, ErrSortedSetNotFound
 }
 
 // SCORE represents the score type.

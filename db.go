@@ -30,7 +30,6 @@ import (
 	"sync"
 
 	"github.com/gofrs/flock"
-	"github.com/nutsdb/nutsdb/ds/zset"
 	"github.com/xujiajun/utils/filesystem"
 	"github.com/xujiajun/utils/strconv2"
 )
@@ -41,9 +40,6 @@ var (
 
 	// ErrBucket is returned when bucket is not in the HintIdx.
 	ErrBucket = errors.New("err bucket")
-
-	// ErrEntryIdxModeOpt is returned when set db EntryIdxMode option is wrong.
-	ErrEntryIdxModeOpt = errors.New("err EntryIdxMode option set")
 
 	// ErrFn is returned when fn is nil.
 	ErrFn = errors.New("err fn")
@@ -954,32 +950,36 @@ func (db *DB) buildSetIdx(bucket string, r *Record) error {
 // buildSortedSetIdx builds sorted set index when opening the DB.
 func (db *DB) buildSortedSetIdx(bucket string, r *Record) error {
 	if _, ok := db.SortedSetIdx[bucket]; !ok {
-		db.SortedSetIdx[bucket] = zset.New()
+		db.SortedSetIdx[bucket] = NewSortedSet(db)
 	}
 
 	key, val, meta := r.E.Key, r.E.Value, r.E.Meta
+	db.resetRecordByMode(r)
 
 	if meta.Flag == DataZAddFlag {
 		keyAndScore := strings.Split(string(key), SeparatorForZSetKey)
 		if len(keyAndScore) == 2 {
 			key := keyAndScore[0]
 			score, _ := strconv2.StrToFloat64(keyAndScore[1])
-			_ = db.SortedSetIdx[bucket].Put(key, zset.SCORE(score), val)
+			value := val
+			db.resetRecordByMode(r)
+			_ = db.SortedSetIdx[bucket].ZAdd(key, SCORE(score), value, r)
 		}
 	}
 	if meta.Flag == DataZRemFlag {
-		_ = db.SortedSetIdx[bucket].Remove(string(key))
+		_, _ = db.SortedSetIdx[bucket].ZRem(string(key), val)
 	}
 	if meta.Flag == DataZRemRangeByRankFlag {
-		start, _ := strconv2.StrToInt(string(key))
-		end, _ := strconv2.StrToInt(string(val))
-		_ = db.SortedSetIdx[bucket].GetByRankRange(start, end, true)
+		startAndEnd := strings.Split(string(val), SeparatorForZSetKey)
+		start, _ := strconv2.StrToInt(startAndEnd[0])
+		end, _ := strconv2.StrToInt(startAndEnd[1])
+		_ = db.SortedSetIdx[bucket].ZRemRangeByRank(string(key), start, end)
 	}
 	if meta.Flag == DataZPopMaxFlag {
-		_ = db.SortedSetIdx[bucket].PopMax()
+		_, _, _ = db.SortedSetIdx[bucket].ZPopMax(string(key))
 	}
 	if meta.Flag == DataZPopMinFlag {
-		_ = db.SortedSetIdx[bucket].PopMin()
+		_, _, _ = db.SortedSetIdx[bucket].ZPopMin(string(key))
 	}
 
 	return nil
