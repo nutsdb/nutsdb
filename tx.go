@@ -290,11 +290,6 @@ func (tx *Tx) Commit() (err error) {
 		}
 
 		offset := tx.db.ActiveFile.writeOff + int64(buff.Len())
-
-		if entry.Meta.Ds == DataStructureBPTree {
-			tx.db.BPTreeKeyEntryPosMap[string(getNewKey(string(entry.Bucket), entry.Key))] = offset
-		}
-
 		if i == lastIndex {
 			entry.Meta.Status = Committed
 		}
@@ -311,11 +306,8 @@ func (tx *Tx) Commit() (err error) {
 
 		if tx.db.opt.EntryIdxMode == HintBPTSparseIdxMode {
 			bucketMetaTemp = tx.buildTempBucketMetaIdx(bucket, entry.Key, bucketMetaTemp)
-		}
-
-		if i == lastIndex {
-			txID := entry.Meta.TxID
-			if tx.db.opt.EntryIdxMode == HintBPTSparseIdxMode {
+			if i == lastIndex {
+				txID := entry.Meta.TxID
 				if err := tx.buildTxIDRootIdx(txID, countFlag); err != nil {
 					return err
 				}
@@ -323,18 +315,21 @@ func (tx *Tx) Commit() (err error) {
 				if err := tx.buildBucketMetaIdx(bucket, entry.Key, bucketMetaTemp); err != nil {
 					return err
 				}
-			} else {
+			}
+		} else {
+			if i == lastIndex {
+				txID := entry.Meta.TxID
 				tx.db.committedTxIds[txID] = struct{}{}
+			}
+			if entry.Meta.Ds == DataStructureBPTree {
+				tx.db.BPTreeKeyEntryPosMap[string(getNewKey(string(entry.Bucket), entry.Key))] = offset
+				tx.buildBPTreeIdx(bucket, entry, e, offset, countFlag)
 			}
 		}
 
 		e = nil
 		if tx.db.opt.EntryIdxMode == HintKeyValAndRAMIdxMode {
 			e = entry
-		}
-
-		if entry.Meta.Ds == DataStructureBPTree {
-			tx.buildBPTreeIdx(bucket, entry, e, offset, countFlag)
 		}
 
 		if entry.Meta.Ds == DataStructureList {
