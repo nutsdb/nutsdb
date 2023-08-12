@@ -311,11 +311,8 @@ func (tx *Tx) Commit() (err error) {
 
 		if tx.db.opt.EntryIdxMode == HintBPTSparseIdxMode {
 			bucketMetaTemp = tx.buildTempBucketMetaIdx(bucket, entry.Key, bucketMetaTemp)
-		}
-
-		if i == lastIndex {
-			txID := entry.Meta.TxID
-			if tx.db.opt.EntryIdxMode == HintBPTSparseIdxMode {
+			if i == lastIndex {
+				txID := entry.Meta.TxID
 				if err := tx.buildTxIDRootIdx(txID, countFlag); err != nil {
 					return err
 				}
