@@ -772,10 +772,11 @@ func (db *DB) buildBPTreeRootIdxes(dataFileIds []int) error {
 
 		for {
 			bs, err := ReadBPTreeRootIdxAt(fd, off)
-			if err == io.EOF || err == nil && bs == nil {
-				break
-			}
+
 			if err != nil {
+				if err == io.EOF || err == nil && bs == nil {
+					break
+				}
 				return err
 			}
 
