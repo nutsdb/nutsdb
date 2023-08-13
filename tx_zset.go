@@ -32,7 +32,7 @@ type SortedSetMember struct {
 	Score float64
 }
 
-// ZAdd adds the specified member key with the specified score and specified val to the sorted set stored at bucket.
+// ZAdd Adds the specified member with the specified score into the sorted set specified by key in a bucket.
 func (tx *Tx) ZAdd(bucket string, key []byte, score float64, val []byte) error {
 	var buffer bytes.Buffer
 
@@ -49,7 +49,7 @@ func (tx *Tx) ZAdd(bucket string, key []byte, score float64, val []byte) error {
 	return tx.put(bucket, newKey, val, Persistent, DataZAddFlag, uint64(time.Now().Unix()), DataStructureSortedSet)
 }
 
-// ZMembers returns all the members of the set value stored at bucket.
+// ZMembers Returns all the members and scores of members of the set specified by key in a bucket.
 func (tx *Tx) ZMembers(bucket string, key string) (map[*SortedSetMember]struct{}, error) {
 	if err := tx.ZCheck(bucket); err != nil {
 		return nil, err
@@ -75,7 +75,7 @@ func (tx *Tx) ZMembers(bucket string, key string) (map[*SortedSetMember]struct{}
 	return res, nil
 }
 
-// ZCard returns the sorted set cardinality (number of elements) of the sorted set stored at bucket.
+// ZCard Returns the sorted set cardinality (number of elements) of the sorted set specified by key in a bucket.
 func (tx *Tx) ZCard(bucket string, key string) (int, error) {
 	if err := tx.ZCheck(bucket); err != nil {
 		return 0, err
@@ -88,7 +88,7 @@ func (tx *Tx) ZCard(bucket string, key string) (int, error) {
 	return card, nil
 }
 
-// ZCount returns the number of elements in the sorted set at bucket with a score between min and max and opts.
+// ZCount Returns the number of elements in the sorted set specified by key in a bucket with a score between min and max and opts.
 // Opt includes the following parameters:
 // Limit        int  // limit the max nodes to return
 // ExcludeStart bool // exclude start value, so it search in interval (start, end] or (start, end)
@@ -106,7 +106,7 @@ func (tx *Tx) ZCount(bucket, key string, start, end float64, opts *GetByScoreRan
 	return count, nil
 }
 
-// ZPopMax removes and returns the member with the highest score in the sorted set stored at bucket.
+// ZPopMax Removes and returns the member with the highest score in the sorted set specified by key in a bucket.
 func (tx *Tx) ZPopMax(bucket, key string) (*SortedSetMember, error) {
 	if err := tx.ZCheck(bucket); err != nil {
 		return nil, err
@@ -125,7 +125,7 @@ func (tx *Tx) ZPopMax(bucket, key string) (*SortedSetMember, error) {
 	return &SortedSetMember{Value: value, Score: float64(score)}, tx.put(bucket, []byte(key), []byte(""), Persistent, DataZPopMaxFlag, uint64(time.Now().Unix()), DataStructureSortedSet)
 }
 
-// ZPopMin removes and returns the member with the lowest score in the sorted set stored at bucket.
+// ZPopMin Removes and returns the member with the lowest score in the sorted set specified by key in a bucket.
 func (tx *Tx) ZPopMin(bucket, key string) (*SortedSetMember, error) {
 	if err := tx.ZCheck(bucket); err != nil {
 		return nil, err
@@ -144,7 +144,7 @@ func (tx *Tx) ZPopMin(bucket, key string) (*SortedSetMember, error) {
 	return &SortedSetMember{Value: value, Score: float64(score)}, tx.put(bucket, []byte(key), []byte(""), Persistent, DataZPopMinFlag, uint64(time.Now().Unix()), DataStructureSortedSet)
 }
 
-// ZPeekMax returns the member with the highest score in the sorted set stored at bucket.
+// ZPeekMax Returns the member with the highest score in the sorted set specified by key in a bucket.
 func (tx *Tx) ZPeekMax(bucket, key string) (*SortedSetMember, error) {
 	if err := tx.ZCheck(bucket); err != nil {
 		return nil, err
@@ -163,7 +163,7 @@ func (tx *Tx) ZPeekMax(bucket, key string) (*SortedSetMember, error) {
 	return &SortedSetMember{Value: value, Score: float64(score)}, nil
 }
 
-// ZPeekMin returns the member with the lowest score in the sorted set stored at bucket.
+// ZPeekMin Returns the member with the lowest score in the sorted set specified by key in a bucket.
 func (tx *Tx) ZPeekMin(bucket, key string) (*SortedSetMember, error) {
 	if err := tx.ZCheck(bucket); err != nil {
 		return nil, err
@@ -182,7 +182,8 @@ func (tx *Tx) ZPeekMin(bucket, key string) (*SortedSetMember, error) {
 	return &SortedSetMember{Value: value, Score: float64(score)}, nil
 }
 
-// ZRangeByScore returns all the elements in the sorted set at bucket with a score between min and max.
+// ZRangeByScore Returns all the elements in the sorted set specified by key in a bucket with a score between min and max.
+// And the parameter `Opts` is the same as ZCount's.
 func (tx *Tx) ZRangeByScore(bucket, key string, start, end float64, opts *GetByScoreRangeOptions) ([]*SortedSetMember, error) {
 	if err := tx.ZCheck(bucket); err != nil {
 		return nil, err
@@ -205,7 +206,7 @@ func (tx *Tx) ZRangeByScore(bucket, key string, start, end float64, opts *GetByS
 	return members, nil
 }
 
-// ZRangeByRank returns all the elements in the sorted set in one bucket and key
+// ZRangeByRank Returns all the elements in the sorted set specified by key in a bucket
 // with a rank between start and end (including elements with rank equal to start or end).
 func (tx *Tx) ZRangeByRank(bucket, key string, start, end int) ([]*SortedSetMember, error) {
 	if err := tx.ZCheck(bucket); err != nil {
@@ -259,8 +260,7 @@ func (tx *Tx) ZRemRangeByRank(bucket, key string, start, end int) error {
 	return tx.put(bucket, []byte(key), []byte(startStr+SeparatorForZSetKey+endStr), Persistent, DataZRemRangeByRankFlag, uint64(time.Now().Unix()), DataStructureSortedSet)
 }
 
-// ZRank returns the rank of member in the sorted set stored in the bucket at given bucket, key and value
-// with the scores ordered from low to high.
+// ZRank Returns the rank of member in the sorted set specified by key in a bucket, with the scores ordered from low to high.
 func (tx *Tx) ZRank(bucket, key string, value []byte) (int, error) {
 	if err := tx.ZCheck(bucket); err != nil {
 		return 0, err
@@ -269,8 +269,7 @@ func (tx *Tx) ZRank(bucket, key string, value []byte) (int, error) {
 	return tx.db.SortedSetIdx[bucket].ZRank(key, value)
 }
 
-// ZRevRank returns the rank of member in the sorted set stored in the bucket at given bucket, key and value
-// with the scores ordered from high to low.
+// ZRevRank Returns the rank of member in the sorted set specified by key in a bucket, with the scores ordered from high to low.
 func (tx *Tx) ZRevRank(bucket, key string, value []byte) (int, error) {
 	if err := tx.ZCheck(bucket); err != nil {
 		return 0, err
@@ -279,7 +278,7 @@ func (tx *Tx) ZRevRank(bucket, key string, value []byte) (int, error) {
 	return tx.db.SortedSetIdx[bucket].ZRevRank(key, value)
 }
 
-// ZScore returns the score of member in the sorted set in the bucket at given bucket, key and value.
+// ZScore Returns the score of members in a sorted set specified by key in a bucket.
 func (tx *Tx) ZScore(bucket, key string, value []byte) (float64, error) {
 	if err := tx.ZCheck(bucket); err != nil {
 		return 0, err
@@ -292,7 +291,7 @@ func (tx *Tx) ZScore(bucket, key string, value []byte) (float64, error) {
 	}
 }
 
-// ZKeys find all keys matching a given pattern
+// ZKeys find all keys matching a given pattern in a bucket
 func (tx *Tx) ZKeys(bucket, pattern string, f func(key string) bool) error {
 	if err := tx.ZCheck(bucket); err != nil {
 		return err
