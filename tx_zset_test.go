@@ -101,7 +101,7 @@ func TestTx_ZMembers(t *testing.T) {
 		}
 
 		err := db.View(func(tx *Tx) error {
-			members, err := tx.ZMembers(bucket, string(key))
+			members, err := tx.ZMembers(bucket, key)
 			require.NoError(t, err)
 
 			require.Len(t, members, 10)
@@ -128,7 +128,7 @@ func TestTx_ZCount(t *testing.T) {
 
 		err := db.View(func(tx *Tx) error {
 
-			count, err := tx.ZCount(bucket, string(key), 10, 20, nil)
+			count, err := tx.ZCount(bucket, key, 10, 20, nil)
 			require.NoError(t, err)
 			require.Equal(t, 11, count)
 
@@ -144,24 +144,24 @@ func TestTx_ZPop(t *testing.T) {
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 
-		txZPop(t, db, bucket, string(key), true, nil, 0, ErrBucket)
-		txZPop(t, db, bucket, string(key), false, nil, 0, ErrBucket)
+		txZPop(t, db, bucket, key, true, nil, 0, ErrBucket)
+		txZPop(t, db, bucket, key, false, nil, 0, ErrBucket)
 
 		txZAdd(t, db, bucket, key, GetTestBytes(0), float64(0), nil)
 		txZRem(t, db, bucket, key, GetTestBytes(0), nil)
 
-		txZPop(t, db, bucket, string(key), true, nil, 0, ErrSortedSetIsEmpty)
-		txZPop(t, db, bucket, string(key), false, nil, 0, ErrSortedSetIsEmpty)
+		txZPop(t, db, bucket, key, true, nil, 0, ErrSortedSetIsEmpty)
+		txZPop(t, db, bucket, key, false, nil, 0, ErrSortedSetIsEmpty)
 
 		for i := 0; i < 30; i++ {
 			txZAdd(t, db, bucket, key, GetTestBytes(i), float64(i), nil)
 		}
 
-		txZPop(t, db, bucket, string(key), true, GetTestBytes(29), float64(29), nil)
-		txZPop(t, db, bucket, string(key), false, GetTestBytes(0), 0, nil)
+		txZPop(t, db, bucket, key, true, GetTestBytes(29), float64(29), nil)
+		txZPop(t, db, bucket, key, false, GetTestBytes(0), 0, nil)
 
-		txZPop(t, db, bucket, string(key), true, GetTestBytes(28), float64(28), nil)
-		txZPop(t, db, bucket, string(key), false, GetTestBytes(1), 1, nil)
+		txZPop(t, db, bucket, key, true, GetTestBytes(28), float64(28), nil)
+		txZPop(t, db, bucket, key, false, GetTestBytes(1), 1, nil)
 	})
 }
 
@@ -172,7 +172,7 @@ func TestTx_ZRangeByRank(t *testing.T) {
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 
 		err := db.View(func(tx *Tx) error {
-			_, err := tx.ZRangeByRank(bucket, string(key), 1, 10)
+			_, err := tx.ZRangeByRank(bucket, key, 1, 10)
 			require.Error(t, err)
 			return nil
 		})
@@ -183,7 +183,7 @@ func TestTx_ZRangeByRank(t *testing.T) {
 		}
 
 		err = db.View(func(tx *Tx) error {
-			members, err := tx.ZRangeByRank(bucket, string(key), 1, 10)
+			members, err := tx.ZRangeByRank(bucket, key, 1, 10)
 			require.NoError(t, err)
 			require.Len(t, members, 10)
 			return nil
@@ -191,7 +191,7 @@ func TestTx_ZRangeByRank(t *testing.T) {
 		require.NoError(t, err)
 
 		err = db.View(func(tx *Tx) error {
-			members, err := tx.ZRangeByRank(bucket, string(key), 3, 6)
+			members, err := tx.ZRangeByRank(bucket, key, 3, 6)
 			require.NoError(t, err)
 			require.Len(t, members, 4)
 			return nil
@@ -199,7 +199,7 @@ func TestTx_ZRangeByRank(t *testing.T) {
 		require.NoError(t, err)
 
 		err = db.View(func(tx *Tx) error {
-			members, err := tx.ZRangeByRank(bucket, string(key), -1, 11)
+			members, err := tx.ZRangeByRank(bucket, key, -1, 11)
 			require.NoError(t, err)
 			require.Len(t, members, 1)
 			return nil
@@ -207,7 +207,7 @@ func TestTx_ZRangeByRank(t *testing.T) {
 		require.NoError(t, err)
 
 		err = db.View(func(tx *Tx) error {
-			members, err := tx.ZRangeByRank(bucket, string(key), 8, 4)
+			members, err := tx.ZRangeByRank(bucket, key, 8, 4)
 			require.NoError(t, err)
 			require.Len(t, members, 5)
 
@@ -229,7 +229,7 @@ func TestTx_ZRemRangeByRank(t *testing.T) {
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 
 		err := db.Update(func(tx *Tx) error {
-			err := tx.ZRemRangeByRank(bucket, string(key), 1, 10)
+			err := tx.ZRemRangeByRank(bucket, key, 1, 10)
 			assert.Error(t, err)
 			return nil
 		})
@@ -240,7 +240,7 @@ func TestTx_ZRemRangeByRank(t *testing.T) {
 		}
 
 		err = db.Update(func(tx *Tx) error {
-			err := tx.ZRemRangeByRank(bucket, string(key), 1, 10)
+			err := tx.ZRemRangeByRank(bucket, key, 1, 10)
 			assert.NoError(t, err)
 			return nil
 		})
@@ -253,7 +253,7 @@ func TestTx_ZRemRangeByRank(t *testing.T) {
 		}
 
 		err = db.Update(func(tx *Tx) error {
-			err := tx.ZRemRangeByRank(bucket, string(key), 1, 2)
+			err := tx.ZRemRangeByRank(bucket, key, 1, 2)
 			assert.NoError(t, err)
 			return nil
 		})
@@ -263,11 +263,11 @@ func TestTx_ZRemRangeByRank(t *testing.T) {
 		}
 
 		err = db.Update(func(tx *Tx) error {
-			card, err := tx.ZCard(bucket, string(key))
+			card, err := tx.ZCard(bucket, key)
 			assert.NoError(t, err)
 			assert.Equal(t, 8, card)
 
-			err = tx.ZRemRangeByRank(bucket, string(key), 6, 8)
+			err = tx.ZRemRangeByRank(bucket, key, 6, 8)
 			assert.NoError(t, err)
 			return nil
 		})
@@ -277,11 +277,11 @@ func TestTx_ZRemRangeByRank(t *testing.T) {
 		}
 
 		err = db.Update(func(tx *Tx) error {
-			card, err := tx.ZCard(bucket, string(key))
+			card, err := tx.ZCard(bucket, key)
 			assert.NoError(t, err)
 			assert.Equal(t, 5, card)
 
-			err = tx.ZRemRangeByRank(bucket, string(key), 4, 3)
+			err = tx.ZRemRangeByRank(bucket, key, 4, 3)
 			assert.NoError(t, err)
 			return nil
 		})
@@ -299,25 +299,25 @@ func TestTx_ZRank(t *testing.T) {
 	key := GetTestBytes(0)
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txZRank(t, db, bucket, string(key), GetTestBytes(0), true, 0, ErrBucket)
-		txZRank(t, db, bucket, string(key), GetTestBytes(0), false, 0, ErrBucket)
+		txZRank(t, db, bucket, key, GetTestBytes(0), true, 0, ErrBucket)
+		txZRank(t, db, bucket, key, GetTestBytes(0), false, 0, ErrBucket)
 
 		for i := 0; i < 10; i++ {
 			txZAdd(t, db, bucket, key, GetTestBytes(i), float64(i), nil)
 		}
 
-		txZRank(t, db, bucket, string(key), GetTestBytes(0), true, 10, nil)
-		txZRank(t, db, bucket, string(key), GetTestBytes(0), false, 1, nil)
+		txZRank(t, db, bucket, key, GetTestBytes(0), true, 10, nil)
+		txZRank(t, db, bucket, key, GetTestBytes(0), false, 1, nil)
 
 		txZRem(t, db, bucket, key, GetTestBytes(0), nil)
 
-		txZRank(t, db, bucket, string(key), GetTestBytes(0), true, 10, ErrSortedSetMemberNotExist)
-		txZRank(t, db, bucket, string(key), GetTestBytes(0), false, 1, ErrSortedSetMemberNotExist)
+		txZRank(t, db, bucket, key, GetTestBytes(0), true, 10, ErrSortedSetMemberNotExist)
+		txZRank(t, db, bucket, key, GetTestBytes(0), false, 1, ErrSortedSetMemberNotExist)
 
 		txZRem(t, db, bucket, key, GetTestBytes(3), nil)
 
-		txZRank(t, db, bucket, string(key), GetTestBytes(4), true, 6, nil)
-		txZRank(t, db, bucket, string(key), GetTestBytes(4), false, 3, nil)
+		txZRank(t, db, bucket, key, GetTestBytes(4), true, 6, nil)
+		txZRank(t, db, bucket, key, GetTestBytes(4), false, 3, nil)
 	})
 }
 

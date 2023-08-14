@@ -237,7 +237,7 @@ func txZAdd(t *testing.T, db *DB, bucket string, key, value []byte, score float6
 
 func txZRem(t *testing.T, db *DB, bucket string, key, value []byte, expectErr error) {
 	err := db.Update(func(tx *Tx) error {
-		err := tx.ZRem(bucket, string(key), value)
+		err := tx.ZRem(bucket, key, value)
 		assertErr(t, err, expectErr)
 		return nil
 	})
@@ -246,7 +246,7 @@ func txZRem(t *testing.T, db *DB, bucket string, key, value []byte, expectErr er
 
 func txZCard(t *testing.T, db *DB, bucket string, key []byte, expectLength int, expectErr error) {
 	err := db.View(func(tx *Tx) error {
-		length, err := tx.ZCard(bucket, string(key))
+		length, err := tx.ZCard(bucket, key)
 		if expectErr != nil {
 			assert.NoError(t, err)
 		} else {
@@ -259,7 +259,7 @@ func txZCard(t *testing.T, db *DB, bucket string, key []byte, expectLength int, 
 
 func txZScore(t *testing.T, db *DB, bucket string, key, value []byte, expectScore float64, expectErr error) {
 	err := db.View(func(tx *Tx) error {
-		score, err := tx.ZScore(bucket, string(key), value)
+		score, err := tx.ZScore(bucket, key, value)
 		if err != nil {
 			assert.Equal(t, expectErr, err)
 		} else {
@@ -270,7 +270,7 @@ func txZScore(t *testing.T, db *DB, bucket string, key, value []byte, expectScor
 	assert.NoError(t, err)
 }
 
-func txZRank(t *testing.T, db *DB, bucket, key string, value []byte, isRev bool, expectRank int, expectErr error) {
+func txZRank(t *testing.T, db *DB, bucket string, key, value []byte, isRev bool, expectRank int, expectErr error) {
 	err := db.View(func(tx *Tx) error {
 		var (
 			rank int
@@ -291,7 +291,7 @@ func txZRank(t *testing.T, db *DB, bucket, key string, value []byte, isRev bool,
 	assert.NoError(t, err)
 }
 
-func txZPop(t *testing.T, db *DB, bucket, key string, isMax bool, expectVal []byte, expectScore float64, expectErr error) {
+func txZPop(t *testing.T, db *DB, bucket string, key []byte, isMax bool, expectVal []byte, expectScore float64, expectErr error) {
 	err := db.Update(func(tx *Tx) error {
 		var (
 			member *SortedSetMember
