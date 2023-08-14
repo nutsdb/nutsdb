@@ -86,7 +86,7 @@ func testZCard() {
 		func(tx *nutsdb.Tx) error {
 			bucket := "myZSet1"
 			key := []byte("key1")
-			num, err := tx.ZCard(bucket, string(key))
+			num, err := tx.ZCard(bucket, key)
 			if err != nil {
 				return err
 			}
@@ -111,7 +111,7 @@ func testZCount() {
 		func(tx *nutsdb.Tx) error {
 			bucket := "myZSet1"
 			key := []byte("key1")
-			num, err := tx.ZCount(bucket, string(key), 0, 1, nil)
+			num, err := tx.ZCount(bucket, key, 0, 1, nil)
 			if err != nil {
 				return err
 			}
@@ -127,7 +127,7 @@ func testZScore() {
 		func(tx *nutsdb.Tx) error {
 			bucket := "myZSet1"
 			key := []byte("key1")
-			score, err := tx.ZScore(bucket, string(key), []byte("val1"))
+			score, err := tx.ZScore(bucket, key, []byte("val1"))
 			if err != nil {
 				return err
 			}
@@ -143,7 +143,7 @@ func testZMembers() {
 		func(tx *nutsdb.Tx) error {
 			bucket := "myZSet1"
 			key := []byte("key1")
-			nodes, err := tx.ZMembers(bucket, string(key))
+			nodes, err := tx.ZMembers(bucket, key)
 			if err != nil {
 				return err
 			}
@@ -170,7 +170,7 @@ func testZPeekMax() {
 		func(tx *nutsdb.Tx) error {
 			bucket := "myZSet1"
 			key := []byte("key1")
-			node, err := tx.ZPeekMax(bucket, string(key))
+			node, err := tx.ZPeekMax(bucket, key)
 			if err != nil {
 				return err
 			}
@@ -186,7 +186,7 @@ func testZPeekMin() {
 		func(tx *nutsdb.Tx) error {
 			bucket := "myZSet1"
 			key := []byte("key1")
-			node, err := tx.ZPeekMin(bucket, string(key))
+			node, err := tx.ZPeekMin(bucket, key)
 			if err != nil {
 				return err
 			}
@@ -202,7 +202,7 @@ func testZPopMax() {
 		func(tx *nutsdb.Tx) error {
 			bucket := "myZSet1"
 			key := []byte("key1")
-			node, err := tx.ZPopMax(bucket, string(key))
+			node, err := tx.ZPopMax(bucket, key)
 			if err != nil {
 				return err
 			}
@@ -218,7 +218,7 @@ func testZPopMin() {
 		func(tx *nutsdb.Tx) error {
 			bucket := "myZSet1"
 			key := []byte("key1")
-			node, err := tx.ZPopMin(bucket, string(key))
+			node, err := tx.ZPopMin(bucket, key)
 			if err != nil {
 				return err
 			}
@@ -261,7 +261,7 @@ func testZRangeByRank() {
 		func(tx *nutsdb.Tx) error {
 			bucket := "myZSet1"
 			key := []byte("key1")
-			nodes, err := tx.ZRangeByRank(bucket, string(key), 1, 3)
+			nodes, err := tx.ZRangeByRank(bucket, key, 1, 3)
 			if err != nil {
 				return err
 			}
@@ -306,7 +306,7 @@ func testZRangeByScore() {
 		func(tx *nutsdb.Tx) error {
 			bucket := "myZSet1"
 			key := []byte("key1")
-			nodes, err := tx.ZRangeByScore(bucket, string(key), 80, 100, nil)
+			nodes, err := tx.ZRangeByScore(bucket, key, 80, 100, nil)
 			if err != nil {
 				return err
 			}
@@ -324,7 +324,7 @@ func testZRank() {
 		func(tx *nutsdb.Tx) error {
 			bucket := "myZSet1"
 			key := []byte("key1")
-			rank, err := tx.ZRank(bucket, string(key), []byte("val1"))
+			rank, err := tx.ZRank(bucket, key, []byte("val1"))
 			if err != nil {
 				return err
 			}
@@ -338,7 +338,7 @@ func testZRank() {
 		func(tx *nutsdb.Tx) error {
 			bucket := "myZSet1"
 			key := []byte("key1")
-			rank, err := tx.ZRank(bucket, string(key), []byte("val2"))
+			rank, err := tx.ZRank(bucket, key, []byte("val2"))
 			if err != nil {
 				return err
 			}
@@ -352,7 +352,7 @@ func testZRank() {
 		func(tx *nutsdb.Tx) error {
 			bucket := "myZSet1"
 			key := []byte("key1")
-			rank, err := tx.ZRank(bucket, string(key), []byte("val3"))
+			rank, err := tx.ZRank(bucket, key, []byte("val3"))
 			if err != nil {
 				return err
 			}
@@ -368,7 +368,7 @@ func testZRevRank() {
 		func(tx *nutsdb.Tx) error {
 			bucket := "myZSet1"
 			key := []byte("key1")
-			rank, err := tx.ZRank(bucket, string(key), []byte("val1"))
+			rank, err := tx.ZRank(bucket, key, []byte("val1"))
 			if err != nil {
 				return err
 			}
@@ -381,7 +381,7 @@ func testZRevRank() {
 		func(tx *nutsdb.Tx) error {
 			bucket := "myZSet1"
 			key := []byte("key1")
-			rank, err := tx.ZRank(bucket, string(key), []byte("val2"))
+			rank, err := tx.ZRank(bucket, key, []byte("val2"))
 			if err != nil {
 				return err
 			}
@@ -394,7 +394,7 @@ func testZRevRank() {
 		func(tx *nutsdb.Tx) error {
 			bucket := "myZSet1"
 			key := []byte("key1")
-			rank, err := tx.ZRank(bucket, string(key), []byte("val3"))
+			rank, err := tx.ZRank(bucket, key, []byte("val3"))
 			if err != nil {
 				return err
 			}
@@ -410,7 +410,7 @@ func testZRem() {
 		func(tx *nutsdb.Tx) error {
 			bucket := "myZSet1"
 			key := []byte("key1")
-			return tx.ZRem(bucket, string(key), []byte("val3"))
+			return tx.ZRem(bucket, key, []byte("val3"))
 		}); err != nil {
 		log.Fatal(err)
 	}
@@ -419,7 +419,7 @@ func testZRem() {
 		func(tx *nutsdb.Tx) error {
 			bucket := "myZSet1"
 			key := []byte("key1")
-			nodes, err := tx.ZMembers(bucket, string(key))
+			nodes, err := tx.ZMembers(bucket, key)
 			if err != nil {
 				return err
 			}
@@ -438,7 +438,7 @@ func testZRemRangeByRank() {
 		func(tx *nutsdb.Tx) error {
 			bucket := "myZSet1"
 			key := []byte("key1")
-			return tx.ZRemRangeByRank(bucket, string(key), 1, 2)
+			return tx.ZRemRangeByRank(bucket, key, 1, 2)
 		}); err != nil {
 		log.Fatal(err)
 	}
@@ -447,7 +447,7 @@ func testZRemRangeByRank() {
 		func(tx *nutsdb.Tx) error {
 			bucket := "myZSet1"
 			key := []byte("key1")
-			nodes, err := tx.ZMembers(bucket, string(key))
+			nodes, err := tx.ZMembers(bucket, key)
 			if err != nil {
 				return err
 			}
