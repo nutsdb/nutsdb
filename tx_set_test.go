@@ -16,6 +16,7 @@ package nutsdb
 
 import (
 	"errors"
+	"github.com/stretchr/testify/require"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -152,6 +153,32 @@ func TestTx_SRem(t *testing.T) {
 	}
 
 	tx.Rollback()
+}
+
+func TestTx_SRem2(t *testing.T) {
+
+	bucket := "bucket"
+	key := GetTestBytes(0)
+	val1 := GetTestBytes(0)
+	val2 := GetTestBytes(1)
+
+	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txSAdd(t, db, bucket, key, val1, nil)
+		txSAdd(t, db, bucket, key, val2, nil)
+
+		txSRem(t, db, bucket, key, val1, nil)
+		txSRem(t, db, bucket, key, val1, ErrSetMemberNotExist)
+
+		txSRem(t, db, bucket, key, val2, nil)
+
+		err := db.View(func(tx *Tx) error {
+			areMembers, err := tx.SAreMembers(bucket, key, val1, val2)
+			require.NoError(t, err)
+			require.False(t, areMembers)
+			return nil
+		})
+		require.NoError(t, err)
+	})
 }
 
 func TestTx_SMembers(t *testing.T) {
