@@ -345,10 +345,6 @@ func (tx *Tx) Commit() (err error) {
 		if entry.Meta.Ds == DataStructureSortedSet {
 			tx.buildSortedSetIdx(bucket, entry, offset)
 		}
-
-		if entry.Meta.Ds == DataStructureNone && entry.Meta.Flag == DataBPTreeBucketDeleteFlag {
-			tx.db.deleteBucket(DataStructureTree, bucket)
-		}
 	}
 
 	tx.buildNotDSIdxes()
@@ -493,6 +489,9 @@ func (tx *Tx) buildNotDSIdxes() {
 		bucket := string(entry.Bucket)
 
 		if entry.Meta.Ds == DataStructureNone {
+			if entry.Meta.Flag == DataBPTreeBucketDeleteFlag {
+				tx.db.deleteBucket(DataStructureTree, bucket)
+			}
 			if entry.Meta.Flag == DataSetBucketDeleteFlag {
 				tx.db.deleteBucket(DataStructureSet, bucket)
 			}
