@@ -810,8 +810,12 @@ func TestTx_ExpiredDeletion(t *testing.T) {
 		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 			txPut(t, db, bucket, GetTestBytes(0), GetTestBytes(0), 1, nil)
 			txPut(t, db, bucket, GetTestBytes(1), GetTestBytes(1), 2, nil)
+			txPut(t, db, bucket, GetTestBytes(2), GetTestBytes(2), 3, nil)
 			txGet(t, db, bucket, GetTestBytes(0), GetTestBytes(0), nil)
 			txGet(t, db, bucket, GetTestBytes(1), GetTestBytes(1), nil)
+			txGet(t, db, bucket, GetTestBytes(2), GetTestBytes(2), nil)
+
+			txDel(t, db, bucket, GetTestBytes(2), nil)
 
 			time.Sleep(1100 * time.Millisecond)
 
@@ -873,7 +877,10 @@ func TestTx_ExpiredDeletion(t *testing.T) {
 			txPut(t, db, bucket, GetTestBytes(2), GetTestBytes(2), 3, nil)
 			txPut(t, db, bucket, GetTestBytes(3), GetTestBytes(3), Persistent, nil)
 			txPut(t, db, bucket, GetTestBytes(4), GetTestBytes(4), Persistent, nil)
+			txPut(t, db, bucket, GetTestBytes(5), GetTestBytes(5), 5, nil)
 			txPut(t, db, bucket, GetTestBytes(1), GetTestBytes(1), Persistent, nil)
+			txDel(t, db, bucket, GetTestBytes(5), nil)
+
 			require.NoError(t, db.Close())
 
 			time.Sleep(1000 * time.Millisecond)
@@ -884,6 +891,7 @@ func TestTx_ExpiredDeletion(t *testing.T) {
 			txGet(t, db, bucket, GetTestBytes(0), nil, ErrKeyNotFound)
 			txGet(t, db, bucket, GetTestBytes(1), GetTestBytes(1), nil)
 			txGet(t, db, bucket, GetTestBytes(2), GetTestBytes(2), nil)
+			txGet(t, db, bucket, GetTestBytes(5), nil, ErrKeyNotFound)
 
 			time.Sleep(2 * time.Second)
 
