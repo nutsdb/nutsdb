@@ -51,7 +51,6 @@ func removeDir(dir string) {
 func runNutsDBTest(t *testing.T, opts *Options, test func(t *testing.T, db *DB)) {
 	if opts == nil {
 		opts = &DefaultOptions
-		opts.EntryIdxMode = HintKeyAndRAMIdxMode
 	}
 	if opts.Dir == "" {
 		opts.Dir = NutsDBTestDirPath
@@ -547,7 +546,6 @@ func withDefaultDB(t *testing.T, fn func(t *testing.T, db *DB)) {
 	opt := DefaultOptions
 	opt.Dir = tmpdir
 	opt.SegmentSize = 8 * 1024
-	opt.EntryIdxMode = HintKeyAndRAMIdxMode
 
 	withDBOption(t, opt, fn)
 }
