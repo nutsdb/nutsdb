@@ -186,6 +186,7 @@ type (
 		mergeEndCh              chan error
 		mergeWorkCloseCh        chan struct{}
 		writeCh                 chan *request
+		tm                      *ttlManager
 	}
 
 	// BucketMetasIdx represents the index of the bucket's meta-information
@@ -213,6 +214,7 @@ func open(opt Options) (*DB, error) {
 		mergeEndCh:              make(chan error),
 		mergeWorkCloseCh:        make(chan struct{}),
 		writeCh:                 make(chan *request, KvWriteChCapacity),
+		tm:                      newTTLManager(opt.ExpiredDeleteType),
 	}
 
 	commitBuffer := new(bytes.Buffer)
@@ -256,6 +258,7 @@ func open(opt Options) (*DB, error) {
 
 	go db.mergeWorker()
 	go db.doWrites()
+	go db.tm.run()
 
 	return db, nil
 }
@@ -401,6 +404,8 @@ func (db *DB) release() error {
 	}
 
 	db.fm = nil
+
+	db.tm.close()
 
 	db = nil
 

@@ -3,6 +3,7 @@ module github.com/nutsdb/nutsdb
 go 1.18
 
 require (
+	github.com/antlabs/timer v0.0.11
 	github.com/bwmarrin/snowflake v0.3.0
 	github.com/cespare/xxhash/v2 v2.1.2
 	github.com/emirpasic/gods v1.18.1
@@ -17,7 +18,6 @@ require (
 
 require (
 	github.com/antlabs/stl v0.0.1 // indirect
-	github.com/antlabs/timer v0.0.11 // indirect
 	github.com/davecgh/go-spew v1.1.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	golang.org/x/sys v0.10.0 // indirect

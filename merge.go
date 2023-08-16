@@ -203,7 +203,7 @@ func (db *DB) mergeWorker() {
 		case <-db.mergeStartCh:
 			db.mergeEndCh <- db.merge()
 			// if automatic merging is enabled, then after a manual merge
-			// the timer needs to be reset.
+			// the t needs to be reset.
 			if db.opt.MergeInterval != 0 {
 				ticker.Reset(db.opt.MergeInterval)
 			}
