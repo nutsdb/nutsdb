@@ -145,32 +145,30 @@ func (tx *Tx) Get(bucket string, key []byte) (e *Entry, err error) {
 		return tx.getByHintBPTSparseIdx(bucket, key)
 	}
 
-	if idxMode == HintKeyValAndRAMIdxMode || idxMode == HintKeyAndRAMIdxMode {
-		if idx, ok := tx.db.BTreeIdx[bucket]; ok {
-			r, found := idx.Find(key)
-			if !found {
-				return nil, ErrKeyNotFound
-			}
-
-			if r.IsExpired() {
-				tx.lazyDeletion(bucket, key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureTree)
-				return nil, ErrNotFoundKey
-			}
-
-			if idxMode == HintKeyValAndRAMIdxMode {
-				return r.E, nil
-			}
-
-			if idxMode == HintKeyAndRAMIdxMode {
-				e, err = tx.db.getEntryByHint(r.H)
-				if err != nil {
-					return nil, err
-				}
-				return e, nil
-			}
-		} else {
-			return nil, ErrNotFoundBucket
+	if idx, ok := tx.db.BTreeIdx[bucket]; ok {
+		r, found := idx.Find(key)
+		if !found {
+			return nil, ErrKeyNotFound
 		}
+
+		if r.IsExpired() {
+			tx.lazyDeletion(bucket, key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureTree)
+			return nil, ErrNotFoundKey
+		}
+
+		if idxMode == HintKeyValAndRAMIdxMode {
+			return NewEntry().WithBucket([]byte(r.Bucket)).WithKey(r.H.Key).WithValue(r.V).WithMeta(r.H.Meta), nil
+		}
+
+		if idxMode == HintKeyAndRAMIdxMode {
+			e, err = tx.db.getEntryByHint(r.H)
+			if err != nil {
+				return nil, err
+			}
+			return e, nil
+		}
+	} else {
+		return nil, ErrNotFoundBucket
 	}
 
 	return nil, ErrBucketAndKey(bucket, key)
@@ -190,17 +188,15 @@ func (tx *Tx) GetAll(bucket string) (entries Entries, err error) {
 		return tx.getAllByHintBPTSparseIdx(bucket)
 	}
 
-	if idxMode == HintKeyValAndRAMIdxMode || idxMode == HintKeyAndRAMIdxMode {
-		if index, ok := tx.db.BTreeIdx[bucket]; ok {
-			records := index.All()
-			if len(records) == 0 {
-				return nil, ErrBucketEmpty
-			}
+	if index, ok := tx.db.BTreeIdx[bucket]; ok {
+		records := index.All()
+		if len(records) == 0 {
+			return nil, ErrBucketEmpty
+		}
 
-			entries, err = tx.getHintIdxDataItemsWrapper(records, ScanNoLimit, entries, RangeScan)
-			if err != nil {
-				return nil, ErrBucketEmpty
-			}
+		entries, err = tx.getHintIdxDataItemsWrapper(records, ScanNoLimit, entries, RangeScan)
+		if err != nil {
+			return nil, ErrBucketEmpty
 		}
 	}
 
@@ -878,7 +874,8 @@ func (tx *Tx) getHintIdxDataItemsWrapper(records Records, limitNum int, es Entri
 					return nil, err
 				}
 			} else {
-				es = append(es, r.E)
+				e := NewEntry().WithBucket([]byte(r.Bucket)).WithKey(r.H.Key).WithValue(r.V).WithMeta(r.H.Meta)
+				es = append(es, e)
 			}
 		}
 	}

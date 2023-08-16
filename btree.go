@@ -45,8 +45,8 @@ func (bt *BTree) Find(key []byte) (*Record, bool) {
 	return nil, ok
 }
 
-func (bt *BTree) Insert(key []byte, e *Entry, h *Hint) bool {
-	r := NewRecord().WithEntry(e).WithHint(h)
+func (bt *BTree) Insert(key []byte, v []byte, h *Hint) bool {
+	r := NewRecord().WithValue(v).WithHint(h)
 	_, replaced := bt.btree.Set(&Item{key: key, r: r})
 	return replaced
 }
