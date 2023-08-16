@@ -563,7 +563,7 @@ func withBPTSparseIdxDB(t *testing.T, fn func(t *testing.T, db *DB)) {
 	tmpdir, _ := os.MkdirTemp("", "nutsdb")
 	opt := DefaultOptions
 	opt.Dir = tmpdir
-	opt.EntryIdxMode = HintKeyAndRAMIdxMode
+	opt.EntryIdxMode = HintBPTSparseIdxMode
 
 	withDBOption(t, opt, fn)
 }

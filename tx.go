@@ -505,14 +505,9 @@ func (tx *Tx) buildNotDSIdxes() {
 func (tx *Tx) buildTreeIdx(record *Record, countFlag bool) {
 	bucket, key, meta, offset := record.Bucket, record.H.Key, record.H.Meta, record.H.DataPos
 
-	var value []byte
-	if tx.db.opt.EntryIdxMode == HintKeyValAndRAMIdxMode {
-		value = record.V
-	}
-
 	if tx.db.opt.EntryIdxMode == HintBPTSparseIdxMode {
 		newKey := getNewKey(bucket, key)
-		_ = tx.db.ActiveBPTreeIdx.Insert(newKey, value, &Hint{
+		_ = tx.db.ActiveBPTreeIdx.Insert(newKey, nil, &Hint{
 			FileID:  tx.db.ActiveFile.fileID,
 			Key:     newKey,
 			Meta:    meta,
@@ -524,6 +519,11 @@ func (tx *Tx) buildTreeIdx(record *Record, countFlag bool) {
 		}
 
 		if meta.Flag == DataSetFlag {
+			var value []byte
+			if tx.db.opt.EntryIdxMode == HintKeyValAndRAMIdxMode {
+				value = record.V
+			}
+
 			tx.db.BTreeIdx[bucket].Insert(key, value, &Hint{
 				FileID:  tx.db.ActiveFile.fileID,
 				Key:     key,
