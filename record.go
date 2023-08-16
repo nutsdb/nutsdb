@@ -40,11 +40,7 @@ func IsExpired(ttl uint32, timestamp uint64) bool {
 	expireTime := time.UnixMilli(int64(timestamp))
 	expireTime = expireTime.Add(time.Duration(ttl) * time.Second)
 
-	if expireTime.After(now) {
-		return false
-	}
-
-	return true
+	return expireTime.Before(now)
 }
 
 // UpdateRecord updates the record.
