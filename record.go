@@ -14,7 +14,9 @@
 
 package nutsdb
 
-import "time"
+import (
+	"time"
+)
 
 // Record records entry and hint.
 type Record struct {
@@ -30,8 +32,15 @@ func (r *Record) IsExpired() bool {
 
 // IsExpired checks the ttl if expired or not.
 func IsExpired(ttl uint32, timestamp uint64) bool {
-	now := time.Now().Unix()
-	if ttl > 0 && uint64(ttl)+timestamp > uint64(now) || ttl == Persistent {
+	if ttl == Persistent {
+		return false
+	}
+
+	now := time.UnixMilli(time.Now().UnixMilli())
+	expireTime := time.UnixMilli(int64(timestamp))
+	expireTime = expireTime.Add(time.Duration(ttl) * time.Second)
+
+	if expireTime.After(now) {
 		return false
 	}
 

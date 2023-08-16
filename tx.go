@@ -540,7 +540,15 @@ func (tx *Tx) buildTreeIdx(record *Record, countFlag bool) {
 					}
 				}
 
-				tx.db.tm.add(bucket, string(key), time.Duration(meta.TTL)*time.Second, callback)
+				now := time.UnixMilli(time.Now().UnixMilli())
+				expireTime := time.UnixMilli(int64(record.H.Meta.Timestamp))
+				expireTime = expireTime.Add(time.Duration(record.H.Meta.TTL) * time.Second)
+
+				if now.After(expireTime) {
+					return
+				}
+
+				tx.db.tm.add(bucket, string(key), expireTime.Sub(now), callback)
 			} else {
 				tx.db.tm.del(bucket, string(key))
 			}
@@ -811,7 +819,7 @@ func (tx *Tx) PutWithTimestamp(bucket string, key, value []byte, ttl uint32, tim
 // Put sets the value for a key in the bucket.
 // a wrapper of the function put.
 func (tx *Tx) Put(bucket string, key, value []byte, ttl uint32) error {
-	return tx.put(bucket, key, value, ttl, DataSetFlag, uint64(time.Now().Unix()), DataStructureTree)
+	return tx.put(bucket, key, value, ttl, DataSetFlag, uint64(time.Now().UnixMilli()), DataStructureTree)
 }
 
 func (tx *Tx) checkTxIsClosed() error {
