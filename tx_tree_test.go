@@ -803,58 +803,110 @@ func TestTx_Notfound_For_BPTSparseIdxMode(t *testing.T) {
 	})
 }
 
-func TestTx_LazyDelete(t *testing.T) {
+func TestTx_ExpiredDeletion(t *testing.T) {
 	bucket := "bucket"
 
-	t.Run("lazy deletion when Get", func(t *testing.T) {
+	t.Run("expired deletion", func(t *testing.T) {
 		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 			txPut(t, db, bucket, GetTestBytes(0), GetTestBytes(0), 1, nil)
+			txPut(t, db, bucket, GetTestBytes(1), GetTestBytes(1), 2, nil)
+			txPut(t, db, bucket, GetTestBytes(2), GetTestBytes(2), 3, nil)
 			txGet(t, db, bucket, GetTestBytes(0), GetTestBytes(0), nil)
+			txGet(t, db, bucket, GetTestBytes(1), GetTestBytes(1), nil)
+			txGet(t, db, bucket, GetTestBytes(2), GetTestBytes(2), nil)
+
+			txDel(t, db, bucket, GetTestBytes(2), nil)
 
 			time.Sleep(1100 * time.Millisecond)
 
-			// this entry will be lazy deleted
-			txGet(t, db, bucket, GetTestBytes(0), nil, ErrNotFoundKey)
+			// this entry will be deleted
+			txGet(t, db, bucket, GetTestBytes(0), nil, ErrKeyNotFound)
+			// this entry still alive
+			txGet(t, db, bucket, GetTestBytes(1), GetTestBytes(1), nil)
+
+			time.Sleep(1 * time.Second)
+
+			// this entry will be deleted
+			txGet(t, db, bucket, GetTestBytes(1), nil, ErrKeyNotFound)
 
 			r, ok := db.BTreeIdx[bucket].Find(GetTestBytes(0))
+			require.Nil(t, r)
+			require.False(t, ok)
+
+			r, ok = db.BTreeIdx[bucket].Find(GetTestBytes(1))
 			require.Nil(t, r)
 			require.False(t, ok)
 		})
 	})
 
-	t.Run("lazy deletion when Delete", func(t *testing.T) {
+	t.Run("update expire time", func(t *testing.T) {
 		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 			txPut(t, db, bucket, GetTestBytes(0), GetTestBytes(0), 1, nil)
+			time.Sleep(500 * time.Millisecond)
+
+			// reset expire time
+			txPut(t, db, bucket, GetTestBytes(0), GetTestBytes(0), 3, nil)
+			time.Sleep(1 * time.Second)
 			txGet(t, db, bucket, GetTestBytes(0), GetTestBytes(0), nil)
 
-			time.Sleep(1100 * time.Millisecond)
-
-			// this entry will be lazy deleted
-			txDel(t, db, bucket, GetTestBytes(0), ErrNotFoundKey)
-
-			r, ok := db.BTreeIdx[bucket].Find(GetTestBytes(0))
-			require.Nil(t, r)
-			require.False(t, ok)
+			time.Sleep(3 * time.Second)
+			txGet(t, db, bucket, GetTestBytes(0), nil, ErrKeyNotFound)
 		})
 	})
 
-	t.Run("lazy deletion when open", func(t *testing.T) {
+	t.Run("persist expire time", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			txPut(t, db, bucket, GetTestBytes(0), GetTestBytes(0), 1, nil)
+			time.Sleep(500 * time.Millisecond)
+
+			// persist expire time
+			txPut(t, db, bucket, GetTestBytes(0), GetTestBytes(0), Persistent, nil)
+			time.Sleep(1 * time.Second)
+			txGet(t, db, bucket, GetTestBytes(0), GetTestBytes(0), nil)
+
+			time.Sleep(3 * time.Second)
+			txGet(t, db, bucket, GetTestBytes(0), GetTestBytes(0), nil)
+		})
+	})
+
+	t.Run("expired deletion when open", func(t *testing.T) {
 		opts := DefaultOptions
 		runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
 			txPut(t, db, bucket, GetTestBytes(0), GetTestBytes(0), 1, nil)
+			txPut(t, db, bucket, GetTestBytes(1), GetTestBytes(1), 3, nil)
+			txPut(t, db, bucket, GetTestBytes(2), GetTestBytes(2), 3, nil)
+			txPut(t, db, bucket, GetTestBytes(3), GetTestBytes(3), Persistent, nil)
+			txPut(t, db, bucket, GetTestBytes(4), GetTestBytes(4), Persistent, nil)
+			txPut(t, db, bucket, GetTestBytes(5), GetTestBytes(5), 5, nil)
+			txPut(t, db, bucket, GetTestBytes(1), GetTestBytes(1), Persistent, nil)
+			txDel(t, db, bucket, GetTestBytes(5), nil)
+
 			require.NoError(t, db.Close())
 
-			time.Sleep(1100 * time.Millisecond)
+			time.Sleep(1000 * time.Millisecond)
 
 			db, err := Open(opts)
 			require.NoError(t, err)
 
-			// because this entry is expired, so the index of this bucket is not exist
-			require.Nil(t, db.BTreeIdx[bucket])
+			txGet(t, db, bucket, GetTestBytes(0), nil, ErrKeyNotFound)
+			txGet(t, db, bucket, GetTestBytes(1), GetTestBytes(1), nil)
+			txGet(t, db, bucket, GetTestBytes(2), GetTestBytes(2), nil)
+			txGet(t, db, bucket, GetTestBytes(5), nil, ErrKeyNotFound)
+
+			time.Sleep(2 * time.Second)
+
+			txGet(t, db, bucket, GetTestBytes(1), GetTestBytes(1), nil)
+			txGet(t, db, bucket, GetTestBytes(2), GetTestBytes(2), ErrKeyNotFound)
+
+			time.Sleep(2 * time.Second)
+			// this entry should be persistent
+			txGet(t, db, bucket, GetTestBytes(1), GetTestBytes(1), nil)
+			txGet(t, db, bucket, GetTestBytes(3), GetTestBytes(3), nil)
+			txGet(t, db, bucket, GetTestBytes(4), GetTestBytes(4), nil)
 		})
 	})
 
-	t.Run("lazy deletion when merge", func(t *testing.T) {
+	t.Run("expire deletion when merge", func(t *testing.T) {
 		opts := DefaultOptions
 		opts.SegmentSize = 1 * 100
 		runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
@@ -863,11 +915,46 @@ func TestTx_LazyDelete(t *testing.T) {
 			txPut(t, db, bucket, GetTestBytes(1), GetTestBytes(1), Persistent, nil)
 			txPut(t, db, bucket, GetTestBytes(2), GetTestBytes(2), 1, nil)
 
-			time.Sleep(1100 * time.Millisecond)
+			time.Sleep(1000 * time.Millisecond)
 
 			require.NoError(t, db.Merge())
 
+			txGet(t, db, bucket, GetTestBytes(0), GetTestBytes(0), nil)
+			txGet(t, db, bucket, GetTestBytes(1), GetTestBytes(1), nil)
+			txGet(t, db, bucket, GetTestBytes(2), nil, ErrKeyNotFound)
+
 			r, ok := db.BTreeIdx[bucket].Find(GetTestBytes(2))
+			require.Nil(t, r)
+			require.False(t, ok)
+		})
+	})
+
+	t.Run("expire deletion use time heap", func(t *testing.T) {
+		opts := DefaultOptions
+		opts.ExpiredDeleteType = TimeHeap
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			txPut(t, db, bucket, GetTestBytes(0), GetTestBytes(0), 1, nil)
+			txPut(t, db, bucket, GetTestBytes(1), GetTestBytes(1), 2, nil)
+			txGet(t, db, bucket, GetTestBytes(0), GetTestBytes(0), nil)
+			txGet(t, db, bucket, GetTestBytes(1), GetTestBytes(1), nil)
+
+			time.Sleep(1100 * time.Millisecond)
+
+			// this entry will be deleted
+			txGet(t, db, bucket, GetTestBytes(0), nil, ErrKeyNotFound)
+			// this entry still alive
+			txGet(t, db, bucket, GetTestBytes(1), GetTestBytes(1), nil)
+
+			time.Sleep(1 * time.Second)
+
+			// this entry will be deleted
+			txGet(t, db, bucket, GetTestBytes(1), nil, ErrKeyNotFound)
+
+			r, ok := db.BTreeIdx[bucket].Find(GetTestBytes(0))
+			require.Nil(t, r)
+			require.False(t, ok)
+
+			r, ok = db.BTreeIdx[bucket].Find(GetTestBytes(1))
 			require.Nil(t, r)
 			require.False(t, ok)
 		})
