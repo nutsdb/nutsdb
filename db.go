@@ -640,8 +640,6 @@ func (db *DB) parseDataFiles(dataFileIds []int) (err error) {
 				db.BPTreeKeyEntryPosMap[string(getNewKey(string(entry.Bucket), entry.Key))] = off
 			}
 
-			bucket := r.Bucket
-
 			if r.H.Meta.Ds == DataStructureTree {
 				r.H.Meta.Status = Committed
 
@@ -653,13 +651,13 @@ func (db *DB) parseDataFiles(dataFileIds []int) (err error) {
 						return err
 					}
 				} else {
-					db.buildBTreeIdx(bucket, r)
+					db.buildBTreeIdx(r)
 				}
 			} else {
 				if r.H.Meta.Ds == DataStructureNone {
-					db.buildNotDSIdxes(bucket, r)
+					db.buildNotDSIdxes(r)
 				} else {
-					if err = db.buildOtherIdxes(bucket, r); err != nil {
+					if err = db.buildOtherIdxes(r); err != nil {
 						return err
 					}
 				}
@@ -792,16 +790,16 @@ func (db *DB) buildBPTreeRootIdxes(dataFileIds []int) error {
 	return nil
 }
 
-func (db *DB) buildBTreeIdx(bucket string, r *Record) {
+func (db *DB) buildBTreeIdx(r *Record) {
 	if r.IsExpired() {
 		return
 	}
 
+	bucket, key := r.Bucket, r.H.Key
+
 	if _, ok := db.BTreeIdx[bucket]; !ok {
 		db.BTreeIdx[bucket] = NewBTree()
 	}
-
-	key := r.H.Key
 
 	if r.H.Meta.Flag == DataDeleteFlag {
 		db.BTreeIdx[bucket].Delete(key)
@@ -852,36 +850,36 @@ func (db *DB) buildBucketMetaIdx() error {
 	return nil
 }
 
-func (db *DB) buildOtherIdxes(bucket string, r *Record) error {
-	if r.H.Meta.Ds == DataStructureSet {
-		if err := db.buildSetIdx(bucket, r); err != nil {
+func (db *DB) buildOtherIdxes(r *Record) error {
+	switch r.H.Meta.Ds {
+	case DataStructureList:
+		if err := db.buildListIdx(r); err != nil {
 			return err
 		}
-	} else if r.H.Meta.Ds == DataStructureSortedSet {
-		if err := db.buildSortedSetIdx(bucket, r); err != nil {
+	case DataStructureSet:
+		if err := db.buildSetIdx(r); err != nil {
 			return err
 		}
-	} else if r.H.Meta.Ds == DataStructureList {
-		if err := db.buildListIdx(bucket, r); err != nil {
+	case DataStructureSortedSet:
+		if err := db.buildSortedSetIdx(r); err != nil {
 			return err
 		}
 	}
-
 	return nil
 }
 
-func (db *DB) buildNotDSIdxes(bucket string, r *Record) {
+func (db *DB) buildNotDSIdxes(r *Record) {
 	if r.H.Meta.Flag == DataSetBucketDeleteFlag {
-		db.deleteBucket(DataStructureSet, bucket)
+		db.deleteBucket(DataStructureSet, r.Bucket)
 	}
 	if r.H.Meta.Flag == DataSortedSetBucketDeleteFlag {
-		db.deleteBucket(DataStructureSortedSet, bucket)
+		db.deleteBucket(DataStructureSortedSet, r.Bucket)
 	}
 	if r.H.Meta.Flag == DataBPTreeBucketDeleteFlag {
-		db.deleteBucket(DataStructureTree, bucket)
+		db.deleteBucket(DataStructureTree, r.Bucket)
 	}
 	if r.H.Meta.Flag == DataListBucketDeleteFlag {
-		db.deleteBucket(DataStructureList, bucket)
+		db.deleteBucket(DataStructureList, r.Bucket)
 	}
 }
 
@@ -901,13 +899,13 @@ func (db *DB) deleteBucket(ds uint16, bucket string) {
 }
 
 // buildSetIdx builds set index when opening the DB.
-func (db *DB) buildSetIdx(bucket string, r *Record) error {
+func (db *DB) buildSetIdx(r *Record) error {
+	bucket, key, val, meta := r.Bucket, r.H.Key, r.V, r.H.Meta
+	db.resetRecordByMode(r)
+
 	if _, ok := db.SetIdx[bucket]; !ok {
 		db.SetIdx[bucket] = NewSet()
 	}
-
-	key, val, meta := r.H.Key, r.V, r.H.Meta
-	db.resetRecordByMode(r)
 
 	if meta.Flag == DataSetFlag {
 		if err := db.SetIdx[bucket].SAdd(string(key), [][]byte{val}, []*Record{r}); err != nil {
@@ -925,13 +923,13 @@ func (db *DB) buildSetIdx(bucket string, r *Record) error {
 }
 
 // buildSortedSetIdx builds sorted set index when opening the DB.
-func (db *DB) buildSortedSetIdx(bucket string, r *Record) error {
+func (db *DB) buildSortedSetIdx(r *Record) error {
+	bucket, key, val, meta := r.Bucket, r.H.Key, r.V, r.H.Meta
+	db.resetRecordByMode(r)
+
 	if _, ok := db.SortedSetIdx[bucket]; !ok {
 		db.SortedSetIdx[bucket] = NewSortedSet(db)
 	}
-
-	key, val, meta := r.H.Key, r.V, r.H.Meta
-	db.resetRecordByMode(r)
 
 	if meta.Flag == DataZAddFlag {
 		keyAndScore := strings.Split(string(key), SeparatorForZSetKey)
@@ -961,11 +959,11 @@ func (db *DB) buildSortedSetIdx(bucket string, r *Record) error {
 }
 
 // buildListIdx builds List index when opening the DB.
-func (db *DB) buildListIdx(bucket string, r *Record) error {
-	l := db.Index.getList(bucket)
-
-	key, val, meta := r.H.Key, r.V, r.H.Meta
+func (db *DB) buildListIdx(r *Record) error {
+	bucket, key, val, meta := r.Bucket, r.H.Key, r.V, r.H.Meta
 	db.resetRecordByMode(r)
+
+	l := db.Index.getList(bucket)
 
 	if IsExpired(meta.TTL, meta.Timestamp) {
 		return nil
