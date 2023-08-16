@@ -33,7 +33,10 @@ const (
 type ExpiredDeleteType uint8
 
 const (
+	// TimeWheel represents use time wheel to do expired deletion
 	TimeWheel ExpiredDeleteType = iota
+
+	// TimeHeap represents use time heap to do expired deletion
 	TimeHeap
 )
 

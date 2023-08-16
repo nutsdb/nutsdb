@@ -527,9 +527,10 @@ func (tx *Tx) buildTreeIdx(record *Record, countFlag bool) {
 
 			if meta.TTL != Persistent {
 				db := tx.db
-				db.tm.add(bucket, string(key), time.Duration(meta.TTL)*time.Second, func() {
+
+				callback := func() {
 					err := db.Update(func(tx *Tx) error {
-						if tx.db.tm.exist(bucket, string(key)) {
+						if db.tm.exist(bucket, string(key)) {
 							return tx.Delete(bucket, key)
 						}
 						return nil
@@ -537,7 +538,9 @@ func (tx *Tx) buildTreeIdx(record *Record, countFlag bool) {
 					if err != nil {
 						log.Printf("occur error when expired deletion, error: %v", err.Error())
 					}
-				})
+				}
+
+				tx.db.tm.add(bucket, string(key), time.Duration(meta.TTL)*time.Second, callback)
 			} else {
 				tx.db.tm.del(bucket, string(key))
 			}

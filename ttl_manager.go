@@ -15,13 +15,46 @@
 package nutsdb
 
 import (
-	"github.com/antlabs/timer"
 	"time"
+
+	"github.com/antlabs/timer"
 )
+
+type nodesInBucket map[string]timer.TimeNoder // key to timer node
+
+func newNodesInBucket() nodesInBucket {
+	return make(map[string]timer.TimeNoder)
+}
+
+type nodes map[string]nodesInBucket // bucket to nodes that in a bucket
+
+func (n nodes) getNode(bucket, key string) (timer.TimeNoder, bool) {
+	nib, ok := n[bucket]
+	if !ok {
+		return nil, false
+	}
+	node, ok := nib[key]
+	return node, ok
+}
+
+func (n nodes) addNode(bucket, key string, node timer.TimeNoder) {
+	nib, ok := n[bucket]
+	if !ok {
+		nib = newNodesInBucket()
+		n[bucket] = nib
+	}
+	nib[key] = node
+}
+
+func (n nodes) delNode(bucket, key string) {
+	if nib, ok := n[bucket]; ok {
+		delete(nib, key)
+	}
+}
 
 type ttlManager struct {
 	t          timer.Timer
-	timerNodes map[string]map[string]timer.TimeNoder
+	timerNodes nodes
 }
 
 func newTTLManager(expiredDeleteType ExpiredDeleteType) *ttlManager {
@@ -38,7 +71,7 @@ func newTTLManager(expiredDeleteType ExpiredDeleteType) *ttlManager {
 
 	return &ttlManager{
 		t:          t,
-		timerNodes: make(map[string]map[string]timer.TimeNoder),
+		timerNodes: make(nodes),
 	}
 }
 
@@ -47,39 +80,21 @@ func (tm *ttlManager) run() {
 }
 
 func (tm *ttlManager) exist(bucket, key string) bool {
-	if nodes, ok := tm.timerNodes[bucket]; ok {
-		if _, ok := nodes[key]; ok {
-			return true
-		}
-	}
-	return false
+	_, ok := tm.timerNodes.getNode(bucket, key)
+	return ok
 }
 
 func (tm *ttlManager) add(bucket, key string, expire time.Duration, callback func()) {
-	nodes, ok := tm.timerNodes[bucket]
-
-	if !ok {
-		tm.timerNodes[bucket] = make(map[string]timer.TimeNoder)
-		nodes = tm.timerNodes[bucket]
-	}
-
-	if node, ok := nodes[key]; ok {
+	if node, ok := tm.timerNodes.getNode(bucket, key); ok {
 		node.Stop()
 	}
 
 	node := tm.t.AfterFunc(expire, callback)
-	tm.timerNodes[bucket][key] = node
+	tm.timerNodes.addNode(bucket, key, node)
 }
 
 func (tm *ttlManager) del(bucket, key string) {
-	if _, ok := tm.timerNodes[bucket]; !ok {
-		return
-	}
-
-	if node, ok := tm.timerNodes[bucket][key]; ok {
-		node.Stop()
-		delete(tm.timerNodes[bucket], key)
-	}
+	tm.timerNodes.delNode(bucket, key)
 }
 
 func (tm *ttlManager) close() {

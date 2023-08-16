@@ -815,7 +815,7 @@ func (db *DB) buildBTreeIdx(r *Record) {
 			expireTime := time.Unix(int64(meta.Timestamp)+int64(meta.TTL), 0)
 			expire := time.Until(expireTime)
 
-			db.tm.add(bucket, string(key), expire, func() {
+			callback := func() {
 				err := db.Update(func(tx *Tx) error {
 					if tx.db.tm.exist(bucket, string(key)) {
 						return tx.Delete(bucket, key)
@@ -825,7 +825,9 @@ func (db *DB) buildBTreeIdx(r *Record) {
 				if err != nil {
 					log.Printf("occur error when expired deletion, error: %v", err.Error())
 				}
-			})
+			}
+
+			db.tm.add(bucket, string(key), expire, callback)
 		} else {
 			db.tm.del(bucket, string(key))
 		}
