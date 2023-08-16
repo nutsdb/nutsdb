@@ -210,6 +210,19 @@ memory and reducing the number of memory allocations.
 
 `MergeInterval` represent the interval for automatic merges, with 0 meaning automatic merging is disabled. Default interval is 2 hours.
 
+- MaxBatchCount int64
+
+`MaxBatchCount` represents max entries in batch.
+
+- MaxBatchSize int64
+
+`MaxBatchSize` represents max batch size in bytes.
+
+- ExpiredDeleteType ExpiredDeleteType
+
+`ExpiredDeleteType ` represents the data structure used for expired deletion. TimeWheel means use the time wheel, You can use it when you need high performance or low memory usage. TimeHeap means use the time heap, You can use it when you need to delete precisely or memory usage will be high.
+
+
 #### Default Options
 
 Recommend to use the `DefaultOptions` . Unless you know what you're doing.
@@ -217,13 +230,16 @@ Recommend to use the `DefaultOptions` . Unless you know what you're doing.
 ```
 var DefaultOptions = func() Options {
 	return Options{
-		EntryIdxMode:     HintKeyValAndRAMIdxMode,
-		SegmentSize:      defaultSegmentSize,
-		NodeNum:          1,
-		RWMode:           FileIO,
-		SyncEnable:       true,
-		CommitBufferSize: 4 * MB,
-		MergeInterval:    2 * time.Hour,
+		EntryIdxMode:      HintKeyValAndRAMIdxMode,
+		SegmentSize:       defaultSegmentSize,
+		NodeNum:           1,
+		RWMode:            FileIO,
+		SyncEnable:        true,
+		CommitBufferSize:  4 * MB,
+		MergeInterval:     2 * time.Hour,
+		MaxBatchSize:      (15 * defaultSegmentSize / 4) / 100,
+		MaxBatchCount:     (15 * defaultSegmentSize / 4) / 100 / 100,
+		ExpiredDeleteType: TimeWheel,
 	}
 }()
 ```

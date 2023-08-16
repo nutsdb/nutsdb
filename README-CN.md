@@ -219,6 +219,20 @@ MB，这个可以自己配置。但是一旦被设置，下次启动数据库也
 
 `MergeInterval` 表示自动化 Merge 的间隔，0 表示不触发自动化 Merge，默认间隔为 2 小时。
 
+- MaxBatchCount int64
+
+`MaxBatchCount` 表示批量写入的最大条数。
+
+- MaxBatchSize int64
+
+`MaxBatchSize` 表示批量写入的最大字节数。
+
+- ExpiredDeleteType ExpiredDeleteType
+
+`ExpiredDeleteType ` 表示用于自动过期删除的数据结构。TimeWheel 意味着使用时间轮，你可以在需要高性能或者内存会充足的时候使用。TimeHeap 意味着使用时间轮，你可以在需要高精度删除或者内存将吃紧的时候使用。
+
+
+
 #### 默认选项
 
 推荐使用默认选项的方式。兼顾了持久化+快速的启动数据库。当然具体还要看你场景的要求。
@@ -229,13 +243,16 @@ MB，这个可以自己配置。但是一旦被设置，下次启动数据库也
 ```
 var DefaultOptions = func() Options {
 	return Options{
-		EntryIdxMode:     HintKeyValAndRAMIdxMode,
-		SegmentSize:      defaultSegmentSize,
-		NodeNum:          1,
-		RWMode:           FileIO,
-		SyncEnable:       true,
-		CommitBufferSize: 4 * MB,
-		MergeInterval:    2 * time.Hour,
+		EntryIdxMode:      HintKeyValAndRAMIdxMode,
+		SegmentSize:       defaultSegmentSize,
+		NodeNum:           1,
+		RWMode:            FileIO,
+		SyncEnable:        true,
+		CommitBufferSize:  4 * MB,
+		MergeInterval:     2 * time.Hour,
+		MaxBatchSize:      (15 * defaultSegmentSize / 4) / 100,
+		MaxBatchCount:     (15 * defaultSegmentSize / 4) / 100 / 100,
+		ExpiredDeleteType: TimeWheel,
 	}
 }()
 ```
