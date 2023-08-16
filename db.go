@@ -813,7 +813,7 @@ func (db *DB) buildBTreeIdx(r *Record) {
 	} else {
 		if meta.TTL != Persistent {
 			expireTime := time.Unix(int64(meta.Timestamp)+int64(meta.TTL), 0)
-			expire := expireTime.Sub(time.Now())
+			expire := time.Until(expireTime)
 
 			db.tm.add(bucket, string(key), expire, func() {
 				err := db.Update(func(tx *Tx) error {
