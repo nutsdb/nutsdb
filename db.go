@@ -812,8 +812,10 @@ func (db *DB) buildBTreeIdx(r *Record) {
 		db.BTreeIdx[bucket].Delete(key)
 	} else {
 		if meta.TTL != Persistent {
-			expireTime := time.Unix(int64(meta.Timestamp)+int64(meta.TTL), 0)
-			expire := time.Until(expireTime)
+			now := time.UnixMilli(time.Now().UnixMilli())
+			expireTime := time.UnixMilli(int64(meta.Timestamp))
+			expireTime = expireTime.Add(time.Duration(int64(meta.TTL)) * time.Second)
+			expire := expireTime.Sub(now)
 
 			callback := func() {
 				err := db.Update(func(tx *Tx) error {

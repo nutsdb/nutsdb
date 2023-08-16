@@ -883,7 +883,7 @@ func TestTx_ExpiredDeletion(t *testing.T) {
 
 			require.NoError(t, db.Close())
 
-			time.Sleep(1000 * time.Millisecond)
+			time.Sleep(1100 * time.Millisecond)
 
 			db, err := Open(opts)
 			require.NoError(t, err)
@@ -915,7 +915,7 @@ func TestTx_ExpiredDeletion(t *testing.T) {
 			txPut(t, db, bucket, GetTestBytes(1), GetTestBytes(1), Persistent, nil)
 			txPut(t, db, bucket, GetTestBytes(2), GetTestBytes(2), 1, nil)
 
-			time.Sleep(1000 * time.Millisecond)
+			time.Sleep(1100 * time.Millisecond)
 
 			require.NoError(t, db.Merge())
 
