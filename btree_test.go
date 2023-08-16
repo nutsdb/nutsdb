@@ -30,7 +30,7 @@ func runBTreeTest(t *testing.T, test func(t *testing.T, btree *BTree)) {
 
 		meta := NewMetaData().WithFlag(DataSetFlag)
 		_ = btree.Insert(key,
-			NewEntry().WithKey(key).WithValue(val),
+			val,
 			NewHint().WithKey(key).WithMeta(meta))
 	}
 
@@ -40,7 +40,7 @@ func runBTreeTest(t *testing.T, test func(t *testing.T, btree *BTree)) {
 func TestBTree_Find(t *testing.T) {
 	runBTreeTest(t, func(t *testing.T, btree *BTree) {
 		r, ok := btree.Find([]byte(fmt.Sprintf(keyFormat, 0)))
-		require.Equal(t, []byte(fmt.Sprintf(keyFormat, 0)), r.E.Key)
+		require.Equal(t, []byte(fmt.Sprintf(keyFormat, 0)), r.H.Key)
 		require.True(t, ok)
 	})
 }
@@ -66,8 +66,8 @@ func TestBTree_PrefixScan(t *testing.T) {
 				wantKey := []byte(fmt.Sprintf(keyFormat, i))
 				wantValue := []byte(fmt.Sprintf(valFormat, i))
 
-				assert.Equal(t, wantKey, r.E.Key)
-				assert.Equal(t, wantValue, r.E.Value)
+				assert.Equal(t, wantKey, r.H.Key)
+				assert.Equal(t, wantValue, r.V)
 			}
 		})
 	})
@@ -88,15 +88,15 @@ func TestBTree_PrefixSearchScan(t *testing.T) {
 			val := GetRandomBytes(24)
 
 			meta := NewMetaData().WithFlag(DataSetFlag)
-			btree.Insert(key, NewEntry().WithKey(key).WithValue(val), NewHint().WithKey(key).WithMeta(meta))
+			btree.Insert(key, val, NewHint().WithKey(key).WithMeta(meta))
 
 			record, ok := btree.Find(key)
 			require.True(t, ok)
-			require.Equal(t, key, record.E.Key)
+			require.Equal(t, key, record.H.Key)
 
 			records := btree.PrefixSearchScan([]byte("nutsdb-"),
 				"[a-z\\d]+(\\.[a-z\\d]+)*@([\\da-z](-[\\da-z])?)+(\\.{1,2}[a-z]+)+$", 0, 1)
-			require.Equal(t, key, records[0].E.Key)
+			require.Equal(t, key, records[0].H.Key)
 		})
 	})
 
@@ -107,11 +107,11 @@ func TestBTree_PrefixSearchScan(t *testing.T) {
 			val := GetRandomBytes(24)
 
 			meta := NewMetaData().WithFlag(DataSetFlag)
-			btree.Insert(key, NewEntry().WithKey(key).WithValue(val), NewHint().WithKey(key).WithMeta(meta))
+			btree.Insert(key, val, NewHint().WithKey(key).WithMeta(meta))
 
 			record, ok := btree.Find(key)
 			require.True(t, ok)
-			require.Equal(t, key, record.E.Key)
+			require.Equal(t, key, record.H.Key)
 
 			records := btree.PrefixSearchScan([]byte("nutsdb-"),
 				"[a-z\\d]+(\\.[a-z\\d]+)*@([\\da-z](-[\\da-z])?)+(\\.{1,2}[a-z]+)+$", 0, 1)
@@ -129,7 +129,7 @@ func TestBTree_All(t *testing.T) {
 			val := []byte(fmt.Sprintf(valFormat, i))
 
 			meta := NewMetaData().WithFlag(DataSetFlag)
-			expectRecords[i] = NewRecord().WithEntry(NewEntry().WithKey(key).WithValue(val)).
+			expectRecords[i] = NewRecord().WithValue(val).
 				WithHint(NewHint().WithKey(key).WithMeta(meta))
 		}
 
@@ -147,7 +147,7 @@ func TestBTree_Range(t *testing.T) {
 				val := []byte(fmt.Sprintf(valFormat, i))
 
 				meta := NewMetaData().WithFlag(DataSetFlag)
-				expectRecords[i] = NewRecord().WithEntry(NewEntry().WithKey(key).WithValue(val)).
+				expectRecords[i] = NewRecord().WithValue(val).
 					WithHint(NewHint().WithKey(key).WithMeta(meta))
 			}
 
@@ -166,7 +166,7 @@ func TestBTree_Range(t *testing.T) {
 				val := []byte(fmt.Sprintf(valFormat, i))
 
 				meta := NewMetaData().WithFlag(DataSetFlag)
-				expectRecords[i-40] = NewRecord().WithEntry(NewEntry().WithKey(key).WithValue(val)).
+				expectRecords[i-40] = NewRecord().WithValue(val).
 					WithHint(NewHint().WithKey(key).WithMeta(meta))
 			}
 
@@ -185,7 +185,7 @@ func TestBTree_Range(t *testing.T) {
 				val := []byte(fmt.Sprintf(valFormat, i))
 
 				meta := NewMetaData().WithFlag(DataSetFlag)
-				expectRecords[i-90] = NewRecord().WithEntry(NewEntry().WithKey(key).WithValue(val)).
+				expectRecords[i-90] = NewRecord().WithValue(val).
 					WithHint(NewHint().WithKey(key).WithMeta(meta))
 			}
 
@@ -203,13 +203,13 @@ func TestBTree_Update(t *testing.T) {
 			val := []byte(fmt.Sprintf("val_%03d_modify", i))
 
 			meta := NewMetaData().WithFlag(DataSetFlag)
-			btree.Insert(key, NewEntry().WithKey(key).WithValue(val), NewHint().WithKey(key).WithMeta(meta))
+			btree.Insert(key, val, NewHint().WithKey(key).WithMeta(meta))
 		}
 
 		records := btree.Range([]byte(fmt.Sprintf(keyFormat, 40)), []byte(fmt.Sprintf(keyFormat, 49)))
 
 		for i := 40; i < 50; i++ {
-			require.Equal(t, []byte(fmt.Sprintf("val_%03d_modify", i)), records[i-40].E.Value)
+			require.Equal(t, []byte(fmt.Sprintf("val_%03d_modify", i)), records[i-40].V)
 		}
 	})
 }

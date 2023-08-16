@@ -88,34 +88,40 @@ func TestDB_MergeForSet(t *testing.T) {
 func TestDB_MergeForZSet(t *testing.T) {
 	opts := DefaultOptions
 	opts.SegmentSize = 100
-	opts.EntryIdxMode = HintKeyAndRAMIdxMode
 	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
 		bucket := "bucket"
+		key := GetTestBytes(0)
 
 		for i := 0; i < 100; i++ {
 			score, _ := strconv2.IntToFloat64(i)
-			txZAdd(t, db, bucket, GetTestBytes(i), GetTestBytes(i), score, nil)
+			txZAdd(t, db, bucket, key, GetTestBytes(i), score, nil)
 		}
 
 		for i := 0; i < 100; i++ {
-			txZGetByKey(t, db, bucket, GetTestBytes(i), nil)
+			score, _ := strconv2.IntToFloat64(i)
+			txZScore(t, db, bucket, key, GetTestBytes(i), score, nil)
 		}
 
 		for i := 0; i < 50; i++ {
-			txZRem(t, db, bucket, GetTestBytes(i), nil)
+			txZRem(t, db, bucket, key, GetTestBytes(i), nil)
 		}
 
 		for i := 0; i < 50; i++ {
-			txZGetByKey(t, db, bucket, GetTestBytes(i), ErrNotFoundKey)
+			score, _ := strconv2.IntToFloat64(i)
+			txZScore(t, db, bucket, key, GetTestBytes(i), score, ErrSortedSetMemberNotExist)
 		}
 
 		for i := 50; i < 100; i++ {
-			txZGetByKey(t, db, bucket, GetTestBytes(i), nil)
+			score, _ := strconv2.IntToFloat64(i)
+			txZScore(t, db, bucket, key, GetTestBytes(i), score, nil)
 		}
 
-		txZRangeByRank(t, db, bucket, 20, 30)
-
 		require.NoError(t, db.Merge())
+
+		for i := 50; i < 100; i++ {
+			score, _ := strconv2.IntToFloat64(i)
+			txZScore(t, db, bucket, key, GetTestBytes(i), score, nil)
+		}
 	})
 }
 

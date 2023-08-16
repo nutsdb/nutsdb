@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/bwmarrin/snowflake"
-	"github.com/nutsdb/nutsdb/ds/zset"
 	"github.com/xujiajun/utils/strconv2"
 )
 
@@ -237,10 +236,7 @@ func (tx *Tx) Commit() (err error) {
 		tx.ReservedStoreTxIDIdxes = nil
 	}()
 
-	var (
-		e              *Entry
-		bucketMetaTemp BucketMeta
-	)
+	var bucketMetaTemp BucketMeta
 
 	if tx.isClosed() {
 		return ErrCannotCommitAClosedTx
@@ -323,29 +319,27 @@ func (tx *Tx) Commit() (err error) {
 			}
 		}
 
-		e = nil
-		if tx.db.opt.EntryIdxMode == HintKeyValAndRAMIdxMode {
-			e = entry
-		}
+		hint := NewHint().WithKey(entry.Key).WithFileId(tx.db.ActiveFile.fileID).WithMeta(entry.Meta).WithDataPos(uint64(offset))
+		record := NewRecord().WithBucket(bucket).WithValue(entry.Value).WithHint(hint)
 
 		if entry.Meta.Ds == DataStructureTree {
-			tx.buildTreeIdx(bucket, entry, e, offset, countFlag)
+			tx.buildTreeIdx(record, countFlag)
 		}
 
 		if entry.Meta.Ds == DataStructureList {
-			tx.buildListIdx(bucket, entry, offset)
+			tx.buildListIdx(record)
 		}
 
 		if entry.Meta.Ds == DataStructureSet {
-			tx.buildSetIdx(bucket, entry, offset)
+			tx.buildSetIdx(record)
 		}
 
-		if entry.Meta.Ds == DataStructureNone && entry.Meta.Flag == DataBPTreeBucketDeleteFlag {
-			tx.db.deleteBucket(DataStructureTree, bucket)
+		if entry.Meta.Ds == DataStructureSortedSet {
+			tx.buildSortedSetIdx(record)
 		}
 	}
 
-	tx.buildIdxes()
+	tx.buildNotDSIdxes()
 
 	return nil
 }
@@ -479,18 +473,17 @@ func (tx *Tx) buildTxIDRootIdx(txID uint64, countFlag bool) error {
 	return nil
 }
 
-func (tx *Tx) buildIdxes() {
+func (tx *Tx) buildNotDSIdxes() {
 	writesLen := len(tx.pendingWrites)
 	for i := 0; i < writesLen; i++ {
 		entry := tx.pendingWrites[i]
 
 		bucket := string(entry.Bucket)
 
-		if entry.Meta.Ds == DataStructureSortedSet {
-			tx.buildSortedSetIdx(bucket, entry)
-		}
-
 		if entry.Meta.Ds == DataStructureNone {
+			if entry.Meta.Flag == DataBPTreeBucketDeleteFlag {
+				tx.db.deleteBucket(DataStructureTree, bucket)
+			}
 			if entry.Meta.Flag == DataSetBucketDeleteFlag {
 				tx.db.deleteBucket(DataStructureSet, bucket)
 			}
@@ -506,92 +499,108 @@ func (tx *Tx) buildIdxes() {
 	}
 }
 
-func (tx *Tx) buildTreeIdx(bucket string, entry, e *Entry, offset int64, countFlag bool) {
+func (tx *Tx) buildTreeIdx(record *Record, countFlag bool) {
+	bucket, key, meta, offset := record.Bucket, record.H.Key, record.H.Meta, record.H.DataPos
+
 	if tx.db.opt.EntryIdxMode == HintBPTSparseIdxMode {
-		newKey := getNewKey(bucket, entry.Key)
-		_ = tx.db.ActiveBPTreeIdx.Insert(newKey, e, &Hint{
+		newKey := getNewKey(bucket, key)
+		_ = tx.db.ActiveBPTreeIdx.Insert(newKey, nil, &Hint{
 			FileID:  tx.db.ActiveFile.fileID,
 			Key:     newKey,
-			Meta:    entry.Meta,
-			DataPos: uint64(offset),
+			Meta:    meta,
+			DataPos: offset,
 		}, countFlag)
 	} else {
 		if _, ok := tx.db.BTreeIdx[bucket]; !ok {
 			tx.db.BTreeIdx[bucket] = NewBTree()
 		}
 
-		if entry.Meta.Flag == DataSetFlag {
-			tx.db.BTreeIdx[bucket].Insert(entry.Key, e, &Hint{
+		if meta.Flag == DataSetFlag {
+			var value []byte
+			if tx.db.opt.EntryIdxMode == HintKeyValAndRAMIdxMode {
+				value = record.V
+			}
+
+			tx.db.BTreeIdx[bucket].Insert(key, value, &Hint{
 				FileID:  tx.db.ActiveFile.fileID,
-				Key:     entry.Key,
-				Meta:    entry.Meta,
-				DataPos: uint64(offset),
+				Key:     key,
+				Meta:    meta,
+				DataPos: offset,
 			})
-		} else if entry.Meta.Flag == DataDeleteFlag {
-			tx.db.BTreeIdx[bucket].Delete(entry.Key)
+		} else if meta.Flag == DataDeleteFlag {
+			tx.db.BTreeIdx[bucket].Delete(key)
 		}
 	}
 }
 
-func (tx *Tx) buildSetIdx(bucket string, entry *Entry, offset int64) {
+func (tx *Tx) buildSetIdx(record *Record) {
+	bucket, key, value, meta := record.Bucket, record.H.Key, record.V, record.H.Meta
+
+	tx.db.resetRecordByMode(record)
+
 	if _, ok := tx.db.SetIdx[bucket]; !ok {
 		tx.db.SetIdx[bucket] = NewSet()
 	}
 
-	if entry.Meta.Flag == DataDeleteFlag {
-		_ = tx.db.SetIdx[bucket].SRem(string(entry.Key), entry.Value)
+	if meta.Flag == DataDeleteFlag {
+		_ = tx.db.SetIdx[bucket].SRem(string(key), value)
 	}
 
-	if entry.Meta.Flag == DataSetFlag {
-		r := tx.db.buildRecordByEntryAndOffset(entry, offset)
-		_ = tx.db.SetIdx[bucket].SAdd(string(entry.Key), [][]byte{entry.Value}, []*Record{r})
+	if meta.Flag == DataSetFlag {
+		_ = tx.db.SetIdx[bucket].SAdd(string(key), [][]byte{value}, []*Record{record})
 	}
 }
 
-func (tx *Tx) buildSortedSetIdx(bucket string, entry *Entry) {
+func (tx *Tx) buildSortedSetIdx(record *Record) {
+	bucket, key, value, meta := record.Bucket, record.H.Key, record.V, record.H.Meta
+
+	tx.db.resetRecordByMode(record)
+
 	if _, ok := tx.db.SortedSetIdx[bucket]; !ok {
-		tx.db.SortedSetIdx[bucket] = zset.New()
+		tx.db.SortedSetIdx[bucket] = NewSortedSet(tx.db)
 	}
 
-	switch entry.Meta.Flag {
+	switch meta.Flag {
 	case DataZAddFlag:
-		keyAndScore := strings.Split(string(entry.Key), SeparatorForZSetKey)
+		keyAndScore := strings.Split(string(key), SeparatorForZSetKey)
 		key := keyAndScore[0]
 		score, _ := strconv2.StrToFloat64(keyAndScore[1])
-		_ = tx.db.SortedSetIdx[bucket].Put(key, zset.SCORE(score), entry.Value)
+		_ = tx.db.SortedSetIdx[bucket].ZAdd(key, SCORE(score), value, record)
 	case DataZRemFlag:
-		_ = tx.db.SortedSetIdx[bucket].Remove(string(entry.Key))
+		_, _ = tx.db.SortedSetIdx[bucket].ZRem(string(key), value)
 	case DataZRemRangeByRankFlag:
-		start, _ := strconv2.StrToInt(string(entry.Key))
-		end, _ := strconv2.StrToInt(string(entry.Value))
-		_ = tx.db.SortedSetIdx[bucket].GetByRankRange(start, end, true)
+		startAndEnd := strings.Split(string(value), SeparatorForZSetKey)
+		start, _ := strconv2.StrToInt(startAndEnd[0])
+		end, _ := strconv2.StrToInt(startAndEnd[1])
+		_ = tx.db.SortedSetIdx[bucket].ZRemRangeByRank(string(key), start, end)
 	case DataZPopMaxFlag:
-		_ = tx.db.SortedSetIdx[bucket].PopMax()
+		_, _, _ = tx.db.SortedSetIdx[bucket].ZPopMax(string(key))
 	case DataZPopMinFlag:
-		_ = tx.db.SortedSetIdx[bucket].PopMin()
+		_, _, _ = tx.db.SortedSetIdx[bucket].ZPopMin(string(key))
 	}
 }
 
-func (tx *Tx) buildListIdx(bucket string, entry *Entry, offset int64) {
+func (tx *Tx) buildListIdx(record *Record) {
+	bucket, key, value, meta := record.Bucket, record.H.Key, record.V, record.H.Meta
+
+	tx.db.resetRecordByMode(record)
+
 	l := tx.db.Index.getList(bucket)
 
-	key, value := entry.Key, entry.Value
-	if IsExpired(entry.Meta.TTL, entry.Meta.Timestamp) {
+	if IsExpired(meta.TTL, meta.Timestamp) {
 		return
 	}
 
-	switch entry.Meta.Flag {
+	switch meta.Flag {
 	case DataExpireListFlag:
 		t, _ := strconv2.StrToInt64(string(value))
 		ttl := uint32(t)
 		l.TTL[string(key)] = ttl
-		l.TimeStamp[string(key)] = entry.Meta.Timestamp
+		l.TimeStamp[string(key)] = meta.Timestamp
 	case DataLPushFlag:
-		r := tx.db.buildRecordByEntryAndOffset(entry, offset)
-		_ = l.LPush(string(key), r)
+		_ = l.LPush(string(key), record)
 	case DataRPushFlag:
-		r := tx.db.buildRecordByEntryAndOffset(entry, offset)
-		_ = l.RPush(string(key), r)
+		_ = l.RPush(string(key), record)
 	case DataLRemFlag:
 		countAndValue := strings.Split(string(value), SeparatorForListKey)
 		count, _ := strconv2.StrToInt(countAndValue[0])
@@ -613,8 +622,7 @@ func (tx *Tx) buildListIdx(bucket string, entry *Entry, offset int64) {
 		keyAndIndex := strings.Split(string(key), SeparatorForListKey)
 		newKey := keyAndIndex[0]
 		index, _ := strconv2.StrToInt(keyAndIndex[1])
-		r := tx.db.buildRecordByEntryAndOffset(entry, offset)
-		_ = l.LSet(newKey, index, r)
+		_ = l.LSet(newKey, index, record)
 	case DataLTrimFlag:
 		keyAndStartIndex := strings.Split(string(key), SeparatorForListKey)
 		newKey := keyAndStartIndex[0]

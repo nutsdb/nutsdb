@@ -66,12 +66,29 @@ func (tx *Tx) sPut(bucket string, key []byte, dataFlag uint16, values ...[]byte)
 
 // SAdd adds the specified members to the set stored int the bucket at given bucket,key and items.
 func (tx *Tx) SAdd(bucket string, key []byte, items ...[]byte) error {
+	if err := tx.checkTxIsClosed(); err != nil {
+		return err
+	}
 	return tx.sPut(bucket, key, DataSetFlag, items...)
 }
 
 // SRem removes the specified members from the set stored int the bucket at given bucket,key and items.
 func (tx *Tx) SRem(bucket string, key []byte, items ...[]byte) error {
-	return tx.sPut(bucket, key, DataDeleteFlag, items...)
+	if err := tx.checkTxIsClosed(); err != nil {
+		return err
+	}
+
+	if _, ok := tx.db.SetIdx[bucket]; ok {
+		ok, err := tx.db.SetIdx[bucket].SAreMembers(string(key), items...)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return ErrSetMemberNotExist
+		}
+		return tx.sPut(bucket, key, DataDeleteFlag, items...)
+	}
+	return ErrBucketNotFound
 }
 
 // SAreMembers returns if the specified members are the member of the set int the bucket at given bucket,key and items.

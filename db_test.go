@@ -232,34 +232,86 @@ func txZAdd(t *testing.T, db *DB, bucket string, key, value []byte, score float6
 		assertErr(t, err, expectErr)
 		return nil
 	})
-	require.NoError(t, err)
+	assert.NoError(t, err)
 }
 
-func txZRem(t *testing.T, db *DB, bucket string, key []byte, expectErr error) {
+func txZRem(t *testing.T, db *DB, bucket string, key, value []byte, expectErr error) {
 	err := db.Update(func(tx *Tx) error {
-		err := tx.ZRem(bucket, string(key))
+		err := tx.ZRem(bucket, key, value)
 		assertErr(t, err, expectErr)
 		return nil
 	})
-	require.NoError(t, err)
+	assert.NoError(t, err)
 }
 
-func txZGetByKey(t *testing.T, db *DB, bucket string, key []byte, expectErr error) {
+func txZCard(t *testing.T, db *DB, bucket string, key []byte, expectLength int, expectErr error) {
 	err := db.View(func(tx *Tx) error {
-		_, err := tx.ZGetByKey(bucket, key)
-		assertErr(t, err, expectErr)
+		length, err := tx.ZCard(bucket, key)
+		if expectErr != nil {
+			assert.NoError(t, err)
+		} else {
+			assert.Equal(t, expectLength, length)
+		}
 		return nil
 	})
-	require.NoError(t, err)
+	assert.NoError(t, err)
 }
 
-func txZRangeByRank(t *testing.T, db *DB, bucket string, start, end int) {
-	err := db.Update(func(tx *Tx) error {
-		err := tx.ZRemRangeByRank(bucket, start, end)
-		require.NoError(t, err)
+func txZScore(t *testing.T, db *DB, bucket string, key, value []byte, expectScore float64, expectErr error) {
+	err := db.View(func(tx *Tx) error {
+		score, err := tx.ZScore(bucket, key, value)
+		if err != nil {
+			assert.Equal(t, expectErr, err)
+		} else {
+			assert.Equal(t, expectScore, score)
+		}
 		return nil
 	})
-	require.NoError(t, err)
+	assert.NoError(t, err)
+}
+
+func txZRank(t *testing.T, db *DB, bucket string, key, value []byte, isRev bool, expectRank int, expectErr error) {
+	err := db.View(func(tx *Tx) error {
+		var (
+			rank int
+			err  error
+		)
+		if isRev {
+			rank, err = tx.ZRevRank(bucket, key, value)
+		} else {
+			rank, err = tx.ZRank(bucket, key, value)
+		}
+		if expectErr != nil {
+			assert.Equal(t, expectErr, err)
+		} else {
+			assert.Equal(t, expectRank, rank)
+		}
+		return nil
+	})
+	assert.NoError(t, err)
+}
+
+func txZPop(t *testing.T, db *DB, bucket string, key []byte, isMax bool, expectVal []byte, expectScore float64, expectErr error) {
+	err := db.Update(func(tx *Tx) error {
+		var (
+			member *SortedSetMember
+			err    error
+		)
+		if isMax {
+			member, err = tx.ZPopMax(bucket, key)
+		} else {
+			member, err = tx.ZPopMin(bucket, key)
+		}
+
+		if expectErr != nil {
+			assert.Equal(t, expectErr, err)
+		} else {
+			assert.Equal(t, expectVal, member.Value)
+			assert.Equal(t, expectScore, member.Score)
+		}
+		return nil
+	})
+	assert.NoError(t, err)
 }
 
 func txPop(t *testing.T, db *DB, bucket string, key, expectVal []byte, expectErr error, isLeft bool) {
@@ -507,11 +559,11 @@ func withRAMIdxDB(t *testing.T, fn func(t *testing.T, db *DB)) {
 	withDBOption(t, opt, fn)
 }
 
-func withBPTSpareeIdxDB(t *testing.T, fn func(t *testing.T, db *DB)) {
+func withBPTSparseIdxDB(t *testing.T, fn func(t *testing.T, db *DB)) {
 	tmpdir, _ := os.MkdirTemp("", "nutsdb")
 	opt := DefaultOptions
 	opt.Dir = tmpdir
-	opt.EntryIdxMode = HintKeyAndRAMIdxMode
+	opt.EntryIdxMode = HintBPTSparseIdxMode
 
 	withDBOption(t, opt, fn)
 }
@@ -577,6 +629,7 @@ func TestDB_ChangeMode_RestartDB(t *testing.T) {
 	changeModeRestart := func(firstMode EntryIdxMode, secondMode EntryIdxMode) {
 		opts := DefaultOptions
 		opts.EntryIdxMode = firstMode
+		var err error
 
 		runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
 			bucket := "bucket"
@@ -590,6 +643,11 @@ func TestDB_ChangeMode_RestartDB(t *testing.T) {
 			for i := 0; i < 10; i++ {
 				txPush(t, db, bucket, GetTestBytes(0), GetTestBytes(i), nil, true)
 			}
+
+			err = db.Update(func(tx *Tx) error {
+				return tx.LRem(bucket, GetTestBytes(0), 1, GetTestBytes(5))
+			})
+			require.NoError(t, err)
 
 			for i := 0; i < 2; i++ {
 				txPop(t, db, bucket, GetTestBytes(0), GetTestBytes(9-i), nil, true)
@@ -610,16 +668,15 @@ func TestDB_ChangeMode_RestartDB(t *testing.T) {
 
 			// zset
 			for i := 0; i < 10; i++ {
-				txZAdd(t, db, bucket, GetTestBytes(i), GetTestBytes(i), float64(i), nil)
+				txZAdd(t, db, bucket, GetTestBytes(0), GetTestBytes(i), float64(i), nil)
 			}
 
 			for i := 0; i < 3; i++ {
-				txZRem(t, db, bucket, GetTestBytes(i), nil)
+				txZRem(t, db, bucket, GetTestBytes(0), GetTestBytes(i), nil)
 			}
 
 			require.NoError(t, db.Close())
 
-			var err error
 			opts.EntryIdxMode = secondMode
 			db, err = Open(opts)
 			require.NoError(t, err)
@@ -631,7 +688,17 @@ func TestDB_ChangeMode_RestartDB(t *testing.T) {
 
 			// list
 			txPop(t, db, bucket, GetTestBytes(0), GetTestBytes(7), nil, true)
+			txPop(t, db, bucket, GetTestBytes(0), GetTestBytes(6), nil, true)
+			txPop(t, db, bucket, GetTestBytes(0), GetTestBytes(4), nil, true)
 			txPop(t, db, bucket, GetTestBytes(0), GetTestBytes(2), nil, false)
+
+			err = db.View(func(tx *Tx) error {
+				size, err := tx.LSize(bucket, GetTestBytes(0))
+				require.NoError(t, err)
+				require.Equal(t, 1, size)
+				return nil
+			})
+			require.NoError(t, err)
 
 			// set
 			for i := 0; i < 3; i++ {
@@ -644,11 +711,11 @@ func TestDB_ChangeMode_RestartDB(t *testing.T) {
 
 			// zset
 			for i := 0; i < 3; i++ {
-				txZGetByKey(t, db, bucket, GetTestBytes(i), ErrNotFoundKey)
+				txZScore(t, db, bucket, GetTestBytes(0), GetTestBytes(i), float64(i), ErrSortedSetMemberNotExist)
 			}
 
 			for i := 3; i < 10; i++ {
-				txZGetByKey(t, db, bucket, GetTestBytes(i), nil)
+				txZScore(t, db, bucket, GetTestBytes(0), GetTestBytes(i), float64(i), nil)
 			}
 		})
 	}

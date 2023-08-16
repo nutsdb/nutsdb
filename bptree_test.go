@@ -43,7 +43,7 @@ func withBPTree(t *testing.T, fn func(t *testing.T, tree *BPTree)) {
 
 		meta := NewMetaData().WithFlag(DataSetFlag)
 		err := tree.Insert(key,
-			NewEntry().WithKey(key).WithValue(val),
+			val,
 			NewHint().WithKey(key).WithMeta(meta),
 			CountFlagEnabled)
 		require.NoError(t, err)
@@ -60,7 +60,7 @@ func setup(t *testing.T, limit int) {
 		val := []byte("val_" + fmt.Sprintf("%03d", i))
 		err := tree.Insert(
 			key,
-			NewEntry().WithKey(key).WithValue(val),
+			val,
 			NewHint().WithKey(key).WithMeta(meta),
 			CountFlagEnabled,
 		)
@@ -72,11 +72,10 @@ func setup(t *testing.T, limit int) {
 		key := []byte("key_" + fmt.Sprintf("%03d", i))
 		val := []byte("val_" + fmt.Sprintf("%03d", i))
 
-		E := NewEntry().WithKey(key).WithValue(val)
 		H := NewHint().WithKey(key).WithMeta(meta)
 		expected = append(
 			expected,
-			NewRecord().WithEntry(E).WithHint(H),
+			NewRecord().WithValue(val).WithHint(H),
 		)
 	}
 }
@@ -92,7 +91,7 @@ func TestBPTree_Find(t *testing.T) {
 	r, err := tree.Find(key)
 	require.NoError(t, err)
 
-	assert.Equal(t, val, r.E.Value)
+	assert.Equal(t, val, r.V)
 }
 
 func TestBPTree_PrefixScan(t *testing.T) {
@@ -114,8 +113,8 @@ func TestBPTree_PrefixScan(t *testing.T) {
 				wantKey := []byte(fmt.Sprintf(keyFormat, i))
 				wantValue := []byte(fmt.Sprintf(valFormat, i))
 
-				assert.Equal(t, wantKey, r.E.Key)
-				assert.Equal(t, wantValue, r.E.Value)
+				assert.Equal(t, wantKey, r.H.Key)
+				assert.Equal(t, wantValue, r.V)
 			}
 		})
 	})
@@ -134,8 +133,8 @@ func TestBPTree_PrefixScan(t *testing.T) {
 				wantKey := []byte(fmt.Sprintf(keyFormat, i+offset))
 				wantValue := []byte(fmt.Sprintf(valFormat, i+offset))
 
-				assert.Equal(t, wantKey, r.E.Key)
-				assert.Equal(t, wantValue, r.E.Value)
+				assert.Equal(t, wantKey, r.H.Key)
+				assert.Equal(t, wantValue, r.V)
 			}
 		})
 	})
@@ -155,8 +154,8 @@ func TestBPTree_PrefixScan(t *testing.T) {
 				wantKey := []byte(fmt.Sprintf(keyFormat, i+offset))
 				wantValue := []byte(fmt.Sprintf(valFormat, i+offset))
 
-				assert.Equal(t, wantKey, r.E.Key)
-				assert.Equal(t, wantValue, r.E.Value)
+				assert.Equal(t, wantKey, r.H.Key)
+				assert.Equal(t, wantValue, r.V)
 			}
 		})
 	})
@@ -176,7 +175,7 @@ func TestBPTree_PrefixScan(t *testing.T) {
 				val := []byte("val_" + fmt.Sprintf("%03d", i))
 				err := tree.Insert(
 					key,
-					NewEntry().WithKey(key).WithValue(val),
+					val,
 					NewHint().WithKey(key).WithMeta(meta),
 					CountFlagEnabled,
 				)
@@ -187,7 +186,7 @@ func TestBPTree_PrefixScan(t *testing.T) {
 			records, _, err := tree.PrefixScan([]byte("name_"), 5, limit)
 			assert.NoError(t, err)
 			assert.Equal(t, limit, len(records))
-			assert.Equal(t, []byte("name_005"), records[0].E.Key)
+			assert.Equal(t, []byte("name_005"), records[0].H.Key)
 		})
 	})
 }
@@ -223,13 +222,13 @@ func TestBPTree_PrefixSearchScan(t *testing.T) {
 
 	for i, e := range rss {
 
-		if !rgxs.Match(expected[i].E.Key) {
+		if !rgxs.Match(expected[i].H.Key) {
 			continue
 		}
 
-		assert.Equal(t, string(expected[i].E.Key), string(e.E.Key))
+		assert.Equal(t, string(expected[i].H.Key), string(e.H.Key))
 
-		if string(expected[i].E.Key) == string(e.E.Key) {
+		if string(expected[i].H.Key) == string(e.H.Key) {
 			break
 		}
 
@@ -238,13 +237,13 @@ func TestBPTree_PrefixSearchScan(t *testing.T) {
 
 	for i, e := range rsm {
 
-		if !rgxm.Match(expected[i].E.Key) {
+		if !rgxm.Match(expected[i].H.Key) {
 			continue
 		}
 
-		assert.Equal(t, string(expected[i].E.Key), string(e.E.Key))
+		assert.Equal(t, string(expected[i].H.Key), string(e.H.Key))
 
-		if string(expected[i].E.Key) == string(e.E.Key) {
+		if string(expected[i].H.Key) == string(e.H.Key) {
 			break
 		}
 
@@ -253,13 +252,13 @@ func TestBPTree_PrefixSearchScan(t *testing.T) {
 
 	for i, e := range rsl {
 
-		if !rgxl.Match(expected[i].E.Key) {
+		if !rgxl.Match(expected[i].H.Key) {
 			continue
 		}
 
-		assert.Equal(t, string(expected[i].E.Key), string(e.E.Key))
+		assert.Equal(t, string(expected[i].H.Key), string(e.H.Key))
 
-		if string(expected[i].E.Key) == string(e.E.Key) {
+		if string(expected[i].H.Key) == string(e.H.Key) {
 			break
 		}
 
@@ -272,7 +271,7 @@ func TestBPTree_PrefixSearchScan(t *testing.T) {
 		val := []byte("val_" + fmt.Sprintf("%03d", i))
 		err := tree.Insert(
 			key,
-			NewEntry().WithKey(key).WithValue(val),
+			val,
 			NewHint().WithKey(key).WithMeta(meta),
 			CountFlagEnabled,
 		)
@@ -310,7 +309,7 @@ func TestBPTree_Range(t *testing.T) {
 	assert.NoError(t, err)
 
 	for i, e := range rs {
-		assert.Equal(t, expected[i].E.Key, e.E.Key)
+		assert.Equal(t, expected[i].H.Key, e.H.Key)
 	}
 
 	_, err = tree.Range([]byte("key_101"), []byte("key_110"))
@@ -358,7 +357,7 @@ func TestBPTree_Update(t *testing.T) {
 		val := []byte("val_modify" + fmt.Sprintf("%03d", i))
 		err := tree.Insert(
 			key,
-			NewEntry().WithKey(key).WithValue(val),
+			val,
 
 			NewHint().WithKey(key).WithMeta(meta),
 			CountFlagEnabled)
@@ -372,9 +371,8 @@ func TestBPTree_Update(t *testing.T) {
 		key := []byte("key_" + fmt.Sprintf("%03d", i))
 		val := []byte("val_modify" + fmt.Sprintf("%03d", i))
 
-		E := NewEntry().WithKey(key).WithValue(val)
 		H := NewHint().WithKey(key).WithMeta(meta)
-		R := NewRecord().WithHint(H).WithEntry(E)
+		R := NewRecord().WithHint(H).WithValue(val)
 		expected = append(expected, R)
 	}
 
@@ -382,7 +380,7 @@ func TestBPTree_Update(t *testing.T) {
 	assert.NoError(t, err)
 
 	for i, e := range rs {
-		assert.Equal(t, expected[i].E.Key, e.E.Key)
+		assert.Equal(t, expected[i].H.Key, e.H.Key)
 	}
 
 	// delete
@@ -391,7 +389,7 @@ func TestBPTree_Update(t *testing.T) {
 		key := []byte("key_" + fmt.Sprintf("%03d", i))
 		err := tree.Insert(
 			key,
-			NewEntry().WithKey(key),
+			nil,
 			NewHint().WithKey(key).WithMeta(meta),
 			CountFlagEnabled,
 		)
@@ -410,7 +408,7 @@ func TestBPTree_Update(t *testing.T) {
 	meta = NewMetaData().WithFlag(DataSetFlag)
 	err = tree.Insert(
 		key,
-		NewEntry().WithKey(key),
+		nil,
 		NewHint().WithKey(key).WithMeta(meta),
 		CountFlagEnabled,
 	)

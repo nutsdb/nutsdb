@@ -30,7 +30,6 @@ import (
 	"sync"
 
 	"github.com/gofrs/flock"
-	"github.com/nutsdb/nutsdb/ds/zset"
 	"github.com/xujiajun/utils/filesystem"
 	"github.com/xujiajun/utils/strconv2"
 )
@@ -41,9 +40,6 @@ var (
 
 	// ErrBucket is returned when bucket is not in the HintIdx.
 	ErrBucket = errors.New("err bucket")
-
-	// ErrEntryIdxModeOpt is returned when set db EntryIdxMode option is wrong.
-	ErrEntryIdxModeOpt = errors.New("err EntryIdxMode option set")
 
 	// ErrFn is returned when fn is nil.
 	ErrFn = errors.New("err fn")
@@ -420,8 +416,8 @@ func (db *DB) getValueByRecord(r *Record) ([]byte, error) {
 		return nil, errors.New("the record is nil")
 	}
 
-	if r.E != nil {
-		return r.E.Value, nil
+	if r.V != nil {
+		return r.V, nil
 	}
 
 	e, err := db.getEntryByHint(r.H)
@@ -616,34 +612,6 @@ func (db *DB) getMaxFileIDAndFileIDs() (maxFileID int64, dataFileIds []int) {
 	return
 }
 
-// getActiveFileWriteOff returns the write-offset of activeFile.
-func (db *DB) getActiveFileWriteOff() (off int64, err error) {
-	off = 0
-	for {
-		if item, err := db.ActiveFile.ReadAt(int(off)); err == nil {
-			if item == nil {
-				break
-			}
-
-			off += item.Size()
-			// set ActiveFileActualSize
-			db.ActiveFile.ActualSize = off
-
-		} else {
-			if err == io.EOF {
-				break
-			}
-			if errors.Is(err, ErrIndexOutOfBound) {
-				break
-			}
-
-			return -1, fmt.Errorf("when build activeDataIndex readAt err: %s", err)
-		}
-	}
-
-	return
-}
-
 func (db *DB) parseDataFiles(dataFileIds []int) (err error) {
 	var (
 		off      int64
@@ -666,33 +634,30 @@ func (db *DB) parseDataFiles(dataFileIds []int) (err error) {
 			}
 
 			h := NewHint().WithKey(entry.Key).WithFileId(fID).WithMeta(entry.Meta).WithDataPos(uint64(off))
-			r := NewRecord().WithHint(h).WithEntry(entry).WithBucket(entry.GetBucketString())
+			r := NewRecord().WithBucket(entry.GetBucketString()).WithValue(entry.Value).WithHint(h)
 
 			if db.opt.EntryIdxMode == HintBPTSparseIdxMode {
 				db.BPTreeKeyEntryPosMap[string(getNewKey(string(entry.Bucket), entry.Key))] = off
 			}
 
-			bucket := r.Bucket
-
 			if r.H.Meta.Ds == DataStructureTree {
-				if db.opt.EntryIdxMode == HintKeyAndRAMIdxMode {
-					r.E = nil
-				}
-
 				r.H.Meta.Status = Committed
+
+				// only if in HintKeyValAndRAMIdxMode, set the value of record
+				db.resetRecordByMode(r)
 
 				if db.opt.EntryIdxMode == HintBPTSparseIdxMode {
 					if err = db.buildActiveBPTreeIdx(r); err != nil {
 						return err
 					}
 				} else {
-					db.buildBTreeIdx(bucket, r)
+					db.buildBTreeIdx(r)
 				}
 			} else {
 				if r.H.Meta.Ds == DataStructureNone {
-					db.buildNotDSIdxes(bucket, r)
+					db.buildNotDSIdxes(r)
 				} else {
-					if err = db.buildOtherIdxes(bucket, r); err != nil {
+					if err = db.buildOtherIdxes(r); err != nil {
 						return err
 					}
 				}
@@ -748,8 +713,13 @@ func (db *DB) parseDataFiles(dataFileIds []int) (err error) {
 			}
 
 			off += entry.Size()
-
 		}
+
+		if fID == db.MaxFileID {
+			db.ActiveFile.ActualSize = off
+			db.ActiveFile.writeOff = off
+		}
+
 		return nil
 	}
 
@@ -799,10 +769,11 @@ func (db *DB) buildBPTreeRootIdxes(dataFileIds []int) error {
 
 		for {
 			bs, err := ReadBPTreeRootIdxAt(fd, off)
-			if err == io.EOF || err == nil && bs == nil {
-				break
-			}
+
 			if err != nil {
+				if err == io.EOF || err == nil && bs == nil {
+					break
+				}
 				return err
 			}
 
@@ -819,27 +790,27 @@ func (db *DB) buildBPTreeRootIdxes(dataFileIds []int) error {
 	return nil
 }
 
-func (db *DB) buildBTreeIdx(bucket string, r *Record) {
+func (db *DB) buildBTreeIdx(r *Record) {
 	if r.IsExpired() {
 		return
 	}
+
+	bucket, key := r.Bucket, r.H.Key
 
 	if _, ok := db.BTreeIdx[bucket]; !ok {
 		db.BTreeIdx[bucket] = NewBTree()
 	}
 
-	key := r.H.Key
-
 	if r.H.Meta.Flag == DataDeleteFlag {
 		db.BTreeIdx[bucket].Delete(key)
 	} else {
-		db.BTreeIdx[bucket].Insert(key, r.E, r.H)
+		db.BTreeIdx[bucket].Insert(key, r.V, r.H)
 	}
 }
 
 func (db *DB) buildActiveBPTreeIdx(r *Record) error {
 	newKey := getNewKey(r.Bucket, r.H.Key)
-	if err := db.ActiveBPTreeIdx.Insert(newKey, r.E, r.H, CountFlagEnabled); err != nil {
+	if err := db.ActiveBPTreeIdx.Insert(newKey, r.V, r.H, CountFlagEnabled); err != nil {
 		return fmt.Errorf("when build BPTreeIdx insert index err: %s", err)
 	}
 
@@ -879,36 +850,36 @@ func (db *DB) buildBucketMetaIdx() error {
 	return nil
 }
 
-func (db *DB) buildOtherIdxes(bucket string, r *Record) error {
-	if r.H.Meta.Ds == DataStructureSet {
-		if err := db.buildSetIdx(bucket, r); err != nil {
+func (db *DB) buildOtherIdxes(r *Record) error {
+	switch r.H.Meta.Ds {
+	case DataStructureList:
+		if err := db.buildListIdx(r); err != nil {
 			return err
 		}
-	} else if r.H.Meta.Ds == DataStructureSortedSet {
-		if err := db.buildSortedSetIdx(bucket, r); err != nil {
+	case DataStructureSet:
+		if err := db.buildSetIdx(r); err != nil {
 			return err
 		}
-	} else if r.H.Meta.Ds == DataStructureList {
-		if err := db.buildListIdx(bucket, r); err != nil {
+	case DataStructureSortedSet:
+		if err := db.buildSortedSetIdx(r); err != nil {
 			return err
 		}
 	}
-
 	return nil
 }
 
-func (db *DB) buildNotDSIdxes(bucket string, r *Record) {
+func (db *DB) buildNotDSIdxes(r *Record) {
 	if r.H.Meta.Flag == DataSetBucketDeleteFlag {
-		db.deleteBucket(DataStructureSet, bucket)
+		db.deleteBucket(DataStructureSet, r.Bucket)
 	}
 	if r.H.Meta.Flag == DataSortedSetBucketDeleteFlag {
-		db.deleteBucket(DataStructureSortedSet, bucket)
+		db.deleteBucket(DataStructureSortedSet, r.Bucket)
 	}
 	if r.H.Meta.Flag == DataBPTreeBucketDeleteFlag {
-		db.deleteBucket(DataStructureTree, bucket)
+		db.deleteBucket(DataStructureTree, r.Bucket)
 	}
 	if r.H.Meta.Flag == DataListBucketDeleteFlag {
-		db.deleteBucket(DataStructureList, bucket)
+		db.deleteBucket(DataStructureList, r.Bucket)
 	}
 }
 
@@ -928,13 +899,13 @@ func (db *DB) deleteBucket(ds uint16, bucket string) {
 }
 
 // buildSetIdx builds set index when opening the DB.
-func (db *DB) buildSetIdx(bucket string, r *Record) error {
+func (db *DB) buildSetIdx(r *Record) error {
+	bucket, key, val, meta := r.Bucket, r.H.Key, r.V, r.H.Meta
+	db.resetRecordByMode(r)
+
 	if _, ok := db.SetIdx[bucket]; !ok {
 		db.SetIdx[bucket] = NewSet()
 	}
-
-	key, val, meta := r.E.Key, r.E.Value, r.E.Meta
-	db.resetRecordByMode(r)
 
 	if meta.Flag == DataSetFlag {
 		if err := db.SetIdx[bucket].SAdd(string(key), [][]byte{val}, []*Record{r}); err != nil {
@@ -952,45 +923,47 @@ func (db *DB) buildSetIdx(bucket string, r *Record) error {
 }
 
 // buildSortedSetIdx builds sorted set index when opening the DB.
-func (db *DB) buildSortedSetIdx(bucket string, r *Record) error {
-	if _, ok := db.SortedSetIdx[bucket]; !ok {
-		db.SortedSetIdx[bucket] = zset.New()
-	}
+func (db *DB) buildSortedSetIdx(r *Record) error {
+	bucket, key, val, meta := r.Bucket, r.H.Key, r.V, r.H.Meta
+	db.resetRecordByMode(r)
 
-	key, val, meta := r.E.Key, r.E.Value, r.E.Meta
+	if _, ok := db.SortedSetIdx[bucket]; !ok {
+		db.SortedSetIdx[bucket] = NewSortedSet(db)
+	}
 
 	if meta.Flag == DataZAddFlag {
 		keyAndScore := strings.Split(string(key), SeparatorForZSetKey)
 		if len(keyAndScore) == 2 {
 			key := keyAndScore[0]
 			score, _ := strconv2.StrToFloat64(keyAndScore[1])
-			_ = db.SortedSetIdx[bucket].Put(key, zset.SCORE(score), val)
+			_ = db.SortedSetIdx[bucket].ZAdd(key, SCORE(score), val, r)
 		}
 	}
 	if meta.Flag == DataZRemFlag {
-		_ = db.SortedSetIdx[bucket].Remove(string(key))
+		_, _ = db.SortedSetIdx[bucket].ZRem(string(key), val)
 	}
 	if meta.Flag == DataZRemRangeByRankFlag {
-		start, _ := strconv2.StrToInt(string(key))
-		end, _ := strconv2.StrToInt(string(val))
-		_ = db.SortedSetIdx[bucket].GetByRankRange(start, end, true)
+		startAndEnd := strings.Split(string(val), SeparatorForZSetKey)
+		start, _ := strconv2.StrToInt(startAndEnd[0])
+		end, _ := strconv2.StrToInt(startAndEnd[1])
+		_ = db.SortedSetIdx[bucket].ZRemRangeByRank(string(key), start, end)
 	}
 	if meta.Flag == DataZPopMaxFlag {
-		_ = db.SortedSetIdx[bucket].PopMax()
+		_, _, _ = db.SortedSetIdx[bucket].ZPopMax(string(key))
 	}
 	if meta.Flag == DataZPopMinFlag {
-		_ = db.SortedSetIdx[bucket].PopMin()
+		_, _, _ = db.SortedSetIdx[bucket].ZPopMin(string(key))
 	}
 
 	return nil
 }
 
 // buildListIdx builds List index when opening the DB.
-func (db *DB) buildListIdx(bucket string, r *Record) error {
-	l := db.Index.getList(bucket)
-
-	key, val, meta := r.E.Key, r.E.Value, r.E.Meta
+func (db *DB) buildListIdx(r *Record) error {
+	bucket, key, val, meta := r.Bucket, r.H.Key, r.V, r.H.Meta
 	db.resetRecordByMode(r)
+
+	l := db.Index.getList(bucket)
 
 	if IsExpired(meta.TTL, meta.Timestamp) {
 		return nil
@@ -1085,10 +1058,6 @@ func (db *DB) buildIndexes() (err error) {
 		return
 	}
 
-	if db.ActiveFile.writeOff, err = db.getActiveFileWriteOff(); err != nil {
-		return
-	}
-
 	if err = db.buildBucketMetaIdx(); err != nil {
 		return
 	}
@@ -1097,25 +1066,9 @@ func (db *DB) buildIndexes() (err error) {
 	return db.parseDataFiles(dataFileIds)
 }
 
-func (db *DB) buildRecordByEntryAndOffset(entry *Entry, offset int64) *Record {
-	var (
-		h *Hint
-		e *Entry
-	)
-	if db.opt.EntryIdxMode == HintKeyAndRAMIdxMode {
-		h = NewHint().WithFileId(db.ActiveFile.fileID).WithKey(entry.Key).WithMeta(entry.Meta).WithDataPos(uint64(offset))
-	} else {
-		e = entry
-	}
-
-	return NewRecord().WithBucket(string(entry.Bucket)).WithEntry(e).WithHint(h)
-}
-
 func (db *DB) resetRecordByMode(record *Record) {
-	if db.opt.EntryIdxMode == HintKeyValAndRAMIdxMode {
-		record.H = nil
-	} else {
-		record.E = nil
+	if db.opt.EntryIdxMode != HintKeyValAndRAMIdxMode {
+		record.V = nil
 	}
 }
 
@@ -1127,11 +1080,11 @@ func (db *DB) managed(writable bool, fn func(tx *Tx) error) (err error) {
 	if err != nil {
 		return err
 	}
-	//defer func() {
-	//	if r := recover(); r != nil {
-	//		err = fmt.Errorf("panic when executing tx, err is %+v", r)
-	//	}
-	//}()
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic when executing tx, err is %+v", r)
+		}
+	}()
 
 	if err = fn(tx); err == nil {
 		err = tx.Commit()

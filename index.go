@@ -1,9 +1,5 @@
 package nutsdb
 
-import (
-	"github.com/nutsdb/nutsdb/ds/zset"
-)
-
 // BPTreeIdx represents the B+ tree index
 type BPTreeIdx map[string]*BPTree
 
@@ -14,7 +10,7 @@ type BTreeIdx map[string]*BTree
 type SetIdx map[string]*Set
 
 // SortedSetIdx represents the sorted set index
-type SortedSetIdx map[string]*zset.SortedSet
+type SortedSetIdx map[string]*SortedSet
 
 // ListIdx represents the list index
 type ListIdx map[string]*List

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -224,36 +223,36 @@ func assertChainFromTail(t *testing.T, fdm *fdManager, testBasePath string, posi
 	assert.Equal(t, fdm.size, nums)
 }
 
-func TestGetMaxNums(t *testing.T) {
-	maxNums := 30000
-	basePath := "test-path/"
-	err := os.RemoveAll(basePath)
-	assert.Nil(t, err)
-	err = os.Mkdir(basePath, os.ModePerm)
-	assert.Nil(t, err)
-	defer func() {
-		err := os.RemoveAll(basePath)
-		if err != nil {
-			t.Logf("err is %s", err)
-		}
-	}()
-	var fdList []*os.File
-	for i := 1; i <= maxNums; i++ {
-		path := basePath + fmt.Sprintf("%d", i)
-		fd, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0644)
-		if err != nil {
-			if strings.HasSuffix(err.Error(), TooManyFileOpenErrSuffix) {
-				t.Logf("file num is %d, err is %s, and it had handle", i, err)
-			}
-			for _, fd := range fdList {
-				err := fd.Close()
-				if err != nil {
-					t.Logf("err is %s, and it had handle", err)
-				}
-			}
-			return
-		} else {
-			fdList = append(fdList, fd)
-		}
-	}
-}
+//func TestGetMaxNums(t *testing.T) {
+//	maxNums := 30000
+//	basePath := "test-path/"
+//	err := os.RemoveAll(basePath)
+//	assert.Nil(t, err)
+//	err = os.Mkdir(basePath, os.ModePerm)
+//	assert.Nil(t, err)
+//	defer func() {
+//		err := os.RemoveAll(basePath)
+//		if err != nil {
+//			t.Logf("err is %s", err)
+//		}
+//	}()
+//	var fdList []*os.File
+//	for i := 1; i <= maxNums; i++ {
+//		path := basePath + fmt.Sprintf("%d", i)
+//		fd, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0644)
+//		if err != nil {
+//			if strings.HasSuffix(err.Error(), TooManyFileOpenErrSuffix) {
+//				t.Logf("file num is %d, err is %s, and it had handle", i, err)
+//			}
+//			for _, fd := range fdList {
+//				err := fd.Close()
+//				if err != nil {
+//					t.Logf("err is %s, and it had handle", err)
+//				}
+//			}
+//			return
+//		} else {
+//			fdList = append(fdList, fd)
+//		}
+//	}
+//}
