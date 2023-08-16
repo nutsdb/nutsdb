@@ -188,17 +188,15 @@ func (tx *Tx) GetAll(bucket string) (entries Entries, err error) {
 		return tx.getAllByHintBPTSparseIdx(bucket)
 	}
 
-	if idxMode == HintKeyValAndRAMIdxMode || idxMode == HintKeyAndRAMIdxMode {
-		if index, ok := tx.db.BTreeIdx[bucket]; ok {
-			records := index.All()
-			if len(records) == 0 {
-				return nil, ErrBucketEmpty
-			}
+	if index, ok := tx.db.BTreeIdx[bucket]; ok {
+		records := index.All()
+		if len(records) == 0 {
+			return nil, ErrBucketEmpty
+		}
 
-			entries, err = tx.getHintIdxDataItemsWrapper(records, ScanNoLimit, entries, RangeScan)
-			if err != nil {
-				return nil, ErrBucketEmpty
-			}
+		entries, err = tx.getHintIdxDataItemsWrapper(records, ScanNoLimit, entries, RangeScan)
+		if err != nil {
+			return nil, ErrBucketEmpty
 		}
 	}
 

@@ -629,6 +629,7 @@ func TestDB_ChangeMode_RestartDB(t *testing.T) {
 	changeModeRestart := func(firstMode EntryIdxMode, secondMode EntryIdxMode) {
 		opts := DefaultOptions
 		opts.EntryIdxMode = firstMode
+		var err error
 
 		runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
 			bucket := "bucket"
@@ -642,6 +643,11 @@ func TestDB_ChangeMode_RestartDB(t *testing.T) {
 			for i := 0; i < 10; i++ {
 				txPush(t, db, bucket, GetTestBytes(0), GetTestBytes(i), nil, true)
 			}
+
+			err = db.Update(func(tx *Tx) error {
+				return tx.LRem(bucket, GetTestBytes(0), 1, GetTestBytes(5))
+			})
+			require.NoError(t, err)
 
 			for i := 0; i < 2; i++ {
 				txPop(t, db, bucket, GetTestBytes(0), GetTestBytes(9-i), nil, true)
@@ -671,7 +677,6 @@ func TestDB_ChangeMode_RestartDB(t *testing.T) {
 
 			require.NoError(t, db.Close())
 
-			var err error
 			opts.EntryIdxMode = secondMode
 			db, err = Open(opts)
 			require.NoError(t, err)
@@ -683,7 +688,17 @@ func TestDB_ChangeMode_RestartDB(t *testing.T) {
 
 			// list
 			txPop(t, db, bucket, GetTestBytes(0), GetTestBytes(7), nil, true)
+			txPop(t, db, bucket, GetTestBytes(0), GetTestBytes(6), nil, true)
+			txPop(t, db, bucket, GetTestBytes(0), GetTestBytes(4), nil, true)
 			txPop(t, db, bucket, GetTestBytes(0), GetTestBytes(2), nil, false)
+
+			err = db.View(func(tx *Tx) error {
+				size, err := tx.LSize(bucket, GetTestBytes(0))
+				require.NoError(t, err)
+				require.Equal(t, 1, size)
+				return nil
+			})
+			require.NoError(t, err)
 
 			// set
 			for i := 0; i < 3; i++ {

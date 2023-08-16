@@ -645,13 +645,14 @@ func (db *DB) parseDataFiles(dataFileIds []int) (err error) {
 			if r.H.Meta.Ds == DataStructureTree {
 				r.H.Meta.Status = Committed
 
+				// only if in HintKeyValAndRAMIdxMode, set the value of record
+				db.resetRecordByMode(r)
+
 				if db.opt.EntryIdxMode == HintBPTSparseIdxMode {
 					if err = db.buildActiveBPTreeIdx(r); err != nil {
 						return err
 					}
 				} else {
-					// only if in HintKeyValAndRAMIdxMode, set the value of record
-					db.resetRecordByMode(r)
 					db.buildBTreeIdx(bucket, r)
 				}
 			} else {
@@ -937,9 +938,7 @@ func (db *DB) buildSortedSetIdx(bucket string, r *Record) error {
 		if len(keyAndScore) == 2 {
 			key := keyAndScore[0]
 			score, _ := strconv2.StrToFloat64(keyAndScore[1])
-			value := val
-			db.resetRecordByMode(r)
-			_ = db.SortedSetIdx[bucket].ZAdd(key, SCORE(score), value, r)
+			_ = db.SortedSetIdx[bucket].ZAdd(key, SCORE(score), val, r)
 		}
 	}
 	if meta.Flag == DataZRemFlag {
