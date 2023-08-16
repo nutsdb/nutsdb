@@ -660,7 +660,7 @@ func TestTx_RangeScan_NotFound(t *testing.T) {
 func TestTx_Get_SCan_For_BPTSparseIdxMode(t *testing.T) {
 	bucket := "bucket_get_test3"
 
-	withBPTSpareeIdxDB(t, func(t *testing.T, db *DB) {
+	withBPTSparseIdxDB(t, func(t *testing.T, db *DB) {
 		tx, err := db.Begin(true)
 		require.NoError(t, err)
 
@@ -691,7 +691,7 @@ func TestTx_Get_SCan_For_BPTSparseIdxMode(t *testing.T) {
 func TestTx_SCan_For_BPTSparseIdxMode(t *testing.T) {
 	bucket := "bucket_get_test4"
 
-	withBPTSpareeIdxDB(t, func(t *testing.T, db *DB) {
+	withBPTSparseIdxDB(t, func(t *testing.T, db *DB) {
 		{ // set up the data
 			tx, err := db.Begin(true)
 			assert.NoError(t, err)
@@ -754,7 +754,7 @@ func TestTx_SCan_For_BPTSparseIdxMode(t *testing.T) {
 func TestTx_Notfound_For_BPTSparseIdxMode(t *testing.T) {
 	bucket := "bucket_get_test3"
 
-	withBPTSpareeIdxDB(t, func(t *testing.T, db *DB) {
+	withBPTSparseIdxDB(t, func(t *testing.T, db *DB) {
 		{ // get not found
 			tx, err := db.Begin(false)
 			require.NoError(t, err)

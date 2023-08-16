@@ -19,7 +19,7 @@ import "time"
 // Record records entry and hint.
 type Record struct {
 	H      *Hint
-	E      *Entry
+	V      []byte
 	Bucket string
 }
 
@@ -39,8 +39,8 @@ func IsExpired(ttl uint32, timestamp uint64) bool {
 }
 
 // UpdateRecord updates the record.
-func (r *Record) UpdateRecord(h *Hint, e *Entry) error {
-	r.E = e
+func (r *Record) UpdateRecord(h *Hint, v []byte) error {
+	r.V = v
 	r.H = h
 
 	return nil
@@ -57,9 +57,9 @@ func (r *Record) WithHint(hint *Hint) *Record {
 	return r
 }
 
-// WithEntry set the Entry to Record
-func (r *Record) WithEntry(e *Entry) *Record {
-	r.E = e
+// WithValue set the Value to Record
+func (r *Record) WithValue(v []byte) *Record {
+	r.V = v
 	return r
 }
 

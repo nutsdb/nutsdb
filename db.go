@@ -416,8 +416,8 @@ func (db *DB) getValueByRecord(r *Record) ([]byte, error) {
 		return nil, errors.New("the record is nil")
 	}
 
-	if r.E != nil {
-		return r.E.Value, nil
+	if r.V != nil {
+		return r.V, nil
 	}
 
 	e, err := db.getEntryByHint(r.H)
@@ -634,7 +634,7 @@ func (db *DB) parseDataFiles(dataFileIds []int) (err error) {
 			}
 
 			h := NewHint().WithKey(entry.Key).WithFileId(fID).WithMeta(entry.Meta).WithDataPos(uint64(off))
-			r := NewRecord().WithHint(h).WithEntry(entry).WithBucket(entry.GetBucketString())
+			r := NewRecord().WithBucket(entry.GetBucketString()).WithValue(entry.Value).WithHint(h)
 
 			if db.opt.EntryIdxMode == HintBPTSparseIdxMode {
 				db.BPTreeKeyEntryPosMap[string(getNewKey(string(entry.Bucket), entry.Key))] = off
@@ -643,10 +643,6 @@ func (db *DB) parseDataFiles(dataFileIds []int) (err error) {
 			bucket := r.Bucket
 
 			if r.H.Meta.Ds == DataStructureTree {
-				if db.opt.EntryIdxMode == HintKeyAndRAMIdxMode {
-					r.E = nil
-				}
-
 				r.H.Meta.Status = Committed
 
 				if db.opt.EntryIdxMode == HintBPTSparseIdxMode {
@@ -654,6 +650,8 @@ func (db *DB) parseDataFiles(dataFileIds []int) (err error) {
 						return err
 					}
 				} else {
+					// only if in HintKeyValAndRAMIdxMode, set the value of record
+					db.resetRecordByMode(r)
 					db.buildBTreeIdx(bucket, r)
 				}
 			} else {
@@ -807,13 +805,13 @@ func (db *DB) buildBTreeIdx(bucket string, r *Record) {
 	if r.H.Meta.Flag == DataDeleteFlag {
 		db.BTreeIdx[bucket].Delete(key)
 	} else {
-		db.BTreeIdx[bucket].Insert(key, r.E, r.H)
+		db.BTreeIdx[bucket].Insert(key, r.V, r.H)
 	}
 }
 
 func (db *DB) buildActiveBPTreeIdx(r *Record) error {
 	newKey := getNewKey(r.Bucket, r.H.Key)
-	if err := db.ActiveBPTreeIdx.Insert(newKey, r.E, r.H, CountFlagEnabled); err != nil {
+	if err := db.ActiveBPTreeIdx.Insert(newKey, r.V, r.H, CountFlagEnabled); err != nil {
 		return fmt.Errorf("when build BPTreeIdx insert index err: %s", err)
 	}
 
@@ -907,7 +905,7 @@ func (db *DB) buildSetIdx(bucket string, r *Record) error {
 		db.SetIdx[bucket] = NewSet()
 	}
 
-	key, val, meta := r.E.Key, r.E.Value, r.E.Meta
+	key, val, meta := r.H.Key, r.V, r.H.Meta
 	db.resetRecordByMode(r)
 
 	if meta.Flag == DataSetFlag {
@@ -931,7 +929,7 @@ func (db *DB) buildSortedSetIdx(bucket string, r *Record) error {
 		db.SortedSetIdx[bucket] = NewSortedSet(db)
 	}
 
-	key, val, meta := r.E.Key, r.E.Value, r.E.Meta
+	key, val, meta := r.H.Key, r.V, r.H.Meta
 	db.resetRecordByMode(r)
 
 	if meta.Flag == DataZAddFlag {
@@ -967,7 +965,7 @@ func (db *DB) buildSortedSetIdx(bucket string, r *Record) error {
 func (db *DB) buildListIdx(bucket string, r *Record) error {
 	l := db.Index.getList(bucket)
 
-	key, val, meta := r.E.Key, r.E.Value, r.E.Meta
+	key, val, meta := r.H.Key, r.V, r.H.Meta
 	db.resetRecordByMode(r)
 
 	if IsExpired(meta.TTL, meta.Timestamp) {
@@ -1071,25 +1069,18 @@ func (db *DB) buildIndexes() (err error) {
 	return db.parseDataFiles(dataFileIds)
 }
 
-func (db *DB) buildRecordByEntryAndOffset(entry *Entry, offset int64) *Record {
-	var (
-		h *Hint
-		e *Entry
-	)
-	if db.opt.EntryIdxMode == HintKeyAndRAMIdxMode {
-		h = NewHint().WithFileId(db.ActiveFile.fileID).WithKey(entry.Key).WithMeta(entry.Meta).WithDataPos(uint64(offset))
-	} else {
-		e = entry
-	}
+func (db *DB) buildRecord(entry *Entry, hint *Hint) *Record {
+	r := NewRecord().WithBucket(string(entry.Bucket)).WithHint(hint)
 
-	return NewRecord().WithBucket(string(entry.Bucket)).WithEntry(e).WithHint(h)
+	if db.opt.EntryIdxMode == HintKeyValAndRAMIdxMode {
+		r.WithValue(entry.Value)
+	}
+	return r
 }
 
 func (db *DB) resetRecordByMode(record *Record) {
-	if db.opt.EntryIdxMode == HintKeyValAndRAMIdxMode {
-		record.H = nil
-	} else {
-		record.E = nil
+	if db.opt.EntryIdxMode != HintKeyValAndRAMIdxMode {
+		record.V = nil
 	}
 }
 

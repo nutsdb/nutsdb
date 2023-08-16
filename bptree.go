@@ -454,7 +454,7 @@ func (t *BPTree) FindRange(start, end []byte, f func(key []byte, pointer interfa
 				break
 			}
 			if f != nil {
-				if !f(n.pointers[i].(*Record).E.Key, n.pointers[i]) {
+				if !f(n.pointers[i].(*Record).H.Key, n.pointers[i]) {
 					break
 				}
 			} else {
@@ -682,7 +682,7 @@ func (t *BPTree) checkAndSetLastKey(key []byte, h *Hint) {
 
 // Insert inserts record to the b+ tree,
 // and if the key exists, update the record and the counter(if countFlag set true,it will start count).
-func (t *BPTree) Insert(key []byte, e *Entry, h *Hint, countFlag bool) error {
+func (t *BPTree) Insert(key []byte, v []byte, h *Hint, countFlag bool) error {
 	t.checkAndSetFirstKey(key, h)
 
 	t.checkAndSetLastKey(key, h)
@@ -696,11 +696,11 @@ func (t *BPTree) Insert(key []byte, e *Entry, h *Hint, countFlag bool) error {
 			t.ValidKeyCount++
 		}
 
-		return r.UpdateRecord(h, e)
+		return r.UpdateRecord(h, v)
 	}
 
 	// Initialize the Record object When key does not exist.
-	pointer := NewRecord().WithEntry(e).WithHint(h)
+	pointer := NewRecord().WithValue(v).WithHint(h)
 
 	// Update the validKeyCount number
 	t.ValidKeyCount++
