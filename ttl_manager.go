@@ -46,6 +46,15 @@ func (tm *ttlManager) run() {
 	tm.t.Run()
 }
 
+func (tm *ttlManager) exist(bucket, key string) bool {
+	if nodes, ok := tm.timerNodes[bucket]; ok {
+		if _, ok := nodes[key]; ok {
+			return true
+		}
+	}
+	return false
+}
+
 func (tm *ttlManager) add(bucket, key string, expire time.Duration, callback func()) {
 	nodes, ok := tm.timerNodes[bucket]
 

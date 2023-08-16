@@ -28,6 +28,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/gofrs/flock"
 	"github.com/xujiajun/utils/filesystem"
@@ -800,15 +801,35 @@ func (db *DB) buildBTreeIdx(r *Record) {
 		return
 	}
 
-	bucket, key := r.Bucket, r.H.Key
+	bucket, key, meta := r.Bucket, r.H.Key, r.H.Meta
 
 	if _, ok := db.BTreeIdx[bucket]; !ok {
 		db.BTreeIdx[bucket] = NewBTree()
 	}
 
-	if r.H.Meta.Flag == DataDeleteFlag {
+	if meta.Flag == DataDeleteFlag {
+		db.tm.del(bucket, string(key))
 		db.BTreeIdx[bucket].Delete(key)
 	} else {
+		if meta.TTL != Persistent {
+			expireTime := time.Unix(int64(meta.Timestamp)+int64(meta.TTL), 0)
+			expire := expireTime.Sub(time.Now())
+
+			db.tm.add(bucket, string(key), expire, func() {
+				err := db.Update(func(tx *Tx) error {
+					if tx.db.tm.exist(bucket, string(key)) {
+						return tx.Delete(bucket, key)
+					}
+					return nil
+				})
+				if err != nil {
+					log.Printf("occur error when expired deletion, error: %v", err.Error())
+				}
+			})
+		} else {
+			db.tm.del(bucket, string(key))
+		}
+
 		db.BTreeIdx[bucket].Insert(key, r.V, r.H)
 	}
 }

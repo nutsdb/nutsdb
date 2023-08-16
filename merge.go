@@ -217,11 +217,12 @@ func (db *DB) mergeWorker() {
 
 func (db *DB) isPendingMergeEntry(entry *Entry) bool {
 	if entry.Meta.Ds == DataStructureTree {
-		bptIdx, exist := db.BTreeIdx[string(entry.Bucket)]
+		idx, exist := db.BTreeIdx[string(entry.Bucket)]
 		if exist {
-			r, ok := bptIdx.Find(entry.Key)
+			r, ok := idx.Find(entry.Key)
 			if ok && r.H.Meta.Flag == DataSetFlag {
 				if r.IsExpired() {
+					db.tm.del(string(entry.Bucket), string(entry.Key))
 					db.BTreeIdx[string(entry.Bucket)].Delete(entry.Key)
 					return false
 				}
