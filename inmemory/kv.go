@@ -35,7 +35,7 @@ func (db *DB) Get(bucket string, key []byte) (*nutsdb.Entry, error) {
 				return nutsdb.ErrNotFoundKey
 			}
 
-			entry = r.E
+			entry = nutsdb.NewEntry().WithBucket([]byte(bucket)).WithKey(key).WithValue(r.V).WithMeta(r.H.Meta)
 		} else if !ok {
 			return nutsdb.ErrBucket
 		}
@@ -74,8 +74,8 @@ func (db *DB) Range(bucket string, start, end []byte, f func(key, value []byte) 
 		if index, ok := shardDB.BPTreeIdx[bucket]; ok {
 			index.FindRange(start, end, func(key []byte, pointer interface{}) bool {
 				record := pointer.(*nutsdb.Record)
-				if record.E.Meta.Flag != nutsdb.DataDeleteFlag && !record.IsExpired() {
-					return f(key, record.E.Value)
+				if record.H.Meta.Flag != nutsdb.DataDeleteFlag && !record.IsExpired() {
+					return f(key, record.V)
 				}
 				return true
 			})
@@ -91,7 +91,7 @@ func (db *DB) AllKeys(bucket string) (keys [][]byte, err error) {
 		if index, ok := shardDB.BPTreeIdx[bucket]; ok {
 			index.FindRange(index.FirstKey, index.LastKey, func(key []byte, pointer interface{}) bool {
 				record := pointer.(*nutsdb.Record)
-				if record.E.Meta.Flag != nutsdb.DataDeleteFlag && !record.IsExpired() {
+				if record.H.Meta.Flag != nutsdb.DataDeleteFlag && !record.IsExpired() {
 					keys = append(keys, key)
 				}
 				return true
@@ -113,10 +113,10 @@ func (db *DB) PrefixScan(bucket string, prefix []byte, offsetNum int, limitNum i
 				return nutsdb.ErrPrefixScan
 			}
 			for _, r := range records {
-				if r.E.Meta.Flag == nutsdb.DataDeleteFlag || r.IsExpired() {
+				if r.H.Meta.Flag == nutsdb.DataDeleteFlag || r.IsExpired() {
 					continue
 				}
-				es = append(es, r.E)
+				es = append(es, nutsdb.NewEntry().WithBucket([]byte(bucket)).WithKey(r.H.Key).WithValue(r.V).WithMeta(r.H.Meta))
 			}
 			return nil
 		}
@@ -138,8 +138,7 @@ func put(shardDB *ShardDB, bucket string, key, value []byte, ttl uint32, flag ui
 	bucketSize := uint32(len(bucket))
 	meta := nutsdb.NewMetaData().WithTimeStamp(timestamp).WithKeySize(keySize).WithValueSize(valueSize).WithFlag(flag).WithTTL(ttl).
 		WithBucketSize(bucketSize).WithStatus(nutsdb.Committed).WithDs(nutsdb.DataStructureTree)
-	entry := nutsdb.NewEntry().WithKey(key).WithValue(value).WithBucket([]byte(bucket)).WithMeta(meta)
 	hint := nutsdb.NewHint().WithKey(key).WithMeta(meta)
-	err = shardDB.BPTreeIdx[bucket].Insert(key, entry, hint, nutsdb.CountFlagEnabled)
+	err = shardDB.BPTreeIdx[bucket].Insert(key, value, hint, nutsdb.CountFlagEnabled)
 	return
 }
