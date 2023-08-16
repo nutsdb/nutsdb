@@ -1068,15 +1068,6 @@ func (db *DB) buildIndexes() (err error) {
 	return db.parseDataFiles(dataFileIds)
 }
 
-func (db *DB) buildRecord(entry *Entry, hint *Hint) *Record {
-	r := NewRecord().WithBucket(string(entry.Bucket)).WithHint(hint)
-
-	if db.opt.EntryIdxMode == HintKeyValAndRAMIdxMode {
-		r.WithValue(entry.Value)
-	}
-	return r
-}
-
 func (db *DB) resetRecordByMode(record *Record) {
 	if db.opt.EntryIdxMode != HintKeyValAndRAMIdxMode {
 		record.V = nil
