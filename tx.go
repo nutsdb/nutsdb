@@ -238,9 +238,6 @@ func (tx *Tx) Commit() (err error) {
 		tx.pendingWrites = nil
 		tx.ReservedStoreTxIDIdxes = nil
 	}()
-
-	var bucketMetaTemp BucketMeta
-
 	if tx.isClosed() {
 		return ErrCannotCommitAClosedTx
 	}
@@ -311,7 +308,7 @@ func (tx *Tx) Commit() (err error) {
 
 		records = append(records, record)
 	}
-	if err := tx.buildIdxes(&bucketMetaTemp, records); err != nil {
+	if err := tx.buildIdxes(records); err != nil {
 		return err
 	}
 
@@ -836,7 +833,9 @@ func (tx *Tx) isClosed() bool {
 	return status == txStatusClosed
 }
 
-func (tx *Tx) buildIdxes(bucketMetaTemp *BucketMeta, records []*Record) error {
+func (tx *Tx) buildIdxes(records []*Record) error {
+	var bucketMetaTemp BucketMeta
+
 	for _, record := range records {
 		bucket, key, meta := record.Bucket, record.H.Key, record.H.Meta
 		txID := meta.TxID
@@ -865,13 +864,13 @@ func (tx *Tx) buildIdxes(bucketMetaTemp *BucketMeta, records []*Record) error {
 		tx.db.KeyCount++
 
 		if tx.db.opt.EntryIdxMode == HintBPTSparseIdxMode {
-			*bucketMetaTemp = tx.buildTempBucketMetaIdx(bucket, key, *bucketMetaTemp)
+			bucketMetaTemp = tx.buildTempBucketMetaIdx(bucket, key, bucketMetaTemp)
 			if meta.Status == Committed {
 				if err := tx.buildTxIDRootIdx(txID, countFlag); err != nil {
 					return err
 				}
 
-				if err := tx.buildBucketMetaIdx(bucket, key, *bucketMetaTemp); err != nil {
+				if err := tx.buildBucketMetaIdx(bucket, key, bucketMetaTemp); err != nil {
 					return err
 				}
 			}
