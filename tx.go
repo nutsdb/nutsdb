@@ -837,7 +837,6 @@ func (tx *Tx) isClosed() bool {
 }
 
 func (tx *Tx) buildIdxes(bucketMetaTemp *BucketMeta, countFlag bool, record *Record) error {
-
 	bucket, key, meta := record.Bucket, record.H.Key, record.H.Meta
 	txID := meta.TxID
 
