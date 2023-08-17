@@ -508,12 +508,8 @@ func (tx *Tx) buildTreeIdx(record *Record, countFlag bool) {
 
 	if tx.db.opt.EntryIdxMode == HintBPTSparseIdxMode {
 		newKey := getNewKey(bucket, key)
-		_ = tx.db.ActiveBPTreeIdx.Insert(newKey, nil, &Hint{
-			FileID:  tx.db.ActiveFile.fileID,
-			Key:     newKey,
-			Meta:    meta,
-			DataPos: offset,
-		}, countFlag)
+		hint := NewHint().WithFileId(tx.db.ActiveFile.fileID).WithKey(newKey).WithMeta(meta).WithDataPos(offset)
+		_ = tx.db.ActiveBPTreeIdx.Insert(newKey, nil, hint, countFlag)
 	} else {
 		if _, ok := tx.db.BTreeIdx[bucket]; !ok {
 			tx.db.BTreeIdx[bucket] = NewBTree()
@@ -553,12 +549,8 @@ func (tx *Tx) buildTreeIdx(record *Record, countFlag bool) {
 				tx.db.tm.del(bucket, string(key))
 			}
 
-			tx.db.BTreeIdx[bucket].Insert(key, value, &Hint{
-				FileID:  tx.db.ActiveFile.fileID,
-				Key:     key,
-				Meta:    meta,
-				DataPos: offset,
-			})
+			hint := NewHint().WithFileId(tx.db.ActiveFile.fileID).WithKey(key).WithMeta(meta).WithDataPos(offset)
+			tx.db.BTreeIdx[bucket].Insert(key, value, hint)
 		} else if meta.Flag == DataDeleteFlag {
 			tx.db.tm.del(bucket, string(key))
 			tx.db.BTreeIdx[bucket].Delete(key)
