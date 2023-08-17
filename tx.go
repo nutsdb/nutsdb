@@ -306,14 +306,10 @@ func (tx *Tx) Commit() (err error) {
 			}
 		}
 
-		if tx.db.opt.EntryIdxMode == HintBPTSparseIdxMode {
-			bucketMetaTemp = tx.buildTempBucketMetaIdx(bucket, entry.Key, bucketMetaTemp)
-		}
-
 		hint := NewHint().WithKey(entry.Key).WithFileId(tx.db.ActiveFile.fileID).WithMeta(entry.Meta).WithDataPos(uint64(offset))
 		record := NewRecord().WithBucket(bucket).WithValue(entry.Value).WithHint(hint)
 
-		if err := tx.buildIdxes(entry, bucketMetaTemp, countFlag, record); err != nil {
+		if err := tx.buildIdxes(&bucketMetaTemp, countFlag, record); err != nil {
 			return err
 		}
 
@@ -840,12 +836,12 @@ func (tx *Tx) isClosed() bool {
 	return status == txStatusClosed
 }
 
-func (tx *Tx) buildIdxes(entry *Entry, bucketMetaTemp BucketMeta, countFlag bool, record *Record) error {
+func (tx *Tx) buildIdxes(bucketMetaTemp *BucketMeta, countFlag bool, record *Record) error {
 
-	txID := entry.Meta.TxID
-	bucket := string(entry.Bucket)
+	bucket, key, meta := record.Bucket, record.H.Key, record.H.Meta
+	txID := meta.TxID
 
-	switch entry.Meta.Ds {
+	switch meta.Ds {
 	case DataStructureTree:
 		tx.buildTreeIdx(record, countFlag)
 	case DataStructureList:
@@ -855,7 +851,7 @@ func (tx *Tx) buildIdxes(entry *Entry, bucketMetaTemp BucketMeta, countFlag bool
 	case DataStructureSortedSet:
 		tx.buildSortedSetIdx(record)
 	case DataStructureNone:
-		switch entry.Meta.Flag {
+		switch meta.Flag {
 		case DataBPTreeBucketDeleteFlag:
 			tx.db.deleteBucket(DataStructureTree, bucket)
 		case DataSetBucketDeleteFlag:
@@ -868,16 +864,17 @@ func (tx *Tx) buildIdxes(entry *Entry, bucketMetaTemp BucketMeta, countFlag bool
 	}
 	tx.db.KeyCount++
 
-	if entry.Meta.Status == Committed {
-		switch tx.db.opt.EntryIdxMode {
-		case HintKeyValAndRAMIdxMode:
-		case HintKeyAndRAMIdxMode:
-		case HintBPTSparseIdxMode:
+	switch tx.db.opt.EntryIdxMode {
+	case HintKeyValAndRAMIdxMode:
+	case HintKeyAndRAMIdxMode:
+	case HintBPTSparseIdxMode:
+		*bucketMetaTemp = tx.buildTempBucketMetaIdx(bucket, key, *bucketMetaTemp)
+		if meta.Status == Committed {
 			if err := tx.buildTxIDRootIdx(txID, countFlag); err != nil {
 				return err
 			}
 
-			if err := tx.buildBucketMetaIdx(bucket, entry.Key, bucketMetaTemp); err != nil {
+			if err := tx.buildBucketMetaIdx(bucket, key, *bucketMetaTemp); err != nil {
 				return err
 			}
 		}
