@@ -152,7 +152,7 @@ func (tx *Tx) Get(bucket string, key []byte) (e *Entry, err error) {
 		}
 
 		if r.IsExpired() {
-			tx.lazyDeletion(bucket, key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureTree)
+			tx.putDeleteLog(bucket, key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureTree)
 			return nil, ErrNotFoundKey
 		}
 
@@ -828,13 +828,7 @@ func (tx *Tx) Delete(bucket string, key []byte) error {
 	}
 
 	if idx, ok := tx.db.BTreeIdx[bucket]; ok {
-		r, found := idx.Find(key)
-		if !found {
-			return ErrNotFoundKey
-		}
-
-		if r.IsExpired() {
-			tx.lazyDeletion(bucket, key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureTree)
+		if _, found := idx.Find(key); !found {
 			return ErrNotFoundKey
 		}
 	} else {
@@ -848,7 +842,7 @@ func (tx *Tx) Delete(bucket string, key []byte) error {
 func (tx *Tx) getHintIdxDataItemsWrapper(records Records, limitNum int, es Entries, scanMode string) (Entries, error) {
 	for _, r := range records {
 		if r.IsExpired() {
-			tx.lazyDeletion(r.Bucket, r.H.Key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureTree)
+			tx.putDeleteLog(r.Bucket, r.H.Key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureTree)
 			continue
 		}
 		if limitNum > 0 && len(es) < limitNum || limitNum == ScanNoLimit {

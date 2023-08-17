@@ -17,6 +17,7 @@ package nutsdb
 import (
 	"bytes"
 	"errors"
+	"log"
 	"os"
 	"strings"
 	"sync/atomic"
@@ -521,6 +522,34 @@ func (tx *Tx) buildTreeIdx(record *Record, countFlag bool) {
 				value = record.V
 			}
 
+			if meta.TTL != Persistent {
+				db := tx.db
+
+				callback := func() {
+					err := db.Update(func(tx *Tx) error {
+						if db.tm.exist(bucket, string(key)) {
+							return tx.Delete(bucket, key)
+						}
+						return nil
+					})
+					if err != nil {
+						log.Printf("occur error when expired deletion, error: %v", err.Error())
+					}
+				}
+
+				now := time.UnixMilli(time.Now().UnixMilli())
+				expireTime := time.UnixMilli(int64(record.H.Meta.Timestamp))
+				expireTime = expireTime.Add(time.Duration(record.H.Meta.TTL) * time.Second)
+
+				if now.After(expireTime) {
+					return
+				}
+
+				tx.db.tm.add(bucket, string(key), expireTime.Sub(now), callback)
+			} else {
+				tx.db.tm.del(bucket, string(key))
+			}
+
 			tx.db.BTreeIdx[bucket].Insert(key, value, &Hint{
 				FileID:  tx.db.ActiveFile.fileID,
 				Key:     key,
@@ -528,6 +557,7 @@ func (tx *Tx) buildTreeIdx(record *Record, countFlag bool) {
 				DataPos: offset,
 			})
 		} else if meta.Flag == DataDeleteFlag {
+			tx.db.tm.del(bucket, string(key))
 			tx.db.BTreeIdx[bucket].Delete(key)
 		}
 	}
@@ -786,7 +816,7 @@ func (tx *Tx) PutWithTimestamp(bucket string, key, value []byte, ttl uint32, tim
 // Put sets the value for a key in the bucket.
 // a wrapper of the function put.
 func (tx *Tx) Put(bucket string, key, value []byte, ttl uint32) error {
-	return tx.put(bucket, key, value, ttl, DataSetFlag, uint64(time.Now().Unix()), DataStructureTree)
+	return tx.put(bucket, key, value, ttl, DataSetFlag, uint64(time.Now().UnixMilli()), DataStructureTree)
 }
 
 func (tx *Tx) checkTxIsClosed() error {
@@ -822,7 +852,7 @@ func (tx *Tx) put(bucket string, key, value []byte, ttl uint32, flag uint16, tim
 	return nil
 }
 
-func (tx *Tx) lazyDeletion(bucket string, key, value []byte, ttl uint32, flag uint16, timestamp uint64, ds uint16) {
+func (tx *Tx) putDeleteLog(bucket string, key, value []byte, ttl uint32, flag uint16, timestamp uint64, ds uint16) {
 	meta := NewMetaData().WithTimeStamp(timestamp).WithKeySize(uint32(len(key))).WithValueSize(uint32(len(value))).WithFlag(flag).
 		WithTTL(ttl).WithBucketSize(uint32(len(bucket))).WithStatus(UnCommitted).WithDs(ds).WithTxID(tx.id)
 
