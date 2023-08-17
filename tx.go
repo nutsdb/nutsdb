@@ -258,13 +258,12 @@ func (tx *Tx) Commit() (err error) {
 	}
 
 	lastIndex := writesLen - 1
-	countFlag := CountFlagEnabled
-	if tx.db.isMerging {
-		countFlag = CountFlagDisabled
-	}
+	countFlag := CountFlagDisabled
 
 	buff := tx.allocCommitBuffer()
 	defer tx.db.commitBuffer.Reset()
+
+	var records []*Record
 
 	for i := 0; i < writesLen; i++ {
 		entry := tx.pendingWrites[i]
@@ -309,10 +308,10 @@ func (tx *Tx) Commit() (err error) {
 		hint := NewHint().WithKey(entry.Key).WithFileId(tx.db.ActiveFile.fileID).WithMeta(entry.Meta).WithDataPos(uint64(offset))
 		record := NewRecord().WithBucket(bucket).WithValue(entry.Value).WithHint(hint)
 
-		if err := tx.buildIdxes(&bucketMetaTemp, countFlag, record); err != nil {
-			return err
-		}
-
+		records = append(records, record)
+	}
+	if err := tx.buildIdxes(&bucketMetaTemp, countFlag, records); err != nil {
+		return err
 	}
 
 	return nil
@@ -836,45 +835,45 @@ func (tx *Tx) isClosed() bool {
 	return status == txStatusClosed
 }
 
-func (tx *Tx) buildIdxes(bucketMetaTemp *BucketMeta, countFlag bool, record *Record) error {
-	bucket, key, meta := record.Bucket, record.H.Key, record.H.Meta
-	txID := meta.TxID
+func (tx *Tx) buildIdxes(bucketMetaTemp *BucketMeta, countFlag bool, records []*Record) error {
 
-	switch meta.Ds {
-	case DataStructureTree:
-		tx.buildTreeIdx(record, countFlag)
-	case DataStructureList:
-		tx.buildListIdx(record)
-	case DataStructureSet:
-		tx.buildSetIdx(record)
-	case DataStructureSortedSet:
-		tx.buildSortedSetIdx(record)
-	case DataStructureNone:
-		switch meta.Flag {
-		case DataBPTreeBucketDeleteFlag:
-			tx.db.deleteBucket(DataStructureTree, bucket)
-		case DataSetBucketDeleteFlag:
-			tx.db.deleteBucket(DataStructureSet, bucket)
-		case DataSortedSetBucketDeleteFlag:
-			tx.db.deleteBucket(DataStructureSortedSet, bucket)
-		case DataListBucketDeleteFlag:
-			tx.db.deleteBucket(DataStructureList, bucket)
-		}
-	}
-	tx.db.KeyCount++
+	for _, record := range records {
+		bucket, key, meta := record.Bucket, record.H.Key, record.H.Meta
+		txID := meta.TxID
 
-	switch tx.db.opt.EntryIdxMode {
-	case HintKeyValAndRAMIdxMode:
-	case HintKeyAndRAMIdxMode:
-	case HintBPTSparseIdxMode:
-		*bucketMetaTemp = tx.buildTempBucketMetaIdx(bucket, key, *bucketMetaTemp)
-		if meta.Status == Committed {
-			if err := tx.buildTxIDRootIdx(txID, countFlag); err != nil {
-				return err
+		switch meta.Ds {
+		case DataStructureTree:
+			tx.buildTreeIdx(record, countFlag)
+		case DataStructureList:
+			tx.buildListIdx(record)
+		case DataStructureSet:
+			tx.buildSetIdx(record)
+		case DataStructureSortedSet:
+			tx.buildSortedSetIdx(record)
+		case DataStructureNone:
+			switch meta.Flag {
+			case DataBPTreeBucketDeleteFlag:
+				tx.db.deleteBucket(DataStructureTree, bucket)
+			case DataSetBucketDeleteFlag:
+				tx.db.deleteBucket(DataStructureSet, bucket)
+			case DataSortedSetBucketDeleteFlag:
+				tx.db.deleteBucket(DataStructureSortedSet, bucket)
+			case DataListBucketDeleteFlag:
+				tx.db.deleteBucket(DataStructureList, bucket)
 			}
+		}
+		tx.db.KeyCount++
 
-			if err := tx.buildBucketMetaIdx(bucket, key, *bucketMetaTemp); err != nil {
-				return err
+		if tx.db.opt.EntryIdxMode == HintBPTSparseIdxMode {
+			*bucketMetaTemp = tx.buildTempBucketMetaIdx(bucket, key, *bucketMetaTemp)
+			if meta.Status == Committed {
+				if err := tx.buildTxIDRootIdx(txID, countFlag); err != nil {
+					return err
+				}
+
+				if err := tx.buildBucketMetaIdx(bucket, key, *bucketMetaTemp); err != nil {
+					return err
+				}
 			}
 		}
 	}
