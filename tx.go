@@ -313,7 +313,9 @@ func (tx *Tx) Commit() (err error) {
 		hint := NewHint().WithKey(entry.Key).WithFileId(tx.db.ActiveFile.fileID).WithMeta(entry.Meta).WithDataPos(uint64(offset))
 		record := NewRecord().WithBucket(bucket).WithValue(entry.Value).WithHint(hint)
 
-		tx.buildIdxes(entry, bucketMetaTemp, countFlag, record)
+		if err := tx.buildIdxes(entry, bucketMetaTemp, countFlag, record); err != nil {
+			return err
+		}
 
 	}
 
