@@ -55,7 +55,6 @@ func runNutsDBTest(t *testing.T, opts *Options, test func(t *testing.T, db *DB))
 	if opts.Dir == "" {
 		opts.Dir = NutsDBTestDirPath
 	}
-	opts.SyncEnable = false
 	defer removeDir(opts.Dir)
 	db, err := Open(*opts)
 	require.NoError(t, err)
