@@ -34,6 +34,8 @@ const (
 	txStatusCommitting = 2
 	// txStatusClosed means the tx is closed, ether committed or rollback
 	txStatusClosed = 3
+	// countFlag always CountFlagDisabled
+	countFlag = CountFlagDisabled
 )
 
 var (
@@ -258,7 +260,6 @@ func (tx *Tx) Commit() (err error) {
 	}
 
 	lastIndex := writesLen - 1
-	countFlag := CountFlagDisabled
 
 	buff := tx.allocCommitBuffer()
 	defer tx.db.commitBuffer.Reset()
@@ -310,7 +311,7 @@ func (tx *Tx) Commit() (err error) {
 
 		records = append(records, record)
 	}
-	if err := tx.buildIdxes(&bucketMetaTemp, countFlag, records); err != nil {
+	if err := tx.buildIdxes(&bucketMetaTemp, records); err != nil {
 		return err
 	}
 
@@ -835,8 +836,7 @@ func (tx *Tx) isClosed() bool {
 	return status == txStatusClosed
 }
 
-func (tx *Tx) buildIdxes(bucketMetaTemp *BucketMeta, countFlag bool, records []*Record) error {
-
+func (tx *Tx) buildIdxes(bucketMetaTemp *BucketMeta, records []*Record) error {
 	for _, record := range records {
 		bucket, key, meta := record.Bucket, record.H.Key, record.H.Meta
 		txID := meta.TxID
