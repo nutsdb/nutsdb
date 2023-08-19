@@ -627,8 +627,9 @@ func (db *DB) parseDataFiles(dataFileIds []int) (err error) {
 	)
 
 	parseDataInTx := func() error {
+		off := dataInTx.startOff
+
 		for _, entry := range dataInTx.es {
-			off := dataInTx.startOff
 
 			if entry.Meta.Status == Committed {
 				meta := NewMetaData().WithFlag(DataSetFlag)
