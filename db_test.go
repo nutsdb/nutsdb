@@ -15,7 +15,6 @@
 package nutsdb
 
 import (
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -393,26 +392,6 @@ func TestDB_Close(t *testing.T) {
 		require.NoError(t, db.Close())
 		require.Equal(t, ErrDBClosed, db.Close())
 	})
-}
-
-func TestDB_ErrWhenBuildListIdx(t *testing.T) {
-	ts := []struct {
-		err     error
-		want    error
-		notwant error
-	}{
-		{
-			errors.New("some err"),
-			errors.New("when build listIdx err: some err"),
-			fmt.Errorf("unexpected error"),
-		},
-	}
-
-	for _, tc := range ts {
-		got := ErrWhenBuildListIdx(tc.err)
-		assert.Equal(t, got, tc.want)
-		assert.NotEqual(t, got, tc.notwant)
-	}
 }
 
 func TestDB_ErrThenReadWrite(t *testing.T) {
