@@ -387,6 +387,23 @@ type dataInTx struct {
 	startOff int64
 }
 
+func (dt *dataInTx) update(e *Entry) {
+	if dt.txId == 0 {
+		dt.txId = e.Meta.TxID
+		return
+	}
+	if dt.txId == e.Meta.TxID {
+		dt.es = append(dt.es, e)
+		return
+	}
+	dt.reset()
+	dt.update(e)
+}
+
+func (dt *dataInTx) setStartOff(off int64) {
+	dt.startOff = off
+}
+
 func (dt *dataInTx) isSameTx(e *Entry) bool {
 	return dt.txId == e.Meta.TxID
 }

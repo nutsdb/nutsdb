@@ -668,13 +668,7 @@ func (db *DB) parseDataFiles(dataFileIds []int) (err error) {
 				break
 			}
 
-			if dataInTx.txId == 0 {
-				dataInTx.appendEntry(entry)
-				dataInTx.txId = entry.Meta.TxID
-				dataInTx.startOff = off
-			} else if dataInTx.isSameTx(entry) {
-				dataInTx.appendEntry(entry)
-			}
+			dataInTx.update(entry)
 
 			if entry.Meta.Status == Committed {
 				err := parseDataInTx()
@@ -682,12 +676,6 @@ func (db *DB) parseDataFiles(dataFileIds []int) (err error) {
 					return err
 				}
 				dataInTx.reset()
-				dataInTx.startOff = off
-			}
-
-			if !dataInTx.isSameTx(entry) {
-				dataInTx.reset()
-				dataInTx.startOff = off
 			}
 
 			off += entry.Size()
