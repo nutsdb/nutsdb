@@ -208,10 +208,158 @@ func txSAdd(t *testing.T, db *DB, bucket string, key, value []byte, expectErr er
 	require.NoError(t, err)
 }
 
+func txSKeys(t *testing.T, db *DB, bucket, pattern string, f func(key string) bool, expectErr error) {
+	err := db.View(func(tx *Tx) error {
+		err := tx.SKeys(bucket, pattern, f)
+		assertErr(t, err, expectErr)
+		return nil
+	})
+	require.NoError(t, err)
+}
+
 func txSIsMember(t *testing.T, db *DB, bucket string, key, value []byte, expect bool) {
 	err := db.View(func(tx *Tx) error {
 		ok, _ := tx.SIsMember(bucket, key, value)
 		require.Equal(t, expect, ok)
+		return nil
+	})
+	require.NoError(t, err)
+}
+
+func txSAreMembers(t *testing.T, db *DB, bucket string, key []byte, expect bool, value ...[]byte) {
+	err := db.View(func(tx *Tx) error {
+		ok, _ := tx.SAreMembers(bucket, key, value...)
+		require.Equal(t, expect, ok)
+		return nil
+	})
+	require.NoError(t, err)
+}
+
+func txSHasKey(t *testing.T, db *DB, bucket string, key []byte, expect bool) {
+	err := db.View(func(tx *Tx) error {
+		ok, _ := tx.SHasKey(bucket, key)
+		require.Equal(t, expect, ok)
+		return nil
+	})
+	require.NoError(t, err)
+}
+
+func txSMembers(t *testing.T, db *DB, bucket string, key []byte, expectLength int, expectErr error) {
+	err := db.View(func(tx *Tx) error {
+		members, err := tx.SMembers(bucket, key)
+		if expectErr != nil {
+			assert.ErrorIs(t, expectErr, err)
+		} else {
+			assert.NoError(t, err)
+			assert.Equal(t, expectLength, len(members))
+		}
+		return nil
+	})
+	require.NoError(t, err)
+}
+
+func txSCard(t *testing.T, db *DB, bucket string, key []byte, expectLength int, expectErr error) {
+	err := db.View(func(tx *Tx) error {
+		length, err := tx.SCard(bucket, key)
+		if expectErr != nil {
+			assert.ErrorIs(t, expectErr, err)
+		} else {
+			assert.NoError(t, err)
+			assert.Equal(t, expectLength, length)
+		}
+		return nil
+	})
+	require.NoError(t, err)
+}
+
+func txSDiffByOneBucket(t *testing.T, db *DB, bucket string, key1, key2 []byte, expectVal [][]byte, expectErr error) {
+	err := db.View(func(tx *Tx) error {
+		diff, err := tx.SDiffByOneBucket(bucket, key1, key2)
+		if expectErr != nil {
+			assert.ErrorIs(t, expectErr, err)
+		} else {
+			assert.NoError(t, err)
+			assert.ElementsMatch(t, expectVal, diff)
+		}
+		return nil
+	})
+	require.NoError(t, err)
+}
+
+func txSDiffByTwoBucket(t *testing.T, db *DB, bucket1 string, key1 []byte, bucket2 string, key2 []byte, expectVal [][]byte, expectErr error) {
+	err := db.View(func(tx *Tx) error {
+		diff, err := tx.SDiffByTwoBuckets(bucket1, key1, bucket2, key2)
+		if expectErr != nil {
+			assert.ErrorIs(t, err, expectErr)
+		} else {
+			assert.NoError(t, err)
+			assert.ElementsMatch(t, expectVal, diff)
+		}
+		return nil
+	})
+	require.NoError(t, err)
+}
+
+func txSPop(t *testing.T, db *DB, bucket string, key []byte, expectErr error) {
+	err := db.Update(func(tx *Tx) error {
+		_, err := tx.SPop(bucket, key)
+		assertErr(t, err, expectErr)
+		return nil
+	})
+	require.NoError(t, err)
+}
+
+func txSMoveByOneBucket(t *testing.T, db *DB, bucket1 string, key1, key2, val []byte, expectVal bool, expectErr error) {
+	err := db.View(func(tx *Tx) error {
+		ok, err := tx.SMoveByOneBucket(bucket1, key1, key2, val)
+		if expectErr != nil {
+			assert.ErrorIs(t, err, expectErr)
+		} else {
+			assert.NoError(t, err)
+			assert.Equal(t, expectVal, ok)
+		}
+		return nil
+	})
+	require.NoError(t, err)
+}
+
+func txSMoveByTwoBuckets(t *testing.T, db *DB, bucket1 string, key1 []byte, bucket2 string, key2 []byte, val []byte, expectVal bool, expectErr error) {
+	err := db.View(func(tx *Tx) error {
+		ok, err := tx.SMoveByTwoBuckets(bucket1, key1, bucket2, key2, val)
+		if expectErr != nil {
+			assert.ErrorIs(t, err, expectErr)
+		} else {
+			assert.NoError(t, err)
+			assert.Equal(t, expectVal, ok)
+		}
+		return nil
+	})
+	require.NoError(t, err)
+}
+
+func txSUnionByOneBucket(t *testing.T, db *DB, bucket1 string, key1, key2 []byte, expectVal [][]byte, expectErr error) {
+	err := db.View(func(tx *Tx) error {
+		union, err := tx.SUnionByOneBucket(bucket1, key1, key2)
+		if expectErr != nil {
+			assert.ErrorIs(t, err, expectErr)
+		} else {
+			assert.NoError(t, err)
+			assert.ElementsMatch(t, expectVal, union)
+		}
+		return nil
+	})
+	require.NoError(t, err)
+}
+
+func txSUnionByTwoBuckets(t *testing.T, db *DB, bucket1 string, key1 []byte, bucket2 string, key2 []byte, expectVal [][]byte, expectErr error) {
+	err := db.View(func(tx *Tx) error {
+		union, err := tx.SUnionByTwoBuckets(bucket1, key1, bucket2, key2)
+		if expectErr != nil {
+			assert.ErrorIs(t, err, expectErr)
+		} else {
+			assert.NoError(t, err)
+			assert.ElementsMatch(t, expectVal, union)
+		}
 		return nil
 	})
 	require.NoError(t, err)
