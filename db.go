@@ -35,35 +35,6 @@ import (
 	"github.com/xujiajun/utils/strconv2"
 )
 
-var (
-	// ErrDBClosed is returned when db is closed.
-	ErrDBClosed = errors.New("db is closed")
-
-	// ErrBucket is returned when bucket is not in the HintIdx.
-	ErrBucket = errors.New("err bucket")
-
-	// ErrFn is returned when fn is nil.
-	ErrFn = errors.New("err fn")
-
-	// ErrBucketNotFound is returned when looking for bucket that does not exist
-	ErrBucketNotFound = errors.New("bucket not found")
-
-	// ErrDataStructureNotSupported is returned when pass a not supported data structure
-	ErrDataStructureNotSupported = errors.New("this data structure is not supported for now")
-
-	// ErrNotSupportHintBPTSparseIdxMode is returned not support mode `HintBPTSparseIdxMode`
-	ErrNotSupportHintBPTSparseIdxMode = errors.New("not support mode `HintBPTSparseIdxMode`")
-
-	// ErrDirLocked is returned when can't get the file lock of dir
-	ErrDirLocked = errors.New("the dir of db is locked")
-
-	// ErrDirUnlocked is returned when the file lock already unlocked
-	ErrDirUnlocked = errors.New("the dir of db is unlocked")
-
-	// ErrIsMerging is returned when merge in progress
-	ErrIsMerging = errors.New("merge in progress")
-)
-
 const (
 	// DataDeleteFlag represents the data delete flag
 	DataDeleteFlag uint16 = iota
@@ -627,8 +598,9 @@ func (db *DB) parseDataFiles(dataFileIds []int) (err error) {
 	)
 
 	parseDataInTx := func() error {
+		off := dataInTx.startOff
+
 		for _, entry := range dataInTx.es {
-			off := dataInTx.startOff
 
 			if entry.Meta.Status == Committed {
 				meta := NewMetaData().WithFlag(DataSetFlag)
