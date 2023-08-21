@@ -236,9 +236,6 @@ func (tx *Tx) Commit() (err error) {
 		tx.pendingWrites = nil
 		tx.ReservedStoreTxIDIdxes = nil
 	}()
-
-	var bucketMetaTemp BucketMeta
-
 	if tx.isClosed() {
 		return ErrCannotCommitAClosedTx
 	}
@@ -258,13 +255,11 @@ func (tx *Tx) Commit() (err error) {
 	}
 
 	lastIndex := writesLen - 1
-	countFlag := CountFlagEnabled
-	if tx.db.isMerging {
-		countFlag = CountFlagDisabled
-	}
 
 	buff := tx.allocCommitBuffer()
 	defer tx.db.commitBuffer.Reset()
+
+	var records []*Record
 
 	for i := 0; i < writesLen; i++ {
 		entry := tx.pendingWrites[i]
@@ -306,44 +301,14 @@ func (tx *Tx) Commit() (err error) {
 			}
 		}
 
-		if tx.db.opt.EntryIdxMode == HintBPTSparseIdxMode {
-			bucketMetaTemp = tx.buildTempBucketMetaIdx(bucket, entry.Key, bucketMetaTemp)
-		}
-
-		if i == lastIndex {
-			txID := entry.Meta.TxID
-			if tx.db.opt.EntryIdxMode == HintBPTSparseIdxMode {
-				if err := tx.buildTxIDRootIdx(txID, countFlag); err != nil {
-					return err
-				}
-
-				if err := tx.buildBucketMetaIdx(bucket, entry.Key, bucketMetaTemp); err != nil {
-					return err
-				}
-			}
-		}
-
 		hint := NewHint().WithKey(entry.Key).WithFileId(tx.db.ActiveFile.fileID).WithMeta(entry.Meta).WithDataPos(uint64(offset))
 		record := NewRecord().WithBucket(bucket).WithValue(entry.Value).WithHint(hint)
 
-		if entry.Meta.Ds == DataStructureTree {
-			tx.buildTreeIdx(record, countFlag)
-		}
-
-		if entry.Meta.Ds == DataStructureList {
-			tx.buildListIdx(record)
-		}
-
-		if entry.Meta.Ds == DataStructureSet {
-			tx.buildSetIdx(record)
-		}
-
-		if entry.Meta.Ds == DataStructureSortedSet {
-			tx.buildSortedSetIdx(record)
-		}
+		records = append(records, record)
 	}
-
-	tx.buildNotDSIdxes()
+	if err := tx.buildIdxes(records); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -434,11 +399,11 @@ func (tx *Tx) buildBucketMetaIdx(bucket string, key []byte, bucketMetaTemp Bucke
 	return nil
 }
 
-func (tx *Tx) buildTxIDRootIdx(txID uint64, countFlag bool) error {
+func (tx *Tx) buildTxIDRootIdx(txID uint64) error {
 	txIDStr := strconv2.IntToStr(int(txID))
 
 	meta := NewMetaData().WithFlag(DataSetFlag)
-	err := tx.db.ActiveCommittedTxIdsIdx.Insert([]byte(txIDStr), nil, NewHint().WithMeta(meta), countFlag)
+	err := tx.db.ActiveCommittedTxIdsIdx.Insert([]byte(txIDStr), nil, NewHint().WithMeta(meta), CountFlagDisabled)
 	if err != nil {
 		return err
 	}
@@ -446,7 +411,7 @@ func (tx *Tx) buildTxIDRootIdx(txID uint64, countFlag bool) error {
 		for fID, txIDIdx := range tx.ReservedStoreTxIDIdxes {
 			filePath := getBPTTxIDPath(fID, tx.db.opt.Dir)
 
-			err := txIDIdx.Insert([]byte(txIDStr), nil, NewHint().WithMeta(meta), countFlag)
+			err := txIDIdx.Insert([]byte(txIDStr), nil, NewHint().WithMeta(meta), CountFlagDisabled)
 			if err != nil {
 				return err
 			}
@@ -461,7 +426,7 @@ func (tx *Tx) buildTxIDRootIdx(txID uint64, countFlag bool) error {
 			txIDRootIdx := NewTree()
 			rootAddress := strconv2.Int64ToStr(txIDIdx.root.Address)
 
-			err = txIDRootIdx.Insert([]byte(rootAddress), nil, NewHint().WithMeta(meta), countFlag)
+			err = txIDRootIdx.Insert([]byte(rootAddress), nil, NewHint().WithMeta(meta), CountFlagDisabled)
 			if err != nil {
 				return err
 			}
@@ -477,39 +442,13 @@ func (tx *Tx) buildTxIDRootIdx(txID uint64, countFlag bool) error {
 	return nil
 }
 
-func (tx *Tx) buildNotDSIdxes() {
-	writesLen := len(tx.pendingWrites)
-	for i := 0; i < writesLen; i++ {
-		entry := tx.pendingWrites[i]
-
-		bucket := string(entry.Bucket)
-
-		if entry.Meta.Ds == DataStructureNone {
-			if entry.Meta.Flag == DataBPTreeBucketDeleteFlag {
-				tx.db.deleteBucket(DataStructureTree, bucket)
-			}
-			if entry.Meta.Flag == DataSetBucketDeleteFlag {
-				tx.db.deleteBucket(DataStructureSet, bucket)
-			}
-			if entry.Meta.Flag == DataSortedSetBucketDeleteFlag {
-				tx.db.deleteBucket(DataStructureSortedSet, bucket)
-			}
-			if entry.Meta.Flag == DataListBucketDeleteFlag {
-				tx.db.deleteBucket(DataStructureList, bucket)
-			}
-		}
-
-		tx.db.KeyCount++
-	}
-}
-
-func (tx *Tx) buildTreeIdx(record *Record, countFlag bool) {
+func (tx *Tx) buildTreeIdx(record *Record) {
 	bucket, key, meta, offset := record.Bucket, record.H.Key, record.H.Meta, record.H.DataPos
 
 	if tx.db.opt.EntryIdxMode == HintBPTSparseIdxMode {
 		newKey := getNewKey(bucket, key)
 		hint := NewHint().WithFileId(tx.db.ActiveFile.fileID).WithKey(newKey).WithMeta(meta).WithDataPos(offset)
-		_ = tx.db.ActiveBPTreeIdx.Insert(newKey, nil, hint, countFlag)
+		_ = tx.db.ActiveBPTreeIdx.Insert(newKey, nil, hint, CountFlagDisabled)
 	} else {
 		if _, ok := tx.db.BTreeIdx[bucket]; !ok {
 			tx.db.BTreeIdx[bucket] = NewBTree()
@@ -890,4 +829,50 @@ func (tx *Tx) isCommitting() bool {
 func (tx *Tx) isClosed() bool {
 	status := tx.status.Load().(int)
 	return status == txStatusClosed
+}
+
+func (tx *Tx) buildIdxes(records []*Record) error {
+	var bucketMetaTemp BucketMeta
+
+	for _, record := range records {
+		bucket, key, meta := record.Bucket, record.H.Key, record.H.Meta
+		txID := meta.TxID
+
+		switch meta.Ds {
+		case DataStructureTree:
+			tx.buildTreeIdx(record)
+		case DataStructureList:
+			tx.buildListIdx(record)
+		case DataStructureSet:
+			tx.buildSetIdx(record)
+		case DataStructureSortedSet:
+			tx.buildSortedSetIdx(record)
+		case DataStructureNone:
+			switch meta.Flag {
+			case DataBPTreeBucketDeleteFlag:
+				tx.db.deleteBucket(DataStructureTree, bucket)
+			case DataSetBucketDeleteFlag:
+				tx.db.deleteBucket(DataStructureSet, bucket)
+			case DataSortedSetBucketDeleteFlag:
+				tx.db.deleteBucket(DataStructureSortedSet, bucket)
+			case DataListBucketDeleteFlag:
+				tx.db.deleteBucket(DataStructureList, bucket)
+			}
+		}
+		tx.db.KeyCount++
+
+		if tx.db.opt.EntryIdxMode == HintBPTSparseIdxMode {
+			bucketMetaTemp = tx.buildTempBucketMetaIdx(bucket, key, bucketMetaTemp)
+			if meta.Status == Committed {
+				if err := tx.buildTxIDRootIdx(txID); err != nil {
+					return err
+				}
+
+				if err := tx.buildBucketMetaIdx(bucket, key, bucketMetaTemp); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
 }
