@@ -34,8 +34,6 @@ const (
 	txStatusCommitting = 2
 	// txStatusClosed means the tx is closed, ether committed or rollback
 	txStatusClosed = 3
-	// countFlag always CountFlagDisabled
-	countFlag = CountFlagDisabled
 )
 
 var (
@@ -401,11 +399,11 @@ func (tx *Tx) buildBucketMetaIdx(bucket string, key []byte, bucketMetaTemp Bucke
 	return nil
 }
 
-func (tx *Tx) buildTxIDRootIdx(txID uint64, countFlag bool) error {
+func (tx *Tx) buildTxIDRootIdx(txID uint64) error {
 	txIDStr := strconv2.IntToStr(int(txID))
 
 	meta := NewMetaData().WithFlag(DataSetFlag)
-	err := tx.db.ActiveCommittedTxIdsIdx.Insert([]byte(txIDStr), nil, NewHint().WithMeta(meta), countFlag)
+	err := tx.db.ActiveCommittedTxIdsIdx.Insert([]byte(txIDStr), nil, NewHint().WithMeta(meta), CountFlagDisabled)
 	if err != nil {
 		return err
 	}
@@ -413,7 +411,7 @@ func (tx *Tx) buildTxIDRootIdx(txID uint64, countFlag bool) error {
 		for fID, txIDIdx := range tx.ReservedStoreTxIDIdxes {
 			filePath := getBPTTxIDPath(fID, tx.db.opt.Dir)
 
-			err := txIDIdx.Insert([]byte(txIDStr), nil, NewHint().WithMeta(meta), countFlag)
+			err := txIDIdx.Insert([]byte(txIDStr), nil, NewHint().WithMeta(meta), CountFlagDisabled)
 			if err != nil {
 				return err
 			}
@@ -428,7 +426,7 @@ func (tx *Tx) buildTxIDRootIdx(txID uint64, countFlag bool) error {
 			txIDRootIdx := NewTree()
 			rootAddress := strconv2.Int64ToStr(txIDIdx.root.Address)
 
-			err = txIDRootIdx.Insert([]byte(rootAddress), nil, NewHint().WithMeta(meta), countFlag)
+			err = txIDRootIdx.Insert([]byte(rootAddress), nil, NewHint().WithMeta(meta), CountFlagDisabled)
 			if err != nil {
 				return err
 			}
@@ -444,13 +442,13 @@ func (tx *Tx) buildTxIDRootIdx(txID uint64, countFlag bool) error {
 	return nil
 }
 
-func (tx *Tx) buildTreeIdx(record *Record, countFlag bool) {
+func (tx *Tx) buildTreeIdx(record *Record) {
 	bucket, key, meta, offset := record.Bucket, record.H.Key, record.H.Meta, record.H.DataPos
 
 	if tx.db.opt.EntryIdxMode == HintBPTSparseIdxMode {
 		newKey := getNewKey(bucket, key)
 		hint := NewHint().WithFileId(tx.db.ActiveFile.fileID).WithKey(newKey).WithMeta(meta).WithDataPos(offset)
-		_ = tx.db.ActiveBPTreeIdx.Insert(newKey, nil, hint, countFlag)
+		_ = tx.db.ActiveBPTreeIdx.Insert(newKey, nil, hint, CountFlagDisabled)
 	} else {
 		if _, ok := tx.db.BTreeIdx[bucket]; !ok {
 			tx.db.BTreeIdx[bucket] = NewBTree()
@@ -842,7 +840,7 @@ func (tx *Tx) buildIdxes(records []*Record) error {
 
 		switch meta.Ds {
 		case DataStructureTree:
-			tx.buildTreeIdx(record, countFlag)
+			tx.buildTreeIdx(record)
 		case DataStructureList:
 			tx.buildListIdx(record)
 		case DataStructureSet:
@@ -866,7 +864,7 @@ func (tx *Tx) buildIdxes(records []*Record) error {
 		if tx.db.opt.EntryIdxMode == HintBPTSparseIdxMode {
 			bucketMetaTemp = tx.buildTempBucketMetaIdx(bucket, key, bucketMetaTemp)
 			if meta.Status == Committed {
-				if err := tx.buildTxIDRootIdx(txID, countFlag); err != nil {
+				if err := tx.buildTxIDRootIdx(txID); err != nil {
 					return err
 				}
 
