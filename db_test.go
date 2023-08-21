@@ -248,7 +248,7 @@ func txZCard(t *testing.T, db *DB, bucket string, key []byte, expectLength int, 
 	err := db.View(func(tx *Tx) error {
 		length, err := tx.ZCard(bucket, key)
 		if expectErr != nil {
-			assert.NoError(t, err)
+			assert.Equal(t, expectErr, err)
 		} else {
 			assert.Equal(t, expectLength, length)
 		}
