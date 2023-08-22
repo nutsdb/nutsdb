@@ -17,7 +17,6 @@ package nutsdb
 import (
 	"errors"
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -80,13 +79,7 @@ func TestTx_SRem2(t *testing.T) {
 
 		txSRem(t, db, bucket, key, val2, nil)
 
-		err := db.View(func(tx *Tx) error {
-			areMembers, err := tx.SAreMembers(bucket, key, val1, val2)
-			require.NoError(t, err)
-			require.False(t, areMembers)
-			return nil
-		})
-		require.NoError(t, err)
+		txSAreMembers(t, db, bucket, key, false, val1, val2)
 	})
 }
 
