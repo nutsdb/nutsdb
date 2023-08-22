@@ -400,23 +400,19 @@ func TestTx_SKeys(t *testing.T) {
 		txSKeys(t, db, bucket, "*", func(key string) bool {
 			keys = append(keys, key)
 			return true
-		}, nil)
-		assert.Equal(t, num, len(keys), "TestTx_SKeys")
+		}, num, nil)
 
 		keys = []string{}
 		txSKeys(t, db, bucket, "*", func(key string) bool {
 			keys = append(keys, key)
 			return len(keys) != num-1
-		}, nil)
-		assert.Equal(t, num-1, len(keys), "TestTx_SKeys")
+		}, num-1, nil)
 
 		keys = []string{}
 		txSKeys(t, db, bucket, "fake_key*", func(key string) bool {
 			keys = append(keys, key)
 			return true
-		}, nil)
-		assert.Equal(t, 0, len(keys), "TestTx_SKeys")
-
+		}, 0, nil)
 	})
 }
 

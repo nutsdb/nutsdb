@@ -208,10 +208,19 @@ func txSAdd(t *testing.T, db *DB, bucket string, key, value []byte, expectErr er
 	require.NoError(t, err)
 }
 
-func txSKeys(t *testing.T, db *DB, bucket, pattern string, f func(key string) bool, expectErr error) {
+func txSKeys(t *testing.T, db *DB, bucket, pattern string, f func(key string) bool, expectVal int, expectErr error) {
 	err := db.View(func(tx *Tx) error {
-		err := tx.SKeys(bucket, pattern, f)
-		assertErr(t, err, expectErr)
+		num := 0
+		err := tx.SKeys(bucket, pattern, func(key string) bool {
+			num += 1
+			return f(key)
+		})
+		if expectErr != nil {
+			assert.ErrorIs(t, expectErr, err)
+		} else {
+			assert.NoError(t, err)
+			assert.Equal(t, expectVal, num)
+		}
 		return nil
 	})
 	require.NoError(t, err)
