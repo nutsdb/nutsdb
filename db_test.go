@@ -520,6 +520,29 @@ func txRange(t *testing.T, db *DB, bucket string, key []byte, start, end, expect
 	require.NoError(t, err)
 }
 
+func txIterateBuckets(t *testing.T, db *DB, ds uint16, pattern string, f func(key string) bool, expectErr error, containsKey ...string) {
+	err := db.View(func(tx *Tx) error {
+		var elements []string
+		err := tx.IterateBuckets(ds, pattern, func(key string) bool {
+			if f != nil && !f(key) {
+				return false
+			}
+			elements = append(elements, key)
+			return true
+		})
+		if err != nil {
+			assert.Equal(t, expectErr, err)
+		} else {
+			assert.NoError(t, err)
+			for _, key := range containsKey {
+				assert.Contains(t, elements, key)
+			}
+		}
+		return nil
+	})
+	require.NoError(t, err)
+}
+
 func TestDB_GetKeyNotFound(t *testing.T) {
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		bucket := "bucket"
