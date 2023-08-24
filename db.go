@@ -909,13 +909,12 @@ func (db *DB) buildSetIdx(r *Record) error {
 		db.SetIdx[bucket] = NewSet()
 	}
 
-	if meta.Flag == DataSetFlag {
+	switch meta.Flag {
+	case DataSetFlag:
 		if err := db.SetIdx[bucket].SAdd(string(key), [][]byte{val}, []*Record{r}); err != nil {
 			return fmt.Errorf("when build SetIdx SAdd index err: %s", err)
 		}
-	}
-
-	if meta.Flag == DataDeleteFlag {
+	case DataDeleteFlag:
 		if err := db.SetIdx[bucket].SRem(string(key), val); err != nil {
 			return fmt.Errorf("when build SetIdx SRem index err: %s", err)
 		}
@@ -933,28 +932,31 @@ func (db *DB) buildSortedSetIdx(r *Record) error {
 		db.SortedSetIdx[bucket] = NewSortedSet(db)
 	}
 
-	if meta.Flag == DataZAddFlag {
+	var err error
+
+	switch meta.Flag {
+	case DataZAddFlag:
 		keyAndScore := strings.Split(string(key), SeparatorForZSetKey)
 		if len(keyAndScore) == 2 {
 			key := keyAndScore[0]
 			score, _ := strconv2.StrToFloat64(keyAndScore[1])
-			_ = db.SortedSetIdx[bucket].ZAdd(key, SCORE(score), val, r)
+			err = db.SortedSetIdx[bucket].ZAdd(key, SCORE(score), val, r)
 		}
-	}
-	if meta.Flag == DataZRemFlag {
-		_, _ = db.SortedSetIdx[bucket].ZRem(string(key), val)
-	}
-	if meta.Flag == DataZRemRangeByRankFlag {
+	case DataZRemFlag:
+		_, err = db.SortedSetIdx[bucket].ZRem(string(key), val)
+	case DataZRemRangeByRankFlag:
 		startAndEnd := strings.Split(string(val), SeparatorForZSetKey)
 		start, _ := strconv2.StrToInt(startAndEnd[0])
 		end, _ := strconv2.StrToInt(startAndEnd[1])
-		_ = db.SortedSetIdx[bucket].ZRemRangeByRank(string(key), start, end)
+		err = db.SortedSetIdx[bucket].ZRemRangeByRank(string(key), start, end)
+	case DataZPopMaxFlag:
+		_, _, err = db.SortedSetIdx[bucket].ZPopMax(string(key))
+	case DataZPopMinFlag:
+		_, _, err = db.SortedSetIdx[bucket].ZPopMin(string(key))
 	}
-	if meta.Flag == DataZPopMaxFlag {
-		_, _, _ = db.SortedSetIdx[bucket].ZPopMax(string(key))
-	}
-	if meta.Flag == DataZPopMinFlag {
-		_, _, _ = db.SortedSetIdx[bucket].ZPopMin(string(key))
+
+	if err != nil {
+		return fmt.Errorf("when build sortedSetIdx err: %s", err)
 	}
 
 	return nil
@@ -971,72 +973,59 @@ func (db *DB) buildListIdx(r *Record) error {
 		return nil
 	}
 
+	var err error
+
 	switch meta.Flag {
 	case DataExpireListFlag:
-		t, err := strconv2.StrToInt64(string(val))
-		if err != nil {
-			return err
-		}
+		t, _ := strconv2.StrToInt64(string(val))
 		ttl := uint32(t)
 		l.TTL[string(key)] = ttl
 		l.TimeStamp[string(key)] = meta.Timestamp
 	case DataLPushFlag:
-		_ = l.LPush(string(key), r)
+		err = l.LPush(string(key), r)
 	case DataRPushFlag:
-		_ = l.RPush(string(key), r)
+		err = l.RPush(string(key), r)
 	case DataLRemFlag:
 		countAndValueIndex := strings.Split(string(val), SeparatorForListKey)
 		count, _ := strconv2.StrToInt(countAndValueIndex[0])
 		value := []byte(countAndValueIndex[1])
 
-		if err := l.LRem(string(key), count, func(r *Record) (bool, error) {
+		err = l.LRem(string(key), count, func(r *Record) (bool, error) {
 			v, err := db.getValueByRecord(r)
 			if err != nil {
 				return false, err
 			}
 			return bytes.Equal(value, v), nil
-		}); err != nil {
-			return ErrWhenBuildListIdx(err)
-		}
+		})
 	case DataLPopFlag:
-		if _, err := l.LPop(string(key)); err != nil {
-			return ErrWhenBuildListIdx(err)
-		}
+		_, err = l.LPop(string(key))
 	case DataRPopFlag:
-		if _, err := l.RPop(string(key)); err != nil {
-			return ErrWhenBuildListIdx(err)
-		}
+		_, err = l.RPop(string(key))
 	case DataLSetFlag:
 		keyAndIndex := strings.Split(string(key), SeparatorForListKey)
 		newKey := keyAndIndex[0]
 		index, _ := strconv2.StrToInt(keyAndIndex[1])
-		if err := l.LSet(newKey, index, r); err != nil {
-			return ErrWhenBuildListIdx(err)
-		}
+		err = l.LSet(newKey, index, r)
 	case DataLTrimFlag:
 		keyAndStartIndex := strings.Split(string(key), SeparatorForListKey)
 		newKey := keyAndStartIndex[0]
 		start, _ := strconv2.StrToInt(keyAndStartIndex[1])
 		end, _ := strconv2.StrToInt(string(val))
-		if err := l.LTrim(newKey, start, end); err != nil {
-			return ErrWhenBuildListIdx(err)
-		}
+		err = l.LTrim(newKey, start, end)
 	case DataLRemByIndex:
-		indexes, err := UnmarshalInts(val)
+		var indexes []int
+		indexes, err = UnmarshalInts(val)
 		if err != nil {
-			return err
+			break
 		}
-		if err := l.LRemByIndex(string(key), indexes); err != nil {
-			return ErrWhenBuildListIdx(err)
-		}
+		err = l.LRemByIndex(string(key), indexes)
+	}
+
+	if err != nil {
+		return fmt.Errorf("when build listIdx err: %s", err)
 	}
 
 	return nil
-}
-
-// ErrWhenBuildListIdx returns err when build listIdx
-func ErrWhenBuildListIdx(err error) error {
-	return fmt.Errorf("when build listIdx err: %s", err)
 }
 
 // buildIndexes builds indexes when db initialize resource.
