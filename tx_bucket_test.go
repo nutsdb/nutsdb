@@ -23,7 +23,7 @@ func setupBucket(t *testing.T, db *DB) {
 	txPut(t, db, stringBucketName, key, val, Persistent, nil)
 }
 
-func TestA_IterateBuckets(t *testing.T) {
+func TestBucket_IterateBuckets(t *testing.T) {
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		setupBucket(t, db)
 
@@ -60,7 +60,7 @@ func TestA_IterateBuckets(t *testing.T) {
 	})
 }
 
-func TestB_DeleteBucket(t *testing.T) {
+func TestBucket_DeleteBucket(t *testing.T) {
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		setupBucket(t, db)
 
@@ -73,7 +73,7 @@ func TestB_DeleteBucket(t *testing.T) {
 	})
 }
 
-func TestC_HintBPTSparseIdxMode(t *testing.T) {
+func TestBucket_HintBPTSparseIdxMode(t *testing.T) {
 	opt = DefaultOptions
 	opt.Dir = "/tmp/nutsdbtestbuckettxx"
 	opt.SegmentSize = 8 * 1024
