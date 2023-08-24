@@ -909,13 +909,12 @@ func (db *DB) buildSetIdx(r *Record) error {
 		db.SetIdx[bucket] = NewSet()
 	}
 
-	if meta.Flag == DataSetFlag {
+	switch meta.Flag {
+	case DataSetFlag:
 		if err := db.SetIdx[bucket].SAdd(string(key), [][]byte{val}, []*Record{r}); err != nil {
 			return fmt.Errorf("when build SetIdx SAdd index err: %s", err)
 		}
-	}
-
-	if meta.Flag == DataDeleteFlag {
+	case DataDeleteFlag:
 		if err := db.SetIdx[bucket].SRem(string(key), val); err != nil {
 			return fmt.Errorf("when build SetIdx SRem index err: %s", err)
 		}
