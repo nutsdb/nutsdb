@@ -18,15 +18,6 @@ import (
 	"time"
 )
 
-func getNewKey(bucket string, key []byte) []byte {
-	newKey := []byte(bucket)
-	newKey = append(newKey, key...)
-	//avoid dup
-	newKey = append(newKey, []byte(bucket)...)
-
-	return newKey
-}
-
 func (tx *Tx) PutWithTimestamp(bucket string, key, value []byte, ttl uint32, timestamp uint64) error {
 	return tx.put(bucket, key, value, ttl, DataSetFlag, timestamp, DataStructureBTree)
 }
