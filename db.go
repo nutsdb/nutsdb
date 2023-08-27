@@ -155,9 +155,6 @@ type (
 		writeCh          chan *request
 		tm               *ttlManager
 	}
-
-	// BucketMetasIdx represents the index of the bucket's meta-information
-	BucketMetasIdx map[string]*BucketMeta
 )
 
 // open returns a newly initialized DB object.

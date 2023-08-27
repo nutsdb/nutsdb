@@ -89,7 +89,7 @@ func (tx *Tx) GetAll(bucket string) (entries Entries, err error) {
 			return nil, ErrBucketEmpty
 		}
 
-		entries, err = tx.getHintIdxDataItemsWrapper(records, ScanNoLimit, entries, RangeScan)
+		entries, err = tx.getHintIdxDataItemsWrapper(records, ScanNoLimit, entries)
 		if err != nil {
 			return nil, ErrBucketEmpty
 		}
@@ -114,7 +114,7 @@ func (tx *Tx) RangeScan(bucket string, start, end []byte) (es Entries, err error
 			return nil, ErrRangeScan
 		}
 
-		es, err = tx.getHintIdxDataItemsWrapper(records, ScanNoLimit, es, RangeScan)
+		es, err = tx.getHintIdxDataItemsWrapper(records, ScanNoLimit, es)
 		if err != nil {
 			return nil, ErrRangeScan
 		}
@@ -137,7 +137,7 @@ func (tx *Tx) PrefixScan(bucket string, prefix []byte, offsetNum int, limitNum i
 
 	if idx, ok := tx.db.BTreeIdx[bucket]; ok {
 		records := idx.PrefixScan(prefix, offsetNum, limitNum)
-		es, err = tx.getHintIdxDataItemsWrapper(records, limitNum, es, PrefixScan)
+		es, err = tx.getHintIdxDataItemsWrapper(records, limitNum, es)
 		if err != nil {
 			return nil, ErrPrefixScan
 		}
@@ -160,7 +160,7 @@ func (tx *Tx) PrefixSearchScan(bucket string, prefix []byte, reg string, offsetN
 
 	if idx, ok := tx.db.BTreeIdx[bucket]; ok {
 		records := idx.PrefixSearchScan(prefix, reg, offsetNum, limitNum)
-		es, err = tx.getHintIdxDataItemsWrapper(records, limitNum, es, PrefixSearchScan)
+		es, err = tx.getHintIdxDataItemsWrapper(records, limitNum, es)
 		if err != nil {
 			return nil, ErrPrefixSearchScan
 		}
@@ -191,7 +191,7 @@ func (tx *Tx) Delete(bucket string, key []byte) error {
 }
 
 // getHintIdxDataItemsWrapper returns wrapped entries when prefix scanning or range scanning.
-func (tx *Tx) getHintIdxDataItemsWrapper(records Records, limitNum int, es Entries, scanMode string) (Entries, error) {
+func (tx *Tx) getHintIdxDataItemsWrapper(records []*Record, limitNum int, es Entries) (Entries, error) {
 	for _, r := range records {
 		if r.IsExpired() {
 			tx.putDeleteLog(r.Bucket, r.H.Key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureBTree)

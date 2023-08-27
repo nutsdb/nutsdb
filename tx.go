@@ -37,13 +37,12 @@ const (
 
 // Tx represents a transaction.
 type Tx struct {
-	id                     uint64
-	db                     *DB
-	writable               bool
-	status                 atomic.Value
-	pendingWrites          []*Entry
-	ReservedStoreTxIDIdxes map[int64]*BPTree
-	size                   int64
+	id            uint64
+	db            *DB
+	writable      bool
+	status        atomic.Value
+	pendingWrites []*Entry
+	size          int64
 }
 
 type txnCb struct {
@@ -96,10 +95,9 @@ func newTx(db *DB, writable bool) (tx *Tx, err error) {
 	var txID uint64
 
 	tx = &Tx{
-		db:                     db,
-		writable:               writable,
-		pendingWrites:          []*Entry{},
-		ReservedStoreTxIDIdxes: make(map[int64]*BPTree),
+		db:            db,
+		writable:      writable,
+		pendingWrites: []*Entry{},
 	}
 
 	txID, err = tx.getTxID()
@@ -188,7 +186,6 @@ func (tx *Tx) Commit() (err error) {
 		tx.db = nil
 
 		tx.pendingWrites = nil
-		tx.ReservedStoreTxIDIdxes = nil
 	}()
 	if tx.isClosed() {
 		return ErrCannotCommitAClosedTx
@@ -280,25 +277,6 @@ func (tx *Tx) allocCommitBuffer() *bytes.Buffer {
 	}
 
 	return buff
-}
-
-func (tx *Tx) buildTempBucketMetaIdx(bucket string, key []byte, bucketMetaTemp BucketMeta) BucketMeta {
-	keySize := uint32(len(key))
-	if bucketMetaTemp.start == nil {
-		bucketMetaTemp = BucketMeta{start: key, end: key, startSize: keySize, endSize: keySize}
-	} else {
-		if compare(bucketMetaTemp.start, key) > 0 {
-			bucketMetaTemp.start = key
-			bucketMetaTemp.startSize = keySize
-		}
-
-		if compare(bucketMetaTemp.end, key) < 0 {
-			bucketMetaTemp.end = key
-			bucketMetaTemp.endSize = keySize
-		}
-	}
-
-	return bucketMetaTemp
 }
 
 func (tx *Tx) buildTreeIdx(record *Record) {
