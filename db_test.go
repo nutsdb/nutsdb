@@ -662,14 +662,14 @@ func TestDB_DeleteBucket(t *testing.T) {
 		key := GetTestBytes(0)
 		val := GetTestBytes(0)
 
-		txDeleteBucket(t, db, DataStructureTree, bucket, ErrBucketNotFound)
+		txDeleteBucket(t, db, DataStructureBTree, bucket, ErrBucketNotFound)
 
 		txPut(t, db, bucket, key, val, Persistent, nil)
 		txGet(t, db, bucket, key, val, nil)
 
-		txDeleteBucket(t, db, DataStructureTree, bucket, nil)
+		txDeleteBucket(t, db, DataStructureBTree, bucket, nil)
 		txGet(t, db, bucket, key, nil, ErrBucketNotFound)
-		txDeleteBucket(t, db, DataStructureTree, bucket, ErrBucketNotFound)
+		txDeleteBucket(t, db, DataStructureBTree, bucket, ErrBucketNotFound)
 	})
 }
 

@@ -18,7 +18,6 @@ import (
 	"bytes"
 	"errors"
 	"log"
-	"os"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -238,10 +237,6 @@ func (tx *Tx) Commit() (err error) {
 
 		offset := tx.db.ActiveFile.writeOff + int64(buff.Len())
 
-		if entry.Meta.Ds == DataStructureTree {
-			tx.db.BPTreeKeyEntryPosMap[string(getNewKey(string(entry.Bucket), entry.Key))] = offset
-		}
-
 		if i == lastIndex {
 			entry.Meta.Status = Committed
 		}
@@ -304,97 +299,6 @@ func (tx *Tx) buildTempBucketMetaIdx(bucket string, key []byte, bucketMetaTemp B
 	}
 
 	return bucketMetaTemp
-}
-
-func (tx *Tx) buildBucketMetaIdx(bucket string, key []byte, bucketMetaTemp BucketMeta) error {
-	bucketMeta, ok := tx.db.bucketMetas[bucket]
-
-	start := bucketMetaTemp.start
-	startSize := uint32(len(start))
-	end := bucketMetaTemp.end
-	endSize := uint32(len(end))
-	var updateFlag bool
-
-	if !ok {
-		bucketMeta = &BucketMeta{start: start, end: end, startSize: startSize, endSize: endSize}
-		updateFlag = true
-	} else {
-		if compare(bucketMeta.start, bucketMetaTemp.start) > 0 {
-			bucketMeta.start = start
-			bucketMeta.startSize = startSize
-			updateFlag = true
-		}
-
-		if compare(bucketMeta.end, bucketMetaTemp.end) < 0 {
-			bucketMeta.end = end
-			bucketMeta.endSize = endSize
-			updateFlag = true
-		}
-	}
-
-	if updateFlag {
-		fd, err := os.OpenFile(getBucketMetaFilePath(bucket, tx.db.opt.Dir), os.O_CREATE|os.O_RDWR, 0o644)
-		if err != nil {
-			return err
-		}
-		defer fd.Close()
-
-		if _, err = fd.WriteAt(bucketMeta.Encode(), 0); err != nil {
-			return err
-		}
-
-		if tx.db.opt.SyncEnable {
-			if err = fd.Sync(); err != nil {
-				return err
-			}
-		}
-		tx.db.bucketMetas[bucket] = bucketMeta
-	}
-
-	return nil
-}
-
-func (tx *Tx) buildTxIDRootIdx(txID uint64) error {
-	txIDStr := strconv2.IntToStr(int(txID))
-
-	meta := NewMetaData().WithFlag(DataSetFlag)
-	err := tx.db.ActiveCommittedTxIdsIdx.Insert([]byte(txIDStr), nil, NewHint().WithMeta(meta), CountFlagDisabled)
-	if err != nil {
-		return err
-	}
-	if len(tx.ReservedStoreTxIDIdxes) > 0 {
-		for fID, txIDIdx := range tx.ReservedStoreTxIDIdxes {
-			filePath := getBPTTxIDPath(fID, tx.db.opt.Dir)
-
-			err := txIDIdx.Insert([]byte(txIDStr), nil, NewHint().WithMeta(meta), CountFlagDisabled)
-			if err != nil {
-				return err
-			}
-			txIDIdx.Filepath = filePath
-
-			err = txIDIdx.WriteNodes(tx.db.opt.RWMode, tx.db.opt.SyncEnable, 2)
-			if err != nil {
-				return err
-			}
-
-			filePath = getBPTRootTxIDPath(fID, tx.db.opt.Dir)
-			txIDRootIdx := NewTree()
-			rootAddress := strconv2.Int64ToStr(txIDIdx.root.Address)
-
-			err = txIDRootIdx.Insert([]byte(rootAddress), nil, NewHint().WithMeta(meta), CountFlagDisabled)
-			if err != nil {
-				return err
-			}
-			txIDRootIdx.Filepath = filePath
-
-			err = txIDRootIdx.WriteNodes(tx.db.opt.RWMode, tx.db.opt.SyncEnable, 2)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
 }
 
 func (tx *Tx) buildTreeIdx(record *Record) {
@@ -649,16 +553,6 @@ func (tx *Tx) handleErr(err error) {
 	}
 }
 
-func (tx *Tx) PutWithTimestamp(bucket string, key, value []byte, ttl uint32, timestamp uint64) error {
-	return tx.put(bucket, key, value, ttl, DataSetFlag, timestamp, DataStructureTree)
-}
-
-// Put sets the value for a key in the bucket.
-// a wrapper of the function put.
-func (tx *Tx) Put(bucket string, key, value []byte, ttl uint32) error {
-	return tx.put(bucket, key, value, ttl, DataSetFlag, uint64(time.Now().UnixMilli()), DataStructureTree)
-}
-
 func (tx *Tx) checkTxIsClosed() error {
 	if tx.db == nil {
 		return ErrTxClosed
@@ -743,7 +637,7 @@ func (tx *Tx) buildIdxes(records []*Record) error {
 		bucket, meta := record.Bucket, record.H.Meta
 
 		switch meta.Ds {
-		case DataStructureTree:
+		case DataStructureBTree:
 			tx.buildTreeIdx(record)
 		case DataStructureList:
 			tx.buildListIdx(record)
@@ -754,7 +648,7 @@ func (tx *Tx) buildIdxes(records []*Record) error {
 		case DataStructureNone:
 			switch meta.Flag {
 			case DataBPTreeBucketDeleteFlag:
-				tx.db.deleteBucket(DataStructureTree, bucket)
+				tx.db.deleteBucket(DataStructureBTree, bucket)
 			case DataSetBucketDeleteFlag:
 				tx.db.deleteBucket(DataStructureSet, bucket)
 			case DataSortedSetBucketDeleteFlag:

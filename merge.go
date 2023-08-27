@@ -212,7 +212,7 @@ func (db *DB) mergeWorker() {
 }
 
 func (db *DB) isPendingMergeEntry(entry *Entry) bool {
-	if entry.Meta.Ds == DataStructureTree {
+	if entry.Meta.Ds == DataStructureBTree {
 		idx, exist := db.BTreeIdx[string(entry.Bucket)]
 		if exist {
 			r, ok := idx.Find(entry.Key)

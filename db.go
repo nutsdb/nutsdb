@@ -120,8 +120,8 @@ const (
 	// DataStructureSortedSet represents the data structure sorted set flag
 	DataStructureSortedSet
 
-	// DataStructureTree represents the data structure b+ tree or b tree flag
-	DataStructureTree
+	// DataStructureBTree represents the data structure b tree flag
+	DataStructureBTree
 
 	// DataStructureList represents the data structure list flag
 	DataStructureList
@@ -135,30 +135,25 @@ const FLockName = "nutsdb-flock"
 type (
 	// DB represents a collection of buckets that persist on disk.
 	DB struct {
-		opt                     Options // the database options
-		BTreeIdx                BTreeIdx
-		BPTreeRootIdxes         []*BPTreeRootIdx
-		BPTreeKeyEntryPosMap    map[string]int64 // key = bucket+key  val = EntryPos
-		bucketMetas             BucketMetasIdx
-		SetIdx                  SetIdx
-		SortedSetIdx            SortedSetIdx
-		Index                   *index
-		ActiveFile              *DataFile
-		ActiveBPTreeIdx         *BPTree
-		ActiveCommittedTxIdsIdx *BPTree
-		MaxFileID               int64
-		mu                      sync.RWMutex
-		KeyCount                int // total key number ,include expired, deleted, repeated.
-		closed                  bool
-		isMerging               bool
-		fm                      *fileManager
-		flock                   *flock.Flock
-		commitBuffer            *bytes.Buffer
-		mergeStartCh            chan struct{}
-		mergeEndCh              chan error
-		mergeWorkCloseCh        chan struct{}
-		writeCh                 chan *request
-		tm                      *ttlManager
+		opt              Options // the database options
+		BTreeIdx         BTreeIdx
+		SetIdx           SetIdx
+		SortedSetIdx     SortedSetIdx
+		Index            *index
+		ActiveFile       *DataFile
+		MaxFileID        int64
+		mu               sync.RWMutex
+		KeyCount         int // total key number ,include expired, deleted, repeated.
+		closed           bool
+		isMerging        bool
+		fm               *fileManager
+		flock            *flock.Flock
+		commitBuffer     *bytes.Buffer
+		mergeStartCh     chan struct{}
+		mergeEndCh       chan error
+		mergeWorkCloseCh chan struct{}
+		writeCh          chan *request
+		tm               *ttlManager
 	}
 
 	// BucketMetasIdx represents the index of the bucket's meta-information
@@ -168,25 +163,20 @@ type (
 // open returns a newly initialized DB object.
 func open(opt Options) (*DB, error) {
 	db := &DB{
-		//BPTreeIdx:               make(BPTreeIdx),
-		BTreeIdx:                make(BTreeIdx),
-		SetIdx:                  make(SetIdx),
-		SortedSetIdx:            make(SortedSetIdx),
-		ActiveBPTreeIdx:         NewTree(),
-		MaxFileID:               0,
-		opt:                     opt,
-		KeyCount:                0,
-		closed:                  false,
-		BPTreeKeyEntryPosMap:    make(map[string]int64),
-		bucketMetas:             make(map[string]*BucketMeta),
-		ActiveCommittedTxIdsIdx: NewTree(),
-		Index:                   NewIndex(),
-		fm:                      newFileManager(opt.RWMode, opt.MaxFdNumsInCache, opt.CleanFdsCacheThreshold),
-		mergeStartCh:            make(chan struct{}),
-		mergeEndCh:              make(chan error),
-		mergeWorkCloseCh:        make(chan struct{}),
-		writeCh:                 make(chan *request, KvWriteChCapacity),
-		tm:                      newTTLManager(opt.ExpiredDeleteType),
+		BTreeIdx:         make(BTreeIdx),
+		SetIdx:           make(SetIdx),
+		SortedSetIdx:     make(SortedSetIdx),
+		MaxFileID:        0,
+		opt:              opt,
+		KeyCount:         0,
+		closed:           false,
+		Index:            NewIndex(),
+		fm:               newFileManager(opt.RWMode, opt.MaxFdNumsInCache, opt.CleanFdsCacheThreshold),
+		mergeStartCh:     make(chan struct{}),
+		mergeEndCh:       make(chan error),
+		mergeWorkCloseCh: make(chan struct{}),
+		writeCh:          make(chan *request, KvWriteChCapacity),
+		tm:               newTTLManager(opt.ExpiredDeleteType),
 	}
 
 	commitBuffer := new(bytes.Buffer)
@@ -290,10 +280,6 @@ func (db *DB) release() error {
 
 	db.BTreeIdx = nil
 
-	db.BPTreeKeyEntryPosMap = nil
-
-	db.bucketMetas = nil
-
 	db.SetIdx = nil
 
 	db.SortedSetIdx = nil
@@ -301,10 +287,6 @@ func (db *DB) release() error {
 	db.Index = nil
 
 	db.ActiveFile = nil
-
-	db.ActiveBPTreeIdx = nil
-
-	db.ActiveCommittedTxIdsIdx = nil
 
 	err = db.fm.close()
 
@@ -549,30 +531,17 @@ func (db *DB) parseDataFiles(dataFileIds []int) (err error) {
 		off := dataInTx.startOff
 
 		for _, entry := range dataInTx.es {
-
-			if entry.Meta.Status == Committed {
-				meta := NewMetaData().WithFlag(DataSetFlag)
-				h := NewHint().WithMeta(meta)
-				err := db.ActiveCommittedTxIdsIdx.Insert(entry.GetTxIDBytes(), nil, h, CountFlagEnabled)
-				if err != nil {
-					return fmt.Errorf("can not ingest the hint obj to ActiveCommittedTxIdsIdx, err: %s", err.Error())
-				}
-			}
-
 			h := NewHint().WithKey(entry.Key).WithFileId(fID).WithMeta(entry.Meta).WithDataPos(uint64(off))
+			// This method is entered when the commit record of a transaction is read
+			// So all records of this transaction should be committed
+			h.Meta.Status = Committed
 			r := NewRecord().WithBucket(entry.GetBucketString()).WithValue(entry.Value).WithHint(h)
 
-			if r.H.Meta.Ds == DataStructureTree {
-				r.H.Meta.Status = Committed
-
-				db.buildBTreeIdx(r)
+			if r.H.Meta.Ds == DataStructureNone {
+				db.buildNotDSIdxes(r)
 			} else {
-				if r.H.Meta.Ds == DataStructureNone {
-					db.buildNotDSIdxes(r)
-				} else {
-					if err = db.buildOtherIdxes(r); err != nil {
-						return err
-					}
+				if err = db.buildIdxes(r); err != nil {
+					return err
 				}
 			}
 
@@ -653,46 +622,6 @@ func (db *DB) parseDataFiles(dataFileIds []int) (err error) {
 	return
 }
 
-func (db *DB) buildBPTreeRootIdxes(dataFileIds []int) error {
-	var off int64
-
-	dataFileIdsSize := len(dataFileIds)
-
-	if dataFileIdsSize == 1 {
-		return nil
-	}
-
-	for i := 0; i < len(dataFileIds[0:dataFileIdsSize-1]); i++ {
-		off = 0
-		path := getBPTRootPath(int64(dataFileIds[i]), db.opt.Dir)
-		fd, err := os.OpenFile(filepath.Clean(path), os.O_RDWR, os.ModePerm)
-		if err != nil {
-			return err
-		}
-
-		for {
-			bs, err := ReadBPTreeRootIdxAt(fd, off)
-
-			if err != nil {
-				if err == io.EOF || err == nil && bs == nil {
-					break
-				}
-				return err
-			}
-
-			if err == nil && bs != nil {
-				db.BPTreeRootIdxes = append(db.BPTreeRootIdxes, bs)
-				off += bs.Size()
-			}
-
-		}
-
-		fd.Close()
-	}
-
-	return nil
-}
-
 func (db *DB) buildBTreeIdx(r *Record) {
 	db.resetRecordByMode(r)
 
@@ -737,17 +666,10 @@ func (db *DB) buildBTreeIdx(r *Record) {
 	}
 }
 
-func (db *DB) buildActiveBPTreeIdx(r *Record) error {
-	newKey := getNewKey(r.Bucket, r.H.Key)
-	if err := db.ActiveBPTreeIdx.Insert(newKey, r.V, r.H, CountFlagEnabled); err != nil {
-		return fmt.Errorf("when build BPTreeIdx insert index err: %s", err)
-	}
-
-	return nil
-}
-
-func (db *DB) buildOtherIdxes(r *Record) error {
+func (db *DB) buildIdxes(r *Record) error {
 	switch r.H.Meta.Ds {
+	case DataStructureBTree:
+		db.buildBTreeIdx(r)
 	case DataStructureList:
 		if err := db.buildListIdx(r); err != nil {
 			return err
@@ -772,7 +694,7 @@ func (db *DB) buildNotDSIdxes(r *Record) {
 		db.deleteBucket(DataStructureSortedSet, r.Bucket)
 	}
 	if r.H.Meta.Flag == DataBPTreeBucketDeleteFlag {
-		db.deleteBucket(DataStructureTree, r.Bucket)
+		db.deleteBucket(DataStructureBTree, r.Bucket)
 	}
 	if r.H.Meta.Flag == DataListBucketDeleteFlag {
 		db.deleteBucket(DataStructureList, r.Bucket)
@@ -786,7 +708,7 @@ func (db *DB) deleteBucket(ds uint16, bucket string) {
 	if ds == DataStructureSortedSet {
 		delete(db.SortedSetIdx, bucket)
 	}
-	if ds == DataStructureTree {
+	if ds == DataStructureBTree {
 		delete(db.BTreeIdx, bucket)
 	}
 	if ds == DataStructureList {
