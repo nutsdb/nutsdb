@@ -52,10 +52,6 @@ func (db *DB) merge() error {
 		pendingMergeFIds []int
 	)
 
-	if db.opt.EntryIdxMode == HintBPTSparseIdxMode {
-		return ErrNotSupportHintBPTSparseIdxMode
-	}
-
 	// to prevent the initiation of multiple merges simultaneously.
 	db.mu.Lock()
 

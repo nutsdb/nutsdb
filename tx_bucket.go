@@ -21,9 +21,7 @@ func (tx *Tx) IterateBuckets(ds uint16, pattern string, f func(key string) bool)
 	if err := tx.checkTxIsClosed(); err != nil {
 		return err
 	}
-	if tx.db.opt.EntryIdxMode == HintBPTSparseIdxMode {
-		return ErrNotSupportHintBPTSparseIdxMode
-	}
+
 	if ds == DataStructureSet {
 		for bucket := range tx.db.SetIdx {
 			if end, err := MatchForRange(pattern, bucket, f); end || err != nil {
@@ -64,9 +62,6 @@ func (tx *Tx) IterateBuckets(ds uint16, pattern string, f func(key string) bool)
 func (tx *Tx) DeleteBucket(ds uint16, bucket string) error {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return err
-	}
-	if tx.db.opt.EntryIdxMode == HintBPTSparseIdxMode {
-		return ErrNotSupportHintBPTSparseIdxMode
 	}
 
 	ok, err := tx.ExistBucket(ds, bucket)

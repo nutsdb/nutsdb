@@ -400,55 +400,49 @@ func (tx *Tx) buildTxIDRootIdx(txID uint64) error {
 func (tx *Tx) buildTreeIdx(record *Record) {
 	bucket, key, meta, offset := record.Bucket, record.H.Key, record.H.Meta, record.H.DataPos
 
-	if tx.db.opt.EntryIdxMode == HintBPTSparseIdxMode {
-		newKey := getNewKey(bucket, key)
-		hint := NewHint().WithFileId(tx.db.ActiveFile.fileID).WithKey(newKey).WithMeta(meta).WithDataPos(offset)
-		_ = tx.db.ActiveBPTreeIdx.Insert(newKey, nil, hint, CountFlagDisabled)
-	} else {
-		if _, ok := tx.db.BTreeIdx[bucket]; !ok {
-			tx.db.BTreeIdx[bucket] = NewBTree()
+	if _, ok := tx.db.BTreeIdx[bucket]; !ok {
+		tx.db.BTreeIdx[bucket] = NewBTree()
+	}
+
+	if meta.Flag == DataSetFlag {
+		var value []byte
+		if tx.db.opt.EntryIdxMode == HintKeyValAndRAMIdxMode {
+			value = record.V
 		}
 
-		if meta.Flag == DataSetFlag {
-			var value []byte
-			if tx.db.opt.EntryIdxMode == HintKeyValAndRAMIdxMode {
-				value = record.V
-			}
+		if meta.TTL != Persistent {
+			db := tx.db
 
-			if meta.TTL != Persistent {
-				db := tx.db
-
-				callback := func() {
-					err := db.Update(func(tx *Tx) error {
-						if db.tm.exist(bucket, string(key)) {
-							return tx.Delete(bucket, key)
-						}
-						return nil
-					})
-					if err != nil {
-						log.Printf("occur error when expired deletion, error: %v", err.Error())
+			callback := func() {
+				err := db.Update(func(tx *Tx) error {
+					if db.tm.exist(bucket, string(key)) {
+						return tx.Delete(bucket, key)
 					}
+					return nil
+				})
+				if err != nil {
+					log.Printf("occur error when expired deletion, error: %v", err.Error())
 				}
-
-				now := time.UnixMilli(time.Now().UnixMilli())
-				expireTime := time.UnixMilli(int64(record.H.Meta.Timestamp))
-				expireTime = expireTime.Add(time.Duration(record.H.Meta.TTL) * time.Second)
-
-				if now.After(expireTime) {
-					return
-				}
-
-				tx.db.tm.add(bucket, string(key), expireTime.Sub(now), callback)
-			} else {
-				tx.db.tm.del(bucket, string(key))
 			}
 
-			hint := NewHint().WithFileId(tx.db.ActiveFile.fileID).WithKey(key).WithMeta(meta).WithDataPos(offset)
-			tx.db.BTreeIdx[bucket].Insert(key, value, hint)
-		} else if meta.Flag == DataDeleteFlag {
+			now := time.UnixMilli(time.Now().UnixMilli())
+			expireTime := time.UnixMilli(int64(record.H.Meta.Timestamp))
+			expireTime = expireTime.Add(time.Duration(record.H.Meta.TTL) * time.Second)
+
+			if now.After(expireTime) {
+				return
+			}
+
+			tx.db.tm.add(bucket, string(key), expireTime.Sub(now), callback)
+		} else {
 			tx.db.tm.del(bucket, string(key))
-			tx.db.BTreeIdx[bucket].Delete(key)
 		}
+
+		hint := NewHint().WithFileId(tx.db.ActiveFile.fileID).WithKey(key).WithMeta(meta).WithDataPos(offset)
+		tx.db.BTreeIdx[bucket].Insert(key, value, hint)
+	} else if meta.Flag == DataDeleteFlag {
+		tx.db.tm.del(bucket, string(key))
+		tx.db.BTreeIdx[bucket].Delete(key)
 	}
 }
 
@@ -557,7 +551,6 @@ func (tx *Tx) buildListIdx(record *Record) {
 // rotateActiveFile rotates log file when active file is not enough space to store the entry.
 func (tx *Tx) rotateActiveFile() error {
 	var err error
-	fID := tx.db.MaxFileID
 	tx.db.MaxFileID++
 
 	if !tx.db.opt.SyncEnable && tx.db.opt.RWMode == MMap {
@@ -568,48 +561,6 @@ func (tx *Tx) rotateActiveFile() error {
 
 	if err := tx.db.ActiveFile.rwManager.Release(); err != nil {
 		return err
-	}
-
-	if tx.db.opt.EntryIdxMode == HintBPTSparseIdxMode {
-		tx.db.ActiveBPTreeIdx.Filepath = getBPTPath(fID, tx.db.opt.Dir)
-		tx.db.ActiveBPTreeIdx.enabledKeyPosMap = true
-		tx.db.ActiveBPTreeIdx.SetKeyPosMap(tx.db.BPTreeKeyEntryPosMap)
-
-		err = tx.db.ActiveBPTreeIdx.WriteNodes(tx.db.opt.RWMode, tx.db.opt.SyncEnable, 1)
-		if err != nil {
-			return err
-		}
-
-		BPTreeRootIdx := &BPTreeRootIdx{
-			rootOff:   uint64(tx.db.ActiveBPTreeIdx.root.Address),
-			fID:       uint64(fID),
-			startSize: uint32(len(tx.db.ActiveBPTreeIdx.FirstKey)),
-			endSize:   uint32(len(tx.db.ActiveBPTreeIdx.LastKey)),
-			start:     tx.db.ActiveBPTreeIdx.FirstKey,
-			end:       tx.db.ActiveBPTreeIdx.LastKey,
-		}
-
-		_, err := BPTreeRootIdx.Persistence(getBPTRootPath(fID, tx.db.opt.Dir),
-			0, tx.db.opt.SyncEnable)
-		if err != nil {
-			return err
-		}
-
-		tx.db.BPTreeRootIdxes = append(tx.db.BPTreeRootIdxes, BPTreeRootIdx)
-
-		// clear and reset BPTreeKeyEntryPosMap
-		tx.db.BPTreeKeyEntryPosMap = nil
-		tx.db.BPTreeKeyEntryPosMap = make(map[string]int64)
-
-		// clear and reset ActiveBPTreeIdx
-		tx.db.ActiveBPTreeIdx = nil
-		tx.db.ActiveBPTreeIdx = NewTree()
-
-		tx.ReservedStoreTxIDIdxes[fID] = tx.db.ActiveCommittedTxIdsIdx
-
-		// clear and reset ActiveCommittedTxIdsIdx
-		tx.db.ActiveCommittedTxIdsIdx = nil
-		tx.db.ActiveCommittedTxIdsIdx = NewTree()
 	}
 
 	// reset ActiveFile
@@ -787,11 +738,9 @@ func (tx *Tx) isClosed() bool {
 }
 
 func (tx *Tx) buildIdxes(records []*Record) error {
-	var bucketMetaTemp BucketMeta
 
 	for _, record := range records {
-		bucket, key, meta := record.Bucket, record.H.Key, record.H.Meta
-		txID := meta.TxID
+		bucket, meta := record.Bucket, record.H.Meta
 
 		switch meta.Ds {
 		case DataStructureTree:
@@ -815,19 +764,6 @@ func (tx *Tx) buildIdxes(records []*Record) error {
 			}
 		}
 		tx.db.KeyCount++
-
-		if tx.db.opt.EntryIdxMode == HintBPTSparseIdxMode {
-			bucketMetaTemp = tx.buildTempBucketMetaIdx(bucket, key, bucketMetaTemp)
-			if meta.Status == Committed {
-				if err := tx.buildTxIDRootIdx(txID); err != nil {
-					return err
-				}
-
-				if err := tx.buildBucketMetaIdx(bucket, key, bucketMetaTemp); err != nil {
-					return err
-				}
-			}
-		}
 	}
 	return nil
 }

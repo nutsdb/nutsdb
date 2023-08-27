@@ -208,22 +208,6 @@ func open(opt Options) (*DB, error) {
 
 	db.flock = flock
 
-	if err := db.checkEntryIdxMode(); err != nil {
-		return nil, err
-	}
-
-	if opt.EntryIdxMode == HintBPTSparseIdxMode {
-		for _, subDir := range []string{
-			path.Join(db.opt.Dir, bptDir, "root"),
-			path.Join(db.opt.Dir, bptDir, "txid"),
-			path.Join(db.opt.Dir, "meta/bucket"),
-		} {
-			if err := createDirIfNotExist(subDir); err != nil {
-				return nil, err
-			}
-		}
-	}
-
 	if err := db.buildIndexes(); err != nil {
 		return nil, fmt.Errorf("db.buildIndexes error: %s", err)
 	}
@@ -242,42 +226,6 @@ func Open(options Options, ops ...Option) (*DB, error) {
 		do(opts)
 	}
 	return open(*opts)
-}
-
-func (db *DB) checkEntryIdxMode() error {
-	hasDataFlag := false
-	hasBptDirFlag := false
-
-	files, err := ioutil.ReadDir(db.opt.Dir)
-	if err != nil {
-		return err
-	}
-
-	for _, f := range files {
-		id := f.Name()
-
-		fileSuffix := path.Ext(path.Base(id))
-		if fileSuffix == DataSuffix {
-			hasDataFlag = true
-			if hasBptDirFlag {
-				break
-			}
-		}
-
-		if id == bptDir {
-			hasBptDirFlag = true
-		}
-	}
-
-	if db.opt.EntryIdxMode != HintBPTSparseIdxMode && hasDataFlag && hasBptDirFlag {
-		return errors.New("not support HintBPTSparseIdxMode switch to the other EntryIdxMode")
-	}
-
-	if db.opt.EntryIdxMode == HintBPTSparseIdxMode && !hasBptDirFlag && hasDataFlag {
-		return errors.New("not support the other EntryIdxMode switch to HintBPTSparseIdxMode")
-	}
-
-	return nil
 }
 
 // Update executes a function within a managed read/write transaction.
@@ -614,23 +562,10 @@ func (db *DB) parseDataFiles(dataFileIds []int) (err error) {
 			h := NewHint().WithKey(entry.Key).WithFileId(fID).WithMeta(entry.Meta).WithDataPos(uint64(off))
 			r := NewRecord().WithBucket(entry.GetBucketString()).WithValue(entry.Value).WithHint(h)
 
-			if db.opt.EntryIdxMode == HintBPTSparseIdxMode {
-				db.BPTreeKeyEntryPosMap[string(getNewKey(string(entry.Bucket), entry.Key))] = off
-			}
-
 			if r.H.Meta.Ds == DataStructureTree {
 				r.H.Meta.Status = Committed
 
-				// only if in HintKeyValAndRAMIdxMode, set the value of record
-				db.resetRecordByMode(r)
-
-				if db.opt.EntryIdxMode == HintBPTSparseIdxMode {
-					if err = db.buildActiveBPTreeIdx(r); err != nil {
-						return err
-					}
-				} else {
-					db.buildBTreeIdx(r)
-				}
+				db.buildBTreeIdx(r)
 			} else {
 				if r.H.Meta.Ds == DataStructureNone {
 					db.buildNotDSIdxes(r)
@@ -701,10 +636,6 @@ func (db *DB) parseDataFiles(dataFileIds []int) (err error) {
 		return nil
 	}
 
-	if db.opt.EntryIdxMode == HintBPTSparseIdxMode {
-		dataFileIds = dataFileIds[len(dataFileIds)-1:]
-	}
-
 	for _, dataID := range dataFileIds {
 		off = 0
 		fID = int64(dataID)
@@ -715,12 +646,6 @@ func (db *DB) parseDataFiles(dataFileIds []int) (err error) {
 		}
 		err := readEntriesFromFile()
 		if err != nil {
-			return err
-		}
-	}
-
-	if HintBPTSparseIdxMode == db.opt.EntryIdxMode {
-		if err = db.buildBPTreeRootIdxes(dataFileIds); err != nil {
 			return err
 		}
 	}
@@ -769,6 +694,8 @@ func (db *DB) buildBPTreeRootIdxes(dataFileIds []int) error {
 }
 
 func (db *DB) buildBTreeIdx(r *Record) {
+	db.resetRecordByMode(r)
+
 	if r.IsExpired() {
 		return
 	}
@@ -814,39 +741,6 @@ func (db *DB) buildActiveBPTreeIdx(r *Record) error {
 	newKey := getNewKey(r.Bucket, r.H.Key)
 	if err := db.ActiveBPTreeIdx.Insert(newKey, r.V, r.H, CountFlagEnabled); err != nil {
 		return fmt.Errorf("when build BPTreeIdx insert index err: %s", err)
-	}
-
-	return nil
-}
-
-func (db *DB) buildBucketMetaIdx() error {
-	if db.opt.EntryIdxMode == HintBPTSparseIdxMode {
-		files, err := ioutil.ReadDir(getBucketMetaPath(db.opt.Dir))
-		if err != nil {
-			return err
-		}
-
-		if len(files) != 0 {
-			for _, f := range files {
-				name := f.Name()
-				fileSuffix := path.Ext(path.Base(name))
-				if fileSuffix != BucketMetaSuffix {
-					continue
-				}
-
-				name = strings.TrimSuffix(name, BucketMetaSuffix)
-
-				bucketMeta, err := ReadBucketMeta(getBucketMetaFilePath(name, db.opt.Dir))
-				if err == io.EOF {
-					break
-				}
-				if err != nil {
-					return err
-				}
-
-				db.bucketMetas[name] = bucketMeta
-			}
-		}
 	}
 
 	return nil
@@ -1046,10 +940,6 @@ func (db *DB) buildIndexes() (err error) {
 	}
 
 	if dataFileIds == nil && maxFileID == 0 {
-		return
-	}
-
-	if err = db.buildBucketMetaIdx(); err != nil {
 		return
 	}
 
