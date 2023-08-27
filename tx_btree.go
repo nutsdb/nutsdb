@@ -172,7 +172,7 @@ func (tx *Tx) Delete(bucket string, key []byte) error {
 
 	if idx, ok := tx.db.BTreeIdx[bucket]; ok {
 		if _, found := idx.Find(key); !found {
-			return ErrNotFoundKey
+			return ErrKeyNotFound
 		}
 	} else {
 		return ErrNotFoundBucket

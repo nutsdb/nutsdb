@@ -418,5 +418,5 @@ func ErrBucketAndKey(bucket string, key []byte) error {
 
 // ErrNotFoundKeyInBucket returns when key not in the bucket.
 func ErrNotFoundKeyInBucket(bucket string, key []byte) error {
-	return errors.Wrapf(ErrKeyNotFound, "%s is not found in %s", key, bucket)
+	return errors.Wrapf(ErrNotFoundKey, "%s is not found in %s", key, bucket)
 }
