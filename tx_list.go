@@ -20,7 +20,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nutsdb/nutsdb/ds/list"
 	"github.com/pkg/errors"
 	"github.com/xujiajun/utils/strconv2"
 )
@@ -215,7 +214,7 @@ func (tx *Tx) LRem(bucket string, key []byte, count int, value []byte) error {
 	}
 
 	if count > size || count < -size {
-		return list.ErrCount
+		return ErrCount
 	}
 
 	buffer.Write([]byte(strconv2.IntToStr(count)))
@@ -251,7 +250,7 @@ func (tx *Tx) LSet(bucket string, key []byte, index int, value []byte) error {
 
 	size, _ := tx.LSize(bucket, key)
 	if index < 0 || index >= size {
-		return list.ErrIndexOutOfRange
+		return ErrIndexOutOfRange
 	}
 
 	buffer.Write(key)

@@ -26,6 +26,9 @@ var (
 
 	// ErrIndexOutOfRange is returned when use LSet function set index out of range.
 	ErrIndexOutOfRange = errors.New("index out of range")
+
+	// ErrCount is returned when count is error.
+	ErrCount = errors.New("err count")
 )
 
 // List represents the list.
