@@ -184,20 +184,6 @@ func TestDB_DeleteANonExistKey(t *testing.T) {
 	})
 }
 
-func TestDB_BPTSparse(t *testing.T) {
-	opts := DefaultOptions
-	opts.EntryIdxMode = HintBPTSparseIdxMode
-	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
-		bucket1, bucket2 := "AA", "AAB"
-		key1, key2 := []byte("BB"), []byte("B")
-		val1, val2 := []byte("key1"), []byte("key2")
-		txPut(t, db, bucket1, key1, val1, Persistent, nil)
-		txPut(t, db, bucket2, key2, val2, Persistent, nil)
-		txGet(t, db, bucket1, key1, val1, nil)
-		txGet(t, db, bucket2, key2, val2, nil)
-	})
-}
-
 func txSAdd(t *testing.T, db *DB, bucket string, key, value []byte, expectErr error) {
 	err := db.Update(func(tx *Tx) error {
 		err := tx.SAdd(bucket, key, value)
@@ -718,15 +704,6 @@ func withRAMIdxDB(t *testing.T, fn func(t *testing.T, db *DB)) {
 	withDBOption(t, opt, fn)
 }
 
-func withBPTSparseIdxDB(t *testing.T, fn func(t *testing.T, db *DB)) {
-	tmpdir, _ := os.MkdirTemp("", "nutsdb")
-	opt := DefaultOptions
-	opt.Dir = tmpdir
-	opt.EntryIdxMode = HintBPTSparseIdxMode
-
-	withDBOption(t, opt, fn)
-}
-
 func TestDB_HintKeyValAndRAMIdxMode_RestartDB(t *testing.T) {
 
 	opts := DefaultOptions
@@ -759,25 +736,6 @@ func TestDB_HintKeyAndRAMIdxMode_RestartDB(t *testing.T) {
 		db.Close()
 
 		// restart db with HintKeyAndRAMIdxMode EntryIdxMode
-		db, err := Open(db.opt)
-		require.NoError(t, err)
-		txGet(t, db, bucket, key, val, nil)
-	})
-}
-
-func TestDB_HintBPTSparseIdxMode_RestartDB(t *testing.T) {
-	opts := DefaultOptions
-	opts.EntryIdxMode = HintBPTSparseIdxMode
-	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
-		bucket := "bucket"
-		key := GetTestBytes(0)
-		val := GetTestBytes(0)
-
-		txPut(t, db, bucket, key, val, Persistent, nil)
-		txGet(t, db, bucket, key, val, nil)
-		db.Close()
-
-		// restart db with HintBPTSparseIdxMode EntryIdxMode
 		db, err := Open(db.opt)
 		require.NoError(t, err)
 		txGet(t, db, bucket, key, val, nil)

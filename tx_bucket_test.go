@@ -72,18 +72,3 @@ func TestBucket_DeleteBucket(t *testing.T) {
 		txDeleteBucket(t, db, DataStructureNone, "none_bucket", ErrDataStructureNotSupported)
 	})
 }
-
-func TestBucket_HintBPTSparseIdxMode(t *testing.T) {
-	opt = DefaultOptions
-	opt.Dir = "/tmp/nutsdbtestbuckettxx"
-	opt.SegmentSize = 8 * 1024
-	opt.EntryIdxMode = HintBPTSparseIdxMode
-
-	runNutsDBTest(t, &opt, func(t *testing.T, db *DB) {
-		txIterateBuckets(t, db, DataStructureList, "*", func(bucket string) bool {
-			return true
-		}, ErrNotSupportHintBPTSparseIdxMode)
-
-		txDeleteBucket(t, db, DataStructureList, "", ErrNotSupportHintBPTSparseIdxMode)
-	})
-}
