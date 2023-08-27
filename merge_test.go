@@ -241,14 +241,3 @@ func TestDB_MergeWithTx(t *testing.T) {
 		}
 	})
 }
-
-func TestDB_MergeInHintBPTSparseIdxMode(t *testing.T) {
-	opts := DefaultOptions
-	opts.EntryIdxMode = HintBPTSparseIdxMode
-
-	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
-		err := db.Merge()
-		require.Error(t, err)
-		require.Equal(t, ErrNotSupportHintBPTSparseIdxMode, err)
-	})
-}

@@ -21,6 +21,11 @@ import (
 	"testing"
 )
 
+var (
+	keyFormat = "key_%03d"
+	valFormat = "val_%03d"
+)
+
 func runBTreeTest(t *testing.T, test func(t *testing.T, btree *BTree)) {
 	btree := NewBTree()
 

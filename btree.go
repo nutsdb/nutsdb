@@ -16,8 +16,14 @@ package nutsdb
 
 import (
 	"bytes"
+	"errors"
 	"github.com/tidwall/btree"
 	"regexp"
+)
+
+var (
+	// ErrKeyNotFound is returned when the key is not in the b tree.
+	ErrKeyNotFound = errors.New("key not found")
 )
 
 type Item struct {

@@ -25,9 +25,6 @@ const (
 
 	// HintKeyAndRAMIdxMode represents ram index (only key) mode.
 	HintKeyAndRAMIdxMode
-
-	// HintBPTSparseIdxMode represents b+ tree sparse index mode.
-	HintBPTSparseIdxMode
 )
 
 type ExpiredDeleteType uint8

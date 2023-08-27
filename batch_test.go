@@ -125,7 +125,7 @@ func TestBatchWrite(t *testing.T) {
 		}
 	}
 
-	dbs := make([]*DB, 9)
+	dbs := make([]*DB, 6)
 	dbs[0], _ = Open(
 		DefaultOptions,
 		WithDir(fileDir1),
@@ -138,43 +138,26 @@ func TestBatchWrite(t *testing.T) {
 	)
 	dbs[2], _ = Open(
 		DefaultOptions,
-		WithDir(fileDir3),
-		WithEntryIdxMode(HintBPTSparseIdxMode),
-	)
-	dbs[3], _ = Open(
-		DefaultOptions,
 		WithDir(fileDir4),
 		WithEntryIdxMode(HintKeyValAndRAMIdxMode),
 		WithMaxBatchCount(195),
 	)
-	dbs[4], _ = Open(
+	dbs[3], _ = Open(
 		DefaultOptions,
 		WithDir(fileDir5),
 		WithEntryIdxMode(HintKeyAndRAMIdxMode),
 		WithMaxBatchCount(195),
 	)
-	dbs[5], _ = Open(
-		DefaultOptions,
-		WithDir(fileDir6),
-		WithEntryIdxMode(HintBPTSparseIdxMode),
-		WithMaxBatchCount(195),
-	)
-	dbs[6], _ = Open(
+	dbs[4], _ = Open(
 		DefaultOptions,
 		WithDir(fileDir7),
 		WithEntryIdxMode(HintKeyValAndRAMIdxMode),
 		WithMaxBatchSize(1000), // change to 1000, unit test is not ok, 1000000 is ok
 	)
-	dbs[7], _ = Open(
+	dbs[5], _ = Open(
 		DefaultOptions,
 		WithDir(fileDir8),
 		WithEntryIdxMode(HintKeyAndRAMIdxMode),
-		WithMaxBatchSize(1000),
-	)
-	dbs[8], _ = Open(
-		DefaultOptions,
-		WithDir(fileDir9),
-		WithEntryIdxMode(HintBPTSparseIdxMode),
 		WithMaxBatchSize(1000),
 	)
 
