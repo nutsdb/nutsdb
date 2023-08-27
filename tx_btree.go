@@ -121,7 +121,6 @@ func (tx *Tx) RangeScan(bucket string, start, end []byte) (es Entries, err error
 // PrefixScan iterates over a key prefix at given bucket, prefix and limitNum.
 // LimitNum will limit the number of entries return.
 func (tx *Tx) PrefixScan(bucket string, prefix []byte, offsetNum int, limitNum int) (es Entries, err error) {
-
 	if err := tx.checkTxIsClosed(); err != nil {
 		return nil, err
 	}
@@ -144,7 +143,6 @@ func (tx *Tx) PrefixScan(bucket string, prefix []byte, offsetNum int, limitNum i
 // PrefixSearchScan iterates over a key prefix at given bucket, prefix, match regular expression and limitNum.
 // LimitNum will limit the number of entries return.
 func (tx *Tx) PrefixSearchScan(bucket string, prefix []byte, reg string, offsetNum int, limitNum int) (es Entries, err error) {
-
 	if err := tx.checkTxIsClosed(); err != nil {
 		return nil, err
 	}
@@ -172,7 +170,7 @@ func (tx *Tx) Delete(bucket string, key []byte) error {
 
 	if idx, ok := tx.db.BTreeIdx[bucket]; ok {
 		if _, found := idx.Find(key); !found {
-			return ErrNotFoundKey
+			return ErrKeyNotFound
 		}
 	} else {
 		return ErrNotFoundBucket

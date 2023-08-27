@@ -65,7 +65,7 @@ func (s *Set) SAdd(key string, values [][]byte, records []*Record) error {
 func (s *Set) SRem(key string, values ...[]byte) error {
 	set, ok := s.M[key]
 	if !ok {
-		return ErrKeyNotFound
+		return ErrSetNotExist
 	}
 
 	if len(values) == 0 || values[0] == nil {

@@ -261,8 +261,8 @@ func TestTx_SMoveByTwoBuckets(t *testing.T) {
 		txSIsMember(t, db, bucket1, key1, val2, false)
 		txSIsMember(t, db, bucket2, key2, val2, true)
 
-		txSMoveByTwoBuckets(t, db, bucket1, fakeKey1, bucket2, key2, val2, false, ErrKeyNotFound)
-		txSMoveByTwoBuckets(t, db, bucket1, key1, bucket2, fakeKey2, val2, false, ErrKeyNotFound)
+		txSMoveByTwoBuckets(t, db, bucket1, fakeKey1, bucket2, key2, val2, false, ErrNotFoundKey)
+		txSMoveByTwoBuckets(t, db, bucket1, key1, bucket2, fakeKey2, val2, false, ErrNotFoundKey)
 		txSMoveByTwoBuckets(t, db, fmt.Sprintf(fakeBucket, 1), key1, bucket2, key2, val2, false, ErrBucketNotFound)
 		txSMoveByTwoBuckets(t, db, bucket1, key1, fmt.Sprintf(fakeBucket, 2), key2, val2, false, ErrBucketNotFound)
 		txSMoveByTwoBuckets(t, db, fmt.Sprintf(fakeBucket, 1), key1, fmt.Sprintf(fakeBucket, 2), key2, val2, false, ErrBucketNotFound)
@@ -319,8 +319,8 @@ func TestTx_SUnionByTwoBuckets(t *testing.T) {
 
 		txSUnionByTwoBuckets(t, db, fmt.Sprintf(fakeBucket, 1), key1, bucket2, key2, nil, ErrBucketNotFound)
 		txSUnionByTwoBuckets(t, db, bucket1, key1, fmt.Sprintf(fakeBucket, 2), key2, nil, ErrBucketNotFound)
-		txSUnionByTwoBuckets(t, db, bucket1, fakeKey1, bucket2, key2, nil, ErrKeyNotFound)
-		txSUnionByTwoBuckets(t, db, bucket1, key1, bucket2, fakeKey2, nil, ErrKeyNotFound)
+		txSUnionByTwoBuckets(t, db, bucket1, fakeKey1, bucket2, key2, nil, ErrNotFoundKey)
+		txSUnionByTwoBuckets(t, db, bucket1, key1, bucket2, fakeKey2, nil, ErrNotFoundKey)
 	})
 }
 
@@ -422,5 +422,5 @@ func TestErrNotFoundKeyInBucket(t *testing.T) {
 	got := ErrNotFoundKeyInBucket("foo", []byte("bar"))
 
 	assert.True(t,
-		errors.Is(got, ErrKeyNotFound))
+		errors.Is(got, ErrNotFoundKey))
 }
