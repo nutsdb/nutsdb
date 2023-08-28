@@ -45,4 +45,7 @@ var (
 
 	// ErrTxnTooBig is returned if too many writes are fit into a single transaction.
 	ErrTxnTooBig = errors.New("Txn is too big to fit into one request")
+
+	// ErrTxnExceedWriteLimit is returned when this tx's write is exceed max write record
+	ErrTxnExceedWriteLimit = errors.New("Txn is exceed max write record count")
 )

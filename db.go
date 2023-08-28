@@ -154,6 +154,7 @@ type (
 		mergeWorkCloseCh chan struct{}
 		writeCh          chan *request
 		tm               *ttlManager
+		RecordCount             int64 // current valid record count, exclude deleted, repeated
 	}
 )
 
@@ -619,7 +620,38 @@ func (db *DB) parseDataFiles(dataFileIds []int) (err error) {
 		}
 	}
 
+	// compute the valid record count and save it in db.RecordCount
+	db.RecordCount = db.getRecordCount()
 	return
+}
+
+func (db *DB) getRecordCount() int64 {
+	var res int64
+	for _, btree := range db.BTreeIdx {
+		res += int64(btree.Count())
+	}
+
+	for _, listItem := range db.Index.list {
+		for key, _ := range listItem.Items {
+			curLen, _ := listItem.Size(key)
+			res += int64(curLen)
+		}
+	}
+
+	for _, setItem := range db.SetIdx {
+		for key, _ := range setItem.M {
+			res += int64(setItem.SCard(key))
+		}
+	}
+
+	for _, zsetItem := range db.SortedSetIdx {
+		for key, _ := range zsetItem.M {
+			curLen, _ := zsetItem.ZCard(key)
+			res += int64(curLen)
+		}
+	}
+
+	return res
 }
 
 func (db *DB) buildBTreeIdx(r *Record) {

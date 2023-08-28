@@ -196,6 +196,15 @@ func (tx *Tx) Commit() (err error) {
 		return ErrDBClosed
 	}
 
+	// judge current tx is whether more than the db.MaxWriteRecordCount
+	var curWriteCount int64
+	if tx.db.opt.MaxWriteRecordCount > 0 {
+		curWriteCount = tx.getNewAddRecordCount()
+		if tx.db.RecordCount+curWriteCount > tx.db.opt.MaxWriteRecordCount {
+			return ErrTxnExceedWriteLimit
+		}
+	}
+
 	tx.setStatusCommitting()
 	defer tx.setStatusClosed()
 
@@ -257,7 +266,108 @@ func (tx *Tx) Commit() (err error) {
 		return err
 	}
 
+	if tx.db.opt.MaxWriteRecordCount > 0 {
+		tx.db.RecordCount += curWriteCount
+	}
+
 	return nil
+}
+
+func (tx *Tx) getNewAddRecordCount() int64 {
+	var res int64
+	writeLen := len(tx.pendingWrites)
+	for i := 0; i < writeLen; i++ {
+		entry := tx.pendingWrites[i]
+		res += tx.getEntryNewAddRecordCount(entry)
+	}
+
+	return res
+}
+
+func (tx *Tx) getEntryNewAddRecordCount(entry *Entry) int64 {
+	var res int64
+	bucket := string(entry.Bucket)
+	key := entry.Key
+	value := entry.Value
+	isFilter := entry.isFilter()
+	if entry.Meta.Ds == DataStructureBTree {
+		oldEntry, _ := tx.Get(string(bucket), key)
+		if isFilter {
+			if oldEntry != nil {
+				res -= 1
+			}
+		} else {
+			if oldEntry == nil {
+				res += 1
+			}
+		}
+	} else if entry.Meta.Ds == DataStructureList {
+		if entry.Meta.Flag != DataExpireListFlag {
+			if isFilter {
+				res -= 1
+			} else {
+				res += 1
+			}
+		}
+	} else if entry.Meta.Ds == DataStructureSet {
+		isMember, _ := tx.SIsMember(bucket, key, value)
+		if isFilter {
+			if isMember {
+				res -= 1
+			}
+		} else {
+			if !isMember {
+				res += 1
+			}
+		}
+	} else if entry.Meta.Ds == DataStructureSortedSet {
+		exist, _ := tx.db.SortedSetIdx[bucket].ZExist(string(key), value)
+		if isFilter {
+			if exist {
+				res -= 1
+			}
+		} else {
+			if !exist {
+				res += 1
+			}
+		}
+	} else if entry.Meta.Ds == DataStructureNone {
+		res -= tx.getBucketDeleteRecordCount(entry)
+	}
+
+	return res
+}
+
+func (tx *Tx) getBucketDeleteRecordCount(entry *Entry) int64 {
+	bucket := string(entry.Bucket)
+	var res int64
+	if entry.Meta.Flag == DataBPTreeBucketDeleteFlag {
+		if _, ok := tx.db.BTreeIdx[bucket]; ok {
+			res = int64(tx.db.BTreeIdx[bucket].Count())
+		}
+	} else if entry.Meta.Flag == DataSetBucketDeleteFlag {
+		if _, ok := tx.db.SetIdx[bucket]; ok {
+			for key, _ := range tx.db.SetIdx[bucket].M {
+				res = int64(tx.db.SetIdx[bucket].SCard(key))
+			}
+		}
+	} else if entry.Meta.Flag == DataSortedSetBucketDeleteFlag {
+		if _, ok := tx.db.SortedSetIdx[bucket]; ok {
+			for key, _ := range tx.db.SortedSetIdx[bucket].M {
+				curLen, _ := tx.db.SortedSetIdx[bucket].ZCard(key)
+				res = int64(curLen)
+			}
+		}
+	} else if entry.Meta.Flag == DataListBucketDeleteFlag {
+		if _, ok := tx.db.Index.list[bucket]; ok {
+			for key, _ := range tx.db.Index.list[bucket].Items {
+				curLen, _ := tx.db.Index.list[bucket].Size(key)
+				res = int64(curLen)
+			}
+		}
+	}
+
+	return res
 }
 
 func (tx *Tx) allocCommitBuffer() *bytes.Buffer {
