@@ -199,8 +199,11 @@ func (tx *Tx) Commit() (err error) {
 	// judge current tx is whether more than the db.MaxWriteRecordCount
 	var curWriteCount int64
 	if tx.db.opt.MaxWriteRecordCount > 0 {
-		curWriteCount = tx.getNewAddRecordCount()
-		if tx.db.RecordCount+curWriteCount > tx.db.opt.MaxWriteRecordCount {
+		curWriteCount, err = tx.getNewAddRecordCount()
+		if err != nil {
+			return err
+		}
+		if tx.db.RecordCount + curWriteCount > tx.db.opt.MaxWriteRecordCount {
 			return ErrTxnExceedWriteLimit
 		}
 	}
@@ -273,18 +276,76 @@ func (tx *Tx) Commit() (err error) {
 	return nil
 }
 
-func (tx *Tx) getNewAddRecordCount() int64 {
+func (tx *Tx) getNewAddRecordCount() (int64, error) {
 	var res int64
 	writeLen := len(tx.pendingWrites)
 	for i := 0; i < writeLen; i++ {
 		entry := tx.pendingWrites[i]
-		res += tx.getEntryNewAddRecordCount(entry)
+		curRecordCnt, err := tx.getEntryNewAddRecordCount(entry)
+		if err != nil {
+			return res, err
+		}
+		res += curRecordCnt
 	}
 
-	return res
+	return res, nil
 }
 
-func (tx *Tx) getEntryNewAddRecordCount(entry *Entry) int64 {
+func (tx *Tx) getListEntryNewAddRecordCount(entry *Entry) (int64, error) {
+	var res int64
+	if entry.Meta.Flag == DataExpireListFlag {
+		return 0, nil
+	}
+
+	bucket := string(entry.Bucket)
+	key := string(entry.Key)
+	value := string(entry.Value)
+	l := tx.db.Index.getList(bucket)
+
+	if entry.Meta.Flag == DataLRemFlag {
+		count, newValue := splitCountValue(value)
+		removeIndices, err := l.getRemoveIndices(key, count, func(r *Record) (bool, error) {
+			v, err := tx.db.getValueByRecord(r)
+			if err != nil {
+				return false, err
+			}
+			return bytes.Equal([]byte(newValue), v), nil
+		})
+		if err != nil {
+			return 0, err
+		}
+		res -= int64(len(removeIndices))
+	} else if entry.Meta.Flag == DataLRemByIndex {
+		indexes, _ := UnmarshalInts([]byte(value))
+		res -= int64(len(l.getValidIndexs(key, indexes)))
+	} else if entry.Meta.Flag == DataLTrimFlag {
+		newKey, start := splitKeyStart(key)
+		end, _ := strconv2.StrToInt(value)
+
+		if l.IsExpire(key) {
+			return 0, nil
+		}
+
+		if _, ok := l.Items[key]; !ok {
+			return 0, nil
+		}
+
+		items, err := l.LRange(newKey, start, end)
+		if err != nil {
+			return res, err
+		}
+		list := l.Items[key]
+		res -= int64(list.Size() - len(items))
+	} else if entry.isFilter() {
+		res -= 1
+	} else {
+		res += 1
+	}
+
+	return res, nil
+}
+
+func (tx *Tx) getEntryNewAddRecordCount(entry *Entry) (int64, error) {
 	var res int64
 	bucket := string(entry.Bucket)
 	key := entry.Key
@@ -302,12 +363,9 @@ func (tx *Tx) getEntryNewAddRecordCount(entry *Entry) int64 {
 			}
 		}
 	} else if entry.Meta.Ds == DataStructureList {
-		if entry.Meta.Flag != DataExpireListFlag {
-			if isFilter {
-				res -= 1
-			} else {
-				res += 1
-			}
+		res, err := tx.getListEntryNewAddRecordCount(entry)
+		if err != nil {
+			return res, err
 		}
 	} else if entry.Meta.Ds == DataStructureSet {
 		isMember, _ := tx.SIsMember(bucket, key, value)
@@ -321,21 +379,30 @@ func (tx *Tx) getEntryNewAddRecordCount(entry *Entry) int64 {
 			}
 		}
 	} else if entry.Meta.Ds == DataStructureSortedSet {
-		exist, _ := tx.db.SortedSetIdx[bucket].ZExist(string(key), value)
-		if isFilter {
-			if exist {
-				res -= 1
+		if entry.Meta.Flag == DataZRemRangeByRankFlag {
+			start, end := splitStartEnd(string(value))
+			delNodes, err := tx.db.SortedSetIdx[bucket].getZRemRangeByRankNodes(string(key), start, end)
+			if err != nil {
+				return res, err
 			}
+			res -= int64(len(delNodes))
 		} else {
-			if !exist {
-				res += 1
+			exist, _ := tx.db.SortedSetIdx[bucket].ZExist(string(key), value)
+			if isFilter {
+				if exist {
+					res -= 1
+				}
+			} else {
+				if !exist {
+					res += 1
+				}
 			}
 		}
 	} else if entry.Meta.Ds == DataStructureNone {
 		res -= tx.getBucketDeleteRecordCount(entry)
 	}
 
-	return res
+	return res, nil
 }
 
 func (tx *Tx) getBucketDeleteRecordCount(entry *Entry) int64 {
@@ -474,9 +541,7 @@ func (tx *Tx) buildSortedSetIdx(record *Record) {
 	case DataZRemFlag:
 		_, _ = tx.db.SortedSetIdx[bucket].ZRem(string(key), value)
 	case DataZRemRangeByRankFlag:
-		startAndEnd := strings.Split(string(value), SeparatorForZSetKey)
-		start, _ := strconv2.StrToInt(startAndEnd[0])
-		end, _ := strconv2.StrToInt(startAndEnd[1])
+		start, end := splitStartEnd(string(value))
 		_ = tx.db.SortedSetIdx[bucket].ZRemRangeByRank(string(key), start, end)
 	case DataZPopMaxFlag:
 		_, _, _ = tx.db.SortedSetIdx[bucket].ZPopMax(string(key))
@@ -507,18 +572,7 @@ func (tx *Tx) buildListIdx(record *Record) {
 	case DataRPushFlag:
 		_ = l.RPush(string(key), record)
 	case DataLRemFlag:
-		countAndValue := strings.Split(string(value), SeparatorForListKey)
-		count, _ := strconv2.StrToInt(countAndValue[0])
-		newValue := countAndValue[1]
-
-		_ = l.LRem(string(key), count, func(r *Record) (bool, error) {
-			v, err := tx.db.getValueByRecord(r)
-			if err != nil {
-				return false, err
-			}
-			return bytes.Equal([]byte(newValue), v), nil
-		})
-
+		tx.buildListLRemIdx(value, l, key)
 	case DataLPopFlag:
 		_, _ = l.LPop(string(key))
 	case DataRPopFlag:
@@ -529,15 +583,25 @@ func (tx *Tx) buildListIdx(record *Record) {
 		index, _ := strconv2.StrToInt(keyAndIndex[1])
 		_ = l.LSet(newKey, index, record)
 	case DataLTrimFlag:
-		keyAndStartIndex := strings.Split(string(key), SeparatorForListKey)
-		newKey := keyAndStartIndex[0]
-		start, _ := strconv2.StrToInt(keyAndStartIndex[1])
+		newKey, start := splitKeyStart(string(key))
 		end, _ := strconv2.StrToInt(string(value))
 		_ = l.LTrim(newKey, start, end)
 	case DataLRemByIndex:
 		indexes, _ := UnmarshalInts(value)
 		_ = l.LRemByIndex(string(key), indexes)
 	}
+}
+
+func (tx *Tx) buildListLRemIdx(value []byte, l *List, key []byte) {
+	count, newValue := splitCountValue(string(value))
+
+	_ = l.LRem(string(key), count, func(r *Record) (bool, error) {
+		v, err := tx.db.getValueByRecord(r)
+		if err != nil {
+			return false, err
+		}
+		return bytes.Equal([]byte(newValue), v), nil
+	})
 }
 
 // rotateActiveFile rotates log file when active file is not enough space to store the entry.

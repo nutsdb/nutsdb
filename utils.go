@@ -21,6 +21,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/xujiajun/utils/filesystem"
 	"github.com/xujiajun/utils/strconv2"
@@ -114,4 +115,25 @@ func createDirIfNotExist(dir string) error {
 		}
 	}
 	return nil
+}
+
+func splitCountValue(str string) (int, string) {
+	countAndValue := strings.Split(str, SeparatorForListKey)
+	count, _ := strconv2.StrToInt(countAndValue[0])
+	newValue := countAndValue[1]
+	return count, newValue
+}
+
+func splitKeyStart(str string) (string, int) {
+	keyAndStartIndex := strings.Split(str, SeparatorForListKey)
+	newKey := keyAndStartIndex[0]
+	start, _ := strconv2.StrToInt(keyAndStartIndex[1])
+    return newKey, start
+}
+
+func splitStartEnd(str string) (int, int) {
+	startAndEnd := strings.Split(str, SeparatorForZSetKey)
+	start, _ := strconv2.StrToInt(startAndEnd[0])
+	end, _ := strconv2.StrToInt(startAndEnd[1])
+	return start, end
 }
