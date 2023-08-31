@@ -891,7 +891,7 @@ func TestTx_SmallFile(t *testing.T) {
 	opts.EntryIdxMode = HintKeyAndRAMIdxMode
 	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
 		bucket := "bucket"
-		db.Update(func(tx *Tx) error {
+		err := db.Update(func(tx *Tx) error {
 			for i := 0; i < 100; i++ {
 				err := tx.Put(bucket, GetTestBytes(i), GetTestBytes(i), Persistent)
 				if err != nil {
@@ -900,6 +900,7 @@ func TestTx_SmallFile(t *testing.T) {
 			}
 			return nil
 		})
+		require.Nil(t, err)
 		require.NoError(t, db.Close())
 		db, _ = Open(opts)
 
