@@ -19,33 +19,28 @@ type IdxType interface {
 }
 
 type op[T IdxType] interface {
-	exist(bucket string) (*T, bool)
+	add(bucket string, f func() *T)
 
-	getIdx() map[string]*T
-
-	computeIfPresent(bucket string, f func() *T) *T
+	computeIfAbsent(bucket string, f func() *T) *T
 
 	delete(bucket string)
 
-	rangeIdx(f func(l *T))
+	exist(bucket string) (*T, bool)
 
 	handleIdxBucket(f func(bucket string) error) error
+
+	rangeIdx(f func(l *T))
 }
 
 type defaultOp[T IdxType] struct {
 	idx map[string]*T
 }
 
-func (op *defaultOp[T]) exist(bucket string) (*T, bool) {
-	i, isExist := op.idx[bucket]
-	return i, isExist
+func (op *defaultOp[T]) add(bucket string, f func() *T) {
+	op.idx[bucket] = f()
 }
 
-func (op *defaultOp[T]) getIdx() map[string]*T {
-	return op.idx
-}
-
-func (op *defaultOp[T]) computeIfPresent(bucket string, f func() *T) *T {
+func (op *defaultOp[T]) computeIfAbsent(bucket string, f func() *T) *T {
 	if i, isExist := op.idx[bucket]; isExist {
 		return i
 	}
@@ -58,14 +53,9 @@ func (op *defaultOp[T]) delete(bucket string) {
 	delete(op.idx, bucket)
 }
 
-func (op *defaultOp[T]) add(bucket string, f func() *T) {
-	op.idx[bucket] = f()
-}
-
-func (op *defaultOp[T]) rangeIdx(f func(l *T)) {
-	for _, l := range op.idx {
-		f(l)
-	}
+func (op *defaultOp[T]) exist(bucket string) (*T, bool) {
+	i, isExist := op.idx[bucket]
+	return i, isExist
 }
 
 func (op *defaultOp[T]) handleIdxBucket(f func(bucket string) error) error {
@@ -78,12 +68,18 @@ func (op *defaultOp[T]) handleIdxBucket(f func(bucket string) error) error {
 	return nil
 }
 
+func (op *defaultOp[T]) rangeIdx(f func(l *T)) {
+	for _, l := range op.idx {
+		f(l)
+	}
+}
+
 type ListIdx struct {
 	*defaultOp[List]
 }
 
 func (idx ListIdx) get(bucket string) *List {
-	return idx.defaultOp.computeIfPresent(bucket, func() *List {
+	return idx.defaultOp.computeIfAbsent(bucket, func() *List {
 		return NewList()
 	})
 }
@@ -93,7 +89,7 @@ type BTreeIdx struct {
 }
 
 func (idx BTreeIdx) get(bucket string) *BTree {
-	return idx.defaultOp.computeIfPresent(bucket, func() *BTree {
+	return idx.defaultOp.computeIfAbsent(bucket, func() *BTree {
 		return NewBTree()
 	})
 }
@@ -103,7 +99,7 @@ type SetIdx struct {
 }
 
 func (idx SetIdx) get(bucket string) *Set {
-	return idx.defaultOp.computeIfPresent(bucket, func() *Set {
+	return idx.defaultOp.computeIfAbsent(bucket, func() *Set {
 		return NewSet()
 	})
 }
@@ -113,7 +109,7 @@ type SortedSetIdx struct {
 }
 
 func (idx SortedSetIdx) get(bucket string, db *DB) *SortedSet {
-	return idx.defaultOp.computeIfPresent(bucket, func() *SortedSet {
+	return idx.defaultOp.computeIfAbsent(bucket, func() *SortedSet {
 		return NewSortedSet(db)
 	})
 }
