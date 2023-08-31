@@ -24,38 +24,27 @@ func (tx *Tx) IterateBuckets(ds uint16, pattern string, f func(key string) bool)
 	if tx.db.opt.EntryIdxMode == HintBPTSparseIdxMode {
 		return ErrNotSupportHintBPTSparseIdxMode
 	}
-	if ds == DataStructureSet {
-		for bucket := range tx.db.SetIdx {
-			if end, err := MatchForRange(pattern, bucket, f); end || err != nil {
-				return err
-			}
-		}
-	}
-	if ds == DataStructureSortedSet {
-		for bucket := range tx.db.SortedSetIdx {
-			if end, err := MatchForRange(pattern, bucket, f); end || err != nil {
-				return err
-			}
-		}
-	}
-	if ds == DataStructureList {
-		f := func(bucket string) error {
-			if end, err := MatchForRange(pattern, bucket, f); end || err != nil {
-				return err
-			}
-			return nil
-		}
-		err := tx.db.Index.handleListBucket(f)
-		if err != nil {
+	handle := func(bucket string) error {
+		if end, err := MatchForRange(pattern, bucket, f); end || err != nil {
 			return err
 		}
+		return nil
+	}
+	var err error
+	if ds == DataStructureSet {
+		err = tx.db.Index.set.handleIdxBucket(handle)
+	}
+	if ds == DataStructureSortedSet {
+		err = tx.db.Index.sortedSet.handleIdxBucket(handle)
+	}
+	if ds == DataStructureList {
+		err = tx.db.Index.list.handleIdxBucket(handle)
 	}
 	if ds == DataStructureTree {
-		for bucket := range tx.db.BTreeIdx {
-			if end, err := MatchForRange(pattern, bucket, f); end || err != nil {
-				return err
-			}
-		}
+		err = tx.db.Index.bTree.handleIdxBucket(handle)
+	}
+	if err != nil {
+		return err
 	}
 	return nil
 }
@@ -97,13 +86,13 @@ func (tx *Tx) ExistBucket(ds uint16, bucket string) (bool, error) {
 
 	switch ds {
 	case DataStructureSet:
-		_, ok = tx.db.SetIdx[bucket]
+		_, ok = tx.db.Index.set.exist(bucket)
 	case DataStructureSortedSet:
-		_, ok = tx.db.SortedSetIdx[bucket]
+		_, ok = tx.db.Index.sortedSet.exist(bucket)
 	case DataStructureTree:
-		_, ok = tx.db.BTreeIdx[bucket]
+		_, ok = tx.db.Index.bTree.exist(bucket)
 	case DataStructureList:
-		ok = tx.db.Index.existList(bucket)
+		_, ok = tx.db.Index.list.exist(bucket)
 	default:
 		return false, ErrDataStructureNotSupported
 	}

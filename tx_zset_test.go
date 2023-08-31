@@ -339,7 +339,7 @@ func TestTx_ZSetEntryIdxMode_HintKeyValAndRAMIdxMode(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		zset := db.SortedSetIdx[bucket].M[string(key)]
+		zset := db.Index.sortedSet.get(bucket, db).M[string(key)]
 		hash, _ := getFnv32(value)
 		node := zset.dict[hash]
 
@@ -366,7 +366,7 @@ func TestTx_ZSetEntryIdxMode_HintKeyAndRAMIdxMode(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		zset := db.SortedSetIdx[bucket].M[string(key)]
+		zset := db.Index.sortedSet.get(bucket, db).M[string(key)]
 		hash, _ := getFnv32(value)
 		node := zset.dict[hash]
 
