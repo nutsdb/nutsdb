@@ -381,21 +381,27 @@ func (c CEntries) processEntriesScanOnDisk() (result []*Entry) {
 	return result
 }
 
+type EntryWhenRecovery struct {
+	Entry
+	fid int64
+	off int64
+}
+
 type dataInTx struct {
-	es       Entries
+	es       []*EntryWhenRecovery
 	txId     uint64
 	startOff int64
 }
 
-func (dt *dataInTx) isSameTx(e *Entry) bool {
+func (dt *dataInTx) isSameTx(e *EntryWhenRecovery) bool {
 	return dt.txId == e.Meta.TxID
 }
 
-func (dt *dataInTx) appendEntry(e *Entry) {
+func (dt *dataInTx) appendEntry(e *EntryWhenRecovery) {
 	dt.es = append(dt.es, e)
 }
 
 func (dt *dataInTx) reset() {
-	dt.es = make(Entries, 0)
+	dt.es = make([]*EntryWhenRecovery, 0)
 	dt.txId = 0
 }
