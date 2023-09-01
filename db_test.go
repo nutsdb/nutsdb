@@ -842,3 +842,26 @@ func TestDB_ChangeMode_RestartDB(t *testing.T) {
 	// HintKeyAndRAMIdxMode to HintKeyValAndRAMIdxMode
 	changeModeRestart(HintKeyAndRAMIdxMode, HintKeyValAndRAMIdxMode)
 }
+
+func TestTx_SmallFile(t *testing.T) {
+	opts := DefaultOptions
+	opts.SegmentSize = 100
+	opts.EntryIdxMode = HintKeyAndRAMIdxMode
+	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
+		bucket := "bucket"
+		err := db.Update(func(tx *Tx) error {
+			for i := 0; i < 100; i++ {
+				err := tx.Put(bucket, GetTestBytes(i), GetTestBytes(i), Persistent)
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+		require.Nil(t, err)
+		require.NoError(t, db.Close())
+		db, _ = Open(opts)
+
+		txGet(t, db, bucket, GetTestBytes(10), GetTestBytes(10), nil)
+	})
+}
