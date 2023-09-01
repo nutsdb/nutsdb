@@ -1,8 +1,5 @@
 package nutsdb
 
-// BPTreeIdx represents the B+ tree index
-type BPTreeIdx map[string]*BPTree
-
 // BTreeIdx represents the B tree index
 type BTreeIdx map[string]*BTree
 

@@ -40,7 +40,7 @@ func main() {
 	bucket := "bucket_003"
 	if err := db.Update(
 		func(tx *nutsdb.Tx) error {
-			return tx.DeleteBucket(nutsdb.DataStructureTree, bucket)
+			return tx.DeleteBucket(nutsdb.DataStructureBTree, bucket)
 		}); err != nil {
 		log.Fatal(err)
 	}
@@ -51,7 +51,7 @@ func main() {
 func iterateBuckets() {
 	if err := db.View(
 		func(tx *nutsdb.Tx) error {
-			return tx.IterateBuckets(nutsdb.DataStructureTree, "*", func(bucket string) bool {
+			return tx.IterateBuckets(nutsdb.DataStructureBTree, "*", func(bucket string) bool {
 				fmt.Println("bucket: ", bucket)
 				return true
 			})

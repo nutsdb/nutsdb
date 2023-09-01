@@ -92,40 +92,10 @@ func getBucketMetaPath(dir string) string {
 	return getMetaPath(dir) + separator + "bucket"
 }
 
-// getBucketMetaFilePath returns the path for the bucket meta file with the given name.
-func getBucketMetaFilePath(name, dir string) string {
-	separator := string(filepath.Separator)
-	return getBucketMetaPath(dir) + separator + name + BucketMetaSuffix
-}
-
 // getBPTDir returns the BPT directory path in the specified directory.
 func getBPTDir(dir string) string {
 	separator := string(filepath.Separator)
 	return dir + separator + bptDir
-}
-
-// getBPTPath returns the BPT index path for the given file ID.
-func getBPTPath(fID int64, dir string) string {
-	separator := string(filepath.Separator)
-	return getBPTDir(dir) + separator + strconv2.Int64ToStr(fID) + BPTIndexSuffix
-}
-
-// getBPTRootPath returns the BPT root index path for the given file ID.
-func getBPTRootPath(fID int64, dir string) string {
-	separator := string(filepath.Separator)
-	return getBPTDir(dir) + separator + "root" + separator + strconv2.Int64ToStr(fID) + BPTRootIndexSuffix
-}
-
-// getBPTTxIDPath returns the BPT transaction ID index path for the given file ID.
-func getBPTTxIDPath(fID int64, dir string) string {
-	separator := string(filepath.Separator)
-	return getBPTDir(dir) + separator + "txid" + separator + strconv2.Int64ToStr(fID) + BPTTxIDIndexSuffix
-}
-
-// getBPTRootTxIDPath returns the BPT root transaction ID index path for the given file ID.
-func getBPTRootTxIDPath(fID int64, dir string) string {
-	separator := string(filepath.Separator)
-	return getBPTDir(dir) + separator + "txid" + separator + strconv2.Int64ToStr(fID) + BPTRootTxIDIndexSuffix
 }
 
 func OneOfUint16Array(value uint16, array []uint16) bool {

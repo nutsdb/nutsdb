@@ -41,12 +41,12 @@ func TestBucket_IterateBuckets(t *testing.T) {
 			return true
 		}, nil, listBucketName)
 
-		txIterateBuckets(t, db, DataStructureTree, "*", func(bucket string) bool {
+		txIterateBuckets(t, db, DataStructureBTree, "*", func(bucket string) bool {
 			return true
 		}, nil, stringBucketName)
 
 		matched := false
-		txIterateBuckets(t, db, DataStructureTree, "str*", func(bucket string) bool {
+		txIterateBuckets(t, db, DataStructureBTree, "str*", func(bucket string) bool {
 			matched = true
 			return true
 		}, nil)
@@ -67,23 +67,8 @@ func TestBucket_DeleteBucket(t *testing.T) {
 		txDeleteBucket(t, db, DataStructureSet, setBucketName, nil)
 		txDeleteBucket(t, db, DataStructureSortedSet, zSetBucketName, nil)
 		txDeleteBucket(t, db, DataStructureList, listBucketName, nil)
-		txDeleteBucket(t, db, DataStructureTree, stringBucketName, nil)
+		txDeleteBucket(t, db, DataStructureBTree, stringBucketName, nil)
 
 		txDeleteBucket(t, db, DataStructureNone, "none_bucket", ErrDataStructureNotSupported)
-	})
-}
-
-func TestBucket_HintBPTSparseIdxMode(t *testing.T) {
-	opt = DefaultOptions
-	opt.Dir = "/tmp/nutsdbtestbuckettxx"
-	opt.SegmentSize = 8 * 1024
-	opt.EntryIdxMode = HintBPTSparseIdxMode
-
-	runNutsDBTest(t, &opt, func(t *testing.T, db *DB) {
-		txIterateBuckets(t, db, DataStructureList, "*", func(bucket string) bool {
-			return true
-		}, ErrNotSupportHintBPTSparseIdxMode)
-
-		txDeleteBucket(t, db, DataStructureList, "", ErrNotSupportHintBPTSparseIdxMode)
 	})
 }
