@@ -11,7 +11,7 @@ NutsDB is a simple, fast, embeddable and persistent key/value store written in p
 It supports fully serializable transactions and many data structures such as list、set、sorted set. All operations happen inside a Tx. Tx represents a transaction, which can be read-only or read-write. Read-only transactions can read values for a given bucket and a given key or iterate over a set of key-value pairs. Read-write transactions can read, update and delete keys from the DB.
 
 ## Announcement
-* v0.14.0 release, see for details: [https://github.com/nutsdb/nutsdb/releases/tag/v0.13.1](https://github.com/nutsdb/nutsdb/releases/tag/v0.14.0)
+* v0.14.0 release, see for details: [https://github.com/nutsdb/nutsdb/releases/tag/v0.14.0](https://github.com/nutsdb/nutsdb/releases/tag/v0.14.0)
 * v0.13.0 release, see for details: [https://github.com/nutsdb/nutsdb/releases/tag/v0.13.0](https://github.com/nutsdb/nutsdb/releases/tag/v0.13.0)
 * v0.12.6 release, see for details: [https://github.com/nutsdb/nutsdb/releases/tag/v0.12.6](https://github.com/nutsdb/nutsdb/releases/tag/v0.12.6)
 * v0.12.4 release, see for details: [https://github.com/nutsdb/nutsdb/releases/tag/v0.12.4](https://github.com/nutsdb/nutsdb/releases/tag/v0.12.4)
