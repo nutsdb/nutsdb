@@ -167,7 +167,7 @@ func open(opt Options) (*DB, error) {
 		opt:              opt,
 		KeyCount:         0,
 		closed:           false,
-		Index:            NewIndex(),
+		Index:            newIndex(),
 		fm:               newFileManager(opt.RWMode, opt.MaxFdNumsInCache, opt.CleanFdsCacheThreshold),
 		mergeStartCh:     make(chan struct{}),
 		mergeEndCh:       make(chan error),

@@ -125,25 +125,14 @@ func TestDB_MergeForZSet(t *testing.T) {
 	})
 }
 
-//func TestDB_MergeForList(t *testing.T) {
-//	opts := DefaultOptions
-//	opts.SegmentSize = 100
-//	opts.EntryIdxMode = HintKeyAndRAMIdxMode
-//	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
-//		bucket := "bucket"
-//		key := GetTestBytes(0)
-//
-//		for i := 0; i < 100; i++ {
-//			txPush(t, db, bucket, key, GetTestBytes(i), nil, true)
-//		}
-//		txRange(t, db, bucket, key, 0, 99, 100)
-//
-//		txPop(t, db, bucket, key, GetTestBytes(99), nil, true)
-//		txPop(t, db, bucket, key, GetTestBytes(0), nil, false)
-//
-//		require.NoError(t, db.Merge())
-//	})
-//}
+func TestDB_MergeForList(t *testing.T) {
+	bucket := "bucket"
+	key := GetTestBytes(0)
+	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txPush(t, db, bucket, key, GetTestBytes(0), nil, true)
+		require.Error(t, ErrNotSupportMergeWhenUsingList, db.Merge())
+	})
+}
 
 func TestDB_MergeAutomatic(t *testing.T) {
 	opts := DefaultOptions

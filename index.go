@@ -16,7 +16,7 @@ type index struct {
 	list ListIdx
 }
 
-func NewIndex() *index {
+func newIndex() *index {
 	i := new(index)
 	i.list = map[string]*List{}
 	return i
