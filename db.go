@@ -763,7 +763,7 @@ func (db *DB) buildBTreeIdx(r *Record) {
 
 	bucket, key, meta := r.Bucket, r.H.Key, r.H.Meta
 
-	bt := db.Index.bTree.get(bucket)
+	bt := db.Index.bTree.getWithDefault(bucket)
 
 	if meta.Flag == DataDeleteFlag {
 		db.tm.del(bucket, string(key))
@@ -891,7 +891,7 @@ func (db *DB) buildSetIdx(r *Record) error {
 	bucket, key, val, meta := r.Bucket, r.H.Key, r.V, r.H.Meta
 	db.resetRecordByMode(r)
 
-	set := db.Index.set.get(bucket)
+	set := db.Index.set.getWithDefault(bucket)
 
 	switch meta.Flag {
 	case DataSetFlag:
@@ -912,7 +912,7 @@ func (db *DB) buildSortedSetIdx(r *Record) error {
 	bucket, key, val, meta := r.Bucket, r.H.Key, r.V, r.H.Meta
 	db.resetRecordByMode(r)
 
-	ss := db.Index.sortedSet.get(bucket, db)
+	ss := db.Index.sortedSet.getWithDefault(bucket, db)
 
 	var err error
 
@@ -949,7 +949,7 @@ func (db *DB) buildListIdx(r *Record) error {
 	bucket, key, val, meta := r.Bucket, r.H.Key, r.V, r.H.Meta
 	db.resetRecordByMode(r)
 
-	l := db.Index.list.get(bucket)
+	l := db.Index.list.getWithDefault(bucket)
 
 	if IsExpired(meta.TTL, meta.Timestamp) {
 		return nil

@@ -78,7 +78,7 @@ type ListIdx struct {
 	*defaultOp[List]
 }
 
-func (idx ListIdx) get(bucket string) *List {
+func (idx ListIdx) getWithDefault(bucket string) *List {
 	return idx.defaultOp.computeIfAbsent(bucket, func() *List {
 		return NewList()
 	})
@@ -88,7 +88,7 @@ type BTreeIdx struct {
 	*defaultOp[BTree]
 }
 
-func (idx BTreeIdx) get(bucket string) *BTree {
+func (idx BTreeIdx) getWithDefault(bucket string) *BTree {
 	return idx.defaultOp.computeIfAbsent(bucket, func() *BTree {
 		return NewBTree()
 	})
@@ -98,7 +98,7 @@ type SetIdx struct {
 	*defaultOp[Set]
 }
 
-func (idx SetIdx) get(bucket string) *Set {
+func (idx SetIdx) getWithDefault(bucket string) *Set {
 	return idx.defaultOp.computeIfAbsent(bucket, func() *Set {
 		return NewSet()
 	})
@@ -108,7 +108,7 @@ type SortedSetIdx struct {
 	*defaultOp[SortedSet]
 }
 
-func (idx SortedSetIdx) get(bucket string, db *DB) *SortedSet {
+func (idx SortedSetIdx) getWithDefault(bucket string, db *DB) *SortedSet {
 	return idx.defaultOp.computeIfAbsent(bucket, func() *SortedSet {
 		return NewSortedSet(db)
 	})

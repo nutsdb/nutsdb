@@ -384,7 +384,7 @@ func TestTx_DeleteFromMemory(t *testing.T) {
 		txDel(t, db, bucket, GetTestBytes(3), nil)
 
 		err := db.View(func(tx *Tx) error {
-			r, ok := db.Index.bTree.get(bucket).Find(GetTestBytes(3))
+			r, ok := db.Index.bTree.getWithDefault(bucket).Find(GetTestBytes(3))
 			require.Nil(t, r)
 			require.False(t, ok)
 
@@ -829,11 +829,11 @@ func TestTx_ExpiredDeletion(t *testing.T) {
 			// this entry will be deleted
 			txGet(t, db, bucket, GetTestBytes(1), nil, ErrKeyNotFound)
 
-			r, ok := db.Index.bTree.get(bucket).Find(GetTestBytes(0))
+			r, ok := db.Index.bTree.getWithDefault(bucket).Find(GetTestBytes(0))
 			require.Nil(t, r)
 			require.False(t, ok)
 
-			r, ok = db.Index.bTree.get(bucket).Find(GetTestBytes(1))
+			r, ok = db.Index.bTree.getWithDefault(bucket).Find(GetTestBytes(1))
 			require.Nil(t, r)
 			require.False(t, ok)
 		})
@@ -923,7 +923,7 @@ func TestTx_ExpiredDeletion(t *testing.T) {
 			txGet(t, db, bucket, GetTestBytes(1), GetTestBytes(1), nil)
 			txGet(t, db, bucket, GetTestBytes(2), nil, ErrKeyNotFound)
 
-			r, ok := db.Index.bTree.get(bucket).Find(GetTestBytes(2))
+			r, ok := db.Index.bTree.getWithDefault(bucket).Find(GetTestBytes(2))
 			require.Nil(t, r)
 			require.False(t, ok)
 		})
@@ -950,11 +950,11 @@ func TestTx_ExpiredDeletion(t *testing.T) {
 			// this entry will be deleted
 			txGet(t, db, bucket, GetTestBytes(1), nil, ErrKeyNotFound)
 
-			r, ok := db.Index.bTree.get(bucket).Find(GetTestBytes(0))
+			r, ok := db.Index.bTree.getWithDefault(bucket).Find(GetTestBytes(0))
 			require.Nil(t, r)
 			require.False(t, ok)
 
-			r, ok = db.Index.bTree.get(bucket).Find(GetTestBytes(1))
+			r, ok = db.Index.bTree.getWithDefault(bucket).Find(GetTestBytes(1))
 			require.Nil(t, r)
 			require.False(t, ok)
 		})

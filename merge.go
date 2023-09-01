@@ -223,7 +223,7 @@ func (db *DB) isPendingMergeEntry(entry *Entry) bool {
 			if ok && r.H.Meta.Flag == DataSetFlag {
 				if r.IsExpired() {
 					db.tm.del(string(entry.Bucket), string(entry.Key))
-					db.Index.bTree.get(string(entry.Bucket)).Delete(entry.Key)
+					db.Index.bTree.getWithDefault(string(entry.Bucket)).Delete(entry.Key)
 					return false
 				}
 				if r.H.Meta.TxID > entry.Meta.TxID {

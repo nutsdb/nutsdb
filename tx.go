@@ -405,7 +405,7 @@ func (tx *Tx) buildTreeIdx(record *Record) {
 		hint := NewHint().WithFileId(tx.db.ActiveFile.fileID).WithKey(newKey).WithMeta(meta).WithDataPos(offset)
 		_ = tx.db.ActiveBPTreeIdx.Insert(newKey, nil, hint, CountFlagDisabled)
 	} else {
-		t := tx.db.Index.bTree.get(bucket)
+		t := tx.db.Index.bTree.getWithDefault(bucket)
 
 		if meta.Flag == DataSetFlag {
 			var value []byte
@@ -455,7 +455,7 @@ func (tx *Tx) buildSetIdx(record *Record) {
 
 	tx.db.resetRecordByMode(record)
 
-	s := tx.db.Index.set.get(bucket)
+	s := tx.db.Index.set.getWithDefault(bucket)
 
 	if meta.Flag == DataDeleteFlag {
 		_ = s.SRem(string(key), value)
@@ -471,7 +471,7 @@ func (tx *Tx) buildSortedSetIdx(record *Record) {
 
 	tx.db.resetRecordByMode(record)
 
-	ss := tx.db.Index.sortedSet.get(bucket, tx.db)
+	ss := tx.db.Index.sortedSet.getWithDefault(bucket, tx.db)
 
 	switch meta.Flag {
 	case DataZAddFlag:
@@ -498,7 +498,7 @@ func (tx *Tx) buildListIdx(record *Record) {
 
 	tx.db.resetRecordByMode(record)
 
-	l := tx.db.Index.list.get(bucket)
+	l := tx.db.Index.list.getWithDefault(bucket)
 
 	if IsExpired(meta.TTL, meta.Timestamp) {
 		return

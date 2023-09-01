@@ -861,7 +861,7 @@ func TestTx_ListEntryIdxMode_HintKeyValAndRAMIdxMode(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		listIdx := db.Index.list.get(bucket)
+		listIdx := db.Index.list.getWithDefault(bucket)
 		item, _ := listIdx.Items[string(key)].Get(0)
 		r, ok := item.(*Record)
 		require.True(t, ok)
@@ -887,7 +887,7 @@ func TestTx_ListEntryIdxMode_HintKeyAndRAMIdxMode(t *testing.T) {
 		})
 		//require.NoError(t, err)
 
-		listIdx := db.Index.list.get(bucket)
+		listIdx := db.Index.list.getWithDefault(bucket)
 		item, _ := listIdx.Items[string(key)].Get(0)
 		r, ok := item.(*Record)
 		require.True(t, ok)
