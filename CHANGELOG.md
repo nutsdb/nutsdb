@@ -240,3 +240,54 @@
 * [Bug Fix] add skip entry zero error when recovery by @elliotchenzichang in #420
 * [Refactor] delete the map db.committedTxIds, it will not needed any more by @elliotchenzichang in #421
 * [Refactor] rebuild the recovery logic, and delete the unconfirmedRecordList by @elliotchenzichang in #422
+
+## v0.14.0 (2023-9-1)
+## Changelog
+
+### Features
+
+- feat: make Set support HintKeyAndRAMIdxMode by @bigboss2063 in https://github.com/nutsdb/nutsdb/pull/397
+- add batch write by @damotiansheng in https://github.com/nutsdb/nutsdb/pull/398
+- fix: fixed the issue where deletion did not actually remove the record from memory. by @bigboss2063 in https://github.com/nutsdb/nutsdb/pull/407
+- feat: make sorted set to support HintKeyAndRAMIdxMode by @bigboss2063 in https://github.com/nutsdb/nutsdb/pull/426
+- pref: refactor index item to save memory useage by @bigboss2063 in https://github.com/nutsdb/nutsdb/pull/434
+- feat: implemented configurable automatic expiration deletion, optional time heap or time wheel by @bigboss2063 in https://github.com/nutsdb/nutsdb/pull/435
+
+### BugFix
+
+- repair tx.SMembers bug by @damotiansheng in https://github.com/nutsdb/nutsdb/pull/404
+- fix: fix dead lock during merging by @bigboss2063 in https://github.com/nutsdb/nutsdb/pull/417
+- [bugFix]Add tx data handle logic in recovery by @elliotchenzichang in https://github.com/nutsdb/nutsdb/pull/418
+- [bug fix]add skip entry zero error when recovery by @elliotchenzichang in https://github.com/nutsdb/nutsdb/pull/420
+- fix: fix the problem that an error occurs when switching between the first and the second mode at startup by @bigboss2063 in https://github.com/nutsdb/nutsdb/pull/423
+- fix: recover panic when executing tx by @bigboss2063 in https://github.com/nutsdb/nutsdb/pull/429
+- fix: fix the problem of allowing delete the non-exist member of a set by @bigboss2063 in https://github.com/nutsdb/nutsdb/pull/432
+- fix: fix the bugs of ttl effective time and IsExpired method  by @bigboss2063 in https://github.com/nutsdb/nutsdb/pull/437
+- [bugFix]fix the bug in prase data in an tx by @elliotchenzichang in https://github.com/nutsdb/nutsdb/pull/441
+- fix: fix bug in `txZCard` by @G-XD in https://github.com/nutsdb/nutsdb/pull/444
+- [bugFix]fix the bug in data in tx logic by @elliotchenzichang in https://github.com/nutsdb/nutsdb/pull/453
+- fix: merge not allowed when using list type (temporary fix) by @bigboss2063 in https://github.com/nutsdb/nutsdb/pull/457
+
+### Other
+
+- create dir if not exist by @moyrne in https://github.com/nutsdb/nutsdb/pull/399
+- optimize parseDataFiles error check by @moyrne in https://github.com/nutsdb/nutsdb/pull/401
+- [Test] Restart the database using three modes by @RuiHuaLiu2023 in https://github.com/nutsdb/nutsdb/pull/406
+- chore: update ci.yml by @bigboss2063 in https://github.com/nutsdb/nutsdb/pull/409
+- style: remove useless code by @bigboss2063 in https://github.com/nutsdb/nutsdb/pull/411
+- chore: add change log by @xujiajun in https://github.com/nutsdb/nutsdb/pull/412
+- ref: use goto refactor recovery logic by @elliotchenzichang in https://github.com/nutsdb/nutsdb/pull/414
+- [ref]delete the map db.committedTxIds, it will not needed any more by @elliotchenzichang in https://github.com/nutsdb/nutsdb/pull/421
+- [ref]rebuild the recovery logic, and delete the unconfirmedRecordList by @elliotchenzichang in https://github.com/nutsdb/nutsdb/pull/422
+- doc: update README.md and add comments for tx_zset.go by @bigboss2063 in https://github.com/nutsdb/nutsdb/pull/427
+- delete getActiveFileWriteOff func by @damotiansheng in https://github.com/nutsdb/nutsdb/pull/428
+- [ref] rebuild the error handling logic in recovery by @elliotchenzichang in https://github.com/nutsdb/nutsdb/pull/430
+- refactor: unified delete bucket in buildNotDSIdxes by @bigboss2063 in https://github.com/nutsdb/nutsdb/pull/433
+- doc: update README.md and README-CN.md by @bigboss2063 in https://github.com/nutsdb/nutsdb/pull/436
+- refactor: use chained calls instead of direct initialization by @bigboss2063 in https://github.com/nutsdb/nutsdb/pull/439
+- [ref] move the errors in db file to another seperated file. by @elliotchenzichang in https://github.com/nutsdb/nutsdb/pull/440
+- [refactor] Refactoring commit  by @RuiHuaLiu2023 in https://github.com/nutsdb/nutsdb/pull/438
+- test: refactor `tx_set_test` by @G-XD in https://github.com/nutsdb/nutsdb/pull/445
+- test: refactor `tx_bucket_test` by @G-XD in https://github.com/nutsdb/nutsdb/pull/446
+- [ref]move the tx error to seperated file by @elliotchenzichang in https://github.com/nutsdb/nutsdb/pull/447
+- refactor: remove func ErrWhenBuildListIdx by @TremblingV5 in https://github.com/nutsdb/nutsdb/pull/443
