@@ -180,7 +180,7 @@ func open(opt Options) (*DB, error) {
 		BPTreeKeyEntryPosMap:    make(map[string]int64),
 		bucketMetas:             make(map[string]*BucketMeta),
 		ActiveCommittedTxIdsIdx: NewTree(),
-		Index:                   NewIndex(),
+		Index:                   newIndex(),
 		fm:                      newFileManager(opt.RWMode, opt.MaxFdNumsInCache, opt.CleanFdsCacheThreshold),
 		mergeStartCh:            make(chan struct{}),
 		mergeEndCh:              make(chan error),

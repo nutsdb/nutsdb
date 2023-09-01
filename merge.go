@@ -56,6 +56,10 @@ func (db *DB) merge() error {
 		return ErrNotSupportHintBPTSparseIdxMode
 	}
 
+	if len(db.Index.list) != 0 {
+		return ErrNotSupportMergeWhenUsingList
+	}
+
 	// to prevent the initiation of multiple merges simultaneously.
 	db.mu.Lock()
 
