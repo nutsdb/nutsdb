@@ -125,6 +125,15 @@ func TestDB_MergeForZSet(t *testing.T) {
 	})
 }
 
+func TestDB_MergeForList(t *testing.T) {
+	bucket := "bucket"
+	key := GetTestBytes(0)
+	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txPush(t, db, bucket, key, GetTestBytes(0), nil, true)
+		require.Error(t, ErrNotSupportMergeWhenUsingList, db.Merge())
+	})
+}
+
 func TestDB_MergeAutomatic(t *testing.T) {
 	opts := DefaultOptions
 	opts.SegmentSize = 1024
