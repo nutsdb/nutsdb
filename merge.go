@@ -269,24 +269,5 @@ func (db *DB) isPendingMergeEntry(entry *Entry) bool {
 		}
 	}
 
-	//if entry.Meta.Ds == DataStructureList {
-	//	//check the key of list is expired or not
-	//	//if expired, it will clear the items of index
-	//	//so that nutsdb can clear entry of expiring list in the function isPendingMergeEntry
-	//	db.checkListExpired()
-	//
-	//	if listIdx := db.Index.getList(string(entry.Bucket)); listIdx != nil {
-	//		items, _ := listIdx.LRange(string(entry.Key), 0, -1)
-	//		if entry.Meta.Flag == DataRPushFlag || entry.Meta.Flag == DataLPushFlag {
-	//			for _, item := range items {
-	//				v, _ := db.getValueByRecord(item)
-	//				if string(entry.Value) == string(v) {
-	//					return true
-	//				}
-	//			}
-	//		}
-	//	}
-	//}
-
 	return false
 }
