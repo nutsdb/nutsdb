@@ -525,10 +525,9 @@ func (db *DB) parseDataFiles(dataFileIds []int) (err error) {
 	)
 
 	parseDataInTx := func() error {
-		off := dataInTx.startOff
 
 		for _, entry := range dataInTx.es {
-			h := NewHint().WithKey(entry.Key).WithFileId(fID).WithMeta(entry.Meta).WithDataPos(uint64(off))
+			h := NewHint().WithKey(entry.Key).WithFileId(entry.fid).WithMeta(entry.Meta).WithDataPos(uint64(entry.off))
 			// This method is entered when the commit record of a transaction is read
 			// So all records of this transaction should be committed
 			h.Meta.Status = Committed
@@ -544,7 +543,6 @@ func (db *DB) parseDataFiles(dataFileIds []int) (err error) {
 
 			db.KeyCount++
 
-			off += entry.Size()
 		}
 		return nil
 	}
@@ -569,12 +567,17 @@ func (db *DB) parseDataFiles(dataFileIds []int) (err error) {
 				break
 			}
 
+			entryWhenRecovery := &EntryWhenRecovery{
+				Entry: *entry,
+				fid:   fID,
+				off:   off,
+			}
 			if dataInTx.txId == 0 {
-				dataInTx.appendEntry(entry)
+				dataInTx.appendEntry(entryWhenRecovery)
 				dataInTx.txId = entry.Meta.TxID
 				dataInTx.startOff = off
-			} else if dataInTx.isSameTx(entry) {
-				dataInTx.appendEntry(entry)
+			} else if dataInTx.isSameTx(entryWhenRecovery) {
+				dataInTx.appendEntry(entryWhenRecovery)
 			}
 
 			if entry.Meta.Status == Committed {
@@ -586,7 +589,7 @@ func (db *DB) parseDataFiles(dataFileIds []int) (err error) {
 				dataInTx.startOff = off
 			}
 
-			if !dataInTx.isSameTx(entry) {
+			if !dataInTx.isSameTx(entryWhenRecovery) {
 				dataInTx.reset()
 				dataInTx.startOff = off
 			}
