@@ -229,7 +229,7 @@
 - add batch write by @damotiansheng in https://github.com/nutsdb/nutsdb/pull/398
 - fix: fixed the issue where deletion did not actually remove the record from memory. by @bigboss2063 in https://github.com/nutsdb/nutsdb/pull/407
 - feat: make sorted set to support HintKeyAndRAMIdxMode by @bigboss2063 in https://github.com/nutsdb/nutsdb/pull/426
-- pref: refactor index item to save memory useage by @bigboss2063 in https://github.com/nutsdb/nutsdb/pull/434
+- pref: refactor index item to save memory usage by @bigboss2063 in https://github.com/nutsdb/nutsdb/pull/434
 - feat: implemented configurable automatic expiration deletion, optional time heap or time wheel by @bigboss2063 in https://github.com/nutsdb/nutsdb/pull/435
 ### BugFix
 - repair tx.SMembers bug by @damotiansheng in https://github.com/nutsdb/nutsdb/pull/404
@@ -260,9 +260,9 @@
 - refactor: unified delete bucket in buildNotDSIdxes by @bigboss2063 in https://github.com/nutsdb/nutsdb/pull/433
 - doc: update README.md and README-CN.md by @bigboss2063 in https://github.com/nutsdb/nutsdb/pull/436
 - refactor: use chained calls instead of direct initialization by @bigboss2063 in https://github.com/nutsdb/nutsdb/pull/439
-- [ref] move the errors in db file to another seperated file. by @elliotchenzichang in https://github.com/nutsdb/nutsdb/pull/440
+- [ref] move the errors in db file to another separated file. by @elliotchenzichang in https://github.com/nutsdb/nutsdb/pull/440
 - [refactor] Refactoring commit  by @RuiHuaLiu2023 in https://github.com/nutsdb/nutsdb/pull/438
 - test: refactor `tx_set_test` by @G-XD in https://github.com/nutsdb/nutsdb/pull/445
 - test: refactor `tx_bucket_test` by @G-XD in https://github.com/nutsdb/nutsdb/pull/446
-- [ref]move the tx error to seperated file by @elliotchenzichang in https://github.com/nutsdb/nutsdb/pull/447
+- [ref]move the tx error to separated file by @elliotchenzichang in https://github.com/nutsdb/nutsdb/pull/447
 - refactor: remove func ErrWhenBuildListIdx by @TremblingV5 in https://github.com/nutsdb/nutsdb/pull/443
