@@ -187,17 +187,19 @@ func (tx *Tx) getHintIdxDataItemsWrapper(records []*Record, limitNum int, es Ent
 			continue
 		}
 		if limitNum > 0 && len(es) < limitNum || limitNum == ScanNoLimit {
-			idxMode := tx.db.opt.EntryIdxMode
-			if idxMode == HintKeyAndRAMIdxMode {
-				e, err := tx.db.getEntryByHint(r.H)
+			var (
+				e   *Entry
+				err error
+			)
+			if tx.db.opt.EntryIdxMode == HintKeyAndRAMIdxMode {
+				e, err = tx.db.getEntryByHint(r.H)
 				if err != nil {
 					return nil, err
 				}
-				es = append(es, e)
 			} else {
-				e := NewEntry().WithBucket([]byte(r.Bucket)).WithKey(r.H.Key).WithValue(r.V).WithMeta(r.H.Meta)
-				es = append(es, e)
+				e = NewEntry().WithBucket([]byte(r.Bucket)).WithKey(r.H.Key).WithValue(r.V).WithMeta(r.H.Meta)
 			}
+			es = append(es, e)
 		}
 	}
 
