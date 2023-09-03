@@ -418,6 +418,10 @@ func (db *DB) getMaxBatchSize() int64 {
 	return db.opt.MaxBatchSize
 }
 
+func (db *DB) getMaxWriteRecordCount() int64 {
+    return db.opt.MaxWriteRecordCount
+}
+
 func (db *DB) doWrites() {
 	pendingCh := make(chan struct{}, 1)
 	writeRequests := func(reqs []*request) {
