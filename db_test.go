@@ -185,21 +185,6 @@ func TestDB_DeleteANonExistKey(t *testing.T) {
 	})
 }
 
-func TestDB_BPTSparse(t *testing.T) {
-	opts := DefaultOptions
-	opts.EntryIdxMode = HintBPTSparseIdxMode
-	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
-		bucket1, bucket2 := "AA", "AAB"
-		key1, key2 := []byte("BB"), []byte("B")
-		val1, val2 := []byte("key1"), []byte("key2")
-		txPut(t, db, bucket1, key1, val1, Persistent, nil, nil)
-		txPut(t, db, bucket2, key2, val2, Persistent, nil, nil)
-		txGet(t, db, bucket1, key1, val1, nil)
-		txGet(t, db, bucket2, key2, val2, nil)
->>>>>>> ef2cd76 (add unit test for limit max write records)
-	})
-}
-
 func txSAdd(t *testing.T, db *DB, bucket string, key, value []byte, expectErr error, finalExpectErr error) {
 	err := db.Update(func(tx *Tx) error {
 		err := tx.SAdd(bucket, key, value)
@@ -882,7 +867,7 @@ func TestTx_SmallFile(t *testing.T) {
 	})
 }
 
-func TestDB_DataStructureTreeWriteRecordLimit(t *testing.T) {
+func TestDB_DataStructureBTreeWriteRecordLimit(t *testing.T) {
 	opts := DefaultOptions
 	limitCount := int64(1000)
 	opts.MaxWriteRecordCount = limitCount
@@ -913,7 +898,7 @@ func TestDB_DataStructureTreeWriteRecordLimit(t *testing.T) {
 			// Add an item to another bucket
 			txPut(t, db, bucket2, []byte("key2"), []byte("value2"), Persistent, nil, ErrTxnExceedWriteLimit)
 			// Delete bucket1
-			txDeleteBucket(t, db, DataStructureTree, bucket1, nil)
+			txDeleteBucket(t, db, DataStructureBTree, bucket1, nil)
 			// Add data to bucket2
 			err = db.Update(func(tx *Tx) error {
 				for i := 0; i < (int(limitCount) - 1); i++ {
@@ -1031,7 +1016,6 @@ func TestDB_DataStructureListWriteRecordLimit(t *testing.T) {
 	}
 }
 
-// TestDB_DataStructureSetWriteRecordLimit tests the write record limit for DataStructureSet.
 func TestDB_DataStructureSetWriteRecordLimit(t *testing.T) {
 	// Set default options and limitCount.
 	opts := DefaultOptions
@@ -1212,5 +1196,3 @@ func TestDB_AllDsWriteRecordLimit(t *testing.T) {
 		})
 	}
 }
-
->>>>>>> ef2cd76 (add unit test for limit max write records)

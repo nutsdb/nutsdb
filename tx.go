@@ -443,7 +443,7 @@ func (tx *Tx) getEntryNewAddRecordCount(entry *Entry) (int64, error) {
 	var res int64
 	var err error
 
-	if entry.Meta.Ds == DataStructureTree {
+	if entry.Meta.Ds == DataStructureBTree {
 		res, err = tx.getKvEntryNewAddRecordCount(entry)
 	}
 

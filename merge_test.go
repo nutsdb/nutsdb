@@ -129,7 +129,7 @@ func TestDB_MergeForList(t *testing.T) {
 	bucket := "bucket"
 	key := GetTestBytes(0)
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txPush(t, db, bucket, key, GetTestBytes(0), nil, true)
+		txPush(t, db, bucket, key, GetTestBytes(0), true, nil, nil)
 		require.Error(t, ErrNotSupportMergeWhenUsingList, db.Merge())
 	})
 }
