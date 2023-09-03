@@ -28,8 +28,8 @@ func TestDB_MergeForString(t *testing.T) {
 	opts.EntryIdxMode = HintKeyAndRAMIdxMode
 	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
 		bucket := "bucket"
-		txPut(t, db, bucket, GetTestBytes(0), GetRandomBytes(24), Persistent, nil)
-		txPut(t, db, bucket, GetTestBytes(1), GetRandomBytes(24), Persistent, nil)
+		txPut(t, db, bucket, GetTestBytes(0), GetRandomBytes(24), Persistent, nil, nil)
+		txPut(t, db, bucket, GetTestBytes(1), GetRandomBytes(24), Persistent, nil, nil)
 		txDel(t, db, bucket, GetTestBytes(1), nil)
 		txGet(t, db, bucket, GetTestBytes(1), nil, ErrKeyNotFound)
 		require.NoError(t, db.Merge())
@@ -43,7 +43,7 @@ func TestDB_MergeRepeated(t *testing.T) {
 	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
 		bucket := "bucket"
 		for i := 0; i < 20; i++ {
-			txPut(t, db, bucket, []byte("hello"), []byte("world"), Persistent, nil)
+			txPut(t, db, bucket, []byte("hello"), []byte("world"), Persistent, nil, nil)
 		}
 		require.Equal(t, int64(9), db.MaxFileID)
 		txGet(t, db, bucket, []byte("hello"), []byte("world"), nil)
@@ -62,7 +62,7 @@ func TestDB_MergeForSet(t *testing.T) {
 		key := GetTestBytes(0)
 
 		for i := 0; i < 100; i++ {
-			txSAdd(t, db, bucket, key, GetTestBytes(i), nil)
+			txSAdd(t, db, bucket, key, GetTestBytes(i), nil, nil)
 		}
 
 		for i := 0; i < 100; i++ {
@@ -94,7 +94,7 @@ func TestDB_MergeForZSet(t *testing.T) {
 
 		for i := 0; i < 100; i++ {
 			score, _ := strconv2.IntToFloat64(i)
-			txZAdd(t, db, bucket, key, GetTestBytes(i), score, nil)
+			txZAdd(t, db, bucket, key, GetTestBytes(i), score, nil, nil)
 		}
 
 		for i := 0; i < 100; i++ {
@@ -150,7 +150,7 @@ func TestDB_MergeAutomatic(t *testing.T) {
 		value := GetRandomBytes(24)
 
 		for i := 0; i < 100; i++ {
-			txPut(t, db, bucket, key, value, Persistent, nil)
+			txPut(t, db, bucket, key, value, Persistent, nil, nil)
 		}
 
 		txGet(t, db, bucket, key, value, nil)
@@ -186,7 +186,7 @@ func TestDB_MergeWithTx(t *testing.T) {
 		// which can lead to the creation of multiple data files and trigger the merge process
 		for i := 0; i < 10000; i++ {
 			for i := 0; i < 10; i++ {
-				txPut(t, db, bucket, GetTestBytes(i), values[i], Persistent, nil)
+				txPut(t, db, bucket, GetTestBytes(i), values[i], Persistent, nil, nil)
 			}
 		}
 
@@ -208,7 +208,7 @@ func TestDB_MergeWithTx(t *testing.T) {
 				// By selectively updating some values,
 				// check if the merge process will overwrite the new values
 				if i%2 == 0 {
-					txPut(t, db, bucket, GetTestBytes(i), newValues[i], Persistent, nil)
+					txPut(t, db, bucket, GetTestBytes(i), newValues[i], Persistent, nil, nil)
 				}
 			}
 

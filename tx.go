@@ -196,13 +196,14 @@ func (tx *Tx) Commit() (err error) {
 		return ErrDBClosed
 	}
 
-	// judge current tx is whether more than the db.MaxWriteRecordCount
 	var curWriteCount int64
 	if tx.db.opt.MaxWriteRecordCount > 0 {
 		curWriteCount, err = tx.getNewAddRecordCount()
 		if err != nil {
 			return err
 		}
+
+		// judge all write records is whether more than the MaxWriteRecordCount
 		if tx.db.RecordCount + curWriteCount > tx.db.opt.MaxWriteRecordCount {
 			return ErrTxnExceedWriteLimit
 		}
@@ -269,9 +270,7 @@ func (tx *Tx) Commit() (err error) {
 		return err
 	}
 
-	if tx.db.opt.MaxWriteRecordCount > 0 {
-		tx.db.RecordCount += curWriteCount
-	}
+	tx.db.RecordCount += curWriteCount
 
 	return nil
 }
@@ -292,18 +291,26 @@ func (tx *Tx) getNewAddRecordCount() (int64, error) {
 }
 
 func (tx *Tx) getListEntryNewAddRecordCount(entry *Entry) (int64, error) {
-	var res int64
 	if entry.Meta.Flag == DataExpireListFlag {
 		return 0, nil
 	}
 
+	var res int64
 	bucket := string(entry.Bucket)
 	key := string(entry.Key)
 	value := string(entry.Value)
 	l := tx.db.Index.getList(bucket)
 
-	if entry.Meta.Flag == DataLRemFlag {
-		count, newValue := splitCountValue(value)
+	switch entry.Meta.Flag {
+	case DataLPushFlag, DataRPushFlag:
+		res++
+	case DataLPopFlag, DataRPopFlag:
+		res--
+	case DataLRemByIndex:
+		indexes, _ := UnmarshalInts([]byte(value))
+		res -= int64(len(l.getValidIndexs(key, indexes)))
+	case DataLRemFlag:
+		count, newValue := splitIntStringStr(value, SeparatorForListKey)
 		removeIndices, err := l.getRemoveIndices(key, count, func(r *Record) (bool, error) {
 			v, err := tx.db.getValueByRecord(r)
 			if err != nil {
@@ -315,18 +322,15 @@ func (tx *Tx) getListEntryNewAddRecordCount(entry *Entry) (int64, error) {
 			return 0, err
 		}
 		res -= int64(len(removeIndices))
-	} else if entry.Meta.Flag == DataLRemByIndex {
-		indexes, _ := UnmarshalInts([]byte(value))
-		res -= int64(len(l.getValidIndexs(key, indexes)))
-	} else if entry.Meta.Flag == DataLTrimFlag {
-		newKey, start := splitKeyStart(key)
+	case DataLTrimFlag:
+		newKey, start := splitStringIntStr(key, SeparatorForListKey)
 		end, _ := strconv2.StrToInt(value)
 
-		if l.IsExpire(key) {
+		if l.IsExpire(newKey) {
 			return 0, nil
 		}
 
-		if _, ok := l.Items[key]; !ok {
+		if _, ok := l.Items[newKey]; !ok {
 			return 0, nil
 		}
 
@@ -334,102 +338,161 @@ func (tx *Tx) getListEntryNewAddRecordCount(entry *Entry) (int64, error) {
 		if err != nil {
 			return res, err
 		}
-		list := l.Items[key]
+		list := l.Items[newKey]
 		res -= int64(list.Size() - len(items))
-	} else if entry.isFilter() {
-		res -= 1
-	} else {
-		res += 1
 	}
 
 	return res, nil
 }
 
-func (tx *Tx) getEntryNewAddRecordCount(entry *Entry) (int64, error) {
+func (tx *Tx) getKvEntryNewAddRecordCount(entry *Entry) (int64, error) {
 	var res int64
-	bucket := string(entry.Bucket)
-	key := entry.Key
-	value := entry.Value
-	isFilter := entry.isFilter()
-	if entry.Meta.Ds == DataStructureBTree {
-		oldEntry, _ := tx.Get(string(bucket), key)
-		if isFilter {
-			if oldEntry != nil {
-				res -= 1
-			}
-		} else {
-			if oldEntry == nil {
-				res += 1
-			}
+
+	oldEntry, _ := tx.Get(string(entry.Bucket), entry.Key)
+
+	switch entry.Meta.Flag {
+	case DataDeleteFlag:
+		if oldEntry != nil {
+			res--
 		}
-	} else if entry.Meta.Ds == DataStructureList {
-		res, err := tx.getListEntryNewAddRecordCount(entry)
-		if err != nil {
-			return res, err
+	case DataSetFlag:
+		if oldEntry == nil {
+			res++
 		}
-	} else if entry.Meta.Ds == DataStructureSet {
-		isMember, _ := tx.SIsMember(bucket, key, value)
-		if isFilter {
-			if isMember {
-				res -= 1
-			}
-		} else {
-			if !isMember {
-				res += 1
-			}
+	}
+
+	return res, nil
+}
+
+func (tx *Tx) getSetEntryNewAddRecordCount(entry *Entry) (int64, error) {
+	var res int64
+	isMember, _ := tx.SIsMember(string(entry.Bucket), entry.Key, entry.Value)
+	if entry.Meta.Flag == DataDeleteFlag && isMember {
+		res--
+	}
+
+	if entry.Meta.Flag == DataSetFlag && !isMember {
+		res++
+	}
+
+	return res, nil
+}
+
+func (tx *Tx) getSortedSetEntryNewAddRecordCount(entry *Entry) (int64, error) {
+	var res int64
+	bucketName := string(entry.Bucket)
+	key := string(entry.Key)
+	value := string(entry.Value)
+	bucketExists := tx.sortedBucketExists(bucketName)
+
+	switch entry.Meta.Flag {
+	case DataZAddFlag:
+		if !tx.keyExistsInSortedSet(bucketName, key, value) {
+			res++
 		}
-	} else if entry.Meta.Ds == DataStructureSortedSet {
-		if entry.Meta.Flag == DataZRemRangeByRankFlag {
-			start, end := splitStartEnd(string(value))
-			delNodes, err := tx.db.SortedSetIdx[bucket].getZRemRangeByRankNodes(string(key), start, end)
+	case DataZRemFlag:
+		if tx.keyExistsInSortedSet(bucketName, key, value) {
+			res--
+		}
+	case DataZRemRangeByRankFlag:
+		if bucketExists {
+			start, end := splitIntIntStr(string(value), SeparatorForZSetKey)
+			delNodes, err := tx.db.SortedSetIdx[bucketName].getZRemRangeByRankNodes(string(key), start, end)
 			if err != nil {
 				return res, err
 			}
 			res -= int64(len(delNodes))
-		} else {
-			exist, _ := tx.db.SortedSetIdx[bucket].ZExist(string(key), value)
-			if isFilter {
-				if exist {
-					res -= 1
-				}
-			} else {
-				if !exist {
-					res += 1
-				}
-			}
 		}
-	} else if entry.Meta.Ds == DataStructureNone {
-		res -= tx.getBucketDeleteRecordCount(entry)
+	case DataZPopMaxFlag, DataZPopMinFlag:
+		if tx.keyHasItemsInSortedSet(bucketName, key) {
+			res--
+		}
 	}
 
 	return res, nil
+}
+
+func (tx *Tx) sortedBucketExists(bucketName string) bool {
+	_, exists := tx.db.SortedSetIdx[bucketName]
+	return exists
+}
+
+func (tx *Tx) keyExistsInSortedSet(bucketName, key, value string) bool {
+	if !tx.sortedBucketExists(bucketName) {
+		return false
+	}
+	newKey := key
+	if strings.Contains(key, SeparatorForZSetKey) {
+		newKey, _ = splitStringFloat64Str(key, SeparatorForZSetKey)
+	}
+	exists, _ := tx.db.SortedSetIdx[bucketName].ZExist(newKey, []byte(value))
+	return exists
+}
+
+func (tx *Tx) keyHasItemsInSortedSet(bucketName, key string) bool {
+	if !tx.sortedBucketExists(bucketName) {
+		return false
+	}
+	if _, exists := tx.db.SortedSetIdx[bucketName].M[key]; exists {
+		return tx.db.SortedSetIdx[bucketName].M[key].Size() > 0
+	}
+	return false
+}
+
+func (tx *Tx) getEntryNewAddRecordCount(entry *Entry) (int64, error) {
+	var res int64
+	var err error
+
+	if entry.Meta.Ds == DataStructureTree {
+		res, err = tx.getKvEntryNewAddRecordCount(entry)
+	}
+
+	if entry.Meta.Ds == DataStructureList {
+		res, err = tx.getListEntryNewAddRecordCount(entry)
+	}
+
+	if entry.Meta.Ds == DataStructureSet {
+		res, err = tx.getSetEntryNewAddRecordCount(entry)
+	}
+
+	if entry.Meta.Ds == DataStructureSortedSet {
+		res, err = tx.getSortedSetEntryNewAddRecordCount(entry)
+	}
+
+	if entry.Meta.Ds == DataStructureNone {
+		res -= tx.getBucketDeleteRecordCount(entry)
+	}
+
+	return res, err
 }
 
 func (tx *Tx) getBucketDeleteRecordCount(entry *Entry) int64 {
 	bucket := string(entry.Bucket)
 	var res int64
-	if entry.Meta.Flag == DataBPTreeBucketDeleteFlag {
-		if _, ok := tx.db.BTreeIdx[bucket]; ok {
-			res = int64(tx.db.BTreeIdx[bucket].Count())
+
+	switch entry.Meta.Flag {
+	case DataBPTreeBucketDeleteFlag:
+		if bTree, ok := tx.db.BTreeIdx[bucket]; ok {
+			res = int64(bTree.Count())
 		}
-	} else if entry.Meta.Flag == DataSetBucketDeleteFlag {
-		if _, ok := tx.db.SetIdx[bucket]; ok {
-			for key, _ := range tx.db.SetIdx[bucket].M {
-				res = int64(tx.db.SetIdx[bucket].SCard(key))
+	case DataSetBucketDeleteFlag:
+		if set, ok := tx.db.SetIdx[bucket]; ok {
+			for key := range set.M {
+				res += int64(set.SCard(key))
 			}
 		}
-	} else if entry.Meta.Flag == DataSortedSetBucketDeleteFlag {
-		if _, ok := tx.db.SortedSetIdx[bucket]; ok {
-			for key, _ := range tx.db.SortedSetIdx[bucket].M {
-				curLen, _ := tx.db.SortedSetIdx[bucket].ZCard(key)
-				res = int64(curLen)
+	case DataSortedSetBucketDeleteFlag:
+		if sortedSet, ok := tx.db.SortedSetIdx[bucket]; ok {
+			for key := range sortedSet.M {
+				curLen, _ := sortedSet.ZCard(key)
+				res += int64(curLen)
 			}
 		}
-	} else if entry.Meta.Flag == DataListBucketDeleteFlag {
-		if _, ok := tx.db.Index.list[bucket]; ok {
-			for key, _ := range tx.db.Index.list[bucket].Items {
-				curLen, _ := tx.db.Index.list[bucket].Size(key)
-				res = int64(curLen)
+	case DataListBucketDeleteFlag:
+		if list, ok := tx.db.Index.list[bucket]; ok {
+			for key := range list.Items {
+				curLen, _ := list.Size(key)
+				res += int64(curLen)
 			}
 		}
 	}
@@ -534,14 +597,12 @@ func (tx *Tx) buildSortedSetIdx(record *Record) {
 
 	switch meta.Flag {
 	case DataZAddFlag:
-		keyAndScore := strings.Split(string(key), SeparatorForZSetKey)
-		key := keyAndScore[0]
-		score, _ := strconv2.StrToFloat64(keyAndScore[1])
+		key, score := splitStringFloat64Str(string(key), SeparatorForZSetKey)
 		_ = tx.db.SortedSetIdx[bucket].ZAdd(key, SCORE(score), value, record)
 	case DataZRemFlag:
 		_, _ = tx.db.SortedSetIdx[bucket].ZRem(string(key), value)
 	case DataZRemRangeByRankFlag:
-		start, end := splitStartEnd(string(value))
+		start, end := splitIntIntStr(string(value), SeparatorForZSetKey)
 		_ = tx.db.SortedSetIdx[bucket].ZRemRangeByRank(string(key), start, end)
 	case DataZPopMaxFlag:
 		_, _, _ = tx.db.SortedSetIdx[bucket].ZPopMax(string(key))
@@ -583,7 +644,7 @@ func (tx *Tx) buildListIdx(record *Record) {
 		index, _ := strconv2.StrToInt(keyAndIndex[1])
 		_ = l.LSet(newKey, index, record)
 	case DataLTrimFlag:
-		newKey, start := splitKeyStart(string(key))
+		newKey, start := splitStringIntStr(string(key), SeparatorForListKey)
 		end, _ := strconv2.StrToInt(string(value))
 		_ = l.LTrim(newKey, start, end)
 	case DataLRemByIndex:
@@ -593,7 +654,7 @@ func (tx *Tx) buildListIdx(record *Record) {
 }
 
 func (tx *Tx) buildListLRemIdx(value []byte, l *List, key []byte) {
-	count, newValue := splitCountValue(string(value))
+	count, newValue := splitIntStringStr(string(value), SeparatorForListKey)
 
 	_ = l.LRem(string(key), count, func(r *Record) (bool, error) {
 		v, err := tx.db.getValueByRecord(r)

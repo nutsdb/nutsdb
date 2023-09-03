@@ -621,37 +621,48 @@ func (db *DB) parseDataFiles(dataFileIds []int) (err error) {
 	}
 
 	// compute the valid record count and save it in db.RecordCount
-	db.RecordCount = db.getRecordCount()
+	db.RecordCount, err = db.getRecordCount()
 	return
 }
 
-func (db *DB) getRecordCount() int64 {
+func (db *DB) getRecordCount() (int64, error) {
 	var res int64
+
+	// Iterate through the BTree indices
 	for _, btree := range db.BTreeIdx {
 		res += int64(btree.Count())
 	}
 
+	// Iterate through the List indices
 	for _, listItem := range db.Index.list {
-		for key, _ := range listItem.Items {
-			curLen, _ := listItem.Size(key)
+		for key := range listItem.Items {
+			curLen, err := listItem.Size(key)
+			if err != nil {
+				return res, err
+			}
 			res += int64(curLen)
 		}
 	}
 
+	// Iterate through the Set indices
 	for _, setItem := range db.SetIdx {
-		for key, _ := range setItem.M {
+		for key := range setItem.M {
 			res += int64(setItem.SCard(key))
 		}
 	}
 
+	// Iterate through the SortedSet indices
 	for _, zsetItem := range db.SortedSetIdx {
-		for key, _ := range zsetItem.M {
-			curLen, _ := zsetItem.ZCard(key)
+		for key := range zsetItem.M {
+			curLen, err := zsetItem.ZCard(key)
+			if err != nil {
+				return res, err
+			}
 			res += int64(curLen)
 		}
 	}
 
-	return res
+	return res, nil
 }
 
 func (db *DB) buildBTreeIdx(r *Record) {

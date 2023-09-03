@@ -258,13 +258,3 @@ func (s *Set) SUnion(key1, key2 string) ([]*Record, error) {
 
 	return records, nil
 }
-
-func getFnv32(value []byte) (uint32, error) {
-	_, err := fnvHash.Write(value)
-	if err != nil {
-		return 0, err
-	}
-	hash := fnvHash.Sum32()
-	fnvHash.Reset()
-	return hash, nil
-}

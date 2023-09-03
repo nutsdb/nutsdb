@@ -71,8 +71,8 @@ func TestTx_SRem2(t *testing.T) {
 	val2 := GetTestBytes(1)
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txSAdd(t, db, bucket, key, val1, nil)
-		txSAdd(t, db, bucket, key, val2, nil)
+		txSAdd(t, db, bucket, key, val1, nil, nil)
+		txSAdd(t, db, bucket, key, val2, nil, nil)
 
 		txSRem(t, db, bucket, key, val1, nil)
 		txSRem(t, db, bucket, key, val1, ErrSetMemberNotExist)

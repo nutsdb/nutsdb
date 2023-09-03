@@ -38,7 +38,7 @@ func TestTx_ZAdd(t *testing.T) {
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		for i := 0; i < 10; i++ {
-			txZAdd(t, db, bucket, GetTestBytes(0), GetTestBytes(i), float64(i), nil)
+			txZAdd(t, db, bucket, GetTestBytes(0), GetTestBytes(i), float64(i), nil, nil)
 		}
 
 		txZCard(t, db, bucket, GetTestBytes(0), 10, nil)
@@ -50,7 +50,7 @@ func TestTx_ZScore(t *testing.T) {
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		for i := 0; i < 10; i++ {
-			txZAdd(t, db, bucket, GetTestBytes(0), GetTestBytes(i), float64(i), nil)
+			txZAdd(t, db, bucket, GetTestBytes(0), GetTestBytes(i), float64(i), nil, nil)
 		}
 
 		for i := 0; i < 10; i++ {
@@ -61,7 +61,7 @@ func TestTx_ZScore(t *testing.T) {
 		txZScore(t, db, bucket, GetTestBytes(1), GetTestBytes(0), float64(0), ErrSortedSetNotFound)
 
 		// update the score of member
-		txZAdd(t, db, bucket, GetTestBytes(0), GetTestBytes(5), float64(999), nil)
+		txZAdd(t, db, bucket, GetTestBytes(0), GetTestBytes(5), float64(999), nil, nil)
 		txZScore(t, db, bucket, GetTestBytes(0), GetTestBytes(5), 999, nil)
 	})
 }
@@ -71,7 +71,7 @@ func TestTx_ZRem(t *testing.T) {
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		for i := 0; i < 10; i++ {
-			txZAdd(t, db, bucket, GetTestBytes(0), GetTestBytes(i), float64(i), nil)
+			txZAdd(t, db, bucket, GetTestBytes(0), GetTestBytes(i), float64(i), nil, nil)
 		}
 
 		txZScore(t, db, bucket, GetTestBytes(0), GetTestBytes(3), float64(3), nil)
@@ -97,7 +97,7 @@ func TestTx_ZMembers(t *testing.T) {
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		for i := 0; i < 10; i++ {
-			txZAdd(t, db, bucket, key, GetTestBytes(i), float64(i), nil)
+			txZAdd(t, db, bucket, key, GetTestBytes(i), float64(i), nil, nil)
 		}
 
 		err := db.View(func(tx *Tx) error {
@@ -123,7 +123,7 @@ func TestTx_ZCount(t *testing.T) {
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		for i := 0; i < 30; i++ {
-			txZAdd(t, db, bucket, key, GetRandomBytes(24), float64(i), nil)
+			txZAdd(t, db, bucket, key, GetRandomBytes(24), float64(i), nil, nil)
 		}
 
 		err := db.View(func(tx *Tx) error {
@@ -147,14 +147,14 @@ func TestTx_ZPop(t *testing.T) {
 		txZPop(t, db, bucket, key, true, nil, 0, ErrBucket)
 		txZPop(t, db, bucket, key, false, nil, 0, ErrBucket)
 
-		txZAdd(t, db, bucket, key, GetTestBytes(0), float64(0), nil)
+		txZAdd(t, db, bucket, key, GetTestBytes(0), float64(0), nil, nil)
 		txZRem(t, db, bucket, key, GetTestBytes(0), nil)
 
 		txZPop(t, db, bucket, key, true, nil, 0, ErrSortedSetIsEmpty)
 		txZPop(t, db, bucket, key, false, nil, 0, ErrSortedSetIsEmpty)
 
 		for i := 0; i < 30; i++ {
-			txZAdd(t, db, bucket, key, GetTestBytes(i), float64(i), nil)
+			txZAdd(t, db, bucket, key, GetTestBytes(i), float64(i), nil, nil)
 		}
 
 		txZPop(t, db, bucket, key, true, GetTestBytes(29), float64(29), nil)
@@ -179,7 +179,7 @@ func TestTx_ZRangeByRank(t *testing.T) {
 		require.NoError(t, err)
 
 		for i := 0; i < 10; i++ {
-			txZAdd(t, db, bucket, key, GetTestBytes(i), float64(i), nil)
+			txZAdd(t, db, bucket, key, GetTestBytes(i), float64(i), nil, nil)
 		}
 
 		err = db.View(func(tx *Tx) error {
@@ -236,7 +236,7 @@ func TestTx_ZRemRangeByRank(t *testing.T) {
 		assert.NoError(t, err)
 
 		for i := 0; i < 10; i++ {
-			txZAdd(t, db, bucket, key, GetTestBytes(i), float64(i), nil)
+			txZAdd(t, db, bucket, key, GetTestBytes(i), float64(i), nil, nil)
 		}
 
 		err = db.Update(func(tx *Tx) error {
@@ -249,7 +249,7 @@ func TestTx_ZRemRangeByRank(t *testing.T) {
 		txZCard(t, db, bucket, key, 0, nil)
 
 		for i := 0; i < 10; i++ {
-			txZAdd(t, db, bucket, key, GetTestBytes(i), float64(i), nil)
+			txZAdd(t, db, bucket, key, GetTestBytes(i), float64(i), nil, nil)
 		}
 
 		err = db.Update(func(tx *Tx) error {
@@ -303,7 +303,7 @@ func TestTx_ZRank(t *testing.T) {
 		txZRank(t, db, bucket, key, GetTestBytes(0), false, 0, ErrBucket)
 
 		for i := 0; i < 10; i++ {
-			txZAdd(t, db, bucket, key, GetTestBytes(i), float64(i), nil)
+			txZAdd(t, db, bucket, key, GetTestBytes(i), float64(i), nil, nil)
 		}
 
 		txZRank(t, db, bucket, key, GetTestBytes(0), true, 10, nil)

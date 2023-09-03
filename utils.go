@@ -117,23 +117,40 @@ func createDirIfNotExist(dir string) error {
 	return nil
 }
 
-func splitCountValue(str string) (int, string) {
-	countAndValue := strings.Split(str, SeparatorForListKey)
-	count, _ := strconv2.StrToInt(countAndValue[0])
-	newValue := countAndValue[1]
-	return count, newValue
+func splitIntStringStr(str, separator string) (int, string) {
+	strList := strings.Split(str, separator )
+	firstItem, _ := strconv2.StrToInt(strList[0])
+	secondItem := strList[1]
+	return firstItem, secondItem
 }
 
-func splitKeyStart(str string) (string, int) {
-	keyAndStartIndex := strings.Split(str, SeparatorForListKey)
-	newKey := keyAndStartIndex[0]
-	start, _ := strconv2.StrToInt(keyAndStartIndex[1])
-    return newKey, start
+func splitStringIntStr(str, separator string) (string, int) {
+	strList := strings.Split(str, separator)
+	firstItem := strList[0]
+	secondItem, _ := strconv2.StrToInt(strList[1])
+	return firstItem, secondItem
 }
 
-func splitStartEnd(str string) (int, int) {
-	startAndEnd := strings.Split(str, SeparatorForZSetKey)
-	start, _ := strconv2.StrToInt(startAndEnd[0])
-	end, _ := strconv2.StrToInt(startAndEnd[1])
-	return start, end
+func splitIntIntStr(str, separator string) (int, int) {
+	strList := strings.Split(str, separator)
+	firstItem, _ := strconv2.StrToInt(strList[0])
+	secondItem, _ := strconv2.StrToInt(strList[1])
+	return firstItem, secondItem
+}
+
+func splitStringFloat64Str(str, separator string) (string, float64) {
+    strList := strings.Split(str, separator)
+    firstItem := strList[0]
+    secondItem, _ := strconv2.StrToFloat64(strList[1])
+    return firstItem, secondItem
+}
+
+func getFnv32(value []byte) (uint32, error) {
+	_, err := fnvHash.Write(value)
+	if err != nil {
+		return 0, err
+	}
+	hash := fnvHash.Sum32()
+	fnvHash.Reset()
+	return hash, nil
 }
