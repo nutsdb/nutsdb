@@ -181,7 +181,7 @@ func TestDB_DeleteANonExistKey(t *testing.T) {
 		testBucket := "test_bucket"
 		txDel(t, db, testBucket, GetTestBytes(0), ErrNotFoundBucket)
 		txPut(t, db, testBucket, GetTestBytes(1), GetRandomBytes(24), Persistent, nil, nil)
-		txDel(t, db, testBucket, GetTestBytes(0), ErrNotFoundKey)
+		txDel(t, db, testBucket, GetTestBytes(0), ErrKeyNotFound)
 	})
 }
 

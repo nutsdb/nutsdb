@@ -215,7 +215,7 @@ func (l *List) LRem(key string, count int, cmp func(r *Record) (bool, error)) er
 		return err
 	}
 
-	list, _ := l.Items[key]
+	list := l.Items[key]
 	// Remove the elements at the specified indices from the list
 	for _, index := range removeIndices {
 		list.Remove(index)
@@ -275,7 +275,7 @@ func (l *List) LRemByIndex(key string, indexes []int) error {
 
 	list := l.Items[key]
 
-	idxes := l.getValidIndexs(key, indexes)
+	idxes := l.getValidIndexes(key, indexes)
 	if len(idxes) == 0 {
 		return nil
 	}
@@ -300,7 +300,7 @@ func (l *List) LRemByIndex(key string, indexes []int) error {
 	return nil
 }
 
-func (l *List) getValidIndexs(key string, indexes []int) (map[int]struct{}) {
+func (l *List) getValidIndexes(key string, indexes []int) (map[int]struct{}) {
 	idxes := make(map[int]struct{})
 	list := l.Items[key]
 	if list == nil || 0 == list.Size() {

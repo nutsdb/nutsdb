@@ -308,7 +308,7 @@ func (tx *Tx) getListEntryNewAddRecordCount(entry *Entry) (int64, error) {
 		res--
 	case DataLRemByIndex:
 		indexes, _ := UnmarshalInts([]byte(value))
-		res -= int64(len(l.getValidIndexs(key, indexes)))
+		res -= int64(len(l.getValidIndexes(key, indexes)))
 	case DataLRemFlag:
 		count, newValue := splitIntStringStr(value, SeparatorForListKey)
 		removeIndices, err := l.getRemoveIndices(key, count, func(r *Record) (bool, error) {
