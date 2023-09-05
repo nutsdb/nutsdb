@@ -59,21 +59,21 @@ func TestTx_RPush(t *testing.T) {
 	key := []byte("myList")
 
 	if err := tx.RPush(bucket, []byte("myList"+SeparatorForListKey), []byte("a"), []byte("b"), []byte("c"), []byte("d")); err == nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		t.Fatal("TestTx_RPush err")
 	}
 
 	if err := tx.RPush(bucket, key, []byte("a"), []byte("b"), []byte("c"), []byte("d")); err != nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		t.Fatal(err)
 	}
 
 	if err := tx.RPush(bucket, []byte(""), []byte("a"), []byte("b"), []byte("c"), []byte("d")); err == nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		t.Fatal("TestTx_RPush err")
 	}
 
-	tx.Commit()
+	_ = tx.Commit()
 
 	err = tx.RPush(bucket, key, []byte("e"))
 	if err == nil {
@@ -105,7 +105,7 @@ func TestTx_LPush(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tx.Commit()
+	_ = tx.Commit()
 
 	err = tx.LPush(bucket, key, []byte("e"))
 	if err == nil {
@@ -125,10 +125,10 @@ func checkPushResult(bucket string, key []byte, t *testing.T) {
 
 		item, err := tx.LPop(bucket, key)
 		if err != nil || string(item) != expectResult[i] {
-			tx.Rollback()
+			_ = tx.Rollback()
 			t.Error("TestTx_LPush err")
 		} else {
-			tx.Commit()
+			_ = tx.Commit()
 		}
 	}
 }
@@ -152,7 +152,7 @@ func TestTx_LPop(t *testing.T) {
 	if err == nil {
 		t.Error("TestTx_LPop err")
 	}
-	tx.Rollback()
+	_ = tx.Rollback()
 
 	InitDataForList(bucket, key, t)
 	tx, err = db.Begin(true)
@@ -161,19 +161,19 @@ func TestTx_LPop(t *testing.T) {
 	}
 	item, err := tx.LPop(bucket, key)
 	if err != nil || string(item) != "a" {
-		tx.Rollback()
+		_ = tx.Rollback()
 		t.Error("TestTx_LPop err")
 	} else {
-		tx.Commit()
+		_ = tx.Commit()
 	}
 
 	tx, _ = db.Begin(true)
 	item, err = tx.LPop(bucket, key)
 	if err != nil || string(item) != "b" {
-		tx.Rollback()
+		_ = tx.Rollback()
 		t.Error("TestTx_LPop err")
 	} else {
-		tx.Commit()
+		_ = tx.Commit()
 		item, err = tx.LPop(bucket, key)
 		if err == nil || item != nil {
 			t.Error("TestTx_LPop err")
@@ -183,20 +183,20 @@ func TestTx_LPop(t *testing.T) {
 	tx, _ = db.Begin(true)
 	item, err = tx.LPop(bucket, key)
 	if err != nil || string(item) != "c" {
-		tx.Rollback()
+		_ = tx.Rollback()
 		t.Error("TestTx_LPop err")
 	} else {
-		tx.Commit()
+		_ = tx.Commit()
 	}
 
 	tx, _ = db.Begin(true)
 	item, err = tx.LPop(bucket, key)
 	if err == nil || item != nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		t.Fatal("TestTx_LPop err")
 	}
 
-	tx.Commit()
+	_ = tx.Commit()
 }
 
 func TestTx_LRange(t *testing.T) {
@@ -218,7 +218,7 @@ func TestTx_LRange(t *testing.T) {
 		t.Error("TestTx_LRange err")
 	}
 
-	tx.Rollback()
+	_ = tx.Rollback()
 
 	InitDataForList(bucket, key, t)
 
@@ -230,7 +230,7 @@ func TestTx_LRange(t *testing.T) {
 	list, err = tx.LRange(bucket, key, 0, -1)
 	expectResult := []string{"a", "b", "c"}
 	if err != nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		t.Fatal(err)
 	}
 
@@ -240,7 +240,7 @@ func TestTx_LRange(t *testing.T) {
 		}
 	}
 
-	tx.Commit()
+	_ = tx.Commit()
 
 	_, err = tx.LRange(bucket, key, 0, -1)
 	if err == nil {
@@ -266,7 +266,7 @@ func TestTx_LRem(t *testing.T) {
 	if err == nil {
 		t.Fatal(err)
 	}
-	tx.Rollback()
+	_ = tx.Rollback()
 }
 
 func TestTx_LRem2(t *testing.T) {
@@ -287,7 +287,7 @@ func TestTx_LRem2(t *testing.T) {
 		}
 
 		if list, err := tx.LRange(bucket, key, 0, -1); err != nil {
-			tx.Rollback()
+			_ = tx.Rollback()
 			t.Fatal(err)
 		} else {
 			expectResult := []string{"a", "b", "c"}
@@ -296,7 +296,7 @@ func TestTx_LRem2(t *testing.T) {
 					t.Error("TestTx_LRem err")
 				}
 			}
-			tx.Commit()
+			_ = tx.Commit()
 		}
 	}
 
@@ -308,7 +308,7 @@ func TestTx_LRem2(t *testing.T) {
 		if err = tx.LRem(bucket, []byte("fake_key"), 1, []byte("fake_val")); err == nil {
 			t.Fatal("TestTx_LRem err")
 		} else {
-			tx.Rollback()
+			_ = tx.Rollback()
 		}
 	}
 
@@ -318,10 +318,10 @@ func TestTx_LRem2(t *testing.T) {
 			t.Fatal(err)
 		}
 		if err = tx.LRem(bucket, key, 1, []byte("a")); err != nil {
-			tx.Rollback()
+			_ = tx.Rollback()
 			t.Fatal(err)
 		} else {
-			tx.Commit()
+			_ = tx.Commit()
 		}
 
 		tx, err = db.Begin(false)
@@ -329,7 +329,7 @@ func TestTx_LRem2(t *testing.T) {
 			t.Fatal(err)
 		}
 		if list, err := tx.LRange(bucket, key, 0, -1); err != nil {
-			tx.Rollback()
+			_ = tx.Rollback()
 			t.Fatal(err)
 		} else {
 			expectResult := []string{"b", "c"}
@@ -338,7 +338,7 @@ func TestTx_LRem2(t *testing.T) {
 					t.Error("TestTx_LRem err")
 				}
 			}
-			tx.Commit()
+			_ = tx.Commit()
 		}
 	}
 }
@@ -364,7 +364,7 @@ func TestTx_LRem3(t *testing.T) {
 		if err == nil {
 			t.Error("TestTx_LRem err")
 		}
-		tx.Rollback()
+		_ = tx.Rollback()
 	}
 
 	{
@@ -377,7 +377,7 @@ func TestTx_LRem3(t *testing.T) {
 		if err == nil {
 			t.Error("TestTx_LRem err")
 		}
-		tx.Rollback()
+		_ = tx.Rollback()
 	}
 
 	{
@@ -390,7 +390,7 @@ func TestTx_LRem3(t *testing.T) {
 		if err != nil {
 			t.Error("TestTx_LRem err")
 		}
-		tx.Rollback()
+		_ = tx.Rollback()
 	}
 
 	InitDataForList(bucket, []byte("myList3"), t)
@@ -401,10 +401,10 @@ func TestTx_LRem3(t *testing.T) {
 	}
 	err = tx.RPush(bucket, []byte("myList3"), []byte("b"))
 	if err != nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		t.Error(err)
 	} else {
-		tx.Commit()
+		_ = tx.Commit()
 	}
 
 	tx, err = db.Begin(true)
@@ -416,7 +416,7 @@ func TestTx_LRem3(t *testing.T) {
 	if err != nil {
 		t.Error("TestTx_LRem err")
 	}
-	tx.Rollback()
+	_ = tx.Rollback()
 }
 
 func InitDataForList(bucket string, key []byte, t *testing.T) {
@@ -426,10 +426,10 @@ func InitDataForList(bucket string, key []byte, t *testing.T) {
 	}
 	err = tx.RPush(bucket, key, []byte("a"), []byte("b"), []byte("c"))
 	if err != nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		t.Error(err)
 	} else {
-		tx.Commit()
+		_ = tx.Commit()
 	}
 }
 
@@ -450,7 +450,7 @@ func TestTx_LSet(t *testing.T) {
 	if err == nil {
 		t.Error("TestTx_LSet err")
 	}
-	tx.Rollback()
+	_ = tx.Rollback()
 
 	InitDataForList(bucket, key, t)
 	tx, err = db.Begin(true)
@@ -470,10 +470,10 @@ func TestTx_LSet(t *testing.T) {
 
 	err = tx.LSet(bucket, key, 0, []byte("a1"))
 	if err != nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		t.Fatal(err)
 	} else {
-		tx.Commit()
+		_ = tx.Commit()
 		err = tx.LSet(bucket, key, 0, []byte("a1"))
 		if err == nil {
 			t.Error("TestTx_LSet err")
@@ -495,10 +495,10 @@ func TestTx_LSet(t *testing.T) {
 	}
 
 	if err != nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		t.Fatal(err)
 	} else {
-		tx.Commit()
+		_ = tx.Commit()
 	}
 
 	tx, err = db.Begin(true)
@@ -507,7 +507,7 @@ func TestTx_LSet(t *testing.T) {
 	}
 
 	err = tx.LSet(bucket, key, 100, []byte("a1"))
-	tx.Rollback()
+	_ = tx.Rollback()
 	if err == nil {
 		t.Fatal("TestTx_LSet err")
 	}
@@ -529,7 +529,7 @@ func TestTx_LTrim(t *testing.T) {
 	if err == nil {
 		t.Error("TestTx_LTrim err")
 	}
-	tx.Rollback()
+	_ = tx.Rollback()
 
 	InitDataForList(bucket, key, t)
 
@@ -542,11 +542,11 @@ func TestTx_LTrim(t *testing.T) {
 
 	err = tx.LTrim(bucket, key, 0, 1)
 	if err != nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		t.Error("TestTx_LTrim err")
 	}
 
-	tx.Commit()
+	_ = tx.Commit()
 
 	tx, err = db.Begin(false)
 	if err != nil {
@@ -558,7 +558,7 @@ func TestTx_LTrim(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tx.Commit()
+	_ = tx.Commit()
 
 	err = tx.LTrim(bucket, key, 0, 1)
 	if err == nil {
@@ -581,7 +581,7 @@ func TestTx_LTrim(t *testing.T) {
 	if err == nil {
 		t.Error("TestTx_LTrim err")
 	}
-	tx.Rollback()
+	_ = tx.Rollback()
 }
 
 func TestTx_RPop(t *testing.T) {
@@ -600,7 +600,7 @@ func TestTx_RPop(t *testing.T) {
 	if err == nil || item != nil {
 		t.Error("TestTx_RPop err")
 	}
-	tx.Rollback()
+	_ = tx.Rollback()
 
 	InitDataForList(bucket, key, t)
 
@@ -616,7 +616,7 @@ func TestTx_RPop(t *testing.T) {
 		t.Error(err)
 	}
 
-	tx.Commit()
+	_ = tx.Commit()
 
 	item, err = tx.RPop(bucket, key)
 	if err == nil || item != nil {
@@ -643,7 +643,7 @@ func TestTx_LSize(t *testing.T) {
 	if err == nil || size != 0 {
 		t.Error("TestTx_LSize err")
 	}
-	tx.Rollback()
+	_ = tx.Rollback()
 
 	InitDataForList(bucket, key, t)
 
@@ -654,13 +654,13 @@ func TestTx_LSize(t *testing.T) {
 
 	size, err = tx.LSize(bucket, key)
 	if err != nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		t.Error(err)
 	} else {
 		if size != 3 {
 			t.Error("TestTx_LSize err")
 		}
-		tx.Commit()
+		_ = tx.Commit()
 
 		size, err = tx.LSize(bucket, key)
 		if size != 0 || err == nil {
@@ -682,7 +682,7 @@ func TestTx_LRemByIndex(t *testing.T) {
 
 	err := tx.LRemByIndex(bucket, []byte("fake_key"))
 	assertions.NoError(err)
-	tx.Rollback()
+	_ = tx.Rollback()
 
 	InitDataForList(bucket, key, t)
 
@@ -694,7 +694,7 @@ func TestTx_LRemByIndex(t *testing.T) {
 	err = tx.LRemByIndex(bucket, key, 88, -88)
 	assertions.NoError(err, "TestTx_LRemByIndex")
 
-	tx.Commit()
+	_ = tx.Commit()
 
 	err = tx.LRemByIndex(bucket, key, 1, 0, 8, -8)
 	assertions.Error(err, "TestTx_LRemByIndex")
@@ -712,7 +712,7 @@ func TestTx_ExpireList(t *testing.T) {
 	if err := tx.LPush(bucket, key, []byte("d"), []byte("c"), []byte("b"), []byte("a")); err != nil {
 		t.Error("TestTx_ExpireList err")
 	}
-	tx.Commit()
+	_ = tx.Commit()
 
 	tx, _ = db.Begin(true)
 	_, err := tx.LRange(bucket, key, 0, -1)
@@ -723,7 +723,7 @@ func TestTx_ExpireList(t *testing.T) {
 	if err != nil {
 		t.Error("TestTx_ExpireList err")
 	}
-	tx.Commit()
+	_ = tx.Commit()
 
 	time.Sleep(time.Second)
 
@@ -732,20 +732,20 @@ func TestTx_ExpireList(t *testing.T) {
 	if err == nil {
 		t.Error("TestTx_ExpireList err")
 	}
-	tx.Commit()
+	_ = tx.Commit()
 
 	tx, _ = db.Begin(true)
 	if err := tx.LPush(bucket, key, []byte("d"), []byte("c"), []byte("b"), []byte("a")); err != nil {
 		t.Error("TestTx_ExpireList err")
 	}
-	tx.Commit()
+	_ = tx.Commit()
 
 	tx, _ = db.Begin(true)
 	err = tx.ExpireList(bucket, key, Persistent)
 	if err != nil {
 		t.Error("TestTx_ExpireList err")
 	}
-	tx.Commit()
+	_ = tx.Commit()
 
 	time.Sleep(time.Second)
 
@@ -754,7 +754,7 @@ func TestTx_ExpireList(t *testing.T) {
 	if err != nil {
 		t.Error("TestTx_ExpireList err")
 	}
-	tx.Commit()
+	_ = tx.Commit()
 }
 
 func TestTx_LKeys(t *testing.T) {
@@ -794,7 +794,7 @@ func TestTx_LKeys(t *testing.T) {
 	assertions.NoError(err, "TestTx_LKeys")
 	assertions.Equal(3, len(keys), "TestTx_LKeys")
 
-	tx.Commit()
+	_ = tx.Commit()
 }
 
 func TestTx_GetListTTL(t *testing.T) {
@@ -809,7 +809,7 @@ func TestTx_GetListTTL(t *testing.T) {
 	if err := tx.LPush(bucket, key, []byte("d"), []byte("c"), []byte("b"), []byte("a")); err != nil {
 		t.Error("TestTx_GetListTTL err")
 	}
-	tx.Commit()
+	_ = tx.Commit()
 
 	tx, _ = db.Begin(true)
 	ttl, err := tx.GetListTTL(bucket, key)
@@ -824,7 +824,7 @@ func TestTx_GetListTTL(t *testing.T) {
 	if err != nil {
 		t.Error("TestTx_GetListTTL err")
 	}
-	tx.Commit()
+	_ = tx.Commit()
 
 	tx, _ = db.Begin(true)
 	ttl, err = tx.GetListTTL(bucket, key)
@@ -840,7 +840,7 @@ func TestTx_GetListTTL(t *testing.T) {
 	//test for TLL is expired
 	assertions.Equal(uint32(0), ttl)
 
-	tx.Commit()
+	_ = tx.Commit()
 
 }
 

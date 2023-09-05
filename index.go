@@ -18,28 +18,8 @@ type IdxType interface {
 	BTree | Set | SortedSet | List
 }
 
-type _op[T IdxType] interface {
-	add(bucket string, f func() *T)
-
-	computeIfAbsent(bucket string, f func() *T) *T
-
-	delete(bucket string)
-
-	exist(bucket string) (*T, bool)
-
-	getIdxLen() int
-
-	handleIdxBucket(f func(bucket string) error) error
-
-	rangeIdx(f func(l *T))
-}
-
 type defaultOp[T IdxType] struct {
 	idx map[string]*T
-}
-
-func (op *defaultOp[T]) add(bucket string, f func() *T) {
-	op.idx[bucket] = f()
 }
 
 func (op *defaultOp[T]) computeIfAbsent(bucket string, f func() *T) *T {
