@@ -38,6 +38,9 @@ var (
 
 	// ErrEmptyList is returned when the list is empty.
 	ErrEmptyList = errors.New("the list is empty")
+
+	// ErrStartOrEnd is returned when start > end
+	ErrStartOrEnd = errors.New("start or end error")
 )
 
 const (
@@ -428,7 +431,7 @@ func checkBounds(start, end int, size int) (int, int, error) {
 	}
 
 	if start > end {
-		return 0, 0, errors.New("start or end error")
+		return 0, 0, ErrStartOrEnd
 	}
 
 	return start, end, nil

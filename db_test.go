@@ -203,6 +203,33 @@ func TestDB_CheckListExpired(t *testing.T) {
 	})
 }
 
+func txLRem(t *testing.T, db *DB, bucket string, key []byte, count int, value []byte, expectErr error) {
+	err := db.Update(func(tx *Tx) error {
+		err := tx.LRem(bucket, key, count, value)
+		assertErr(t, err, expectErr)
+		return nil
+	})
+	require.NoError(t, err)
+}
+
+func txLRemByIndex(t *testing.T, db *DB, bucket string, key []byte, expectErr error, indexes ...int) {
+	err := db.Update(func(tx *Tx) error {
+		err := tx.LRemByIndex(bucket, key, indexes...)
+		assertErr(t, err, expectErr)
+		return nil
+	})
+	require.NoError(t, err)
+}
+
+func txLSet(t *testing.T, db *DB, bucket string, key []byte, index int, value []byte, expectErr error) {
+	err := db.Update(func(tx *Tx) error {
+		err := tx.LSet(bucket, key, index, value)
+		assertErr(t, err, expectErr)
+		return nil
+	})
+	require.NoError(t, err)
+}
+
 func txSAdd(t *testing.T, db *DB, bucket string, key, value []byte, expectErr error, finalExpectErr error) {
 	err := db.Update(func(tx *Tx) error {
 		err := tx.SAdd(bucket, key, value)
@@ -514,11 +541,73 @@ func txPush(t *testing.T, db *DB, bucket string, key, val []byte, isLeft bool, e
 	assertErr(t, err, finalExpectErr)
 }
 
-func txRange(t *testing.T, db *DB, bucket string, key []byte, start, end, expectLen int) {
+func txExpireList(t *testing.T, db *DB, bucket string, key []byte, ttl uint32, expectErr error) {
+	err := db.Update(func(tx *Tx) error {
+		err := tx.ExpireList(bucket, key, ttl)
+		assertErr(t, err, expectErr)
+		return nil
+	})
+	require.NoError(t, err)
+}
+
+func txGetListTTL(t *testing.T, db *DB, bucket string, key []byte, expectVal uint32, expectErr error) {
+	err := db.View(func(tx *Tx) error {
+		ttl, err := tx.GetListTTL(bucket, key)
+		assertErr(t, err, expectErr)
+		require.Equal(t, ttl, expectVal)
+		return nil
+	})
+	require.NoError(t, err)
+}
+
+func txLKeys(t *testing.T, db *DB, bucket, pattern string, expectLen int, expectErr error, keysOperation func(keys []string) bool) {
+	err := db.View(func(tx *Tx) error {
+		var keys []string
+		err := tx.LKeys(bucket, pattern, func(key string) bool {
+			keys = append(keys, key)
+			return keysOperation(keys)
+		})
+		assertErr(t, err, expectErr)
+		require.Equal(t, expectLen, len(keys))
+		return nil
+	})
+	require.NoError(t, err)
+}
+
+func txLRange(t *testing.T, db *DB, bucket string, key []byte, start, end, expectLen int, expectVal [][]byte, expectErr error) {
 	err := db.View(func(tx *Tx) error {
 		list, err := tx.LRange(bucket, key, start, end)
-		require.NoError(t, err)
+		assertErr(t, err, expectErr)
+
 		require.Equal(t, expectLen, len(list))
+
+		if len(expectVal) > 0 {
+			for i, val := range list {
+				assert.Equal(t, expectVal[i], val)
+			}
+		}
+
+		return nil
+	})
+	require.NoError(t, err)
+}
+
+func txLSize(t *testing.T, db *DB, bucket string, key []byte, expectVal int, expectErr error) {
+	err := db.View(func(tx *Tx) error {
+		size, err := tx.LSize(bucket, key)
+		assertErr(t, err, expectErr)
+
+		require.Equal(t, expectVal, size)
+
+		return nil
+	})
+	require.NoError(t, err)
+}
+
+func txLTrim(t *testing.T, db *DB, bucket string, key []byte, start int, end int, expectErr error) {
+	err := db.Update(func(tx *Tx) error {
+		err := tx.LTrim(bucket, key, start, end)
+		assertErr(t, err, expectErr)
 		return nil
 	})
 	require.NoError(t, err)
