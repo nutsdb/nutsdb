@@ -190,13 +190,13 @@ func TestDB_CheckListExpired(t *testing.T) {
 		txPut(t, db, testBucket, GetTestBytes(0), GetTestBytes(1), Persistent, nil)
 		txPut(t, db, testBucket, GetTestBytes(1), GetRandomBytes(24), 1, nil)
 
-		time.Sleep(time.Second)
+		time.Sleep(1100 * time.Millisecond)
 
 		db.checkListExpired()
 
-		// this entry will be deleted
-		txGet(t, db, testBucket, GetTestBytes(0), GetTestBytes(1), nil)
 		// this entry still alive
+		txGet(t, db, testBucket, GetTestBytes(0), GetTestBytes(1), nil)
+		// this entry will be deleted
 		txGet(t, db, testBucket, GetTestBytes(1), nil, ErrKeyNotFound)
 	})
 }
