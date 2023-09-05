@@ -57,12 +57,13 @@ func runNutsDBTest(t *testing.T, opts *Options, test func(t *testing.T, db *DB))
 	defer removeDir(opts.Dir)
 	db, err := Open(*opts)
 	require.NoError(t, err)
-	defer func() {
+
+	test(t, db)
+	t.Cleanup(func() {
 		if !db.IsClose() {
 			require.NoError(t, db.Close())
 		}
-	}()
-	test(t, db)
+	})
 }
 
 func txPut(t *testing.T, db *DB, bucket string, key, value []byte, ttl uint32, expectErr error) {
