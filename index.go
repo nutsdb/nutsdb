@@ -54,9 +54,9 @@ func (op *defaultOp[T]) handleIdxBucket(f func(bucket string) error) error {
 	return nil
 }
 
-func (op *defaultOp[T]) rangeIdx(f func(l *T)) {
-	for _, l := range op.idx {
-		f(l)
+func (op *defaultOp[T]) rangeIdx(f func(elem *T)) {
+	for _, t := range op.idx {
+		f(t)
 	}
 }
 
