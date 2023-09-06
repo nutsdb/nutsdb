@@ -620,12 +620,12 @@ func (db *DB) getRecordCount() (int64, error) {
 	var res int64
 
 	// Iterate through the BTree indices
-	for _, btree := range db.BTreeIdx {
+	for _, btree := range db.Index.bTree.idx {
 		res += int64(btree.Count())
 	}
 
 	// Iterate through the List indices
-	for _, listItem := range db.Index.list {
+	for _, listItem := range db.Index.list.idx {
 		for key := range listItem.Items {
 			curLen, err := listItem.Size(key)
 			if err != nil {
@@ -636,14 +636,14 @@ func (db *DB) getRecordCount() (int64, error) {
 	}
 
 	// Iterate through the Set indices
-	for _, setItem := range db.SetIdx {
+	for _, setItem := range db.Index.set.idx {
 		for key := range setItem.M {
 			res += int64(setItem.SCard(key))
 		}
 	}
 
 	// Iterate through the SortedSet indices
-	for _, zsetItem := range db.SortedSetIdx {
+	for _, zsetItem := range db.Index.sortedSet.idx {
 		for key := range zsetItem.M {
 			curLen, err := zsetItem.ZCard(key)
 			if err != nil {

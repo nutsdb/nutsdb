@@ -189,8 +189,8 @@ func TestDB_DeleteANonExistKey(t *testing.T) {
 func TestDB_CheckListExpired(t *testing.T) {
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		testBucket := "test_bucket"
-		txPut(t, db, testBucket, GetTestBytes(0), GetTestBytes(1), Persistent, nil)
-		txPut(t, db, testBucket, GetTestBytes(1), GetRandomBytes(24), 1, nil)
+		txPut(t, db, testBucket, GetTestBytes(0), GetTestBytes(1), Persistent, nil, nil)
+		txPut(t, db, testBucket, GetTestBytes(1), GetRandomBytes(24), 1, nil, nil)
 
 		time.Sleep(1100 * time.Millisecond)
 

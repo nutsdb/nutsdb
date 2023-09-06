@@ -299,7 +299,7 @@ func (tx *Tx) getListEntryNewAddRecordCount(entry *Entry) (int64, error) {
 	bucket := string(entry.Bucket)
 	key := string(entry.Key)
 	value := string(entry.Value)
-	l := tx.db.Index.getList(bucket)
+	l := tx.db.Index.list.getWithDefault(bucket)
 
 	switch entry.Meta.Flag {
 	case DataLPushFlag, DataRPushFlag:
@@ -397,7 +397,7 @@ func (tx *Tx) getSortedSetEntryNewAddRecordCount(entry *Entry) (int64, error) {
 	case DataZRemRangeByRankFlag:
 		if bucketExists {
 			start, end := splitIntIntStr(string(value), SeparatorForZSetKey)
-			delNodes, err := tx.db.SortedSetIdx[bucketName].getZRemRangeByRankNodes(string(key), start, end)
+			delNodes, err := tx.db.Index.sortedSet.getWithDefault(bucketName, tx.db).getZRemRangeByRankNodes(string(key), start, end)
 			if err != nil {
 				return res, err
 			}
@@ -413,7 +413,7 @@ func (tx *Tx) getSortedSetEntryNewAddRecordCount(entry *Entry) (int64, error) {
 }
 
 func (tx *Tx) sortedBucketExists(bucketName string) bool {
-	_, exists := tx.db.SortedSetIdx[bucketName]
+	_, exists := tx.db.Index.sortedSet.idx[bucketName]
 	return exists
 }
 
@@ -425,7 +425,7 @@ func (tx *Tx) keyExistsInSortedSet(bucketName, key, value string) bool {
 	if strings.Contains(key, SeparatorForZSetKey) {
 		newKey, _ = splitStringFloat64Str(key, SeparatorForZSetKey)
 	}
-	exists, _ := tx.db.SortedSetIdx[bucketName].ZExist(newKey, []byte(value))
+	exists, _ := tx.db.Index.sortedSet.idx[bucketName].ZExist(newKey, []byte(value))
 	return exists
 }
 
@@ -433,8 +433,8 @@ func (tx *Tx) keyHasItemsInSortedSet(bucketName, key string) bool {
 	if !tx.sortedBucketExists(bucketName) {
 		return false
 	}
-	if _, exists := tx.db.SortedSetIdx[bucketName].M[key]; exists {
-		return tx.db.SortedSetIdx[bucketName].M[key].Size() > 0
+	if _, exists := tx.db.Index.sortedSet.idx[bucketName].M[key]; exists {
+		return tx.db.Index.sortedSet.idx[bucketName].M[key].Size() > 0
 	}
 	return false
 }
@@ -472,24 +472,24 @@ func (tx *Tx) getBucketDeleteRecordCount(entry *Entry) int64 {
 
 	switch entry.Meta.Flag {
 	case DataBPTreeBucketDeleteFlag:
-		if bTree, ok := tx.db.BTreeIdx[bucket]; ok {
+		if bTree, ok := tx.db.Index.bTree.idx[bucket]; ok {
 			res = int64(bTree.Count())
 		}
 	case DataSetBucketDeleteFlag:
-		if set, ok := tx.db.SetIdx[bucket]; ok {
+		if set, ok := tx.db.Index.set.idx[bucket]; ok {
 			for key := range set.M {
 				res += int64(set.SCard(key))
 			}
 		}
 	case DataSortedSetBucketDeleteFlag:
-		if sortedSet, ok := tx.db.SortedSetIdx[bucket]; ok {
+		if sortedSet, ok := tx.db.Index.sortedSet.idx[bucket]; ok {
 			for key := range sortedSet.M {
 				curLen, _ := sortedSet.ZCard(key)
 				res += int64(curLen)
 			}
 		}
 	case DataListBucketDeleteFlag:
-		if list, ok := tx.db.Index.list[bucket]; ok {
+		if list, ok := tx.db.Index.list.idx[bucket]; ok {
 			for key := range list.Items {
 				curLen, _ := list.Size(key)
 				res += int64(curLen)
@@ -591,18 +591,19 @@ func (tx *Tx) buildSortedSetIdx(record *Record) {
 
 	switch meta.Flag {
 	case DataZAddFlag:
-    key, score := splitStringFloat64Str(string(key), SeparatorForZSetKey)
+		key, score := splitStringFloat64Str(string(key), SeparatorForZSetKey)
 		_ = ss.ZAdd(key, SCORE(score), value, record)
 	case DataZRemFlag:
 		_, _ = ss.ZRem(string(key), value)
 	case DataZRemRangeByRankFlag:
-    start, end := splitIntIntStr(string(value), SeparatorForZSetKey)
+		start, end := splitIntIntStr(string(value), SeparatorForZSetKey)
 		_ = ss.ZRemRangeByRank(string(key), start, end)
 	case DataZPopMaxFlag:
 		_, _, _ = ss.ZPopMax(string(key))
 	case DataZPopMinFlag:
 		_, _, _ = ss.ZPopMin(string(key))
 	}
+}
 
 func (tx *Tx) buildListIdx(record *Record) {
 	bucket, key, value, meta := record.Bucket, record.H.Key, record.V, record.H.Meta
@@ -632,9 +633,7 @@ func (tx *Tx) buildListIdx(record *Record) {
 	case DataRPopFlag:
 		_, _ = l.RPop(string(key))
 	case DataLSetFlag:
-		keyAndIndex := strings.Split(string(key), SeparatorForListKey)
-		newKey := keyAndIndex[0]
-		index, _ := strconv2.StrToInt(keyAndIndex[1])
+		newKey, index := splitStringIntStr(string(key), SeparatorForListKey)
 		_ = l.LSet(newKey, index, record)
 	case DataLTrimFlag:
 		newKey, start := splitStringIntStr(string(key), SeparatorForListKey)
