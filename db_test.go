@@ -58,12 +58,13 @@ func runNutsDBTest(t *testing.T, opts *Options, test func(t *testing.T, db *DB))
 	defer removeDir(opts.Dir)
 	db, err := Open(*opts)
 	require.NoError(t, err)
-	defer func() {
+
+	test(t, db)
+	t.Cleanup(func() {
 		if !db.IsClose() {
 			require.NoError(t, db.Close())
 		}
-	}()
-	test(t, db)
+	})
 }
 
 func txPut(t *testing.T, db *DB, bucket string, key, value []byte, ttl uint32, expectErr error, finalExpectErr error) {
@@ -182,6 +183,23 @@ func TestDB_DeleteANonExistKey(t *testing.T) {
 		txDel(t, db, testBucket, GetTestBytes(0), ErrNotFoundBucket)
 		txPut(t, db, testBucket, GetTestBytes(1), GetRandomBytes(24), Persistent, nil, nil)
 		txDel(t, db, testBucket, GetTestBytes(0), ErrKeyNotFound)
+	})
+}
+
+func TestDB_CheckListExpired(t *testing.T) {
+	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		testBucket := "test_bucket"
+		txPut(t, db, testBucket, GetTestBytes(0), GetTestBytes(1), Persistent, nil)
+		txPut(t, db, testBucket, GetTestBytes(1), GetRandomBytes(24), 1, nil)
+
+		time.Sleep(1100 * time.Millisecond)
+
+		db.checkListExpired()
+
+		// this entry still alive
+		txGet(t, db, testBucket, GetTestBytes(0), GetTestBytes(1), nil)
+		// this entry will be deleted
+		txGet(t, db, testBucket, GetTestBytes(1), nil, ErrKeyNotFound)
 	})
 }
 

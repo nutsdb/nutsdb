@@ -136,9 +136,6 @@ type (
 	// DB represents a collection of buckets that persist on disk.
 	DB struct {
 		opt              Options // the database options
-		BTreeIdx         BTreeIdx
-		SetIdx           SetIdx
-		SortedSetIdx     SortedSetIdx
 		Index            *index
 		ActiveFile       *DataFile
 		MaxFileID        int64
@@ -161,9 +158,6 @@ type (
 // open returns a newly initialized DB object.
 func open(opt Options) (*DB, error) {
 	db := &DB{
-		BTreeIdx:         make(BTreeIdx),
-		SetIdx:           make(SetIdx),
-		SortedSetIdx:     make(SortedSetIdx),
 		MaxFileID:        0,
 		opt:              opt,
 		KeyCount:         0,
@@ -275,12 +269,6 @@ func (db *DB) release() error {
 	if err != nil {
 		return err
 	}
-
-	db.BTreeIdx = nil
-
-	db.SetIdx = nil
-
-	db.SortedSetIdx = nil
 
 	db.Index = nil
 
@@ -677,13 +665,11 @@ func (db *DB) buildBTreeIdx(r *Record) {
 
 	bucket, key, meta := r.Bucket, r.H.Key, r.H.Meta
 
-	if _, ok := db.BTreeIdx[bucket]; !ok {
-		db.BTreeIdx[bucket] = NewBTree()
-	}
+	b := db.Index.bTree.getWithDefault(bucket)
 
 	if meta.Flag == DataDeleteFlag {
 		db.tm.del(bucket, string(key))
-		db.BTreeIdx[bucket].Delete(key)
+		b.Delete(key)
 	} else {
 		if meta.TTL != Persistent {
 			now := time.UnixMilli(time.Now().UnixMilli())
@@ -708,7 +694,7 @@ func (db *DB) buildBTreeIdx(r *Record) {
 			db.tm.del(bucket, string(key))
 		}
 
-		db.BTreeIdx[bucket].Insert(key, r.V, r.H)
+		b.Insert(key, r.V, r.H)
 	}
 }
 
@@ -749,16 +735,16 @@ func (db *DB) buildNotDSIdxes(r *Record) {
 
 func (db *DB) deleteBucket(ds uint16, bucket string) {
 	if ds == DataStructureSet {
-		delete(db.SetIdx, bucket)
+		db.Index.set.delete(bucket)
 	}
 	if ds == DataStructureSortedSet {
-		delete(db.SortedSetIdx, bucket)
+		db.Index.sortedSet.delete(bucket)
 	}
 	if ds == DataStructureBTree {
-		delete(db.BTreeIdx, bucket)
+		db.Index.bTree.delete(bucket)
 	}
 	if ds == DataStructureList {
-		db.Index.deleteList(bucket)
+		db.Index.list.delete(bucket)
 	}
 }
 
@@ -767,17 +753,15 @@ func (db *DB) buildSetIdx(r *Record) error {
 	bucket, key, val, meta := r.Bucket, r.H.Key, r.V, r.H.Meta
 	db.resetRecordByMode(r)
 
-	if _, ok := db.SetIdx[bucket]; !ok {
-		db.SetIdx[bucket] = NewSet()
-	}
+	s := db.Index.set.getWithDefault(bucket)
 
 	switch meta.Flag {
 	case DataSetFlag:
-		if err := db.SetIdx[bucket].SAdd(string(key), [][]byte{val}, []*Record{r}); err != nil {
+		if err := s.SAdd(string(key), [][]byte{val}, []*Record{r}); err != nil {
 			return fmt.Errorf("when build SetIdx SAdd index err: %s", err)
 		}
 	case DataDeleteFlag:
-		if err := db.SetIdx[bucket].SRem(string(key), val); err != nil {
+		if err := s.SRem(string(key), val); err != nil {
 			return fmt.Errorf("when build SetIdx SRem index err: %s", err)
 		}
 	}
@@ -790,9 +774,7 @@ func (db *DB) buildSortedSetIdx(r *Record) error {
 	bucket, key, val, meta := r.Bucket, r.H.Key, r.V, r.H.Meta
 	db.resetRecordByMode(r)
 
-	if _, ok := db.SortedSetIdx[bucket]; !ok {
-		db.SortedSetIdx[bucket] = NewSortedSet(db)
-	}
+	ss := db.Index.sortedSet.getWithDefault(bucket, db)
 
 	var err error
 
@@ -802,19 +784,19 @@ func (db *DB) buildSortedSetIdx(r *Record) error {
 		if len(keyAndScore) == 2 {
 			key := keyAndScore[0]
 			score, _ := strconv2.StrToFloat64(keyAndScore[1])
-			err = db.SortedSetIdx[bucket].ZAdd(key, SCORE(score), val, r)
+			err = ss.ZAdd(key, SCORE(score), val, r)
 		}
 	case DataZRemFlag:
-		_, err = db.SortedSetIdx[bucket].ZRem(string(key), val)
+		_, err = ss.ZRem(string(key), val)
 	case DataZRemRangeByRankFlag:
 		startAndEnd := strings.Split(string(val), SeparatorForZSetKey)
 		start, _ := strconv2.StrToInt(startAndEnd[0])
 		end, _ := strconv2.StrToInt(startAndEnd[1])
-		err = db.SortedSetIdx[bucket].ZRemRangeByRank(string(key), start, end)
+		err = ss.ZRemRangeByRank(string(key), start, end)
 	case DataZPopMaxFlag:
-		_, _, err = db.SortedSetIdx[bucket].ZPopMax(string(key))
+		_, _, err = ss.ZPopMax(string(key))
 	case DataZPopMinFlag:
-		_, _, err = db.SortedSetIdx[bucket].ZPopMin(string(key))
+		_, _, err = ss.ZPopMin(string(key))
 	}
 
 	if err != nil {
@@ -829,7 +811,7 @@ func (db *DB) buildListIdx(r *Record) error {
 	bucket, key, val, meta := r.Bucket, r.H.Key, r.V, r.H.Meta
 	db.resetRecordByMode(r)
 
-	l := db.Index.getList(bucket)
+	l := db.Index.list.getWithDefault(bucket)
 
 	if IsExpired(meta.TTL, meta.Timestamp) {
 		return nil
@@ -962,7 +944,7 @@ func (db *DB) sendToWriteCh(tx *Tx) (*request, error) {
 }
 
 func (db *DB) checkListExpired() {
-	db.Index.rangeList(func(l *List) {
+	db.Index.list.rangeIdx(func(l *List) {
 		for key := range l.TTL {
 			l.IsExpire(key)
 		}

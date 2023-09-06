@@ -522,9 +522,7 @@ func (tx *Tx) allocCommitBuffer() *bytes.Buffer {
 func (tx *Tx) buildTreeIdx(record *Record) {
 	bucket, key, meta, offset := record.Bucket, record.H.Key, record.H.Meta, record.H.DataPos
 
-	if _, ok := tx.db.BTreeIdx[bucket]; !ok {
-		tx.db.BTreeIdx[bucket] = NewBTree()
-	}
+	b := tx.db.Index.bTree.getWithDefault(bucket)
 
 	if meta.Flag == DataSetFlag {
 		var value []byte
@@ -561,10 +559,10 @@ func (tx *Tx) buildTreeIdx(record *Record) {
 		}
 
 		hint := NewHint().WithFileId(tx.db.ActiveFile.fileID).WithKey(key).WithMeta(meta).WithDataPos(offset)
-		tx.db.BTreeIdx[bucket].Insert(key, value, hint)
+		b.Insert(key, value, hint)
 	} else if meta.Flag == DataDeleteFlag {
 		tx.db.tm.del(bucket, string(key))
-		tx.db.BTreeIdx[bucket].Delete(key)
+		b.Delete(key)
 	}
 }
 
@@ -573,16 +571,14 @@ func (tx *Tx) buildSetIdx(record *Record) {
 
 	tx.db.resetRecordByMode(record)
 
-	if _, ok := tx.db.SetIdx[bucket]; !ok {
-		tx.db.SetIdx[bucket] = NewSet()
-	}
+	s := tx.db.Index.set.getWithDefault(bucket)
 
 	if meta.Flag == DataDeleteFlag {
-		_ = tx.db.SetIdx[bucket].SRem(string(key), value)
+		_ = s.SRem(string(key), value)
 	}
 
 	if meta.Flag == DataSetFlag {
-		_ = tx.db.SetIdx[bucket].SAdd(string(key), [][]byte{value}, []*Record{record})
+		_ = s.SAdd(string(key), [][]byte{value}, []*Record{record})
 	}
 }
 
@@ -591,32 +587,29 @@ func (tx *Tx) buildSortedSetIdx(record *Record) {
 
 	tx.db.resetRecordByMode(record)
 
-	if _, ok := tx.db.SortedSetIdx[bucket]; !ok {
-		tx.db.SortedSetIdx[bucket] = NewSortedSet(tx.db)
-	}
+	ss := tx.db.Index.sortedSet.getWithDefault(bucket, tx.db)
 
 	switch meta.Flag {
 	case DataZAddFlag:
-		key, score := splitStringFloat64Str(string(key), SeparatorForZSetKey)
-		_ = tx.db.SortedSetIdx[bucket].ZAdd(key, SCORE(score), value, record)
+    key, score := splitStringFloat64Str(string(key), SeparatorForZSetKey)
+		_ = ss.ZAdd(key, SCORE(score), value, record)
 	case DataZRemFlag:
-		_, _ = tx.db.SortedSetIdx[bucket].ZRem(string(key), value)
+		_, _ = ss.ZRem(string(key), value)
 	case DataZRemRangeByRankFlag:
-		start, end := splitIntIntStr(string(value), SeparatorForZSetKey)
-		_ = tx.db.SortedSetIdx[bucket].ZRemRangeByRank(string(key), start, end)
+    start, end := splitIntIntStr(string(value), SeparatorForZSetKey)
+		_ = ss.ZRemRangeByRank(string(key), start, end)
 	case DataZPopMaxFlag:
-		_, _, _ = tx.db.SortedSetIdx[bucket].ZPopMax(string(key))
+		_, _, _ = ss.ZPopMax(string(key))
 	case DataZPopMinFlag:
-		_, _, _ = tx.db.SortedSetIdx[bucket].ZPopMin(string(key))
+		_, _, _ = ss.ZPopMin(string(key))
 	}
-}
 
 func (tx *Tx) buildListIdx(record *Record) {
 	bucket, key, value, meta := record.Bucket, record.H.Key, record.V, record.H.Meta
 
 	tx.db.resetRecordByMode(record)
 
-	l := tx.db.Index.getList(bucket)
+	l := tx.db.Index.list.getWithDefault(bucket)
 
 	if IsExpired(meta.TTL, meta.Timestamp) {
 		return

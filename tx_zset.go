@@ -55,7 +55,7 @@ func (tx *Tx) ZMembers(bucket string, key []byte) (map[*SortedSetMember]struct{}
 		return nil, err
 	}
 
-	members, err := tx.db.SortedSetIdx[bucket].ZMembers(string(key))
+	members, err := tx.db.Index.sortedSet.getWithDefault(bucket, tx.db).ZMembers(string(key))
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +81,7 @@ func (tx *Tx) ZCard(bucket string, key []byte) (int, error) {
 		return 0, err
 	}
 
-	card, err := tx.db.SortedSetIdx[bucket].ZCard(string(key))
+	card, err := tx.db.Index.sortedSet.getWithDefault(bucket, tx.db).ZCard(string(key))
 	if err != nil {
 		return 0, err
 	}
@@ -98,7 +98,7 @@ func (tx *Tx) ZCount(bucket string, key []byte, start, end float64, opts *GetByS
 		return 0, err
 	}
 
-	count, err := tx.db.SortedSetIdx[bucket].ZCount(string(key), SCORE(start), SCORE(end), opts)
+	count, err := tx.db.Index.sortedSet.getWithDefault(bucket, tx.db).ZCount(string(key), SCORE(start), SCORE(end), opts)
 	if err != nil {
 		return 0, err
 	}
@@ -112,7 +112,7 @@ func (tx *Tx) ZPopMax(bucket string, key []byte) (*SortedSetMember, error) {
 		return nil, err
 	}
 
-	record, score, err := tx.db.SortedSetIdx[bucket].ZPeekMax(string(key))
+	record, score, err := tx.db.Index.sortedSet.getWithDefault(bucket, tx.db).ZPeekMax(string(key))
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +131,7 @@ func (tx *Tx) ZPopMin(bucket string, key []byte) (*SortedSetMember, error) {
 		return nil, err
 	}
 
-	record, score, err := tx.db.SortedSetIdx[bucket].ZPeekMin(string(key))
+	record, score, err := tx.db.Index.sortedSet.getWithDefault(bucket, tx.db).ZPeekMin(string(key))
 	if err != nil {
 		return nil, err
 	}
@@ -150,7 +150,7 @@ func (tx *Tx) ZPeekMax(bucket string, key []byte) (*SortedSetMember, error) {
 		return nil, err
 	}
 
-	record, score, err := tx.db.SortedSetIdx[bucket].ZPeekMax(string(key))
+	record, score, err := tx.db.Index.sortedSet.getWithDefault(bucket, tx.db).ZPeekMax(string(key))
 	if err != nil {
 		return nil, err
 	}
@@ -169,7 +169,7 @@ func (tx *Tx) ZPeekMin(bucket string, key []byte) (*SortedSetMember, error) {
 		return nil, err
 	}
 
-	record, score, err := tx.db.SortedSetIdx[bucket].ZPeekMin(string(key))
+	record, score, err := tx.db.Index.sortedSet.getWithDefault(bucket, tx.db).ZPeekMin(string(key))
 	if err != nil {
 		return nil, err
 	}
@@ -189,7 +189,7 @@ func (tx *Tx) ZRangeByScore(bucket string, key []byte, start, end float64, opts 
 		return nil, err
 	}
 
-	records, scores, err := tx.db.SortedSetIdx[bucket].ZRangeByScore(string(key), SCORE(start), SCORE(end), opts)
+	records, scores, err := tx.db.Index.sortedSet.getWithDefault(bucket, tx.db).ZRangeByScore(string(key), SCORE(start), SCORE(end), opts)
 	if err != nil {
 		return nil, err
 	}
@@ -213,7 +213,7 @@ func (tx *Tx) ZRangeByRank(bucket string, key []byte, start, end int) ([]*Sorted
 		return nil, err
 	}
 
-	records, scores, err := tx.db.SortedSetIdx[bucket].ZRangeByRank(string(key), start, end)
+	records, scores, err := tx.db.Index.sortedSet.getWithDefault(bucket, tx.db).ZRangeByRank(string(key), start, end)
 	if err != nil {
 		return nil, err
 	}
@@ -236,7 +236,7 @@ func (tx *Tx) ZRem(bucket string, key []byte, value []byte) error {
 		return err
 	}
 
-	exist, err := tx.db.SortedSetIdx[bucket].ZExist(string(key), value)
+	exist, err := tx.db.Index.sortedSet.getWithDefault(bucket, tx.db).ZExist(string(key), value)
 	if err != nil {
 		return err
 	}
@@ -266,7 +266,7 @@ func (tx *Tx) ZRank(bucket string, key, value []byte) (int, error) {
 		return 0, err
 	}
 
-	return tx.db.SortedSetIdx[bucket].ZRank(string(key), value)
+	return tx.db.Index.sortedSet.getWithDefault(bucket, tx.db).ZRank(string(key), value)
 }
 
 // ZRevRank Returns the rank of member in the sorted set specified by key in a bucket, with the scores ordered from high to low.
@@ -275,7 +275,7 @@ func (tx *Tx) ZRevRank(bucket string, key, value []byte) (int, error) {
 		return 0, err
 	}
 
-	return tx.db.SortedSetIdx[bucket].ZRevRank(string(key), value)
+	return tx.db.Index.sortedSet.getWithDefault(bucket, tx.db).ZRevRank(string(key), value)
 }
 
 // ZScore Returns the score of members in a sorted set specified by key in a bucket.
@@ -284,7 +284,7 @@ func (tx *Tx) ZScore(bucket string, key, value []byte) (float64, error) {
 		return 0, err
 	}
 
-	if score, err := tx.db.SortedSetIdx[bucket].ZScore(string(key), value); err != nil {
+	if score, err := tx.db.Index.sortedSet.getWithDefault(bucket, tx.db).ZScore(string(key), value); err != nil {
 		return 0, err
 	} else {
 		return score, nil
@@ -296,7 +296,7 @@ func (tx *Tx) ZKeys(bucket, pattern string, f func(key string) bool) error {
 	if err := tx.ZCheck(bucket); err != nil {
 		return err
 	}
-	for key := range tx.db.SortedSetIdx[bucket].M {
+	for key := range tx.db.Index.sortedSet.getWithDefault(bucket, tx.db).M {
 		if end, err := MatchForRange(pattern, key, f); end || err != nil {
 			return err
 		}
@@ -308,7 +308,7 @@ func (tx *Tx) ZCheck(bucket string) error {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return err
 	}
-	if _, ok := tx.db.SortedSetIdx[bucket]; !ok {
+	if _, ok := tx.db.Index.sortedSet.exist(bucket); !ok {
 		return ErrBucket
 	}
 	return nil
