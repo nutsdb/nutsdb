@@ -16,8 +16,9 @@ package nutsdb
 
 import (
 	"errors"
-	dll "github.com/emirpasic/gods/lists/doublylinkedlist"
 	"time"
+
+	dll "github.com/emirpasic/gods/lists/doublylinkedlist"
 )
 
 var (
@@ -203,7 +204,6 @@ func (l *List) getRemoveIndices(key string, count int, cmp func(r *Record) (bool
 	return removeIndexes, nil
 }
 
-
 // LRem removes the first count occurrences of elements equal to value from the list stored at key.
 // The count argument influences the operation in the following ways:
 // count > 0: Remove elements equal to value moving from head to tail.
@@ -300,7 +300,7 @@ func (l *List) LRemByIndex(key string, indexes []int) error {
 	return nil
 }
 
-func (l *List) getValidIndexes(key string, indexes []int) (map[int]struct{}) {
+func (l *List) getValidIndexes(key string, indexes []int) map[int]struct{} {
 	idxes := make(map[int]struct{})
 	list := l.Items[key]
 	if list == nil || 0 == list.Size() {
@@ -374,7 +374,6 @@ func (l *List) GetListTTL(key string) (uint32, error) {
 	remain := timestamp + uint64(ttl) - uint64(now)
 
 	return uint32(remain), nil
-
 }
 
 func checkBounds(start, end int, size int) (int, int, error) {

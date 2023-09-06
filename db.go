@@ -154,7 +154,7 @@ type (
 		mergeWorkCloseCh chan struct{}
 		writeCh          chan *request
 		tm               *ttlManager
-		RecordCount             int64 // current valid record count, exclude deleted, repeated
+		RecordCount      int64 // current valid record count, exclude deleted, repeated
 	}
 )
 
@@ -364,7 +364,7 @@ func (db *DB) commitTransaction(tx *Tx) error {
 			panicked = true
 		}
 		if panicked || err != nil {
-			//log.Fatal("panicked=", panicked, ", err=", err)
+			// log.Fatal("panicked=", panicked, ", err=", err)
 			if errRollback := tx.Rollback(); errRollback != nil {
 				err = errRollback
 			}
@@ -376,7 +376,7 @@ func (db *DB) commitTransaction(tx *Tx) error {
 	tx.setStatusRunning()
 	err = tx.Commit()
 	if err != nil {
-		//log.Fatal("txCommit fail,err=", err)
+		// log.Fatal("txCommit fail,err=", err)
 		return err
 	}
 
@@ -419,7 +419,7 @@ func (db *DB) getMaxBatchSize() int64 {
 }
 
 func (db *DB) getMaxWriteRecordCount() int64 {
-    return db.opt.MaxWriteRecordCount
+	return db.opt.MaxWriteRecordCount
 }
 
 func (db *DB) doWrites() {
@@ -530,7 +530,6 @@ func (db *DB) parseDataFiles(dataFileIds []int) (err error) {
 	)
 
 	parseDataInTx := func() error {
-
 		for _, entry := range dataInTx.es {
 			h := NewHint().WithKey(entry.Key).WithFileId(entry.fid).WithMeta(entry.Meta).WithDataPos(uint64(entry.off))
 			// This method is entered when the commit record of a transaction is read
@@ -552,7 +551,7 @@ func (db *DB) parseDataFiles(dataFileIds []int) (err error) {
 		return nil
 	}
 
-	var readEntriesFromFile = func() error {
+	readEntriesFromFile := func() error {
 		for {
 			entry, err := f.readEntry()
 			if err != nil {

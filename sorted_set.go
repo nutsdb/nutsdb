@@ -202,7 +202,7 @@ func (z *SortedSet) ZRemRangeByRank(key string, start int, end int) error {
 	return ErrSortedSetNotFound
 }
 
-func (z *SortedSet) getZRemRangeByRankNodes(key string, start int, end int) ([]*SkipListNode, error){
+func (z *SortedSet) getZRemRangeByRankNodes(key string, start int, end int) ([]*SkipListNode, error) {
 	if sortedSet, ok := z.M[key]; ok {
 		return sortedSet.GetByRankRange(start, end, false), nil
 	}

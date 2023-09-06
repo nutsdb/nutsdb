@@ -122,7 +122,7 @@ func (tx *Tx) CommitWith(cb func(error)) {
 		go runTxnCallback(&txnCb{user: cb, err: nil})
 		return
 	}
-	//defer tx.setStatusClosed()  //must not add this code because another process is also accessing tx
+	// defer tx.setStatusClosed()  //must not add this code because another process is also accessing tx
 	commitCb, err := tx.commitAndSend()
 	if err != nil {
 		go runTxnCallback(&txnCb{user: cb, err: err})
@@ -204,7 +204,7 @@ func (tx *Tx) Commit() (err error) {
 		}
 
 		// judge all write records is whether more than the MaxWriteRecordCount
-		if tx.db.RecordCount + curWriteCount > tx.db.opt.MaxWriteRecordCount {
+		if tx.db.RecordCount+curWriteCount > tx.db.opt.MaxWriteRecordCount {
 			return ErrTxnExceedWriteLimit
 		}
 	}
@@ -845,7 +845,6 @@ func (tx *Tx) isClosed() bool {
 }
 
 func (tx *Tx) buildIdxes(records []*Record) error {
-
 	for _, record := range records {
 		bucket, meta := record.Bucket, record.H.Meta
 
