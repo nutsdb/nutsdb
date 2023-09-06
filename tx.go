@@ -348,15 +348,11 @@ func (tx *Tx) getListEntryNewAddRecordCount(entry *Entry) (int64, error) {
 func (tx *Tx) getKvEntryNewAddRecordCount(entry *Entry) (int64, error) {
 	var res int64
 
-	oldEntry, _ := tx.Get(string(entry.Bucket), entry.Key)
-
 	switch entry.Meta.Flag {
 	case DataDeleteFlag:
-		if oldEntry != nil {
-			res--
-		}
+		res--
 	case DataSetFlag:
-		if oldEntry == nil {
+		if oldEntry, _ := tx.Get(string(entry.Bucket), entry.Key); oldEntry == nil {
 			res++
 		}
 	}
@@ -366,12 +362,12 @@ func (tx *Tx) getKvEntryNewAddRecordCount(entry *Entry) (int64, error) {
 
 func (tx *Tx) getSetEntryNewAddRecordCount(entry *Entry) (int64, error) {
 	var res int64
-	isMember, _ := tx.SIsMember(string(entry.Bucket), entry.Key, entry.Value)
-	if entry.Meta.Flag == DataDeleteFlag && isMember {
+
+	if entry.Meta.Flag == DataDeleteFlag {
 		res--
 	}
 
-	if entry.Meta.Flag == DataSetFlag && !isMember {
+	if entry.Meta.Flag == DataSetFlag {
 		res++
 	}
 
@@ -383,7 +379,6 @@ func (tx *Tx) getSortedSetEntryNewAddRecordCount(entry *Entry) (int64, error) {
 	bucketName := string(entry.Bucket)
 	key := string(entry.Key)
 	value := string(entry.Value)
-	bucketExists := tx.sortedBucketExists(bucketName)
 
 	switch entry.Meta.Flag {
 	case DataZAddFlag:
@@ -391,22 +386,16 @@ func (tx *Tx) getSortedSetEntryNewAddRecordCount(entry *Entry) (int64, error) {
 			res++
 		}
 	case DataZRemFlag:
-		if tx.keyExistsInSortedSet(bucketName, key, value) {
-			res--
-		}
+		res--
 	case DataZRemRangeByRankFlag:
-		if bucketExists {
-			start, end := splitIntIntStr(string(value), SeparatorForZSetKey)
-			delNodes, err := tx.db.Index.sortedSet.getWithDefault(bucketName, tx.db).getZRemRangeByRankNodes(string(key), start, end)
-			if err != nil {
-				return res, err
-			}
-			res -= int64(len(delNodes))
+		start, end := splitIntIntStr(string(value), SeparatorForZSetKey)
+		delNodes, err := tx.db.Index.sortedSet.getWithDefault(bucketName, tx.db).getZRemRangeByRankNodes(string(key), start, end)
+		if err != nil {
+			return res, err
 		}
+		res -= int64(len(delNodes))
 	case DataZPopMaxFlag, DataZPopMinFlag:
-		if tx.keyHasItemsInSortedSet(bucketName, key) {
-			res--
-		}
+		res--
 	}
 
 	return res, nil
@@ -427,16 +416,6 @@ func (tx *Tx) keyExistsInSortedSet(bucketName, key, value string) bool {
 	}
 	exists, _ := tx.db.Index.sortedSet.idx[bucketName].ZExist(newKey, []byte(value))
 	return exists
-}
-
-func (tx *Tx) keyHasItemsInSortedSet(bucketName, key string) bool {
-	if !tx.sortedBucketExists(bucketName) {
-		return false
-	}
-	if _, exists := tx.db.Index.sortedSet.idx[bucketName].M[key]; exists {
-		return tx.db.Index.sortedSet.idx[bucketName].M[key].Size() > 0
-	}
-	return false
 }
 
 func (tx *Tx) getEntryNewAddRecordCount(entry *Entry) (int64, error) {
