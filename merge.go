@@ -52,7 +52,7 @@ func (db *DB) merge() error {
 		pendingMergeFIds []int
 	)
 
-	if len(db.Index.list) != 0 {
+	if db.Index.list.getIdxLen() != 0 {
 		return ErrNotSupportMergeWhenUsingList
 	}
 
@@ -217,13 +217,13 @@ func (db *DB) mergeWorker() {
 
 func (db *DB) isPendingMergeEntry(entry *Entry) bool {
 	if entry.Meta.Ds == DataStructureBTree {
-		idx, exist := db.BTreeIdx[string(entry.Bucket)]
+		idx, exist := db.Index.bTree.exist(string(entry.Bucket))
 		if exist {
 			r, ok := idx.Find(entry.Key)
 			if ok && r.H.Meta.Flag == DataSetFlag {
 				if r.IsExpired() {
 					db.tm.del(string(entry.Bucket), string(entry.Key))
-					db.BTreeIdx[string(entry.Bucket)].Delete(entry.Key)
+					idx.Delete(entry.Key)
 					return false
 				}
 				if r.H.Meta.TxID > entry.Meta.TxID {
@@ -235,7 +235,7 @@ func (db *DB) isPendingMergeEntry(entry *Entry) bool {
 	}
 
 	if entry.Meta.Ds == DataStructureSet {
-		setIdx, exist := db.SetIdx[string(entry.Bucket)]
+		setIdx, exist := db.Index.set.exist(string(entry.Bucket))
 		if exist {
 			isMember, err := setIdx.SIsMember(string(entry.Key), entry.Value)
 			if err != nil {
@@ -252,7 +252,7 @@ func (db *DB) isPendingMergeEntry(entry *Entry) bool {
 		if len(keyAndScore) == 2 {
 			key := keyAndScore[0]
 			score, _ := strconv2.StrToFloat64(keyAndScore[1])
-			sortedSetIdx, exist := db.SortedSetIdx[string(entry.Bucket)]
+			sortedSetIdx, exist := db.Index.sortedSet.exist(string(entry.Bucket))
 			if exist {
 				s, err := sortedSetIdx.ZScore(key, entry.Value)
 				if err != nil {

@@ -37,7 +37,7 @@ func (tx *Tx) Get(bucket string, key []byte) (e *Entry, err error) {
 
 	idxMode := tx.db.opt.EntryIdxMode
 
-	if idx, ok := tx.db.BTreeIdx[bucket]; ok {
+	if idx, ok := tx.db.Index.bTree.exist(bucket); ok {
 		r, found := idx.Find(key)
 		if !found {
 			return nil, ErrKeyNotFound
@@ -74,7 +74,7 @@ func (tx *Tx) GetAll(bucket string) (entries Entries, err error) {
 
 	entries = Entries{}
 
-	if index, ok := tx.db.BTreeIdx[bucket]; ok {
+	if index, ok := tx.db.Index.bTree.exist(bucket); ok {
 		records := index.All()
 		if len(records) == 0 {
 			return nil, ErrBucketEmpty
@@ -99,7 +99,7 @@ func (tx *Tx) RangeScan(bucket string, start, end []byte) (es Entries, err error
 		return nil, err
 	}
 
-	if index, ok := tx.db.BTreeIdx[bucket]; ok {
+	if index, ok := tx.db.Index.bTree.exist(bucket); ok {
 		records := index.Range(start, end)
 		if err != nil {
 			return nil, ErrRangeScan
@@ -125,7 +125,7 @@ func (tx *Tx) PrefixScan(bucket string, prefix []byte, offsetNum int, limitNum i
 		return nil, err
 	}
 
-	if idx, ok := tx.db.BTreeIdx[bucket]; ok {
+	if idx, ok := tx.db.Index.bTree.exist(bucket); ok {
 		records := idx.PrefixScan(prefix, offsetNum, limitNum)
 		es, err = tx.getHintIdxDataItemsWrapper(records, limitNum, es)
 		if err != nil {
@@ -147,7 +147,7 @@ func (tx *Tx) PrefixSearchScan(bucket string, prefix []byte, reg string, offsetN
 		return nil, err
 	}
 
-	if idx, ok := tx.db.BTreeIdx[bucket]; ok {
+	if idx, ok := tx.db.Index.bTree.exist(bucket); ok {
 		records := idx.PrefixSearchScan(prefix, reg, offsetNum, limitNum)
 		es, err = tx.getHintIdxDataItemsWrapper(records, limitNum, es)
 		if err != nil {
@@ -168,7 +168,7 @@ func (tx *Tx) Delete(bucket string, key []byte) error {
 		return err
 	}
 
-	if idx, ok := tx.db.BTreeIdx[bucket]; ok {
+	if idx, ok := tx.db.Index.bTree.exist(bucket); ok {
 		if _, found := idx.Find(key); !found {
 			return ErrKeyNotFound
 		}

@@ -185,6 +185,23 @@ func TestDB_DeleteANonExistKey(t *testing.T) {
 	})
 }
 
+func TestDB_CheckListExpired(t *testing.T) {
+	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		testBucket := "test_bucket"
+		txPut(t, db, testBucket, GetTestBytes(0), GetTestBytes(1), Persistent, nil)
+		txPut(t, db, testBucket, GetTestBytes(1), GetRandomBytes(24), 1, nil)
+
+		time.Sleep(1100 * time.Millisecond)
+
+		db.checkListExpired()
+
+		// this entry still alive
+		txGet(t, db, testBucket, GetTestBytes(0), GetTestBytes(1), nil)
+		// this entry will be deleted
+		txGet(t, db, testBucket, GetTestBytes(1), nil, ErrKeyNotFound)
+	})
+}
+
 func txSAdd(t *testing.T, db *DB, bucket string, key, value []byte, expectErr error) {
 	err := db.Update(func(tx *Tx) error {
 		err := tx.SAdd(bucket, key, value)
