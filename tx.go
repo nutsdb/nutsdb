@@ -352,7 +352,12 @@ func (tx *Tx) getKvEntryNewAddRecordCount(entry *Entry) (int64, error) {
 	case DataDeleteFlag:
 		res--
 	case DataSetFlag:
-		if oldEntry, _ := tx.Get(string(entry.Bucket), entry.Key); oldEntry == nil {
+		if idx, ok := tx.db.Index.bTree.exist(string(entry.Bucket)); ok {
+			_, found := idx.Find(entry.Key)
+			if !found {
+				res++
+			}
+		} else {
 			res++
 		}
 	}
@@ -388,8 +393,8 @@ func (tx *Tx) getSortedSetEntryNewAddRecordCount(entry *Entry) (int64, error) {
 	case DataZRemFlag:
 		res--
 	case DataZRemRangeByRankFlag:
-		start, end := splitIntIntStr(string(value), SeparatorForZSetKey)
-		delNodes, err := tx.db.Index.sortedSet.getWithDefault(bucketName, tx.db).getZRemRangeByRankNodes(string(key), start, end)
+		start, end := splitIntIntStr(value, SeparatorForZSetKey)
+		delNodes, err := tx.db.Index.sortedSet.getWithDefault(bucketName, tx.db).getZRemRangeByRankNodes(key, start, end)
 		if err != nil {
 			return res, err
 		}
@@ -401,13 +406,8 @@ func (tx *Tx) getSortedSetEntryNewAddRecordCount(entry *Entry) (int64, error) {
 	return res, nil
 }
 
-func (tx *Tx) sortedBucketExists(bucketName string) bool {
-	_, exists := tx.db.Index.sortedSet.idx[bucketName]
-	return exists
-}
-
 func (tx *Tx) keyExistsInSortedSet(bucketName, key, value string) bool {
-	if !tx.sortedBucketExists(bucketName) {
+	if _, exist := tx.db.Index.sortedSet.exist(bucketName); !exist {
 		return false
 	}
 	newKey := key
