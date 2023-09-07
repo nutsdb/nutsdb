@@ -115,6 +115,9 @@ type Options struct {
 	// TimeWheel means use the time wheel, You can use it when you need high performance or low memory usage
 	// TimeHeap means use the time heap, You can use it when you need to delete precisely or memory usage will be high
 	ExpiredDeleteType ExpiredDeleteType
+
+	// max write record num
+	MaxWriteRecordCount int64
 }
 
 const (
@@ -235,5 +238,11 @@ func WithCommitBufferSize(commitBufferSize int64) Option {
 func WithLessFunc(lessFunc LessFunc) Option {
 	return func(opt *Options) {
 		opt.LessFunc = lessFunc
+	}
+}
+
+func WithMaxWriteRecordCount(maxWriteRecordCount int64) Option {
+	return func(opt *Options) {
+		opt.MaxWriteRecordCount = maxWriteRecordCount
 	}
 }

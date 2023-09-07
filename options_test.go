@@ -42,6 +42,18 @@ func TestWithMaxBatchSize(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestWithMaxWriteRecordCount(t *testing.T) {
+	InitOpt("", true)
+	db, err := Open(
+		opt,
+		WithMaxWriteRecordCount(100),
+	)
+	assert.NoError(t, err)
+	assert.Equal(t, int64(100), db.getMaxWriteRecordCount())
+	err = db.Close()
+	assert.NoError(t, err)
+}
+
 func TestWithRWMode(t *testing.T) {
 	db, err = Open(DefaultOptions,
 		WithDir("/tmp/nutsdb"),

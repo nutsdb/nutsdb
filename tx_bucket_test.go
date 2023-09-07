@@ -31,10 +31,10 @@ func setupBucket(t *testing.T, db *DB) {
 	key := GetTestBytes(0)
 	val := GetTestBytes(1)
 
-	txSAdd(t, db, setBucketName, key, val, nil)
-	txZAdd(t, db, zSetBucketName, key, val, 80, nil)
-	txPush(t, db, listBucketName, key, val, nil, true)
-	txPut(t, db, stringBucketName, key, val, Persistent, nil)
+	txSAdd(t, db, setBucketName, key, val, nil, nil)
+	txZAdd(t, db, zSetBucketName, key, val, 80, nil, nil)
+	txPush(t, db, listBucketName, key, val, true, nil, nil)
+	txPut(t, db, stringBucketName, key, val, Persistent, nil, nil)
 }
 
 func TestBucket_IterateBuckets(t *testing.T) {

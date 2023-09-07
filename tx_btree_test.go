@@ -374,7 +374,7 @@ func TestTx_DeleteFromMemory(t *testing.T) {
 		bucket := "bucket"
 
 		for i := 0; i < 10; i++ {
-			txPut(t, db, bucket, GetTestBytes(i), GetTestBytes(i), Persistent, nil)
+			txPut(t, db, bucket, GetTestBytes(i), GetTestBytes(i), Persistent, nil, nil)
 		}
 
 		for i := 0; i < 10; i++ {
@@ -662,9 +662,9 @@ func TestTx_ExpiredDeletion(t *testing.T) {
 
 	t.Run("expired deletion", func(t *testing.T) {
 		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-			txPut(t, db, bucket, GetTestBytes(0), GetTestBytes(0), 1, nil)
-			txPut(t, db, bucket, GetTestBytes(1), GetTestBytes(1), 2, nil)
-			txPut(t, db, bucket, GetTestBytes(2), GetTestBytes(2), 3, nil)
+			txPut(t, db, bucket, GetTestBytes(0), GetTestBytes(0), 1, nil, nil)
+			txPut(t, db, bucket, GetTestBytes(1), GetTestBytes(1), 2, nil, nil)
+			txPut(t, db, bucket, GetTestBytes(2), GetTestBytes(2), 3, nil, nil)
 			txGet(t, db, bucket, GetTestBytes(0), GetTestBytes(0), nil)
 			txGet(t, db, bucket, GetTestBytes(1), GetTestBytes(1), nil)
 			txGet(t, db, bucket, GetTestBytes(2), GetTestBytes(2), nil)
@@ -695,11 +695,11 @@ func TestTx_ExpiredDeletion(t *testing.T) {
 
 	t.Run("update expire time", func(t *testing.T) {
 		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-			txPut(t, db, bucket, GetTestBytes(0), GetTestBytes(0), 1, nil)
+			txPut(t, db, bucket, GetTestBytes(0), GetTestBytes(0), 1, nil, nil)
 			time.Sleep(500 * time.Millisecond)
 
 			// reset expire time
-			txPut(t, db, bucket, GetTestBytes(0), GetTestBytes(0), 3, nil)
+			txPut(t, db, bucket, GetTestBytes(0), GetTestBytes(0), 3, nil, nil)
 			time.Sleep(1 * time.Second)
 			txGet(t, db, bucket, GetTestBytes(0), GetTestBytes(0), nil)
 
@@ -710,11 +710,11 @@ func TestTx_ExpiredDeletion(t *testing.T) {
 
 	t.Run("persist expire time", func(t *testing.T) {
 		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-			txPut(t, db, bucket, GetTestBytes(0), GetTestBytes(0), 1, nil)
+			txPut(t, db, bucket, GetTestBytes(0), GetTestBytes(0), 1, nil, nil)
 			time.Sleep(500 * time.Millisecond)
 
 			// persist expire time
-			txPut(t, db, bucket, GetTestBytes(0), GetTestBytes(0), Persistent, nil)
+			txPut(t, db, bucket, GetTestBytes(0), GetTestBytes(0), Persistent, nil, nil)
 			time.Sleep(1 * time.Second)
 			txGet(t, db, bucket, GetTestBytes(0), GetTestBytes(0), nil)
 
@@ -726,13 +726,13 @@ func TestTx_ExpiredDeletion(t *testing.T) {
 	t.Run("expired deletion when open", func(t *testing.T) {
 		opts := DefaultOptions
 		runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
-			txPut(t, db, bucket, GetTestBytes(0), GetTestBytes(0), 1, nil)
-			txPut(t, db, bucket, GetTestBytes(1), GetTestBytes(1), 3, nil)
-			txPut(t, db, bucket, GetTestBytes(2), GetTestBytes(2), 3, nil)
-			txPut(t, db, bucket, GetTestBytes(3), GetTestBytes(3), Persistent, nil)
-			txPut(t, db, bucket, GetTestBytes(4), GetTestBytes(4), Persistent, nil)
-			txPut(t, db, bucket, GetTestBytes(5), GetTestBytes(5), 5, nil)
-			txPut(t, db, bucket, GetTestBytes(1), GetTestBytes(1), Persistent, nil)
+			txPut(t, db, bucket, GetTestBytes(0), GetTestBytes(0), 1, nil, nil)
+			txPut(t, db, bucket, GetTestBytes(1), GetTestBytes(1), 3, nil, nil)
+			txPut(t, db, bucket, GetTestBytes(2), GetTestBytes(2), 3, nil, nil)
+			txPut(t, db, bucket, GetTestBytes(3), GetTestBytes(3), Persistent, nil, nil)
+			txPut(t, db, bucket, GetTestBytes(4), GetTestBytes(4), Persistent, nil, nil)
+			txPut(t, db, bucket, GetTestBytes(5), GetTestBytes(5), 5, nil, nil)
+			txPut(t, db, bucket, GetTestBytes(1), GetTestBytes(1), Persistent, nil, nil)
 			txDel(t, db, bucket, GetTestBytes(5), nil)
 
 			require.NoError(t, db.Close())
@@ -765,9 +765,9 @@ func TestTx_ExpiredDeletion(t *testing.T) {
 		opts.SegmentSize = 1 * 100
 		runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
 			bucket := "bucket"
-			txPut(t, db, bucket, GetTestBytes(0), GetTestBytes(0), Persistent, nil)
-			txPut(t, db, bucket, GetTestBytes(1), GetTestBytes(1), Persistent, nil)
-			txPut(t, db, bucket, GetTestBytes(2), GetTestBytes(2), 1, nil)
+			txPut(t, db, bucket, GetTestBytes(0), GetTestBytes(0), Persistent, nil, nil)
+			txPut(t, db, bucket, GetTestBytes(1), GetTestBytes(1), Persistent, nil, nil)
+			txPut(t, db, bucket, GetTestBytes(2), GetTestBytes(2), 1, nil, nil)
 
 			time.Sleep(1100 * time.Millisecond)
 
@@ -787,8 +787,8 @@ func TestTx_ExpiredDeletion(t *testing.T) {
 		opts := DefaultOptions
 		opts.ExpiredDeleteType = TimeHeap
 		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-			txPut(t, db, bucket, GetTestBytes(0), GetTestBytes(0), 1, nil)
-			txPut(t, db, bucket, GetTestBytes(1), GetTestBytes(1), 2, nil)
+			txPut(t, db, bucket, GetTestBytes(0), GetTestBytes(0), 1, nil, nil)
+			txPut(t, db, bucket, GetTestBytes(1), GetTestBytes(1), 2, nil, nil)
 			txGet(t, db, bucket, GetTestBytes(0), GetTestBytes(0), nil)
 			txGet(t, db, bucket, GetTestBytes(1), GetTestBytes(1), nil)
 

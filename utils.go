@@ -21,6 +21,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/xujiajun/utils/filesystem"
 	"github.com/xujiajun/utils/strconv2"
@@ -114,4 +115,42 @@ func createDirIfNotExist(dir string) error {
 		}
 	}
 	return nil
+}
+
+func splitIntStringStr(str, separator string) (int, string) {
+	strList := strings.Split(str, separator)
+	firstItem, _ := strconv2.StrToInt(strList[0])
+	secondItem := strList[1]
+	return firstItem, secondItem
+}
+
+func splitStringIntStr(str, separator string) (string, int) {
+	strList := strings.Split(str, separator)
+	firstItem := strList[0]
+	secondItem, _ := strconv2.StrToInt(strList[1])
+	return firstItem, secondItem
+}
+
+func splitIntIntStr(str, separator string) (int, int) {
+	strList := strings.Split(str, separator)
+	firstItem, _ := strconv2.StrToInt(strList[0])
+	secondItem, _ := strconv2.StrToInt(strList[1])
+	return firstItem, secondItem
+}
+
+func splitStringFloat64Str(str, separator string) (string, float64) {
+	strList := strings.Split(str, separator)
+	firstItem := strList[0]
+	secondItem, _ := strconv2.StrToFloat64(strList[1])
+	return firstItem, secondItem
+}
+
+func getFnv32(value []byte) (uint32, error) {
+	_, err := fnvHash.Write(value)
+	if err != nil {
+		return 0, err
+	}
+	hash := fnvHash.Sum32()
+	fnvHash.Reset()
+	return hash, nil
 }

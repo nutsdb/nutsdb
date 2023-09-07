@@ -151,6 +151,7 @@ type (
 		mergeWorkCloseCh chan struct{}
 		writeCh          chan *request
 		tm               *ttlManager
+		RecordCount      int64 // current valid record count, exclude deleted, repeated
 	}
 )
 
@@ -351,7 +352,7 @@ func (db *DB) commitTransaction(tx *Tx) error {
 			panicked = true
 		}
 		if panicked || err != nil {
-			//log.Fatal("panicked=", panicked, ", err=", err)
+			// log.Fatal("panicked=", panicked, ", err=", err)
 			if errRollback := tx.Rollback(); errRollback != nil {
 				err = errRollback
 			}
@@ -363,7 +364,7 @@ func (db *DB) commitTransaction(tx *Tx) error {
 	tx.setStatusRunning()
 	err = tx.Commit()
 	if err != nil {
-		//log.Fatal("txCommit fail,err=", err)
+		// log.Fatal("txCommit fail,err=", err)
 		return err
 	}
 
@@ -403,6 +404,10 @@ func (db *DB) getMaxBatchCount() int64 {
 // MaxBatchSize returns max possible batch size
 func (db *DB) getMaxBatchSize() int64 {
 	return db.opt.MaxBatchSize
+}
+
+func (db *DB) getMaxWriteRecordCount() int64 {
+	return db.opt.MaxWriteRecordCount
 }
 
 func (db *DB) doWrites() {
@@ -513,7 +518,6 @@ func (db *DB) parseDataFiles(dataFileIds []int) (err error) {
 	)
 
 	parseDataInTx := func() error {
-
 		for _, entry := range dataInTx.es {
 			h := NewHint().WithKey(entry.Key).WithFileId(entry.fid).WithMeta(entry.Meta).WithDataPos(uint64(entry.off))
 			// This method is entered when the commit record of a transaction is read
@@ -535,7 +539,7 @@ func (db *DB) parseDataFiles(dataFileIds []int) (err error) {
 		return nil
 	}
 
-	var readEntriesFromFile = func() error {
+	readEntriesFromFile := func() error {
 		for {
 			entry, err := f.readEntry()
 			if err != nil {
@@ -607,7 +611,49 @@ func (db *DB) parseDataFiles(dataFileIds []int) (err error) {
 		}
 	}
 
+	// compute the valid record count and save it in db.RecordCount
+	db.RecordCount, err = db.getRecordCount()
 	return
+}
+
+func (db *DB) getRecordCount() (int64, error) {
+	var res int64
+
+	// Iterate through the BTree indices
+	for _, btree := range db.Index.bTree.idx {
+		res += int64(btree.Count())
+	}
+
+	// Iterate through the List indices
+	for _, listItem := range db.Index.list.idx {
+		for key := range listItem.Items {
+			curLen, err := listItem.Size(key)
+			if err != nil {
+				return res, err
+			}
+			res += int64(curLen)
+		}
+	}
+
+	// Iterate through the Set indices
+	for _, setItem := range db.Index.set.idx {
+		for key := range setItem.M {
+			res += int64(setItem.SCard(key))
+		}
+	}
+
+	// Iterate through the SortedSet indices
+	for _, zsetItem := range db.Index.sortedSet.idx {
+		for key := range zsetItem.M {
+			curLen, err := zsetItem.ZCard(key)
+			if err != nil {
+				return res, err
+			}
+			res += int64(curLen)
+		}
+	}
+
+	return res, nil
 }
 
 func (db *DB) buildBTreeIdx(r *Record) {

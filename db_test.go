@@ -20,6 +20,7 @@ import (
 	"os"
 	"testing"
 	"time"
+	"strconv"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -66,13 +67,13 @@ func runNutsDBTest(t *testing.T, opts *Options, test func(t *testing.T, db *DB))
 	})
 }
 
-func txPut(t *testing.T, db *DB, bucket string, key, value []byte, ttl uint32, expectErr error) {
+func txPut(t *testing.T, db *DB, bucket string, key, value []byte, ttl uint32, expectErr error, finalExpectErr error) {
 	err := db.Update(func(tx *Tx) error {
 		err = tx.Put(bucket, key, value, ttl)
 		assertErr(t, err, expectErr)
 		return nil
 	})
-	require.NoError(t, err)
+	assertErr(t, err, finalExpectErr)
 }
 
 func txGet(t *testing.T, db *DB, bucket string, key []byte, expectVal []byte, expectErr error) {
@@ -138,13 +139,13 @@ func TestDB_Basic(t *testing.T) {
 		val0 := GetRandomBytes(24)
 
 		// put
-		txPut(t, db, bucket, key0, val0, Persistent, nil)
+		txPut(t, db, bucket, key0, val0, Persistent, nil, nil)
 		txGet(t, db, bucket, key0, val0, nil)
 
 		val1 := GetRandomBytes(24)
 
 		// update
-		txPut(t, db, bucket, key0, val1, Persistent, nil)
+		txPut(t, db, bucket, key0, val1, Persistent, nil, nil)
 		txGet(t, db, bucket, key0, val1, nil)
 
 		// del
@@ -180,7 +181,7 @@ func TestDB_DeleteANonExistKey(t *testing.T) {
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		testBucket := "test_bucket"
 		txDel(t, db, testBucket, GetTestBytes(0), ErrNotFoundBucket)
-		txPut(t, db, testBucket, GetTestBytes(1), GetRandomBytes(24), Persistent, nil)
+		txPut(t, db, testBucket, GetTestBytes(1), GetRandomBytes(24), Persistent, nil, nil)
 		txDel(t, db, testBucket, GetTestBytes(0), ErrKeyNotFound)
 	})
 }
@@ -188,8 +189,8 @@ func TestDB_DeleteANonExistKey(t *testing.T) {
 func TestDB_CheckListExpired(t *testing.T) {
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		testBucket := "test_bucket"
-		txPut(t, db, testBucket, GetTestBytes(0), GetTestBytes(1), Persistent, nil)
-		txPut(t, db, testBucket, GetTestBytes(1), GetRandomBytes(24), 1, nil)
+		txPut(t, db, testBucket, GetTestBytes(0), GetTestBytes(1), Persistent, nil, nil)
+		txPut(t, db, testBucket, GetTestBytes(1), GetRandomBytes(24), 1, nil, nil)
 
 		time.Sleep(1100 * time.Millisecond)
 
@@ -202,13 +203,13 @@ func TestDB_CheckListExpired(t *testing.T) {
 	})
 }
 
-func txSAdd(t *testing.T, db *DB, bucket string, key, value []byte, expectErr error) {
+func txSAdd(t *testing.T, db *DB, bucket string, key, value []byte, expectErr error, finalExpectErr error) {
 	err := db.Update(func(tx *Tx) error {
 		err := tx.SAdd(bucket, key, value)
 		assertErr(t, err, expectErr)
 		return nil
 	})
-	require.NoError(t, err)
+	assertErr(t, err, finalExpectErr)
 }
 
 func txSKeys(t *testing.T, db *DB, bucket, pattern string, f func(key string) bool, expectVal int, expectErr error) {
@@ -386,13 +387,13 @@ func txSRem(t *testing.T, db *DB, bucket string, key, value []byte, expectErr er
 	require.NoError(t, err)
 }
 
-func txZAdd(t *testing.T, db *DB, bucket string, key, value []byte, score float64, expectErr error) {
+func txZAdd(t *testing.T, db *DB, bucket string, key, value []byte, score float64, expectErr error, finalExpectErr error) {
 	err := db.Update(func(tx *Tx) error {
 		err := tx.ZAdd(bucket, key, score, value)
 		assertErr(t, err, expectErr)
 		return nil
 	})
-	assert.NoError(t, err)
+	assertErr(t, err, finalExpectErr)
 }
 
 func txZRem(t *testing.T, db *DB, bucket string, key, value []byte, expectErr error) {
@@ -496,7 +497,7 @@ func txPop(t *testing.T, db *DB, bucket string, key, expectVal []byte, expectErr
 	require.NoError(t, err)
 }
 
-func txPush(t *testing.T, db *DB, bucket string, key, val []byte, expectErr error, isLeft bool) {
+func txPush(t *testing.T, db *DB, bucket string, key, val []byte, isLeft bool, expectErr error, finalExpectErr error) {
 	err := db.Update(func(tx *Tx) error {
 		var err error
 
@@ -510,7 +511,7 @@ func txPush(t *testing.T, db *DB, bucket string, key, val []byte, expectErr erro
 
 		return nil
 	})
-	require.NoError(t, err)
+	assertErr(t, err, finalExpectErr)
 }
 
 func txRange(t *testing.T, db *DB, bucket string, key []byte, start, end, expectLen int) {
@@ -550,7 +551,7 @@ func TestDB_GetKeyNotFound(t *testing.T) {
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		bucket := "bucket"
 		txGet(t, db, bucket, GetTestBytes(0), nil, ErrBucketNotFound)
-		txPut(t, db, bucket, GetTestBytes(1), GetRandomBytes(24), Persistent, nil)
+		txPut(t, db, bucket, GetTestBytes(1), GetRandomBytes(24), Persistent, nil, nil)
 		txGet(t, db, bucket, GetTestBytes(0), nil, ErrKeyNotFound)
 	})
 }
@@ -647,7 +648,7 @@ func TestDB_CommitBuffer(t *testing.T) {
 		require.Equal(t, 0, db.commitBuffer.Len())
 		require.Equal(t, db.opt.CommitBufferSize, int64(db.commitBuffer.Cap()))
 
-		txPut(t, db, bucket, GetTestBytes(0), GetRandomBytes(24), Persistent, nil)
+		txPut(t, db, bucket, GetTestBytes(0), GetRandomBytes(24), Persistent, nil, nil)
 
 		// When tx is committed, content of commit buffer should be empty, but do not release memory
 		require.Equal(t, 0, db.commitBuffer.Len())
@@ -682,7 +683,7 @@ func TestDB_DeleteBucket(t *testing.T) {
 
 		txDeleteBucket(t, db, DataStructureBTree, bucket, ErrBucketNotFound)
 
-		txPut(t, db, bucket, key, val, Persistent, nil)
+		txPut(t, db, bucket, key, val, Persistent, nil, nil)
 		txGet(t, db, bucket, key, val, nil)
 
 		txDeleteBucket(t, db, DataStructureBTree, bucket, nil)
@@ -730,7 +731,7 @@ func TestDB_HintKeyValAndRAMIdxMode_RestartDB(t *testing.T) {
 		key := GetTestBytes(0)
 		val := GetTestBytes(0)
 
-		txPut(t, db, bucket, key, val, Persistent, nil)
+		txPut(t, db, bucket, key, val, Persistent, nil, nil)
 		txGet(t, db, bucket, key, val, nil)
 
 		db.Close()
@@ -749,7 +750,7 @@ func TestDB_HintKeyAndRAMIdxMode_RestartDB(t *testing.T) {
 		key := GetTestBytes(0)
 		val := GetTestBytes(0)
 
-		txPut(t, db, bucket, key, val, Persistent, nil)
+		txPut(t, db, bucket, key, val, Persistent, nil, nil)
 		txGet(t, db, bucket, key, val, nil)
 		db.Close()
 
@@ -771,12 +772,12 @@ func TestDB_ChangeMode_RestartDB(t *testing.T) {
 
 			// k-v
 			for i := 0; i < 10; i++ {
-				txPut(t, db, bucket, GetTestBytes(i), GetTestBytes(i), Persistent, nil)
+				txPut(t, db, bucket, GetTestBytes(i), GetTestBytes(i), Persistent, nil, nil)
 			}
 
 			// list
 			for i := 0; i < 10; i++ {
-				txPush(t, db, bucket, GetTestBytes(0), GetTestBytes(i), nil, true)
+				txPush(t, db, bucket, GetTestBytes(0), GetTestBytes(i), true, nil, nil)
 			}
 
 			err = db.Update(func(tx *Tx) error {
@@ -794,7 +795,7 @@ func TestDB_ChangeMode_RestartDB(t *testing.T) {
 
 			// set
 			for i := 0; i < 10; i++ {
-				txSAdd(t, db, bucket, GetTestBytes(0), GetTestBytes(i), nil)
+				txSAdd(t, db, bucket, GetTestBytes(0), GetTestBytes(i), nil, nil)
 			}
 
 			for i := 0; i < 3; i++ {
@@ -803,7 +804,7 @@ func TestDB_ChangeMode_RestartDB(t *testing.T) {
 
 			// zset
 			for i := 0; i < 10; i++ {
-				txZAdd(t, db, bucket, GetTestBytes(0), GetTestBytes(i), float64(i), nil)
+				txZAdd(t, db, bucket, GetTestBytes(0), GetTestBytes(i), float64(i), nil, nil)
 			}
 
 			for i := 0; i < 3; i++ {
@@ -882,4 +883,334 @@ func TestTx_SmallFile(t *testing.T) {
 
 		txGet(t, db, bucket, GetTestBytes(10), GetTestBytes(10), nil)
 	})
+}
+
+func TestDB_DataStructureBTreeWriteRecordLimit(t *testing.T) {
+	opts := DefaultOptions
+	limitCount := int64(1000)
+	opts.MaxWriteRecordCount = limitCount
+	bucket1 := "bucket1"
+	bucket2 := "bucket2"
+	// Iterate over different EntryIdxModes
+	for _, idxMode := range []EntryIdxMode{HintKeyValAndRAMIdxMode, HintKeyAndRAMIdxMode} {
+		opts.EntryIdxMode = idxMode
+		runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
+			// Add limitCount records
+			err := db.Update(func(tx *Tx) error {
+				for i := 0; i < int(limitCount); i++ {
+					key := []byte(strconv.Itoa(i))
+					value := []byte(strconv.Itoa(i))
+					err = tx.Put(bucket1, key, value, Persistent)
+					assertErr(t, err, nil)
+				}
+				return nil
+			})
+			require.NoError(t, err)
+			// Trigger the limit
+			txPut(t, db, bucket1, []byte("key1"), []byte("value1"), Persistent, nil, ErrTxnExceedWriteLimit)
+			// Add a key that is within the limit
+			txPut(t, db, bucket1, []byte("0"), []byte("000"), Persistent, nil, nil)
+			// Delete and add one item
+			txDel(t, db, bucket1, []byte("0"), nil)
+			txPut(t, db, bucket1, []byte("key1"), []byte("value1"), Persistent, nil, nil)
+			// Add an item to another bucket
+			txPut(t, db, bucket2, []byte("key2"), []byte("value2"), Persistent, nil, ErrTxnExceedWriteLimit)
+			// Delete bucket1
+			txDeleteBucket(t, db, DataStructureBTree, bucket1, nil)
+			// Add data to bucket2
+			err = db.Update(func(tx *Tx) error {
+				for i := 0; i < (int(limitCount) - 1); i++ {
+					key := []byte(strconv.Itoa(i))
+					value := []byte(strconv.Itoa(i))
+					err = tx.Put(bucket2, key, value, Persistent)
+					assertErr(t, err, nil)
+				}
+				return nil
+			})
+			require.NoError(t, err)
+			// Add items to bucket2
+			txPut(t, db, bucket2, []byte("key1"), []byte("value1"), Persistent, nil, nil)
+			txPut(t, db, bucket2, []byte("key2"), []byte("value2"), Persistent, nil, ErrTxnExceedWriteLimit)
+		})
+	}
+}
+
+func TestDB_DataStructureListWriteRecordLimit(t *testing.T) {
+	// Set options
+	opts := DefaultOptions
+	limitCount := int64(1000)
+	opts.MaxWriteRecordCount = limitCount
+	// Define bucket names
+	bucket1 := "bucket1"
+	bucket2 := "bucket2"
+	// Iterate over EntryIdxMode options
+	for _, idxMode := range []EntryIdxMode{HintKeyValAndRAMIdxMode, HintKeyAndRAMIdxMode} {
+		opts.EntryIdxMode = idxMode
+		runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
+			// Add limitCount records
+			err := db.Update(func(tx *Tx) error {
+				for i := 0; i < int(limitCount); i++ {
+					key := []byte("0")
+					value := []byte(strconv.Itoa(i))
+					err = tx.LPush(bucket1, key, value)
+					assertErr(t, err, nil)
+				}
+				return nil
+			})
+			require.NoError(t, err)
+			// Trigger the limit
+			txPush(t, db, bucket1, []byte("0"), []byte("value1"), false, nil, ErrTxnExceedWriteLimit)
+			// Test LRem
+			err = db.Update(func(tx *Tx) error {
+				err := tx.LRem(bucket1, []byte("0"), 1, []byte("0"))
+				assertErr(t, err, nil)
+				return nil
+			})
+			require.NoError(t, err)
+			txPush(t, db, bucket1, []byte("0"), []byte("value1"), true, nil, nil)
+			txPush(t, db, bucket1, []byte("0"), []byte("value1"), false, nil, ErrTxnExceedWriteLimit)
+			// Test for DataLPopFlag
+			err = db.Update(func(tx *Tx) error {
+				_, err := tx.LPop(bucket1, []byte("0"))
+				assertErr(t, err, nil)
+				return nil
+			})
+			require.NoError(t, err)
+			txPush(t, db, bucket1, []byte("0"), []byte("value1"), false, nil, nil)
+			txPush(t, db, bucket1, []byte("0"), []byte("value1"), false, nil, ErrTxnExceedWriteLimit)
+			// Test for DataLTrimFlag
+			err = db.Update(func(tx *Tx) error {
+				err := tx.LTrim(bucket1, []byte("0"), 0, 0)
+				assertErr(t, err, nil)
+				return nil
+			})
+			require.NoError(t, err)
+			err = db.Update(func(tx *Tx) error {
+				for i := 0; i < int(limitCount)-2; i++ {
+					key := []byte("0")
+					value := []byte(strconv.Itoa(i))
+					err = tx.RPush(bucket1, key, value)
+					assertErr(t, err, nil)
+				}
+				return nil
+			})
+			require.NoError(t, err)
+			txPush(t, db, bucket1, []byte("0"), []byte("value11"), false, nil, nil)
+			txPush(t, db, bucket1, []byte("0"), []byte("value11"), false, nil, ErrTxnExceedWriteLimit)
+			// Test for LRemByIndex
+			err = db.Update(func(tx *Tx) error {
+				err := tx.LRemByIndex(bucket1, []byte("0"), 0, 1, 2)
+				assertErr(t, err, nil)
+				return nil
+			})
+			require.NoError(t, err)
+			err = db.Update(func(tx *Tx) error {
+				for i := 0; i < 2; i++ {
+					key := []byte("0")
+					value := []byte(strconv.Itoa(i))
+					err = tx.RPush(bucket1, key, value)
+					assertErr(t, err, nil)
+				}
+				return nil
+			})
+			require.NoError(t, err)
+			txPush(t, db, bucket2, []byte("0"), []byte("value11"), false, nil, nil)
+			txPush(t, db, bucket1, []byte("0"), []byte("value11"), false, nil, ErrTxnExceedWriteLimit)
+			// Delete bucket
+			txDeleteBucket(t, db, DataStructureList, bucket1, nil)
+			// Add data to another bucket
+			err = db.Update(func(tx *Tx) error {
+				for i := 0; i < int(limitCount)-1; i++ {
+					key := []byte(strconv.Itoa(i))
+					value := []byte(strconv.Itoa(i))
+					err = tx.RPush(bucket2, key, value)
+					assertErr(t, err, nil)
+				}
+				return nil
+			})
+			require.NoError(t, err)
+			txPush(t, db, bucket2, []byte("key1"), []byte("value1"), false, nil, ErrTxnExceedWriteLimit)
+		})
+	}
+}
+
+func TestDB_DataStructureSetWriteRecordLimit(t *testing.T) {
+	// Set default options and limitCount.
+	opts := DefaultOptions
+	limitCount := int64(1000)
+	opts.MaxWriteRecordCount = limitCount
+	// Define bucket names.
+	bucket1 := "bucket1"
+	bucket2 := "bucket2"
+	// Loop through EntryIdxModes.
+	for _, idxMode := range []EntryIdxMode{HintKeyValAndRAMIdxMode, HintKeyAndRAMIdxMode} {
+		opts.EntryIdxMode = idxMode
+		runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
+			// Add limitCount records to bucket1.
+			err := db.Update(func(tx *Tx) error {
+				for i := 0; i < int(limitCount); i++ {
+					key := []byte("0")
+					value := []byte(strconv.Itoa(i))
+					err := tx.SAdd(bucket1, key, value)
+					assertErr(t, err, nil)
+				}
+				return nil
+			})
+			require.NoError(t, err)
+			// Try to add one more item to bucket1 and check for ErrTxnExceedWriteLimit.
+			txSAdd(t, db, bucket1, []byte("key1"), []byte("value1"), nil, ErrTxnExceedWriteLimit)
+			// Remove one item and add another item to bucket1.
+			txSRem(t, db, bucket1, []byte("0"), []byte("0"), nil)
+			txSAdd(t, db, bucket1, []byte("key1"), []byte("value1"), nil, nil)
+			// Add two more items to bucket1 and check for ErrTxnExceedWriteLimit.
+			txSAdd(t, db, bucket1, []byte("key1"), []byte("value1"), nil, nil)
+			txSAdd(t, db, bucket1, []byte("key11"), []byte("value11"), nil, ErrTxnExceedWriteLimit)
+			// Test for SPOP, SPOP two items from bucket1.
+			err = db.Update(func(tx *Tx) error {
+				_, err := tx.SPop(bucket1, []byte("0"))
+				assertErr(t, err, nil)
+				_, err = tx.SPop(bucket1, []byte("key1"))
+				assertErr(t, err, nil)
+				return nil
+			})
+			require.NoError(t, err)
+			// Add two items to bucket1 and check for ErrTxnExceedWriteLimit.
+			txSAdd(t, db, bucket1, []byte("1"), []byte("value1"), nil, nil)
+			txSAdd(t, db, bucket1, []byte("1"), []byte("value2"), nil, nil)
+			txSAdd(t, db, bucket1, []byte("1"), []byte("value3"), nil, ErrTxnExceedWriteLimit)
+			// Delete bucket1.
+			txDeleteBucket(t, db, DataStructureSet, bucket1, nil)
+			// Add data to bucket2.
+			txSAdd(t, db, bucket2, []byte("key1"), []byte("value1"), nil, nil)
+			err = db.Update(func(tx *Tx) error {
+				for i := 0; i < int(limitCount)-1; i++ {
+					value := []byte(strconv.Itoa(i))
+					err = tx.SAdd(bucket2, []byte("2"), value)
+					assertErr(t, err, nil)
+				}
+				return nil
+			})
+			require.NoError(t, err)
+			// Try to add one more item to bucket2 and check for ErrTxnExceedWriteLimit.
+			txSAdd(t, db, bucket2, []byte("key2"), []byte("value2"), nil, ErrTxnExceedWriteLimit)
+		})
+	}
+}
+
+func TestDB_DataStructureSortedSetWriteRecordLimit(t *testing.T) {
+	// Set up options
+	opts := DefaultOptions
+	limitCount := int64(1000)
+	opts.MaxWriteRecordCount = limitCount
+	// Set up bucket names and score
+	bucket1 := "bucket1"
+	bucket2 := "bucket2"
+	score := 1.0
+	// Iterate over EntryIdxMode options
+	for _, idxMode := range []EntryIdxMode{HintKeyValAndRAMIdxMode, HintKeyAndRAMIdxMode} {
+		opts.EntryIdxMode = idxMode
+		runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
+			// Add limitCount records
+			err := db.Update(func(tx *Tx) error {
+				for i := 0; i < int(limitCount); i++ {
+					key := []byte("0")
+					value := []byte(strconv.Itoa(i))
+					err := tx.ZAdd(bucket1, key, score+float64(i), value)
+					assertErr(t, err, nil)
+				}
+				return nil
+			})
+			require.NoError(t, err)
+			// Trigger the limit
+			txZAdd(t, db, bucket1, []byte("key1"), []byte("value1"), score, nil, ErrTxnExceedWriteLimit)
+			// Delete and add one item
+			txZRem(t, db, bucket1, []byte("0"), []byte("0"), nil)
+			txZAdd(t, db, bucket1, []byte("key1"), []byte("value1"), score, nil, nil)
+			// Add some data is ok
+			txZAdd(t, db, bucket1, []byte("key1"), []byte("value1"), score, nil, nil)
+			// Trigger the limit
+			txZAdd(t, db, bucket1, []byte("key2"), []byte("value2"), score, nil, ErrTxnExceedWriteLimit)
+			// Test for ZRemRangeByRank
+			err = db.Update(func(tx *Tx) error {
+				err := tx.ZRemRangeByRank(bucket1, []byte("0"), 1, 3)
+				assert.NoError(t, err)
+				return nil
+			})
+			assert.NoError(t, err)
+			txZAdd(t, db, bucket1, []byte("0"), []byte("value1"), score, nil, nil)
+			txZAdd(t, db, bucket1, []byte("0"), []byte("value2"), score, nil, nil)
+			txZAdd(t, db, bucket1, []byte("0"), []byte("value3"), score+float64(1000), nil, nil)
+			// Trigger the limit
+			txZAdd(t, db, bucket1, []byte("0"), []byte("value4"), score, nil, ErrTxnExceedWriteLimit)
+			// Test for ZPop
+			txZPop(t, db, bucket1, []byte("0"), true, []byte("value3"), score+float64(1000), nil)
+			txZAdd(t, db, bucket1, []byte("key3"), []byte("value3"), score, nil, nil)
+			// Delete bucket
+			txDeleteBucket(t, db, DataStructureSortedSet, bucket1, nil)
+			// Add data to another bucket
+			txZAdd(t, db, bucket2, []byte("key1"), []byte("value1"), score, nil, nil)
+			// Add data to bucket1
+			err = db.Update(func(tx *Tx) error {
+				for i := 0; i < int(limitCount)-1; i++ {
+					key := []byte(strconv.Itoa(i))
+					value := []byte(strconv.Itoa(i))
+					err = tx.ZAdd(bucket1, key, score, value)
+					assertErr(t, err, nil)
+				}
+				return nil
+			})
+			require.NoError(t, err)
+			// Trigger the limit
+			txZAdd(t, db, bucket2, []byte("key1"), []byte("value2"), score, nil, ErrTxnExceedWriteLimit)
+		})
+	}
+}
+
+func TestDB_AllDsWriteRecordLimit(t *testing.T) {
+	// Set up options
+	opts := DefaultOptions
+	limitCount := int64(1000)
+	opts.MaxWriteRecordCount = limitCount
+	// Set up bucket names and score
+	bucket1 := "bucket1"
+	bucket2 := "bucket2"
+	score := 1.0
+	// Iterate over EntryIdxMode options
+	for _, idxMode := range []EntryIdxMode{HintKeyValAndRAMIdxMode, HintKeyAndRAMIdxMode} {
+		opts.EntryIdxMode = idxMode
+		runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
+			// Add limitCount records
+			err := db.Update(func(tx *Tx) error {
+				for i := 0; i < int(limitCount); i++ {
+					key := []byte(strconv.Itoa(i))
+					value := []byte(strconv.Itoa(i))
+					err = tx.Put(bucket1, key, value, Persistent)
+					assertErr(t, err, nil)
+				}
+				return nil
+			})
+			require.NoError(t, err)
+			// Trigger the limit
+			txPush(t, db, bucket1, []byte("0"), []byte("value1"), false, nil, ErrTxnExceedWriteLimit)
+			// Delete item and add one
+			txDel(t, db, bucket1, []byte("0"), nil)
+			txPush(t, db, bucket1, []byte("0"), []byte("value1"), false, nil, nil)
+			// Trigger the limit
+			txSAdd(t, db, bucket1, []byte("key1"), []byte("value1"), nil, ErrTxnExceedWriteLimit)
+			// Delete item and add one
+			txDel(t, db, bucket1, []byte("1"), nil)
+			txSAdd(t, db, bucket1, []byte("key1"), []byte("value1"), nil, nil)
+			// Trigger the limit
+			txZAdd(t, db, bucket1, []byte("key1"), []byte("value1"), score, nil, ErrTxnExceedWriteLimit)
+			// Delete item and add one
+			txDel(t, db, bucket1, []byte("2"), nil)
+			txZAdd(t, db, bucket1, []byte("key1"), []byte("value1"), score, nil, nil)
+			// Delete bucket
+			txDeleteBucket(t, db, DataStructureSortedSet, bucket1, nil)
+			// Add data to another bucket
+			txPush(t, db, bucket2, []byte("key1"), []byte("value1"), false, nil, nil)
+			// Trigger the limit
+			txPush(t, db, bucket2, []byte("key2"), []byte("value2"), false, nil, ErrTxnExceedWriteLimit)
+		})
+	}
 }

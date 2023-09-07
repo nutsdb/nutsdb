@@ -24,7 +24,7 @@ func TestIterator(t *testing.T) {
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		for i := 0; i < 100; i++ {
-			txPut(t, db, bucket, GetTestBytes(i), GetTestBytes(i), Persistent, nil)
+			txPut(t, db, bucket, GetTestBytes(i), GetTestBytes(i), Persistent, nil, nil)
 		}
 
 		_ = db.View(func(tx *Tx) error {
@@ -52,7 +52,7 @@ func TestIterator_Reverse(t *testing.T) {
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		for i := 0; i < 100; i++ {
-			txPut(t, db, bucket, GetTestBytes(i), GetTestBytes(i), Persistent, nil)
+			txPut(t, db, bucket, GetTestBytes(i), GetTestBytes(i), Persistent, nil, nil)
 		}
 
 		_ = db.View(func(tx *Tx) error {
@@ -79,7 +79,7 @@ func TestIterator_Seek(t *testing.T) {
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		for i := 0; i < 100; i++ {
-			txPut(t, db, bucket, GetTestBytes(i), GetTestBytes(i), Persistent, nil)
+			txPut(t, db, bucket, GetTestBytes(i), GetTestBytes(i), Persistent, nil, nil)
 		}
 
 		_ = db.View(func(tx *Tx) error {

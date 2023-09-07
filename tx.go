@@ -122,7 +122,7 @@ func (tx *Tx) CommitWith(cb func(error)) {
 		go runTxnCallback(&txnCb{user: cb, err: nil})
 		return
 	}
-	//defer tx.setStatusClosed()  //must not add this code because another process is also accessing tx
+	// defer tx.setStatusClosed()  //must not add this code because another process is also accessing tx
 	commitCb, err := tx.commitAndSend()
 	if err != nil {
 		go runTxnCallback(&txnCb{user: cb, err: err})
@@ -196,6 +196,19 @@ func (tx *Tx) Commit() (err error) {
 		return ErrDBClosed
 	}
 
+	var curWriteCount int64
+	if tx.db.opt.MaxWriteRecordCount > 0 {
+		curWriteCount, err = tx.getNewAddRecordCount()
+		if err != nil {
+			return err
+		}
+
+		// judge all write records is whether more than the MaxWriteRecordCount
+		if tx.db.RecordCount+curWriteCount > tx.db.opt.MaxWriteRecordCount {
+			return ErrTxnExceedWriteLimit
+		}
+	}
+
 	tx.setStatusCommitting()
 	defer tx.setStatusClosed()
 
@@ -257,7 +270,213 @@ func (tx *Tx) Commit() (err error) {
 		return err
 	}
 
+	tx.db.RecordCount += curWriteCount
+
 	return nil
+}
+
+func (tx *Tx) getNewAddRecordCount() (int64, error) {
+	var res int64
+	writeLen := len(tx.pendingWrites)
+	for i := 0; i < writeLen; i++ {
+		entry := tx.pendingWrites[i]
+		curRecordCnt, err := tx.getEntryNewAddRecordCount(entry)
+		if err != nil {
+			return res, err
+		}
+		res += curRecordCnt
+	}
+
+	return res, nil
+}
+
+func (tx *Tx) getListEntryNewAddRecordCount(entry *Entry) (int64, error) {
+	if entry.Meta.Flag == DataExpireListFlag {
+		return 0, nil
+	}
+
+	var res int64
+	bucket := string(entry.Bucket)
+	key := string(entry.Key)
+	value := string(entry.Value)
+	l := tx.db.Index.list.getWithDefault(bucket)
+
+	switch entry.Meta.Flag {
+	case DataLPushFlag, DataRPushFlag:
+		res++
+	case DataLPopFlag, DataRPopFlag:
+		res--
+	case DataLRemByIndex:
+		indexes, _ := UnmarshalInts([]byte(value))
+		res -= int64(len(l.getValidIndexes(key, indexes)))
+	case DataLRemFlag:
+		count, newValue := splitIntStringStr(value, SeparatorForListKey)
+		removeIndices, err := l.getRemoveIndices(key, count, func(r *Record) (bool, error) {
+			v, err := tx.db.getValueByRecord(r)
+			if err != nil {
+				return false, err
+			}
+			return bytes.Equal([]byte(newValue), v), nil
+		})
+		if err != nil {
+			return 0, err
+		}
+		res -= int64(len(removeIndices))
+	case DataLTrimFlag:
+		newKey, start := splitStringIntStr(key, SeparatorForListKey)
+		end, _ := strconv2.StrToInt(value)
+
+		if l.IsExpire(newKey) {
+			return 0, nil
+		}
+
+		if _, ok := l.Items[newKey]; !ok {
+			return 0, nil
+		}
+
+		items, err := l.LRange(newKey, start, end)
+		if err != nil {
+			return res, err
+		}
+		list := l.Items[newKey]
+		res -= int64(list.Size() - len(items))
+	}
+
+	return res, nil
+}
+
+func (tx *Tx) getKvEntryNewAddRecordCount(entry *Entry) (int64, error) {
+	var res int64
+
+	switch entry.Meta.Flag {
+	case DataDeleteFlag:
+		res--
+	case DataSetFlag:
+		if idx, ok := tx.db.Index.bTree.exist(string(entry.Bucket)); ok {
+			_, found := idx.Find(entry.Key)
+			if !found {
+				res++
+			}
+		} else {
+			res++
+		}
+	}
+
+	return res, nil
+}
+
+func (tx *Tx) getSetEntryNewAddRecordCount(entry *Entry) (int64, error) {
+	var res int64
+
+	if entry.Meta.Flag == DataDeleteFlag {
+		res--
+	}
+
+	if entry.Meta.Flag == DataSetFlag {
+		res++
+	}
+
+	return res, nil
+}
+
+func (tx *Tx) getSortedSetEntryNewAddRecordCount(entry *Entry) (int64, error) {
+	var res int64
+	bucketName := string(entry.Bucket)
+	key := string(entry.Key)
+	value := string(entry.Value)
+
+	switch entry.Meta.Flag {
+	case DataZAddFlag:
+		if !tx.keyExistsInSortedSet(bucketName, key, value) {
+			res++
+		}
+	case DataZRemFlag:
+		res--
+	case DataZRemRangeByRankFlag:
+		start, end := splitIntIntStr(value, SeparatorForZSetKey)
+		delNodes, err := tx.db.Index.sortedSet.getWithDefault(bucketName, tx.db).getZRemRangeByRankNodes(key, start, end)
+		if err != nil {
+			return res, err
+		}
+		res -= int64(len(delNodes))
+	case DataZPopMaxFlag, DataZPopMinFlag:
+		res--
+	}
+
+	return res, nil
+}
+
+func (tx *Tx) keyExistsInSortedSet(bucketName, key, value string) bool {
+	if _, exist := tx.db.Index.sortedSet.exist(bucketName); !exist {
+		return false
+	}
+	newKey := key
+	if strings.Contains(key, SeparatorForZSetKey) {
+		newKey, _ = splitStringFloat64Str(key, SeparatorForZSetKey)
+	}
+	exists, _ := tx.db.Index.sortedSet.idx[bucketName].ZExist(newKey, []byte(value))
+	return exists
+}
+
+func (tx *Tx) getEntryNewAddRecordCount(entry *Entry) (int64, error) {
+	var res int64
+	var err error
+
+	if entry.Meta.Ds == DataStructureBTree {
+		res, err = tx.getKvEntryNewAddRecordCount(entry)
+	}
+
+	if entry.Meta.Ds == DataStructureList {
+		res, err = tx.getListEntryNewAddRecordCount(entry)
+	}
+
+	if entry.Meta.Ds == DataStructureSet {
+		res, err = tx.getSetEntryNewAddRecordCount(entry)
+	}
+
+	if entry.Meta.Ds == DataStructureSortedSet {
+		res, err = tx.getSortedSetEntryNewAddRecordCount(entry)
+	}
+
+	if entry.Meta.Ds == DataStructureNone {
+		res -= tx.getBucketDeleteRecordCount(entry)
+	}
+
+	return res, err
+}
+
+func (tx *Tx) getBucketDeleteRecordCount(entry *Entry) int64 {
+	bucket := string(entry.Bucket)
+	var res int64
+
+	switch entry.Meta.Flag {
+	case DataBPTreeBucketDeleteFlag:
+		if bTree, ok := tx.db.Index.bTree.idx[bucket]; ok {
+			res = int64(bTree.Count())
+		}
+	case DataSetBucketDeleteFlag:
+		if set, ok := tx.db.Index.set.idx[bucket]; ok {
+			for key := range set.M {
+				res += int64(set.SCard(key))
+			}
+		}
+	case DataSortedSetBucketDeleteFlag:
+		if sortedSet, ok := tx.db.Index.sortedSet.idx[bucket]; ok {
+			for key := range sortedSet.M {
+				curLen, _ := sortedSet.ZCard(key)
+				res += int64(curLen)
+			}
+		}
+	case DataListBucketDeleteFlag:
+		if list, ok := tx.db.Index.list.idx[bucket]; ok {
+			for key := range list.Items {
+				curLen, _ := list.Size(key)
+				res += int64(curLen)
+			}
+		}
+	}
+
+	return res
 }
 
 func (tx *Tx) allocCommitBuffer() *bytes.Buffer {
@@ -351,16 +570,12 @@ func (tx *Tx) buildSortedSetIdx(record *Record) {
 
 	switch meta.Flag {
 	case DataZAddFlag:
-		keyAndScore := strings.Split(string(key), SeparatorForZSetKey)
-		key := keyAndScore[0]
-		score, _ := strconv2.StrToFloat64(keyAndScore[1])
+		key, score := splitStringFloat64Str(string(key), SeparatorForZSetKey)
 		_ = ss.ZAdd(key, SCORE(score), value, record)
 	case DataZRemFlag:
 		_, _ = ss.ZRem(string(key), value)
 	case DataZRemRangeByRankFlag:
-		startAndEnd := strings.Split(string(value), SeparatorForZSetKey)
-		start, _ := strconv2.StrToInt(startAndEnd[0])
-		end, _ := strconv2.StrToInt(startAndEnd[1])
+		start, end := splitIntIntStr(string(value), SeparatorForZSetKey)
 		_ = ss.ZRemRangeByRank(string(key), start, end)
 	case DataZPopMaxFlag:
 		_, _, _ = ss.ZPopMax(string(key))
@@ -391,37 +606,34 @@ func (tx *Tx) buildListIdx(record *Record) {
 	case DataRPushFlag:
 		_ = l.RPush(string(key), record)
 	case DataLRemFlag:
-		countAndValue := strings.Split(string(value), SeparatorForListKey)
-		count, _ := strconv2.StrToInt(countAndValue[0])
-		newValue := countAndValue[1]
-
-		_ = l.LRem(string(key), count, func(r *Record) (bool, error) {
-			v, err := tx.db.getValueByRecord(r)
-			if err != nil {
-				return false, err
-			}
-			return bytes.Equal([]byte(newValue), v), nil
-		})
-
+		tx.buildListLRemIdx(value, l, key)
 	case DataLPopFlag:
 		_, _ = l.LPop(string(key))
 	case DataRPopFlag:
 		_, _ = l.RPop(string(key))
 	case DataLSetFlag:
-		keyAndIndex := strings.Split(string(key), SeparatorForListKey)
-		newKey := keyAndIndex[0]
-		index, _ := strconv2.StrToInt(keyAndIndex[1])
+		newKey, index := splitStringIntStr(string(key), SeparatorForListKey)
 		_ = l.LSet(newKey, index, record)
 	case DataLTrimFlag:
-		keyAndStartIndex := strings.Split(string(key), SeparatorForListKey)
-		newKey := keyAndStartIndex[0]
-		start, _ := strconv2.StrToInt(keyAndStartIndex[1])
+		newKey, start := splitStringIntStr(string(key), SeparatorForListKey)
 		end, _ := strconv2.StrToInt(string(value))
 		_ = l.LTrim(newKey, start, end)
 	case DataLRemByIndex:
 		indexes, _ := UnmarshalInts(value)
 		_ = l.LRemByIndex(string(key), indexes)
 	}
+}
+
+func (tx *Tx) buildListLRemIdx(value []byte, l *List, key []byte) {
+	count, newValue := splitIntStringStr(string(value), SeparatorForListKey)
+
+	_ = l.LRem(string(key), count, func(r *Record) (bool, error) {
+		v, err := tx.db.getValueByRecord(r)
+		if err != nil {
+			return false, err
+		}
+		return bytes.Equal([]byte(newValue), v), nil
+	})
 }
 
 // rotateActiveFile rotates log file when active file is not enough space to store the entry.
@@ -604,7 +816,6 @@ func (tx *Tx) isClosed() bool {
 }
 
 func (tx *Tx) buildIdxes(records []*Record) error {
-
 	for _, record := range records {
 		bucket, meta := record.Bucket, record.H.Meta
 

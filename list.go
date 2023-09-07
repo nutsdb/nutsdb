@@ -16,8 +16,9 @@ package nutsdb
 
 import (
 	"errors"
-	dll "github.com/emirpasic/gods/lists/doublylinkedlist"
 	"time"
+
+	dll "github.com/emirpasic/gods/lists/doublylinkedlist"
 )
 
 var (
@@ -152,59 +153,72 @@ func (l *List) LRange(key string, start, end int) ([]*Record, error) {
 	return items, nil
 }
 
+// getRemoveIndices returns a slice of indices to be removed from the list based on the count
+func (l *List) getRemoveIndices(key string, count int, cmp func(r *Record) (bool, error)) ([]int, error) {
+	if l.IsExpire(key) {
+		return nil, ErrListNotFound
+	}
+
+	list, ok := l.Items[key]
+
+	if !ok {
+		return nil, ErrListNotFound
+	}
+
+	var removeIndexes []int
+	iterator := list.Iterator()
+	if 0 == count {
+		count = list.Size()
+	}
+
+	if count >= 0 {
+		iterator.Begin()
+		for iterator.Next() && count > 0 {
+			r := iterator.Value().(*Record)
+
+			ok, err := cmp(r)
+			if err != nil {
+				return nil, err
+			}
+			if ok {
+				removeIndexes = append(removeIndexes, iterator.Index())
+				count--
+			}
+		}
+	} else {
+		iterator.End()
+		for iterator.Prev() && count < 0 {
+			r := iterator.Value().(*Record)
+
+			ok, err := cmp(r)
+			if err != nil {
+				return nil, err
+			}
+			if ok {
+				removeIndexes = append(removeIndexes, iterator.Index())
+				count++
+			}
+		}
+	}
+
+	return removeIndexes, nil
+}
+
 // LRem removes the first count occurrences of elements equal to value from the list stored at key.
 // The count argument influences the operation in the following ways:
 // count > 0: Remove elements equal to value moving from head to tail.
 // count < 0: Remove elements equal to value moving from tail to head.
 // count = 0: Remove all elements equal to value.
 func (l *List) LRem(key string, count int, cmp func(r *Record) (bool, error)) error {
-	if l.IsExpire(key) {
-		return ErrListNotFound
+	removeIndices, err := l.getRemoveIndices(key, count, cmp)
+	if err != nil {
+		return err
 	}
 
-	list, ok := l.Items[key]
-
-	if !ok {
-		return ErrListNotFound
-	}
-
-	iterator := list.Iterator()
-
-	if count >= 0 {
-		if count == 0 {
-			count = list.Size()
-		}
-		iterator.Begin()
-
-		for iterator.Next() && count > 0 {
-			r := iterator.Value().(*Record)
-
-			ok, err := cmp(r)
-			if err != nil {
-				return err
-			}
-			if ok {
-				list.Remove(iterator.Index())
-				count--
-			}
-		}
-	}
-
-	if count < 0 {
-		iterator.End()
-
-		for iterator.Prev() && count < 0 {
-			r := iterator.Value().(*Record)
-
-			ok, err := cmp(r)
-			if err != nil {
-				return err
-			}
-			if ok {
-				list.Remove(iterator.Index())
-				count++
-			}
-		}
+	list := l.Items[key]
+	// Remove the elements at the specified indices from the list
+	for _, index := range removeIndices {
+		list.Remove(index)
 	}
 
 	return nil
@@ -261,21 +275,9 @@ func (l *List) LRemByIndex(key string, indexes []int) error {
 
 	list := l.Items[key]
 
-	if list.Size() == 0 {
+	idxes := l.getValidIndexes(key, indexes)
+	if len(idxes) == 0 {
 		return nil
-	}
-
-	if len(indexes) == 1 {
-		list.Remove(indexes[0])
-		return nil
-	}
-
-	idxes := make(map[int]struct{})
-	for _, idx := range indexes {
-		if idx < 0 || idx >= list.Size() {
-			continue
-		}
-		idxes[idx] = struct{}{}
 	}
 
 	iterator := list.Iterator()
@@ -296,6 +298,23 @@ func (l *List) LRemByIndex(key string, indexes []int) error {
 	}
 
 	return nil
+}
+
+func (l *List) getValidIndexes(key string, indexes []int) map[int]struct{} {
+	idxes := make(map[int]struct{})
+	list := l.Items[key]
+	if list == nil || 0 == list.Size() {
+		return idxes
+	}
+
+	for _, idx := range indexes {
+		if idx < 0 || idx >= list.Size() {
+			continue
+		}
+		idxes[idx] = struct{}{}
+	}
+
+	return idxes
 }
 
 func (l *List) IsExpire(key string) bool {
@@ -355,7 +374,6 @@ func (l *List) GetListTTL(key string) (uint32, error) {
 	remain := timestamp + uint64(ttl) - uint64(now)
 
 	return uint32(remain), nil
-
 }
 
 func checkBounds(start, end int, size int) (int, int, error) {
