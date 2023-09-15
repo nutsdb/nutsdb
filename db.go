@@ -659,13 +659,14 @@ func (db *DB) getRecordCount() (int64, error) {
 func (db *DB) buildBTreeIdx(r *Record) {
 	db.resetRecordByMode(r)
 
+	bucket, key, meta := r.Bucket, r.H.Key, r.H.Meta
+	b := db.Index.bTree.getWithDefault(bucket)
+
 	if r.IsExpired() {
+		db.tm.del(bucket, string(key))
+		b.Delete(key)
 		return
 	}
-
-	bucket, key, meta := r.Bucket, r.H.Key, r.H.Meta
-
-	b := db.Index.bTree.getWithDefault(bucket)
 
 	if meta.Flag == DataDeleteFlag {
 		db.tm.del(bucket, string(key))
