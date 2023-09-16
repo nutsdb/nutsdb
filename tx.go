@@ -224,6 +224,7 @@ func (tx *Tx) Commit() (err error) {
 	defer tx.db.commitBuffer.Reset()
 
 	var records []*Record
+	bucketKeySeqMap := make(map[string]*HeadTailSeq)
 
 	for i := 0; i < writesLen; i++ {
 		entry := tx.pendingWrites[i]
@@ -233,6 +234,10 @@ func (tx *Tx) Commit() (err error) {
 		}
 
 		bucket := string(entry.Bucket)
+		bucketKey := bucket + string(entry.Key)
+		if _, ok := bucketKeySeqMap[bucketKey]; !ok {
+			bucketKeySeqMap[bucketKey] = tx.getListHeadTailSeq(bucket, string(entry.Key))
+		}
 
 		if tx.db.ActiveFile.ActualSize+int64(buff.Len())+entrySize > tx.db.opt.SegmentSize {
 			if _, err := tx.writeData(buff.Bytes()); err != nil {
@@ -251,6 +256,18 @@ func (tx *Tx) Commit() (err error) {
 			entry.Meta.Status = Committed
 		}
 
+		if entry.Meta.Ds == DataStructureList && (entry.Meta.Flag == DataLPushFlag || entry.Meta.Flag == DataRPushFlag) {
+			var seq uint64
+			if entry.Meta.Flag == DataLPushFlag {
+				seq = generateSeq(bucketKeySeqMap[bucketKey], true)
+			} else {
+				seq = generateSeq(bucketKeySeqMap[bucketKey], false)
+			}
+			newKey := encodeListKey(entry.Key, seq)
+			entry.Key = newKey
+			entry.Meta.KeySize = uint32(len(entry.Key))
+		}
+
 		if _, err := buff.Write(entry.Encode()); err != nil {
 			return err
 		}
@@ -266,10 +283,10 @@ func (tx *Tx) Commit() (err error) {
 
 		records = append(records, record)
 	}
+
 	if err := tx.buildIdxes(records); err != nil {
 		return err
 	}
-
 	tx.db.RecordCount += curWriteCount
 
 	return nil
@@ -288,6 +305,17 @@ func (tx *Tx) getNewAddRecordCount() (int64, error) {
 	}
 
 	return res, nil
+}
+
+func (tx *Tx) getListHeadTailSeq(bucket, key string) *HeadTailSeq {
+	res := HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
+	if _, ok := tx.db.Index.list.idx[bucket]; ok {
+		if _, ok := tx.db.Index.list.idx[bucket].Seq[key]; ok {
+			res = *tx.db.Index.list.idx[bucket].Seq[key]
+		}
+	}
+
+	return &res
 }
 
 func (tx *Tx) getListEntryNewAddRecordCount(entry *Entry) (int64, error) {
@@ -311,7 +339,7 @@ func (tx *Tx) getListEntryNewAddRecordCount(entry *Entry) (int64, error) {
 		res -= int64(len(l.getValidIndexes(key, indexes)))
 	case DataLRemFlag:
 		count, newValue := splitIntStringStr(value, SeparatorForListKey)
-		removeIndices, err := l.getRemoveIndices(key, count, func(r *Record) (bool, error) {
+		removeIndices, err := l.getRemoveIndexes(key, count, func(r *Record) (bool, error) {
 			v, err := tx.db.getValueByRecord(r)
 			if err != nil {
 				return false, err
@@ -338,8 +366,9 @@ func (tx *Tx) getListEntryNewAddRecordCount(entry *Entry) (int64, error) {
 		if err != nil {
 			return res, err
 		}
+
 		list := l.Items[newKey]
-		res -= int64(list.Size() - len(items))
+		res -= int64(list.Count() - len(items))
 	}
 
 	return res, nil

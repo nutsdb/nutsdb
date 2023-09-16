@@ -24,10 +24,8 @@ import (
 	"github.com/xujiajun/utils/strconv2"
 )
 
-var (
-	// ErrSeparatorForListKey returns when list key contains the SeparatorForListKey.
-	ErrSeparatorForListKey = errors.Errorf("contain separator (%s) for List key", SeparatorForListKey)
-)
+// ErrSeparatorForListKey returns when list key contains the SeparatorForListKey.
+var ErrSeparatorForListKey = errors.Errorf("contain separator (%s) for List key", SeparatorForListKey)
 
 // SeparatorForListKey represents separator for listKey
 const SeparatorForListKey = "|"
@@ -57,12 +55,12 @@ func (tx *Tx) RPeek(bucket string, key []byte) ([]byte, error) {
 		return nil, ErrListNotFound
 	}
 
-	r, err := l.RPeek(string(key))
+	item, err := l.RPeek(string(key))
 	if err != nil {
 		return nil, err
 	}
 
-	v, err := tx.db.getValueByRecord(r)
+	v, err := tx.db.getValueByRecord(item.r)
 	if err != nil {
 		return nil, err
 	}
@@ -140,7 +138,7 @@ func (tx *Tx) LPeek(bucket string, key []byte) (item []byte, err error) {
 		return nil, err
 	}
 
-	v, err := tx.db.getValueByRecord(r)
+	v, err := tx.db.getValueByRecord(r.r)
 	if err != nil {
 		return nil, err
 	}

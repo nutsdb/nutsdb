@@ -15,12 +15,13 @@
 package nutsdb
 
 import (
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"io/ioutil"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func InitForList() {
@@ -816,7 +817,7 @@ func TestTx_GetListTTL(t *testing.T) {
 	if err != nil {
 		t.Error("TestTx_GetListTTL err")
 	}
-	//test for TLL is 0
+	// test for TLL is 0
 	assertions.Equal(uint32(0), ttl)
 
 	wantTLL := uint32(1)
@@ -831,17 +832,16 @@ func TestTx_GetListTTL(t *testing.T) {
 	if err != nil {
 		t.Error("TestTx_GetListTTL err")
 	}
-	//test while remain bigger than zero
+	// test while remain bigger than zero
 	assertions.Equal(wantTLL, ttl)
 
 	time.Sleep(3 * time.Second)
 	ttl, err = tx.GetListTTL(bucket, key)
 
-	//test for TLL is expired
+	// test for TLL is expired
 	assertions.Equal(uint32(0), ttl)
 
 	_ = tx.Commit()
-
 }
 
 func TestTx_ListEntryIdxMode_HintKeyValAndRAMIdxMode(t *testing.T) {
@@ -862,8 +862,8 @@ func TestTx_ListEntryIdxMode_HintKeyValAndRAMIdxMode(t *testing.T) {
 		require.NoError(t, err)
 
 		listIdx := db.Index.list.getWithDefault(bucket)
-		item, _ := listIdx.Items[string(key)].Get(0)
-		r, ok := item.(*Record)
+		item, ok := listIdx.Items[string(key)].PopMin()
+		r := item.r
 		require.True(t, ok)
 		require.NotNil(t, r.V)
 		require.Equal(t, []byte("a"), r.V)
@@ -885,11 +885,11 @@ func TestTx_ListEntryIdxMode_HintKeyAndRAMIdxMode(t *testing.T) {
 
 			return nil
 		})
-		//require.NoError(t, err)
+		// require.NoError(t, err)
 
 		listIdx := db.Index.list.getWithDefault(bucket)
-		item, _ := listIdx.Items[string(key)].Get(0)
-		r, ok := item.(*Record)
+		item, ok := listIdx.Items[string(key)].PopMin()
+		r := item.r
 		require.True(t, ok)
 		require.Nil(t, r.V)
 

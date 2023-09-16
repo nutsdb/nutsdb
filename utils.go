@@ -38,6 +38,16 @@ func Truncate(path string, capacity int64, f *os.File) error {
 	return nil
 }
 
+func ConvertBigEndianBytesToUint64(data []byte) uint64 {
+	return binary.BigEndian.Uint64(data)
+}
+
+func ConvertUint64ToBigEndianBytes(value uint64) []byte {
+	b := make([]byte, 8)
+	binary.BigEndian.PutUint64(b, value)
+	return b
+}
+
 func MarshalInts(ints []int) ([]byte, error) {
 	buffer := bytes.NewBuffer([]byte{})
 	for _, x := range ints {
@@ -138,6 +148,20 @@ func splitIntIntStr(str, separator string) (int, int) {
 	return firstItem, secondItem
 }
 
+func encodeListKey(key []byte, seq uint64) []byte {
+	buf := make([]byte, len(key)+8)
+	binary.LittleEndian.PutUint64(buf[:8], seq)
+	copy(buf[8:], key[:])
+	return buf
+}
+
+func decodeListKey(buf []byte) ([]byte, uint64) {
+	seq := binary.LittleEndian.Uint64(buf[:8])
+	key := make([]byte, len(buf[8:]))
+	copy(key[:], buf[8:])
+	return key, seq
+}
+
 func splitStringFloat64Str(str, separator string) (string, float64) {
 	strList := strings.Split(str, separator)
 	firstItem := strList[0]
@@ -153,4 +177,17 @@ func getFnv32(value []byte) (uint32, error) {
 	hash := fnvHash.Sum32()
 	fnvHash.Reset()
 	return hash, nil
+}
+
+func generateSeq(seq *HeadTailSeq, isLeft bool) uint64 {
+	var res uint64
+	if isLeft {
+		res = seq.Head
+		seq.Head--
+	} else {
+		res = seq.Tail
+		seq.Tail++
+	}
+
+	return res
 }
