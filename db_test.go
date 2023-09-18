@@ -18,9 +18,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strconv"
 	"testing"
 	"time"
-	"strconv"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

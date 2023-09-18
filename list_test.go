@@ -15,10 +15,11 @@ package nutsdb
 
 import (
 	"bytes"
-	"github.com/stretchr/testify/require"
 	"math/rand"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 func ListPush(t *testing.T, list *List, key string, r *Record, isLeft bool, expectError error) {
@@ -67,11 +68,17 @@ func ListCmp(t *testing.T, list *List, key string, expectRecords []*Record, isRe
 
 func TestList_LPush(t *testing.T) {
 	list := NewList()
-	expectRecords := generateRecords(5)
+	// 测试 LPush
 	key := string(GetTestBytes(0))
+	expectRecords := generateRecords(5)
+	seqInfo := HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
 
 	for i := 0; i < len(expectRecords); i++ {
-		ListPush(t, list, key, expectRecords[i], true, nil)
+		seq := generateSeq(&seqInfo, true)
+		newKey := encodeListKey([]byte(key), seq)
+		expectRecords[i].H.Key = newKey
+		expectRecords[i].H.Meta.KeySize = uint32(len(newKey))
+		ListPush(t, list, string(newKey), expectRecords[i], true, nil)
 	}
 
 	ListCmp(t, list, key, expectRecords, true)
@@ -81,9 +88,14 @@ func TestList_RPush(t *testing.T) {
 	list := NewList()
 	expectRecords := generateRecords(5)
 	key := string(GetTestBytes(0))
+	seqInfo := HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
 
 	for i := 0; i < len(expectRecords); i++ {
-		ListPush(t, list, key, expectRecords[i], false, nil)
+		seq := generateSeq(&seqInfo, false)
+		newKey := encodeListKey([]byte(key), seq)
+		expectRecords[i].H.Key = newKey
+		expectRecords[i].H.Meta.KeySize = uint32(len(newKey))
+		ListPush(t, list, string(newKey), expectRecords[i], false, nil)
 	}
 
 	ListCmp(t, list, key, expectRecords, false)
@@ -95,9 +107,14 @@ func TestList_Pop(t *testing.T) {
 	key := string(GetTestBytes(0))
 
 	ListPop(t, list, key, true, nil, ErrListNotFound)
+	seqInfo := HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
 
 	for i := 0; i < len(expectRecords); i++ {
-		ListPush(t, list, key, expectRecords[i], false, nil)
+		seq := generateSeq(&seqInfo, false)
+		newKey := encodeListKey([]byte(key), seq)
+		expectRecords[i].H.Key = newKey
+		expectRecords[i].H.Meta.KeySize = uint32(len(newKey))
+		ListPush(t, list, string(newKey), expectRecords[i], false, nil)
 	}
 
 	ListPop(t, list, key, true, expectRecords[0], nil)
@@ -113,14 +130,33 @@ func TestList_LRem(t *testing.T) {
 	list := NewList()
 	records := generateRecords(2)
 	key := string(GetTestBytes(0))
+	seqInfo := HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
 
 	for i := 0; i < 3; i++ {
-		ListPush(t, list, key, records[0], false, nil)
+		seq := generateSeq(&seqInfo, false)
+		newKey := encodeListKey([]byte(key), seq)
+		records[0].H.Key = newKey
+		records[0].H.Meta.KeySize = uint32(len(newKey))
+		ListPush(t, list, string(newKey), records[0], false, nil)
 	}
 
-	ListPush(t, list, key, records[1], false, nil)
-	ListPush(t, list, key, records[0], false, nil)
-	ListPush(t, list, key, records[1], false, nil)
+	seq := generateSeq(&seqInfo, false)
+	newKey := encodeListKey([]byte(key), seq)
+	records[1].H.Key = newKey
+	records[1].H.Meta.KeySize = uint32(len(newKey))
+	ListPush(t, list, string(newKey), records[1], false, nil)
+
+	seq = generateSeq(&seqInfo, false)
+	newKey = encodeListKey([]byte(key), seq)
+	records[0].H.Key = newKey
+	records[0].H.Meta.KeySize = uint32(len(newKey))
+	ListPush(t, list, string(newKey), records[0], false, nil)
+
+	seq = generateSeq(&seqInfo, false)
+	newKey = encodeListKey([]byte(key), seq)
+	records[1].H.Key = newKey
+	records[1].H.Meta.KeySize = uint32(len(newKey))
+	ListPush(t, list, string(newKey), records[1], false, nil)
 
 	// r1 r1 r1 r2 r1 r2
 	expectRecords := []*Record{records[0], records[0], records[0], records[1], records[0], records[1]}
@@ -156,9 +192,14 @@ func TestList_LSet(t *testing.T) {
 	list := NewList()
 	expectRecords := generateRecords(5)
 	key := string(GetTestBytes(0))
+	seqInfo := HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
 
 	for i := 0; i < len(expectRecords); i++ {
-		ListPush(t, list, key, expectRecords[i], false, nil)
+		seq := generateSeq(&seqInfo, false)
+		newKey := encodeListKey([]byte(key), seq)
+		expectRecords[i].H.Key = newKey
+		expectRecords[i].H.Meta.KeySize = uint32(len(newKey))
+		ListPush(t, list, string(newKey), expectRecords[i], false, nil)
 	}
 
 	err := list.LSet(key, 3, expectRecords[4])
@@ -172,9 +213,14 @@ func TestList_LTrim(t *testing.T) {
 	list := NewList()
 	expectRecords := generateRecords(5)
 	key := string(GetTestBytes(0))
+	seqInfo := HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
 
 	for i := 0; i < len(expectRecords); i++ {
-		ListPush(t, list, key, expectRecords[i], false, nil)
+		seq := generateSeq(&seqInfo, false)
+		newKey := encodeListKey([]byte(key), seq)
+		expectRecords[i].H.Key = newKey
+		expectRecords[i].H.Meta.KeySize = uint32(len(newKey))
+		ListPush(t, list, string(newKey), expectRecords[i], false, nil)
 	}
 
 	err := list.LTrim(key, 1, 3)
@@ -187,10 +233,15 @@ func TestList_LRemByIndex(t *testing.T) {
 	list := NewList()
 	expectRecords := generateRecords(8)
 	key := string(GetTestBytes(0))
+	seqInfo := HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
 
 	// r1 r2 r3 r4 r5 r6 r7 r8
 	for i := 0; i < 8; i++ {
-		ListPush(t, list, key, expectRecords[i], false, nil)
+		seq := generateSeq(&seqInfo, false)
+		newKey := encodeListKey([]byte(key), seq)
+		expectRecords[i].H.Key = newKey
+		expectRecords[i].H.Meta.KeySize = uint32(len(newKey))
+		ListPush(t, list, string(newKey), expectRecords[i], false, nil)
 	}
 
 	// r1 r2 r4 r5 r6 r7 r8
