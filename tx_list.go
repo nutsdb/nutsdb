@@ -300,6 +300,11 @@ func (tx *Tx) LRemByIndex(bucket string, key []byte, indexes ...int) error {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return err
 	}
+
+	if _, ok := tx.db.Index.list.exist(bucket); !ok {
+		return ErrListNotFound
+	}
+
 	if tx.CheckExpire(bucket, key) {
 		return ErrListNotFound
 	}

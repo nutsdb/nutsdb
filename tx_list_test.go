@@ -277,7 +277,21 @@ func TestTx_LRemByIndex(t *testing.T) {
 
 	// Calling LRemByIndex on a non-existent list
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txLRemByIndex(t, db, bucket, GetTestBytes(0), ErrListNotFound)
+	})
+
+	// Calling LRemByIndex with len(indexes) == 0
+	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		pushDataByValues(t, db, bucket, 0, true, 0)
 		txLRemByIndex(t, db, bucket, GetTestBytes(0), nil)
+	})
+
+	// Calling LRemByIndex with a expired bucket name
+	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		pushDataByValues(t, db, bucket, 0, true, 0)
+		txExpireList(t, db, bucket, GetTestBytes(0), 1, nil)
+		time.Sleep(3 * time.Second)
+		txLRemByIndex(t, db, bucket, GetTestBytes(0), ErrListNotFound)
 	})
 
 	// Calling LRemByIndex on a list with added data and use LRange to validate it
