@@ -306,7 +306,7 @@ func (db *DB) release() error {
 
 func (db *DB) getValueByRecord(r *Record) ([]byte, error) {
 	if r == nil {
-		return nil, errors.New("the record is nil")
+		return nil, ErrRecordIsNil
 	}
 
 	if r.V != nil {
