@@ -24,6 +24,10 @@ import (
 	"github.com/xujiajun/utils/strconv2"
 )
 
+var (
+	bucketKeySeqMap map[string]*HeadTailSeq
+)
+
 // ErrSeparatorForListKey returns when list key contains the SeparatorForListKey.
 var ErrSeparatorForListKey = errors.Errorf("contain separator (%s) for List key", SeparatorForListKey)
 
@@ -80,35 +84,70 @@ func (tx *Tx) push(bucket string, key []byte, flag uint16, values ...[]byte) err
 	return nil
 }
 
+func (tx *Tx) getListNewKey(bucket string, key []byte, isLeft bool) []byte {
+	if bucketKeySeqMap == nil {
+		bucketKeySeqMap = make(map[string]*HeadTailSeq)
+	}
+
+	bucketKey := bucket + string(key)
+	if _, ok := bucketKeySeqMap[bucketKey]; !ok {
+		bucketKeySeqMap[bucketKey] = tx.getListHeadTailSeq(bucket, string(key))
+	}
+
+	seq := generateSeq(bucketKeySeqMap[bucketKey], isLeft)
+	return encodeListKey(key, seq)
+}
+
 // RPush inserts the values at the tail of the list stored in the bucket at given bucket,key and values.
 func (tx *Tx) RPush(bucket string, key []byte, values ...[]byte) error {
+	if err := tx.isKeyValid(bucket, key); err != nil {
+		return err
+	}
+
+	newKey := tx.getListNewKey(bucket, key, false)
+	return tx.push(bucket, newKey, DataRPushFlag, values...)
+}
+
+// LPush inserts the values at the head of the list stored in the bucket at given bucket,key and values.
+func (tx *Tx) LPush(bucket string, key []byte, values ...[]byte) error {
+	if err := tx.isKeyValid(bucket, key); err != nil {
+		return err
+	}
+
+	newKey := tx.getListNewKey(bucket, key, true)
+	return tx.push(bucket, newKey, DataLPushFlag, values...)
+}
+
+func (tx *Tx) isKeyValid(bucket string, key []byte) error {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return err
 	}
+
 	if tx.CheckExpire(bucket, key) {
 		return ErrListNotFound
 	}
+
 	if strings.Contains(string(key), SeparatorForListKey) {
 		return ErrSeparatorForListKey
+	}
+
+	return nil
+}
+
+func (tx *Tx) MergeLPush(bucket string, key []byte, values ...[]byte) error {
+	if err := tx.isKeyValid(bucket, key); err != nil {
+		return err
 	}
 
 	return tx.push(bucket, key, DataRPushFlag, values...)
 }
 
-// LPush inserts the values at the head of the list stored in the bucket at given bucket,key and values.
-func (tx *Tx) LPush(bucket string, key []byte, values ...[]byte) error {
-	if err := tx.checkTxIsClosed(); err != nil {
+func (tx *Tx) MergeRPush(bucket string, key []byte, values ...[]byte) error {
+	if err := tx.isKeyValid(bucket, key); err != nil {
 		return err
 	}
-	if tx.CheckExpire(bucket, key) {
-		return ErrListNotFound
-	}
 
-	if strings.Contains(string(key), SeparatorForListKey) {
-		return ErrSeparatorForListKey
-	}
-
-	return tx.push(bucket, key, DataLPushFlag, values...)
+	return tx.push(bucket, key, DataRPushFlag, values...)
 }
 
 // LPop removes and returns the first element of the list stored in the bucket at given bucket and key.
