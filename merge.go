@@ -342,5 +342,12 @@ func (db *DB) isPendingListEntry(bucketId BucketId, entry *Entry) bool {
 		return true
 	}
 
+	if entry.Meta.Ds == DataStructureList {
+		//userKey, curSeq := decodeListKey([]byte(entry.Key))
+		//userKeyStr := string(userKey)
+		// check bucket and key is exits
+		// check
+	}
+
 	return false
 }
