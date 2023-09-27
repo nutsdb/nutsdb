@@ -15,6 +15,7 @@
 package nutsdb
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"github.com/xujiajun/utils/strconv2"
@@ -51,10 +52,6 @@ func (db *DB) merge() error {
 		off              int64
 		pendingMergeFIds []int
 	)
-
-	if db.Index.list.getIdxLen() != 0 {
-		return ErrNotSupportMergeWhenUsingList
-	}
 
 	// to prevent the initiation of multiple merges simultaneously.
 	db.mu.Lock()
@@ -132,16 +129,26 @@ func (db *DB) merge() error {
 				err := db.Update(func(tx *Tx) error {
 					// check if we have a new entry with same key and bucket
 					if ok := db.isPendingMergeEntry(entry); ok {
-						return tx.put(
-							string(entry.Bucket),
-							entry.Key,
-							entry.Value,
-							entry.Meta.TTL,
-							entry.Meta.Flag,
-							entry.Meta.Timestamp,
-							entry.Meta.Ds,
-						)
+						if entry.Meta.Ds != DataStructureList || entry.Meta.Flag == DataLSetFlag ||  entry.Meta.Flag == DataExpireListFlag {
+							return tx.put(
+								string(entry.Bucket),
+								entry.Key,
+								entry.Value,
+								entry.Meta.TTL,
+								entry.Meta.Flag,
+								entry.Meta.Timestamp,
+								entry.Meta.Ds,
+							)
+						}
+
+						switch entry.Meta.Flag {
+						case DataLPushFlag:
+							return tx.LPushRaw(string(entry.Bucket), entry.Key, entry.Value)
+						case DataRPushFlag:
+							return tx.RPushRaw(string(entry.Bucket), entry.Key, entry.Value)
+						}
 					}
+
 					return nil
 				})
 
@@ -266,10 +273,27 @@ func (db *DB) isPendingMergeEntry(entry *Entry) bool {
 	}
 
 	if entry.Meta.Ds == DataStructureList {
-		//userKey, curSeq := decodeListKey([]byte(entry.Key))
-		//userKeyStr := string(userKey)
-		// check bucket and key is exits
-		// check
+		userKey, curSeq := decodeListKey(entry.Key)
+		userKeyStr := string(userKey)
+		list, exist := db.Index.list.exist(string(entry.Bucket))
+		if !exist {
+			return false
+		}
+
+		if _, ok := list.Items[userKeyStr]; !ok {
+			return false
+		}
+
+		r, ok := list.Items[userKeyStr].Find(ConvertUint64ToBigEndianBytes(curSeq))
+		if !ok {
+			return false
+		}
+
+		if !bytes.Equal(r.H.Key, entry.Key) || r.H.Meta.TxID != entry.Meta.TxID || r.H.Meta.Timestamp !=  entry.Meta.Timestamp {
+			return false
+		}
+
+		return true
 	}
 
 	return false

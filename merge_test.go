@@ -128,10 +128,50 @@ func TestDB_MergeForZSet(t *testing.T) {
 func TestDB_MergeForList(t *testing.T) {
 	bucket := "bucket"
 	key := GetTestBytes(0)
-	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txPush(t, db, bucket, key, GetTestBytes(0), true, nil, nil)
-		require.Error(t, ErrNotSupportMergeWhenUsingList, db.Merge())
+	opts := &DefaultOptions
+	opts.SegmentSize = KB
+	opts.Dir = "/tmp/test-merge/"
+	runNutsDBTest(t, opts, func(t *testing.T, db *DB) {
+		err := db.Merge()
+		require.Error(t, err)
+		require.Error(t, ErrDontNeedMerge, err)
+
+		n := 10000
+		for i := 0; i < n; i++ {
+			txPush(t, db, bucket, key, GetTestBytes(i), true, nil, nil)
+		}
+
+		for i := n; i < 2 * n; i++ {
+			txPush(t, db, bucket, key, GetTestBytes(i), false, nil, nil)
+		}
+
+		// Lpop
+		for i := n - 1; i >= n / 2; i-- {
+			txPop(t, db, bucket, key, GetTestBytes(i), nil, true)
+		}
+
+		// Rpop
+		for i := 2 * n - 1; i >= 3 * n / 2; i-- {
+			txPop(t, db, bucket, key, GetTestBytes(i), nil, false)
+		}
+
+		txLTrim(t, db, bucket, key, 0, 9, nil)
+		txLRem(t, db, bucket, key, 0, GetTestBytes(100), nil)
+		txLRemByIndex(t, db, bucket, key, nil, []int{3, 4, 5}...)
+		txLSet(t, db, bucket, key, 0, []byte("0000"), nil)
+		require.NoError(t, db.Merge())
+		dbCnt, err := db.getRecordCount()
+		require.NoError(t, err)
+		require.Equal(t, int64(7), dbCnt)
 	})
+
+	/*
+	runNutsDBTest(t, opts, func(t *testing.T, db *DB) {
+		dbCnt, err := db.getRecordCount()
+		require.NoError(t, err)
+		require.Equal(t, int64(7), dbCnt)
+		txPop(t, db, bucket, key, []byte("0000"), nil, true)
+	})*/
 }
 
 func TestDB_MergeAutomatic(t *testing.T) {

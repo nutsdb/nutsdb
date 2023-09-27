@@ -134,15 +134,15 @@ func (tx *Tx) isKeyValid(bucket string, key []byte) error {
 	return nil
 }
 
-func (tx *Tx) MergeLPush(bucket string, key []byte, values ...[]byte) error {
+func (tx *Tx) LPushRaw(bucket string, key []byte, values ...[]byte) error {
 	if err := tx.isKeyValid(bucket, key); err != nil {
 		return err
 	}
 
-	return tx.push(bucket, key, DataRPushFlag, values...)
+	return tx.push(bucket, key, DataLPushFlag, values...)
 }
 
-func (tx *Tx) MergeRPush(bucket string, key []byte, values ...[]byte) error {
+func (tx *Tx) RPushRaw(bucket string, key []byte, values ...[]byte) error {
 	if err := tx.isKeyValid(bucket, key); err != nil {
 		return err
 	}
