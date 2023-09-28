@@ -104,6 +104,10 @@ func (tx *Tx) RPush(bucket string, key []byte, values ...[]byte) error {
 		return err
 	}
 
+	if strings.Contains(string(key), SeparatorForListKey) {
+		return ErrSeparatorForListKey
+	}
+
 	newKey := tx.getListNewKey(bucket, key, false)
 	return tx.push(bucket, newKey, DataRPushFlag, values...)
 }
@@ -112,6 +116,10 @@ func (tx *Tx) RPush(bucket string, key []byte, values ...[]byte) error {
 func (tx *Tx) LPush(bucket string, key []byte, values ...[]byte) error {
 	if err := tx.isKeyValid(bucket, key); err != nil {
 		return err
+	}
+
+	if strings.Contains(string(key), SeparatorForListKey) {
+		return ErrSeparatorForListKey
 	}
 
 	newKey := tx.getListNewKey(bucket, key, true)
@@ -125,10 +133,6 @@ func (tx *Tx) isKeyValid(bucket string, key []byte) error {
 
 	if tx.CheckExpire(bucket, key) {
 		return ErrListNotFound
-	}
-
-	if strings.Contains(string(key), SeparatorForListKey) {
-		return ErrSeparatorForListKey
 	}
 
 	return nil

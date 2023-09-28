@@ -851,6 +851,9 @@ func (db *DB) buildListIdx(r *Record) error {
 		newKey := keyAndIndex[0]
 		index, _ := strconv2.StrToInt(keyAndIndex[1])
 		err = l.LSet(newKey, index, r)
+		if err != nil {
+			fmt.Println("err is not err, index=", index, ", err=", err)
+		}
 	case DataLTrimFlag:
 		keyAndStartIndex := strings.Split(string(key), SeparatorForListKey)
 		newKey := keyAndStartIndex[0]
