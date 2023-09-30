@@ -532,6 +532,23 @@ func txPush(t *testing.T, db *DB, bucket string, key, val []byte, isLeft bool, e
 	assertErr(t, err, finalExpectErr)
 }
 
+func txPushRaw(t *testing.T, db *DB, bucket string, key, val []byte, isLeft bool, expectErr error, finalExpectErr error) {
+	err := db.Update(func(tx *Tx) error {
+		var err error
+
+		if isLeft {
+			err = tx.LPushRaw(bucket, key, val)
+		} else {
+			err = tx.RPushRaw(bucket, key, val)
+		}
+
+		assertErr(t, err, expectErr)
+
+		return nil
+	})
+	assertErr(t, err, finalExpectErr)
+}
+
 func txExpireList(t *testing.T, db *DB, bucket string, key []byte, ttl uint32, expectErr error) {
 	err := db.Update(func(tx *Tx) error {
 		err := tx.ExpireList(bucket, key, ttl)

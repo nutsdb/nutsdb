@@ -77,6 +77,40 @@ func TestTx_LPush(t *testing.T) {
 	})
 }
 
+func TestTx_LPushRaw(t *testing.T) {
+	bucket := "bucket"
+	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		seq := uint64(100000)
+		for i := 0; i <= 100; i++ {
+			key := encodeListKey([]byte("0"), seq)
+			seq--
+			txPushRaw(t, db, bucket, key, GetTestBytes(i), true, nil, nil)
+		}
+
+		for i := 0; i <= 100; i++ {
+			v := GetTestBytes(100 - i)
+			txPop(t, db, bucket, []byte("0"), v, nil, true)
+		}
+	})
+}
+
+func TestTx_RPushRaw(t *testing.T) {
+	bucket := "bucket"
+	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		seq := uint64(100000)
+		for i := 0; i <= 100; i++ {
+			key := encodeListKey([]byte("0"), seq)
+			seq++
+			txPushRaw(t, db, bucket, key, GetTestBytes(i), false, nil, nil)
+		}
+
+		for i := 0; i <= 100; i++ {
+			v := GetTestBytes(100 - i)
+			txPop(t, db, bucket, []byte("0"), v, nil, false)
+		}
+	})
+}
+
 func TestTx_LPop(t *testing.T) {
 	bucket := "bucket"
 
