@@ -18,16 +18,15 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/xujiajun/utils/strconv2"
 	"io"
 	"math"
 	"os"
 	"time"
+
+	"github.com/xujiajun/utils/strconv2"
 )
 
-var (
-	ErrDontNeedMerge = errors.New("the number of files waiting to be merged is at least 2")
-)
+var ErrDontNeedMerge = errors.New("the number of files waiting to be merged is at least 2")
 
 func (db *DB) Merge() error {
 	db.mergeStartCh <- struct{}{}
@@ -128,27 +127,26 @@ func (db *DB) merge() error {
 				err := db.Update(func(tx *Tx) error {
 					// check if we have a new entry with same key and bucket
 					if ok := db.isPendingMergeEntry(entry); ok {
-							switch entry.Meta.Flag {
-								case DataLPushFlag:
-									return tx.LPushRaw(string(entry.Bucket), entry.Key, entry.Value)
-								case DataRPushFlag:
-									return tx.RPushRaw(string(entry.Bucket), entry.Key, entry.Value)
-							}
+						switch entry.Meta.Flag {
+						case DataLPushFlag:
+							return tx.LPushRaw(string(entry.Bucket), entry.Key, entry.Value)
+						case DataRPushFlag:
+							return tx.RPushRaw(string(entry.Bucket), entry.Key, entry.Value)
+						}
 
-							return tx.put(
-								string(entry.Bucket),
-								entry.Key,
-								entry.Value,
-								entry.Meta.TTL,
-								entry.Meta.Flag,
-								entry.Meta.Timestamp,
-								entry.Meta.Ds,
-							)
+						return tx.put(
+							string(entry.Bucket),
+							entry.Key,
+							entry.Value,
+							entry.Meta.TTL,
+							entry.Meta.Flag,
+							entry.Meta.Timestamp,
+							entry.Meta.Ds,
+						)
 					}
 
 					return nil
 				})
-
 				if err != nil {
 					_ = fr.release()
 					return err

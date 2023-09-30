@@ -661,7 +661,6 @@ func TestDB_Close(t *testing.T) {
 
 func TestDB_ErrThenReadWrite(t *testing.T) {
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-
 		bucket := "testForDeadLock"
 		err = db.View(
 			func(tx *Tx) error {
@@ -785,7 +784,6 @@ func withDBOption(t *testing.T, opt Options, fn func(t *testing.T, db *DB)) {
 }
 
 func withDefaultDB(t *testing.T, fn func(t *testing.T, db *DB)) {
-
 	tmpdir, _ := os.MkdirTemp("", "nutsdb")
 	opt := DefaultOptions
 	opt.Dir = tmpdir
@@ -804,7 +802,6 @@ func withRAMIdxDB(t *testing.T, fn func(t *testing.T, db *DB)) {
 }
 
 func TestDB_HintKeyValAndRAMIdxMode_RestartDB(t *testing.T) {
-
 	opts := DefaultOptions
 	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
 		bucket := "bucket"

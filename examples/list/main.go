@@ -149,6 +149,7 @@ func testLPop() {
 		log.Fatal(err)
 	}
 }
+
 func testRPop() {
 	if err := db.Update(
 		func(tx *nutsdb.Tx) error {
@@ -233,7 +234,6 @@ func testLPeek() {
 		}); err != nil {
 		log.Fatal(err)
 	}
-
 }
 
 func testRPeek() {

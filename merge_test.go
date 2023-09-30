@@ -16,9 +16,10 @@ package nutsdb
 
 import (
 	"bytes"
+	"testing"
+
 	"github.com/stretchr/testify/require"
 	"github.com/xujiajun/utils/strconv2"
-	"testing"
 )
 
 func TestDB_MergeForString(t *testing.T) {
@@ -43,7 +44,7 @@ func TestDB_MergeForString(t *testing.T) {
 		}
 
 		// Delete some data
-		for i := 0; i < n / 2; i++ {
+		for i := 0; i < n/2; i++ {
 			txDel(t, db, bucket, GetTestBytes(i), nil)
 		}
 
@@ -52,10 +53,10 @@ func TestDB_MergeForString(t *testing.T) {
 
 		dbCnt, err := db.getRecordCount()
 		require.NoError(t, err)
-		require.Equal(t, int64(n / 2), dbCnt)
+		require.Equal(t, int64(n/2), dbCnt)
 
 		// Check the deleted data is deleted
-		for i := 0; i < n / 2; i++ {
+		for i := 0; i < n/2; i++ {
 			txGet(t, db, bucket, GetTestBytes(i), GetTestBytes(i), ErrKeyNotFound)
 		}
 
@@ -72,10 +73,10 @@ func TestDB_MergeForString(t *testing.T) {
 
 		dbCnt, err = db.getRecordCount()
 		require.NoError(t, err)
-		require.Equal(t, int64(n / 2), dbCnt)
+		require.Equal(t, int64(n/2), dbCnt)
 
 		// Check the deleted data is deleted
-		for i := 0; i < n / 2; i++ {
+		for i := 0; i < n/2; i++ {
 			txGet(t, db, bucket, GetTestBytes(i), GetTestBytes(i), ErrKeyNotFound)
 		}
 
@@ -112,8 +113,8 @@ func TestDB_MergeForSet(t *testing.T) {
 		}
 
 		// Delete some data
-		for i := 0; i < n / 2; i++ {
-			txSRem(t, db, bucket, key, GetTestBytes(i),nil)
+		for i := 0; i < n/2; i++ {
+			txSRem(t, db, bucket, key, GetTestBytes(i), nil)
 		}
 
 		// Pop a random value
@@ -126,22 +127,22 @@ func TestDB_MergeForSet(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		// Check the random value is poped
+		// Check the random value is popped
 		txSIsMember(t, db, bucket, key, spopValue, false)
 
-		//txSPop(t, db, bucket, key,nil)
+		// txSPop(t, db, bucket, key,nil)
 		dbCnt, err := db.getRecordCount()
 		require.NoError(t, err)
-		require.Equal(t, int64(n / 2 - 1), dbCnt)
+		require.Equal(t, int64(n/2-1), dbCnt)
 
 		// Merge and check the result
 		require.NoError(t, db.Merge())
 
 		dbCnt, err = db.getRecordCount()
 		require.NoError(t, err)
-		require.Equal(t, int64(n / 2 - 1), dbCnt)
+		require.Equal(t, int64(n/2-1), dbCnt)
 
-		// Check the random value is poped
+		// Check the random value is popped
 		txSIsMember(t, db, bucket, key, spopValue, false)
 		for i := n / 2; i < n; i++ {
 			v := GetTestBytes(i)
@@ -160,9 +161,9 @@ func TestDB_MergeForSet(t *testing.T) {
 
 		dbCnt, err = db.getRecordCount()
 		require.NoError(t, err)
-		require.Equal(t, int64(n / 2 - 1), dbCnt)
+		require.Equal(t, int64(n/2-1), dbCnt)
 
-		// Check the random value is poped
+		// Check the random value is popped
 		txSIsMember(t, db, bucket, key, spopValue, false)
 		for i := n / 2; i < n; i++ {
 			v := GetTestBytes(i)
@@ -177,9 +178,9 @@ func TestDB_MergeForSet(t *testing.T) {
 }
 
 // TestDB_MergeForZSet is a test function to check the Merge() function of the DB struct
- // It creates a DB with two different EntryIdxMode, then adds and scores each item in the DB
- // It then removes half of the items from the DB, then checks that the items that are left are the same as the ones that were removed
- // It then closes the DB, reopens it, and checks that the items that were removed are now not present
+// It creates a DB with two different EntryIdxMode, then adds and scores each item in the DB
+// It then removes half of the items from the DB, then checks that the items that are left are the same as the ones that were removed
+// It then closes the DB, reopens it, and checks that the items that were removed are now not present
 func TestDB_MergeForZSet(t *testing.T) {
 	bucket := "bucket"
 	key := GetTestBytes(0)
@@ -209,12 +210,12 @@ func TestDB_MergeForZSet(t *testing.T) {
 		}
 
 		// remove half of the items
-		for i := 0; i < n / 2; i++ {
+		for i := 0; i < n/2; i++ {
 			txZRem(t, db, bucket, key, GetTestBytes(i), nil)
 		}
 
 		// check that the items that are left are the same as the ones that were removed
-		for i := 0; i < n / 2; i++ {
+		for i := 0; i < n/2; i++ {
 			score, _ := strconv2.IntToFloat64(i)
 			txZScore(t, db, bucket, key, GetTestBytes(i), score, ErrSortedSetMemberNotExist)
 		}
@@ -228,7 +229,7 @@ func TestDB_MergeForZSet(t *testing.T) {
 		// check that the number of items in the DB is correct
 		dbCnt, err := db.getRecordCount()
 		require.NoError(t, err)
-		require.Equal(t, int64(n / 2), dbCnt)
+		require.Equal(t, int64(n/2), dbCnt)
 
 		// merge
 		require.NoError(t, db.Merge())
@@ -236,10 +237,10 @@ func TestDB_MergeForZSet(t *testing.T) {
 		// check that the number of items in the DB is correct
 		dbCnt, err = db.getRecordCount()
 		require.NoError(t, err)
-		require.Equal(t, int64(n / 2), dbCnt)
+		require.Equal(t, int64(n/2), dbCnt)
 
 		// check that the items that were removed are now not present
-		for i := 0; i < n / 2; i++ {
+		for i := 0; i < n/2; i++ {
 			score, _ := strconv2.IntToFloat64(i)
 			txZScore(t, db, bucket, key, GetTestBytes(i), score, ErrSortedSetMemberNotExist)
 		}
@@ -258,10 +259,10 @@ func TestDB_MergeForZSet(t *testing.T) {
 		require.NoError(t, err)
 		dbCnt, err = db.getRecordCount()
 		require.NoError(t, err)
-		require.Equal(t, int64(n / 2), dbCnt)
+		require.Equal(t, int64(n/2), dbCnt)
 
 		// check that the items that were removed are now not present
-		for i := 0; i < n / 2; i++ {
+		for i := 0; i < n/2; i++ {
 			score, _ := strconv2.IntToFloat64(i)
 			txZScore(t, db, bucket, key, GetTestBytes(i), score, ErrSortedSetMemberNotExist)
 		}
@@ -278,8 +279,8 @@ func TestDB_MergeForZSet(t *testing.T) {
 }
 
 // TestDB_MergeForList tests the Merge() function of the DB struct.
- // It creates a DB with two different EntryIdxMode, pushes and pops data, and then merges the DB.
- // It then reopens the DB and checks that the data is still there.
+// It creates a DB with two different EntryIdxMode, pushes and pops data, and then merges the DB.
+// It then reopens the DB and checks that the data is still there.
 func TestDB_MergeForList(t *testing.T) {
 	bucket := "bucket"
 	key := GetTestBytes(0)
@@ -303,16 +304,16 @@ func TestDB_MergeForList(t *testing.T) {
 			txPush(t, db, bucket, key, GetTestBytes(i), true, nil, nil)
 		}
 
-		for i := n; i < 2 * n; i++ {
+		for i := n; i < 2*n; i++ {
 			txPush(t, db, bucket, key, GetTestBytes(i), false, nil, nil)
 		}
 
 		// pop data
-		for i := n - 1; i >= n / 2; i-- {
+		for i := n - 1; i >= n/2; i-- {
 			txPop(t, db, bucket, key, GetTestBytes(i), nil, true)
 		}
 
-		for i := 2 * n - 1; i >= 3 * n / 2; i-- {
+		for i := 2*n - 1; i >= 3*n/2; i-- {
 			txPop(t, db, bucket, key, GetTestBytes(i), nil, false)
 		}
 
@@ -343,7 +344,7 @@ func TestDB_MergeForList(t *testing.T) {
 		require.Equal(t, int64(7), dbCnt)
 
 		// pop data
-		for i := n / 2 - 1; i < n / 2 - 8; i-- {
+		for i := n/2 - 1; i < n/2-8; i-- {
 			txPop(t, db, bucket, key, GetTestBytes(i), nil, true)
 		}
 

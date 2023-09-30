@@ -24,9 +24,7 @@ import (
 	"github.com/xujiajun/utils/strconv2"
 )
 
-var (
-	bucketKeySeqMap map[string]*HeadTailSeq
-)
+var bucketKeySeqMap map[string]*HeadTailSeq
 
 // ErrSeparatorForListKey returns when list key contains the SeparatorForListKey.
 var ErrSeparatorForListKey = errors.Errorf("contain separator (%s) for List key", SeparatorForListKey)
