@@ -225,27 +225,3 @@ func TestIsPrefixSearchScan(t *testing.T) {
 		})
 	})
 }
-
-func TestGetMergeReadEntryError(t *testing.T) {
-	type args struct {
-		err error
-	}
-	tests := []struct {
-		name    string
-		args    args
-		wantErr error
-	}{
-		{
-			name: "test error",
-			args: args{
-				err: errors.New("test error"),
-			},
-			wantErr: fmt.Errorf("when merge operation build hintIndex readAt err: %s", errors.New("test error")),
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			require.Equal(t, tt.wantErr, GetMergeReadEntryError(tt.args.err))
-		})
-	}
-}
