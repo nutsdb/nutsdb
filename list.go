@@ -24,9 +24,6 @@ var (
 	// ErrListNotFound is returned when the list not found.
 	ErrListNotFound = errors.New("the list not found")
 
-	// ErrIndexOutOfRange is returned when use LSet function set index out of range.
-	ErrIndexOutOfRange = errors.New("index out of range")
-
 	// ErrCount is returned when count is error.
 	ErrCount = errors.New("err count")
 
@@ -260,35 +257,6 @@ func (l *List) LRem(key string, count int, cmp func(r *Record) (bool, error)) er
 	list := l.Items[key]
 	for _, idx := range removeIndexes {
 		list.Delete(idx)
-	}
-
-	return nil
-}
-
-// LSet sets the list element at index to value.
-func (l *List) LSet(key string, index int, r *Record) error {
-	if l.IsExpire(key) {
-		return ErrListNotFound
-	}
-	if _, ok := l.Items[key]; !ok {
-		return ErrListNotFound
-	}
-
-	size, _ := l.Size(key)
-	if index >= size || index < 0 {
-		return ErrIndexOutOfRange
-	}
-
-	list := l.Items[key]
-	allItems := list.AllItems()
-	for i, item := range allItems {
-		if i != index {
-			continue
-		}
-
-		if !list.InsertRecord(item.key, r) {
-			return ErrBuildListIndex
-		}
 	}
 
 	return nil

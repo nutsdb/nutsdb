@@ -623,9 +623,6 @@ func (tx *Tx) buildListIdx(record *Record) {
 		_, _ = l.LPop(string(key))
 	case DataRPopFlag:
 		_, _ = l.RPop(string(key))
-	case DataLSetFlag:
-		newKey, index := splitStringIntStr(string(key), SeparatorForListKey)
-		_ = l.LSet(newKey, index, record)
 	case DataLTrimFlag:
 		newKey, start := splitStringIntStr(string(key), SeparatorForListKey)
 		end, _ := strconv2.StrToInt(string(value))

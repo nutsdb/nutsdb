@@ -22,7 +22,6 @@ import (
 	"io"
 	"math"
 	"os"
-	"strings"
 	"time"
 )
 
@@ -129,12 +128,11 @@ func (db *DB) merge() error {
 				err := db.Update(func(tx *Tx) error {
 					// check if we have a new entry with same key and bucket
 					if ok := db.isPendingMergeEntry(entry); ok {
-						//fmt.Println("entry already exists: ", entry.Key, ", flag=", entry.Meta.Flag)
 							switch entry.Meta.Flag {
-							case DataLPushFlag:
-								return tx.LPushRaw(string(entry.Bucket), entry.Key, entry.Value)
-							case DataRPushFlag:
-								return tx.RPushRaw(string(entry.Bucket), entry.Key, entry.Value)
+								case DataLPushFlag:
+									return tx.LPushRaw(string(entry.Bucket), entry.Key, entry.Value)
+								case DataRPushFlag:
+									return tx.RPushRaw(string(entry.Bucket), entry.Key, entry.Value)
 							}
 
 							return tx.put(
@@ -171,7 +169,7 @@ func (db *DB) merge() error {
 				if err == io.ErrUnexpectedEOF {
 					break
 				}
-				return fmt.Errorf("when merge operation build hintIndex readAt err: %s", err)
+				return GetMergeReadEntryError(err)
 			}
 		}
 
@@ -223,138 +221,128 @@ func (db *DB) mergeWorker() {
 
 func (db *DB) isPendingMergeEntry(entry *Entry) bool {
 	if entry.Meta.Ds == DataStructureBTree {
-		idx, exist := db.Index.bTree.exist(string(entry.Bucket))
-		if exist {
-			r, ok := idx.Find(entry.Key)
-			if ok && r.H.Meta.Flag == DataSetFlag {
-				if r.IsExpired() {
-					db.tm.del(string(entry.Bucket), string(entry.Key))
-					idx.Delete(entry.Key)
-					return false
-				}
-
-				if r.H.Meta.TxID != entry.Meta.TxID || r.H.Meta.Timestamp != entry.Meta.Timestamp {
-					return false
-				}
-
-				return true
-			}
-		}
+		return db.isPendingBtreeEntry(entry)
 	}
 
 	if entry.Meta.Ds == DataStructureSet {
-		setIdx, exist := db.Index.set.exist(string(entry.Bucket))
-		if exist {
-			isMember, err := setIdx.SIsMember(string(entry.Key), entry.Value)
-			if err != nil {
-				return false
-			}
-			if isMember {
-				return true
-			}
-		}
+		return db.isPendingSetEntry(entry)
 	}
 
 	if entry.Meta.Ds == DataStructureSortedSet {
-		keyAndScore := strings.Split(string(entry.Key), SeparatorForZSetKey)
-		if len(keyAndScore) == 2 {
-			key := keyAndScore[0]
-			score, _ := strconv2.StrToFloat64(keyAndScore[1])
-			sortedSetIdx, exist := db.Index.sortedSet.exist(string(entry.Bucket))
-			if exist {
-				s, err := sortedSetIdx.ZScore(key, entry.Value)
-				if err != nil {
-					return false
-				}
-				if s == score {
-					return true
-				}
-			}
-		}
+		return db.isPendingZSetEntry(entry)
 	}
 
 	if entry.Meta.Ds == DataStructureList {
-		var userKeyStr string
-		var curSeq uint64
-		var userKey []byte
-		if entry.Meta.Flag == DataLSetFlag {
-			var index int
-			userKeyStr, index = splitStringIntStr(string(entry.Key), SeparatorForListKey)
-			//userKeyStr = string(entry.Key)
-			list, exist := db.Index.list.exist(string(entry.Bucket))
-			if !exist {
-				return false
-			}
+		return db.isPendingListEntry(entry)
+	}
 
-			if _, ok := list.Items[userKeyStr]; !ok {
-				return false
-			}
-			allItems := list.Items[userKeyStr].AllItems()
-			var r *Record
-			for i, item := range allItems {
-				if i != index {
-					continue
-				}
-				r = item.r
-			}
+	return false
+}
 
-			if !bytes.Equal(r.H.Key, entry.Key) || r.H.Meta.TxID != entry.Meta.TxID || r.H.Meta.Timestamp !=  entry.Meta.Timestamp {
-				return false
-			}
-
-			return true
-		}
-
-		if entry.Meta.Flag == DataExpireListFlag {
-			userKeyStr = string(entry.Key)
-			list, exist := db.Index.list.exist(string(entry.Bucket))
-			if !exist {
-				return false
-			}
-
-			if _, ok := list.Items[userKeyStr]; !ok {
-				return false
-			}
-
-			t, _ := strconv2.StrToInt64(string(entry.Value))
-			ttl := uint32(t)
-			if _, ok := list.TTL[userKeyStr]; !ok {
-				return false
-			}
-
-			if list.TTL[userKeyStr] != ttl || list.TimeStamp[userKeyStr] != entry.Meta.Timestamp {
-				return false
-			}
-
-			return true
-		}
-
-		if entry.Meta.Flag == DataLPushFlag || entry.Meta.Flag == DataRPushFlag {
-			userKey, curSeq = decodeListKey(entry.Key)
-			userKeyStr = string(userKey)
-
-			list, exist := db.Index.list.exist(string(entry.Bucket))
-			if !exist {
-				return false
-			}
-
-			if _, ok := list.Items[userKeyStr]; !ok {
-				return false
-			}
-
-			r, ok := list.Items[userKeyStr].Find(ConvertUint64ToBigEndianBytes(curSeq))
-			if !ok {
-				return false
-			}
-
-			if !bytes.Equal(r.H.Key, entry.Key) || r.H.Meta.TxID != entry.Meta.TxID || r.H.Meta.Timestamp !=  entry.Meta.Timestamp {
-				return false
-			}
-
-			return true
-		}
-
+func (db *DB) isPendingBtreeEntry(entry *Entry) bool {
+	idx, exist := db.Index.bTree.exist(string(entry.Bucket))
+	if !exist {
 		return false
+	}
+
+	r, ok := idx.Find(entry.Key)
+	if !ok || r.H.Meta.Flag != DataSetFlag {
+		return false
+	}
+
+	if r.IsExpired() {
+		db.tm.del(string(entry.Bucket), string(entry.Key))
+		idx.Delete(entry.Key)
+		return false
+	}
+
+	if r.H.Meta.TxID != entry.Meta.TxID || r.H.Meta.Timestamp != entry.Meta.Timestamp {
+		return false
+	}
+
+	return true
+}
+
+func (db *DB) isPendingSetEntry(entry *Entry) bool {
+	setIdx, exist := db.Index.set.exist(string(entry.Bucket))
+	if !exist {
+		return false
+	}
+
+	isMember, err := setIdx.SIsMember(string(entry.Key), entry.Value)
+	if err != nil || !isMember {
+		return false
+	}
+
+	return true
+}
+
+func (db *DB) isPendingZSetEntry(entry *Entry) bool {
+	key, score := splitStringFloat64Str(string(entry.Key), SeparatorForZSetKey)
+	sortedSetIdx, exist := db.Index.sortedSet.exist(string(entry.Bucket))
+	if !exist {
+		return false
+	}
+	s, err := sortedSetIdx.ZScore(key, entry.Value)
+	if err != nil || s != score {
+		return false
+	}
+
+	return true
+}
+
+func (db *DB) isPendingListEntry(entry *Entry) bool {
+	var userKeyStr string
+	var curSeq uint64
+	var userKey []byte
+
+	if entry.Meta.Flag == DataExpireListFlag {
+		userKeyStr = string(entry.Key)
+		list, exist := db.Index.list.exist(string(entry.Bucket))
+		if !exist {
+			return false
+		}
+
+		if _, ok := list.Items[userKeyStr]; !ok {
+			return false
+		}
+
+		t, _ := strconv2.StrToInt64(string(entry.Value))
+		ttl := uint32(t)
+		if _, ok := list.TTL[userKeyStr]; !ok {
+			return false
+		}
+
+		if list.TTL[userKeyStr] != ttl || list.TimeStamp[userKeyStr] != entry.Meta.Timestamp {
+			return false
+		}
+
+		return true
+	}
+
+	if entry.Meta.Flag == DataLPushFlag || entry.Meta.Flag == DataRPushFlag {
+		userKey, curSeq = decodeListKey(entry.Key)
+		userKeyStr = string(userKey)
+
+		list, exist := db.Index.list.exist(string(entry.Bucket))
+		if !exist {
+			return false
+		}
+
+		if _, ok := list.Items[userKeyStr]; !ok {
+			return false
+		}
+
+		r, ok := list.Items[userKeyStr].Find(ConvertUint64ToBigEndianBytes(curSeq))
+		if !ok {
+			return false
+		}
+
+		if !bytes.Equal(r.H.Key, entry.Key) || r.H.Meta.TxID != entry.Meta.TxID || r.H.Meta.Timestamp != entry.Meta.Timestamp {
+			return false
+		}
+
+		return true
 	}
 
 	return false

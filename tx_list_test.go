@@ -209,27 +209,6 @@ func TestTx_LRem(t *testing.T) {
 	})
 }
 
-func TestTx_LSet(t *testing.T) {
-	bucket := "bucket"
-
-	// Calling LSet on a non-existent list
-	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txLSet(t, db, bucket, GetTestBytes(0), 0, GetTestBytes(0), ErrListNotFound)
-	})
-
-	// Calling LSet on a list with added data
-	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		pushDataByStartEnd(t, db, bucket, 0, 0, 2, true)
-
-		txLSet(t, db, bucket, GetTestBytes(0), -1, GetTestBytes(4), ErrIndexOutOfRange)
-		txLSet(t, db, bucket, GetTestBytes(0), 0, GetTestBytes(4), nil)
-		txLRange(t, db, bucket, GetTestBytes(0), 0, -1, 3, [][]byte{
-			GetTestBytes(4), GetTestBytes(1), GetTestBytes(0),
-		}, nil)
-		txLSet(t, db, bucket, GetTestBytes(0), 100, GetTestBytes(4), ErrIndexOutOfRange)
-	})
-}
-
 func TestTx_LTrim(t *testing.T) {
 	bucket := "bucket"
 

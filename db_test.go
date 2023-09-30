@@ -221,15 +221,6 @@ func txLRemByIndex(t *testing.T, db *DB, bucket string, key []byte, expectErr er
 	require.NoError(t, err)
 }
 
-func txLSet(t *testing.T, db *DB, bucket string, key []byte, index int, value []byte, expectErr error) {
-	err := db.Update(func(tx *Tx) error {
-		err := tx.LSet(bucket, key, index, value)
-		assertErr(t, err, expectErr)
-		return nil
-	})
-	require.NoError(t, err)
-}
-
 func txSAdd(t *testing.T, db *DB, bucket string, key, value []byte, expectErr error, finalExpectErr error) {
 	err := db.Update(func(tx *Tx) error {
 		err := tx.SAdd(bucket, key, value)

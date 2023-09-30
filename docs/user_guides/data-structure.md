@@ -190,27 +190,6 @@ if err := db.Update(
 </details>
 
 <details>
-  <summary><b>LSet</b></summary>
-Sets the list element at index to value.
-
-```go
-if err := db.Update(
-    func(tx *nutsdb.Tx) error {
-        bucket := "bucketForList"
-        key := []byte("myList")
-        if err := tx.LSet(bucket, key, 0, []byte("val11")); err != nil {
-            return err
-        } else {
-            fmt.Println("LSet ok, index 0 item value => val11")
-        }
-        return nil
-    }); err != nil {
-    log.Fatal(err)
-}
-```
-  </details>
-
-<details>
   <summary><b>LTrim</b></summary>
 Trims an existing list so that it will contain only the specified range of elements specified. The offsets start and stop are zero-based indexes 0 being the first element of the list (the head of the list), 1 being the next element and so on.Start and end can also be negative numbers indicating offsets from the end of the list, where -1 is the last element of the list, -2 the penultimate element and so on.
 

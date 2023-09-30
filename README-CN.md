@@ -72,7 +72,6 @@ https://www.bilibili.com/video/BV1T34y1x7AS/
      - [LRange](#lrange)
      - [LRem](#lrem)
      - [LRemByIndex](#lrembyindex)
-     - [LSet](#lset)    
      - [LTrim](#LTrim)
      - [LSize](#lsize)      
      - [LKeys](#lkeys)
@@ -911,26 +910,6 @@ if err := db.Update(
         removedNum, err := tx.LRemByIndex(bucket, key, 0, 1)
         fmt.Printf("removed num %d\n", removedNum)
         return err
-    }); err != nil {
-    log.Fatal(err)
-}
-```
-
-##### LSet 
-
-设置指定bucket的指定list的index位置的的值为value。
-
-```golang
-if err := db.Update(
-    func(tx *nutsdb.Tx) error {
-            bucket := "bucketForList"
-        key := []byte("myList")
-        if err := tx.LSet(bucket, key, 0, []byte("val11")); err != nil {
-            return err
-        } else {
-            fmt.Println("LSet ok, index 0 item value => val11")
-        }
-        return nil
     }); err != nil {
     log.Fatal(err)
 }

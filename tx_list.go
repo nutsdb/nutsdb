@@ -271,38 +271,6 @@ func (tx *Tx) LRem(bucket string, key []byte, count int, value []byte) error {
 	return nil
 }
 
-// LSet sets the list element at index to value.
-func (tx *Tx) LSet(bucket string, key []byte, index int, value []byte) error {
-	var (
-		err    error
-		buffer bytes.Buffer
-	)
-
-	if err = tx.checkTxIsClosed(); err != nil {
-		return err
-	}
-	l := tx.db.Index.list.getWithDefault(bucket)
-	if tx.CheckExpire(bucket, key) {
-		return ErrListNotFound
-	}
-	if _, ok := l.Items[string(key)]; !ok {
-		return ErrListNotFound
-	}
-
-	size, _ := tx.LSize(bucket, key)
-	if index < 0 || index >= size {
-		return ErrIndexOutOfRange
-	}
-
-	buffer.Write(key)
-	buffer.Write([]byte(SeparatorForListKey))
-	indexBytes := []byte(strconv2.IntToStr(index))
-	buffer.Write(indexBytes)
-	newKey := buffer.Bytes()
-
-	return tx.push(bucket, newKey, DataLSetFlag, value)
-}
-
 // LTrim trims an existing list so that it will contain only the specified range of elements specified.
 // the offsets start and stop are zero-based indexes 0 being the first element of the list (the head of the list),
 // 1 being the next element and so on.

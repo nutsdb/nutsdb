@@ -54,8 +54,6 @@ func main() {
 
 	testLRange()
 
-	testLSet()
-
 	testLPeek()
 
 	testRPeek()
@@ -219,21 +217,6 @@ func testLRem() {
 		count = -count
 	}
 	fmt.Println("LRem count : ", count, string(value))
-}
-
-func testLSet() {
-	if err := db.Update(
-		func(tx *nutsdb.Tx) error {
-			key := []byte("myList")
-			err := tx.LSet(bucket, key, 0, []byte("val11"))
-			if err != nil {
-				return err
-			}
-			fmt.Println("LSet ok, index 0 item value => val11")
-			return nil
-		}); err != nil {
-		log.Fatal(err)
-	}
 }
 
 func testLPeek() {
