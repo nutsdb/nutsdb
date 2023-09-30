@@ -127,10 +127,11 @@ func (db *DB) merge() error {
 				err := db.Update(func(tx *Tx) error {
 					// check if we have a new entry with same key and bucket
 					if ok := db.isPendingMergeEntry(entry); ok {
-						switch entry.Meta.Flag {
-						case DataLPushFlag:
+						if entry.Meta.Flag == DataLPushFlag {
 							return tx.LPushRaw(string(entry.Bucket), entry.Key, entry.Value)
-						case DataRPushFlag:
+						}
+
+						if entry.Meta.Flag == DataRPushFlag {
 							return tx.RPushRaw(string(entry.Bucket), entry.Key, entry.Value)
 						}
 
@@ -167,7 +168,7 @@ func (db *DB) merge() error {
 				if err == io.ErrUnexpectedEOF {
 					break
 				}
-				return GetMergeReadEntryError(err)
+				return fmt.Errorf("when merge operation build hintIndex readAt err: %s", err)
 			}
 		}
 

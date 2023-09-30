@@ -2,7 +2,6 @@ package nutsdb
 
 import (
 	"errors"
-	"fmt"
 )
 
 // IsDBClosed is true if the error indicates the db was closed.
@@ -38,8 +37,4 @@ func IsPrefixScan(err error) bool {
 // IsPrefixSearchScan is true if prefix and search scanning not found the result.
 func IsPrefixSearchScan(err error) bool {
 	return errors.Is(err, ErrPrefixSearchScan)
-}
-
-func GetMergeReadEntryError(err error) error {
-	return fmt.Errorf("when merge operation build hintIndex readAt err: %s", err)
 }

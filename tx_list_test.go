@@ -65,6 +65,8 @@ func TestTx_LPush(t *testing.T) {
 		pushDataByStartEnd(t, db, bucket, 1, 10, 19, true)
 		pushDataByStartEnd(t, db, bucket, 2, 20, 29, true)
 
+		txPush(t, db, bucket, []byte("012|sas"), GetTestBytes(0), true, ErrSeparatorForListKey, nil)
+
 		for i := 0; i < 10; i++ {
 			txPop(t, db, bucket, GetTestBytes(0), GetTestBytes(9-i), nil, true)
 		}
@@ -103,6 +105,8 @@ func TestTx_RPushRaw(t *testing.T) {
 			seq++
 			txPushRaw(t, db, bucket, key, GetTestBytes(i), false, nil, nil)
 		}
+
+		txPush(t, db, bucket, []byte("012|sas"), GetTestBytes(0), false, ErrSeparatorForListKey, nil)
 
 		for i := 0; i <= 100; i++ {
 			v := GetTestBytes(100 - i)
