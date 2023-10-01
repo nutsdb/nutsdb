@@ -188,27 +188,6 @@ func TestList_LRem(t *testing.T) {
 	ListCmp(t, list, key, expectRecords, false)
 }
 
-func TestList_LSet(t *testing.T) {
-	list := NewList()
-	expectRecords := generateRecords(5)
-	key := string(GetTestBytes(0))
-	seqInfo := HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
-
-	for i := 0; i < len(expectRecords); i++ {
-		seq := generateSeq(&seqInfo, false)
-		newKey := encodeListKey([]byte(key), seq)
-		expectRecords[i].H.Key = newKey
-		expectRecords[i].H.Meta.KeySize = uint32(len(newKey))
-		ListPush(t, list, string(newKey), expectRecords[i], false, nil)
-	}
-
-	err := list.LSet(key, 3, expectRecords[4])
-	require.NoError(t, err)
-
-	expectRecords[3] = expectRecords[4]
-	ListCmp(t, list, key, expectRecords, false)
-}
-
 func TestList_LTrim(t *testing.T) {
 	list := NewList()
 	expectRecords := generateRecords(5)

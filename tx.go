@@ -224,7 +224,6 @@ func (tx *Tx) Commit() (err error) {
 	defer tx.db.commitBuffer.Reset()
 
 	var records []*Record
-	bucketKeySeqMap := make(map[string]*HeadTailSeq)
 
 	for i := 0; i < writesLen; i++ {
 		entry := tx.pendingWrites[i]
@@ -234,10 +233,6 @@ func (tx *Tx) Commit() (err error) {
 		}
 
 		bucket := string(entry.Bucket)
-		bucketKey := bucket + string(entry.Key)
-		if _, ok := bucketKeySeqMap[bucketKey]; !ok {
-			bucketKeySeqMap[bucketKey] = tx.getListHeadTailSeq(bucket, string(entry.Key))
-		}
 
 		if tx.db.ActiveFile.ActualSize+int64(buff.Len())+entrySize > tx.db.opt.SegmentSize {
 			if _, err := tx.writeData(buff.Bytes()); err != nil {
@@ -254,18 +249,6 @@ func (tx *Tx) Commit() (err error) {
 
 		if i == lastIndex {
 			entry.Meta.Status = Committed
-		}
-
-		if entry.Meta.Ds == DataStructureList && (entry.Meta.Flag == DataLPushFlag || entry.Meta.Flag == DataRPushFlag) {
-			var seq uint64
-			if entry.Meta.Flag == DataLPushFlag {
-				seq = generateSeq(bucketKeySeqMap[bucketKey], true)
-			} else {
-				seq = generateSeq(bucketKeySeqMap[bucketKey], false)
-			}
-			newKey := encodeListKey(entry.Key, seq)
-			entry.Key = newKey
-			entry.Meta.KeySize = uint32(len(entry.Key))
 		}
 
 		if _, err := buff.Write(entry.Encode()); err != nil {
@@ -640,9 +623,6 @@ func (tx *Tx) buildListIdx(record *Record) {
 		_, _ = l.LPop(string(key))
 	case DataRPopFlag:
 		_, _ = l.RPop(string(key))
-	case DataLSetFlag:
-		newKey, index := splitStringIntStr(string(key), SeparatorForListKey)
-		_ = l.LSet(newKey, index, record)
 	case DataLTrimFlag:
 		newKey, start := splitStringIntStr(string(key), SeparatorForListKey)
 		end, _ := strconv2.StrToInt(string(value))

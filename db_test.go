@@ -221,15 +221,6 @@ func txLRemByIndex(t *testing.T, db *DB, bucket string, key []byte, expectErr er
 	require.NoError(t, err)
 }
 
-func txLSet(t *testing.T, db *DB, bucket string, key []byte, index int, value []byte, expectErr error) {
-	err := db.Update(func(tx *Tx) error {
-		err := tx.LSet(bucket, key, index, value)
-		assertErr(t, err, expectErr)
-		return nil
-	})
-	require.NoError(t, err)
-}
-
 func txSAdd(t *testing.T, db *DB, bucket string, key, value []byte, expectErr error, finalExpectErr error) {
 	err := db.Update(func(tx *Tx) error {
 		err := tx.SAdd(bucket, key, value)
@@ -541,6 +532,23 @@ func txPush(t *testing.T, db *DB, bucket string, key, val []byte, isLeft bool, e
 	assertErr(t, err, finalExpectErr)
 }
 
+func txPushRaw(t *testing.T, db *DB, bucket string, key, val []byte, isLeft bool, expectErr error, finalExpectErr error) {
+	err := db.Update(func(tx *Tx) error {
+		var err error
+
+		if isLeft {
+			err = tx.LPushRaw(bucket, key, val)
+		} else {
+			err = tx.RPushRaw(bucket, key, val)
+		}
+
+		assertErr(t, err, expectErr)
+
+		return nil
+	})
+	assertErr(t, err, finalExpectErr)
+}
+
 func txExpireList(t *testing.T, db *DB, bucket string, key []byte, ttl uint32, expectErr error) {
 	err := db.Update(func(tx *Tx) error {
 		err := tx.ExpireList(bucket, key, ttl)
@@ -670,7 +678,6 @@ func TestDB_Close(t *testing.T) {
 
 func TestDB_ErrThenReadWrite(t *testing.T) {
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-
 		bucket := "testForDeadLock"
 		err = db.View(
 			func(tx *Tx) error {
@@ -794,7 +801,6 @@ func withDBOption(t *testing.T, opt Options, fn func(t *testing.T, db *DB)) {
 }
 
 func withDefaultDB(t *testing.T, fn func(t *testing.T, db *DB)) {
-
 	tmpdir, _ := os.MkdirTemp("", "nutsdb")
 	opt := DefaultOptions
 	opt.Dir = tmpdir
@@ -813,7 +819,6 @@ func withRAMIdxDB(t *testing.T, fn func(t *testing.T, db *DB)) {
 }
 
 func TestDB_HintKeyValAndRAMIdxMode_RestartDB(t *testing.T) {
-
 	opts := DefaultOptions
 	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
 		bucket := "bucket"

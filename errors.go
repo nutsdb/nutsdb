@@ -1,6 +1,8 @@
 package nutsdb
 
-import "errors"
+import (
+	"errors"
+)
 
 // IsDBClosed is true if the error indicates the db was closed.
 func IsDBClosed(err error) bool {

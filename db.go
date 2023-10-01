@@ -57,9 +57,6 @@ const (
 	// DataRPopFlag represents the data RPop flag
 	DataRPopFlag
 
-	// DataLSetFlag represents the data LSet flag
-	DataLSetFlag
-
 	// DataLTrimFlag represents the data LTrim flag
 	DataLTrimFlag
 
@@ -846,11 +843,6 @@ func (db *DB) buildListIdx(r *Record) error {
 		_, err = l.LPop(string(key))
 	case DataRPopFlag:
 		_, err = l.RPop(string(key))
-	case DataLSetFlag:
-		keyAndIndex := strings.Split(string(key), SeparatorForListKey)
-		newKey := keyAndIndex[0]
-		index, _ := strconv2.StrToInt(keyAndIndex[1])
-		err = l.LSet(newKey, index, r)
 	case DataLTrimFlag:
 		keyAndStartIndex := strings.Split(string(key), SeparatorForListKey)
 		newKey := keyAndStartIndex[0]

@@ -2,15 +2,15 @@ package nutsdb
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestIsKeyNotFound(t *testing.T) {
-
 	ts := []struct {
 		err error
 

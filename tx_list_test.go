@@ -65,6 +65,8 @@ func TestTx_LPush(t *testing.T) {
 		pushDataByStartEnd(t, db, bucket, 1, 10, 19, true)
 		pushDataByStartEnd(t, db, bucket, 2, 20, 29, true)
 
+		txPush(t, db, bucket, []byte("012|sas"), GetTestBytes(0), true, ErrSeparatorForListKey, nil)
+
 		for i := 0; i < 10; i++ {
 			txPop(t, db, bucket, GetTestBytes(0), GetTestBytes(9-i), nil, true)
 		}
@@ -73,6 +75,42 @@ func TestTx_LPush(t *testing.T) {
 		}
 		for i := 20; i < 30; i++ {
 			txPop(t, db, bucket, GetTestBytes(2), GetTestBytes(49-i), nil, true)
+		}
+	})
+}
+
+func TestTx_LPushRaw(t *testing.T) {
+	bucket := "bucket"
+	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		seq := uint64(100000)
+		for i := 0; i <= 100; i++ {
+			key := encodeListKey([]byte("0"), seq)
+			seq--
+			txPushRaw(t, db, bucket, key, GetTestBytes(i), true, nil, nil)
+		}
+
+		for i := 0; i <= 100; i++ {
+			v := GetTestBytes(100 - i)
+			txPop(t, db, bucket, []byte("0"), v, nil, true)
+		}
+	})
+}
+
+func TestTx_RPushRaw(t *testing.T) {
+	bucket := "bucket"
+	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		seq := uint64(100000)
+		for i := 0; i <= 100; i++ {
+			key := encodeListKey([]byte("0"), seq)
+			seq++
+			txPushRaw(t, db, bucket, key, GetTestBytes(i), false, nil, nil)
+		}
+
+		txPush(t, db, bucket, []byte("012|sas"), GetTestBytes(0), false, ErrSeparatorForListKey, nil)
+
+		for i := 0; i <= 100; i++ {
+			v := GetTestBytes(100 - i)
+			txPop(t, db, bucket, []byte("0"), v, nil, false)
 		}
 	})
 }
@@ -206,27 +244,6 @@ func TestTx_LRem(t *testing.T) {
 		txLRange(t, db, bucket, GetTestBytes(1), 0, -1, 5, [][]byte{
 			GetTestBytes(1), GetTestBytes(0), GetTestBytes(1), GetTestBytes(1), GetTestBytes(1),
 		}, nil)
-	})
-}
-
-func TestTx_LSet(t *testing.T) {
-	bucket := "bucket"
-
-	// Calling LSet on a non-existent list
-	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txLSet(t, db, bucket, GetTestBytes(0), 0, GetTestBytes(0), ErrListNotFound)
-	})
-
-	// Calling LSet on a list with added data
-	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		pushDataByStartEnd(t, db, bucket, 0, 0, 2, true)
-
-		txLSet(t, db, bucket, GetTestBytes(0), -1, GetTestBytes(4), ErrIndexOutOfRange)
-		txLSet(t, db, bucket, GetTestBytes(0), 0, GetTestBytes(4), nil)
-		txLRange(t, db, bucket, GetTestBytes(0), 0, -1, 3, [][]byte{
-			GetTestBytes(4), GetTestBytes(1), GetTestBytes(0),
-		}, nil)
-		txLSet(t, db, bucket, GetTestBytes(0), 100, GetTestBytes(4), ErrIndexOutOfRange)
 	})
 }
 

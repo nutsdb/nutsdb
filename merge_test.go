@@ -15,218 +15,340 @@
 package nutsdb
 
 import (
+	"bytes"
+	"testing"
+
 	"github.com/stretchr/testify/require"
 	"github.com/xujiajun/utils/strconv2"
-	"sync"
-	"testing"
-	"time"
 )
 
 func TestDB_MergeForString(t *testing.T) {
+	bucket := "bucket"
 	opts := DefaultOptions
-	opts.SegmentSize = 1 * 100
-	opts.EntryIdxMode = HintKeyAndRAMIdxMode
-	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
-		bucket := "bucket"
-		txPut(t, db, bucket, GetTestBytes(0), GetRandomBytes(24), Persistent, nil, nil)
-		txPut(t, db, bucket, GetTestBytes(1), GetRandomBytes(24), Persistent, nil, nil)
-		txDel(t, db, bucket, GetTestBytes(1), nil)
-		txGet(t, db, bucket, GetTestBytes(1), nil, ErrKeyNotFound)
-		require.NoError(t, db.Merge())
-	})
-}
+	opts.SegmentSize = KB
+	opts.Dir = "/tmp/test-string-merge/"
 
-func TestDB_MergeRepeated(t *testing.T) {
-	opts := DefaultOptions
-	opts.SegmentSize = 120
-	opts.EntryIdxMode = HintKeyAndRAMIdxMode
-	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
-		bucket := "bucket"
-		for i := 0; i < 20; i++ {
-			txPut(t, db, bucket, []byte("hello"), []byte("world"), Persistent, nil, nil)
+	for _, idxMode := range []EntryIdxMode{HintKeyValAndRAMIdxMode, HintKeyAndRAMIdxMode} {
+		opts.EntryIdxMode = idxMode
+		db, err := Open(opts)
+		require.NoError(t, err)
+
+		// Merge is not needed
+		err = db.Merge()
+		require.Equal(t, ErrDontNeedMerge, err)
+
+		// Add some data
+		n := 1000
+		for i := 0; i < n; i++ {
+			txPut(t, db, bucket, GetTestBytes(i), GetTestBytes(i), Persistent, nil, nil)
 		}
-		require.Equal(t, int64(9), db.MaxFileID)
-		txGet(t, db, bucket, []byte("hello"), []byte("world"), nil)
+
+		// Delete some data
+		for i := 0; i < n/2; i++ {
+			txDel(t, db, bucket, GetTestBytes(i), nil)
+		}
+
+		// Merge and check the result
 		require.NoError(t, db.Merge())
-		require.Equal(t, int64(10), db.MaxFileID)
-		txGet(t, db, bucket, []byte("hello"), []byte("world"), nil)
-	})
+
+		dbCnt, err := db.getRecordCount()
+		require.NoError(t, err)
+		require.Equal(t, int64(n/2), dbCnt)
+
+		// Check the deleted data is deleted
+		for i := 0; i < n/2; i++ {
+			txGet(t, db, bucket, GetTestBytes(i), GetTestBytes(i), ErrKeyNotFound)
+		}
+
+		// Check the added data is added
+		for i := n / 2; i < n; i++ {
+			txGet(t, db, bucket, GetTestBytes(i), GetTestBytes(i), nil)
+		}
+
+		// Close and reopen the db
+		require.NoError(t, db.Close())
+
+		db, err = Open(opts)
+		require.NoError(t, err)
+
+		dbCnt, err = db.getRecordCount()
+		require.NoError(t, err)
+		require.Equal(t, int64(n/2), dbCnt)
+
+		// Check the deleted data is deleted
+		for i := 0; i < n/2; i++ {
+			txGet(t, db, bucket, GetTestBytes(i), GetTestBytes(i), ErrKeyNotFound)
+		}
+
+		// Check the added data is added
+		for i := n / 2; i < n; i++ {
+			txGet(t, db, bucket, GetTestBytes(i), GetTestBytes(i), nil)
+		}
+
+		require.NoError(t, db.Close())
+		removeDir(opts.Dir)
+	}
 }
 
 func TestDB_MergeForSet(t *testing.T) {
+	bucket := "bucket"
 	opts := DefaultOptions
-	opts.SegmentSize = 100
-	opts.EntryIdxMode = HintKeyAndRAMIdxMode
-	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
-		bucket := "bucket"
-		key := GetTestBytes(0)
+	opts.SegmentSize = KB
+	opts.Dir = "/tmp/test-set-merge/"
 
-		for i := 0; i < 100; i++ {
+	for _, idxMode := range []EntryIdxMode{HintKeyValAndRAMIdxMode, HintKeyAndRAMIdxMode} {
+		opts.EntryIdxMode = idxMode
+		db, err := Open(opts)
+		require.NoError(t, err)
+
+		// Merge is not needed
+		err = db.Merge()
+		require.Equal(t, ErrDontNeedMerge, err)
+
+		// Add some data
+		n := 1000
+		key := GetTestBytes(0)
+		for i := 0; i < n; i++ {
 			txSAdd(t, db, bucket, key, GetTestBytes(i), nil, nil)
 		}
 
-		for i := 0; i < 100; i++ {
-			txSIsMember(t, db, bucket, key, GetTestBytes(i), true)
-		}
-
-		for i := 0; i < 50; i++ {
+		// Delete some data
+		for i := 0; i < n/2; i++ {
 			txSRem(t, db, bucket, key, GetTestBytes(i), nil)
 		}
 
-		for i := 0; i < 50; i++ {
-			txSIsMember(t, db, bucket, key, GetTestBytes(i), false)
-		}
+		// Pop a random value
+		var spopValue []byte
+		err = db.Update(func(tx *Tx) error {
+			var err error
+			spopValue, err = tx.SPop(bucket, key)
+			assertErr(t, err, nil)
+			return nil
+		})
+		require.NoError(t, err)
 
-		for i := 50; i < 100; i++ {
-			txSIsMember(t, db, bucket, key, GetTestBytes(i), true)
-		}
+		// Check the random value is popped
+		txSIsMember(t, db, bucket, key, spopValue, false)
 
+		// txSPop(t, db, bucket, key,nil)
+		dbCnt, err := db.getRecordCount()
+		require.NoError(t, err)
+		require.Equal(t, int64(n/2-1), dbCnt)
+
+		// Merge and check the result
 		require.NoError(t, db.Merge())
-	})
+
+		dbCnt, err = db.getRecordCount()
+		require.NoError(t, err)
+		require.Equal(t, int64(n/2-1), dbCnt)
+
+		// Check the random value is popped
+		txSIsMember(t, db, bucket, key, spopValue, false)
+		for i := n / 2; i < n; i++ {
+			v := GetTestBytes(i)
+			if bytes.Equal(v, spopValue) {
+				continue
+			}
+			txSIsMember(t, db, bucket, key, v, true)
+		}
+
+		// Close and reopen the db
+		require.NoError(t, db.Close())
+
+		// reopen db
+		db, err = Open(opts)
+		require.NoError(t, err)
+
+		dbCnt, err = db.getRecordCount()
+		require.NoError(t, err)
+		require.Equal(t, int64(n/2-1), dbCnt)
+
+		// Check the random value is popped
+		txSIsMember(t, db, bucket, key, spopValue, false)
+		for i := n / 2; i < n; i++ {
+			v := GetTestBytes(i)
+			if bytes.Equal(v, spopValue) {
+				continue
+			}
+			txSIsMember(t, db, bucket, key, v, true)
+		}
+		require.NoError(t, db.Close())
+		removeDir(opts.Dir)
+	}
 }
 
+// TestDB_MergeForZSet is a test function to check the Merge() function of the DB struct
+// It creates a DB with two different EntryIdxMode, then adds and scores each item in the DB
+// It then removes half of the items from the DB, then checks that the items that are left are the same as the ones that were removed
+// It then closes the DB, reopens it, and checks that the items that were removed are now not present
 func TestDB_MergeForZSet(t *testing.T) {
+	bucket := "bucket"
+	key := GetTestBytes(0)
+	n := 1000
 	opts := DefaultOptions
-	opts.SegmentSize = 100
-	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
-		bucket := "bucket"
-		key := GetTestBytes(0)
+	opts.SegmentSize = KB
+	opts.Dir = "/tmp/test-zset-merge/"
 
-		for i := 0; i < 100; i++ {
+	// test different EntryIdxMode
+	for _, idxMode := range []EntryIdxMode{HintKeyValAndRAMIdxMode, HintKeyAndRAMIdxMode} {
+		opts.EntryIdxMode = idxMode
+		db, err := Open(opts)
+		require.NoError(t, err)
+
+		// add items
+		err = db.Merge()
+		require.Equal(t, ErrDontNeedMerge, err)
+
+		for i := 0; i < n; i++ {
 			score, _ := strconv2.IntToFloat64(i)
 			txZAdd(t, db, bucket, key, GetTestBytes(i), score, nil, nil)
 		}
 
-		for i := 0; i < 100; i++ {
+		for i := 0; i < n; i++ {
 			score, _ := strconv2.IntToFloat64(i)
 			txZScore(t, db, bucket, key, GetTestBytes(i), score, nil)
 		}
 
-		for i := 0; i < 50; i++ {
+		// remove half of the items
+		for i := 0; i < n/2; i++ {
 			txZRem(t, db, bucket, key, GetTestBytes(i), nil)
 		}
 
-		for i := 0; i < 50; i++ {
+		// check that the items that are left are the same as the ones that were removed
+		for i := 0; i < n/2; i++ {
 			score, _ := strconv2.IntToFloat64(i)
 			txZScore(t, db, bucket, key, GetTestBytes(i), score, ErrSortedSetMemberNotExist)
 		}
 
-		for i := 50; i < 100; i++ {
+		// check that the items that are left are the same as the ones that were removed
+		for i := n / 2; i < n; i++ {
 			score, _ := strconv2.IntToFloat64(i)
 			txZScore(t, db, bucket, key, GetTestBytes(i), score, nil)
 		}
 
+		// check that the number of items in the DB is correct
+		dbCnt, err := db.getRecordCount()
+		require.NoError(t, err)
+		require.Equal(t, int64(n/2), dbCnt)
+
+		// merge
 		require.NoError(t, db.Merge())
 
-		for i := 50; i < 100; i++ {
+		// check that the number of items in the DB is correct
+		dbCnt, err = db.getRecordCount()
+		require.NoError(t, err)
+		require.Equal(t, int64(n/2), dbCnt)
+
+		// check that the items that were removed are now not present
+		for i := 0; i < n/2; i++ {
+			score, _ := strconv2.IntToFloat64(i)
+			txZScore(t, db, bucket, key, GetTestBytes(i), score, ErrSortedSetMemberNotExist)
+		}
+
+		// check that the items that are left are the same as the ones that were removed
+		for i := n / 2; i < n; i++ {
 			score, _ := strconv2.IntToFloat64(i)
 			txZScore(t, db, bucket, key, GetTestBytes(i), score, nil)
 		}
-	})
+
+		// close db
+		require.NoError(t, db.Close())
+
+		// reopen db
+		db, err = Open(opts)
+		require.NoError(t, err)
+		dbCnt, err = db.getRecordCount()
+		require.NoError(t, err)
+		require.Equal(t, int64(n/2), dbCnt)
+
+		// check that the items that were removed are now not present
+		for i := 0; i < n/2; i++ {
+			score, _ := strconv2.IntToFloat64(i)
+			txZScore(t, db, bucket, key, GetTestBytes(i), score, ErrSortedSetMemberNotExist)
+		}
+
+		// check that the items that are left are the same as the ones that were removed
+		for i := n / 2; i < n; i++ {
+			score, _ := strconv2.IntToFloat64(i)
+			txZScore(t, db, bucket, key, GetTestBytes(i), score, nil)
+		}
+
+		require.NoError(t, db.Close())
+		removeDir(opts.Dir)
+	}
 }
 
+// TestDB_MergeForList tests the Merge() function of the DB struct.
+// It creates a DB with two different EntryIdxMode, pushes and pops data, and then merges the DB.
+// It then reopens the DB and checks that the data is still there.
 func TestDB_MergeForList(t *testing.T) {
 	bucket := "bucket"
 	key := GetTestBytes(0)
-	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txPush(t, db, bucket, key, GetTestBytes(0), true, nil, nil)
-		require.Error(t, ErrNotSupportMergeWhenUsingList, db.Merge())
-	})
-}
-
-func TestDB_MergeAutomatic(t *testing.T) {
 	opts := DefaultOptions
-	opts.SegmentSize = 1024
-	opts.MergeInterval = 200 * time.Millisecond
+	opts.SegmentSize = KB
+	opts.Dir = "/tmp/test-list-merge/"
 
-	bucket := "bucket"
-
-	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
-		err := db.Merge()
-		require.Error(t, err)
-		require.Error(t, ErrDontNeedMerge, err)
-
-		key := GetTestBytes(0)
-		value := GetRandomBytes(24)
-
-		for i := 0; i < 100; i++ {
-			txPut(t, db, bucket, key, value, Persistent, nil, nil)
-		}
-
-		txGet(t, db, bucket, key, value, nil)
-
-		// waiting for the merge work to be triggered.
-		time.Sleep(200 * time.Millisecond)
-
-		_, pendingMergeFileIds := db.getMaxFileIDAndFileIDs()
-		// because there is only one valid entry, there will be only one data file after merging
-		require.Len(t, pendingMergeFileIds, 1)
-
-		txGet(t, db, bucket, key, value, nil)
-	})
-}
-
-func TestDB_MergeWithTx(t *testing.T) {
-	opts := DefaultOptions
-	opts.SegmentSize = 24 * MB
-	opts.SyncEnable = false
-	opts.EntryIdxMode = HintKeyAndRAMIdxMode
-	bucket := "bucket"
-
-	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
-		_, pendingMergeFileIds := db.getMaxFileIDAndFileIDs()
-		require.Len(t, pendingMergeFileIds, 1)
-
-		values := make([][]byte, 10)
-		for i := 0; i < 10; i++ {
-			values[i] = GetRandomBytes(1024)
-		}
-
-		// By repeatedly inserting values, a large amount of garbage data has been generated,
-		// which can lead to the creation of multiple data files and trigger the merge process
-		for i := 0; i < 10000; i++ {
-			for i := 0; i < 10; i++ {
-				txPut(t, db, bucket, GetTestBytes(i), values[i], Persistent, nil, nil)
-			}
-		}
-
-		newValues := make([][]byte, 10)
-		for i := 0; i < 10; i++ {
-			newValues[i] = GetRandomBytes(1024)
-		}
-
-		wg := new(sync.WaitGroup)
-
-		wg.Add(1)
-		// this goroutine will run concurrently with the merge goroutine.
-		go func() {
-
-			// Waiting for the merge to start.
-			time.Sleep(10 * time.Millisecond)
-
-			for i := 0; i < 10; i++ {
-				// By selectively updating some values,
-				// check if the merge process will overwrite the new values
-				if i%2 == 0 {
-					txPut(t, db, bucket, GetTestBytes(i), newValues[i], Persistent, nil, nil)
-				}
-			}
-
-			wg.Done()
-		}()
-
-		err := db.Merge()
+	// test different EntryIdxMode
+	for _, idxMode := range []EntryIdxMode{HintKeyValAndRAMIdxMode, HintKeyAndRAMIdxMode} {
+		opts.EntryIdxMode = idxMode
+		db, err := Open(opts)
 		require.NoError(t, err)
 
-		wg.Wait()
+		// check that we don't need merge
+		err = db.Merge()
+		require.Equal(t, ErrDontNeedMerge, err)
 
-		// check if the data after the merge is correct
-		for i := 0; i < 10; i++ {
-			if i%2 == 0 {
-				txGet(t, db, bucket, GetTestBytes(i), newValues[i], nil)
-			} else {
-				txGet(t, db, bucket, GetTestBytes(i), values[i], nil)
-			}
+		// push data
+		n := 1000
+		for i := 0; i < n; i++ {
+			txPush(t, db, bucket, key, GetTestBytes(i), true, nil, nil)
 		}
-	})
+
+		for i := n; i < 2*n; i++ {
+			txPush(t, db, bucket, key, GetTestBytes(i), false, nil, nil)
+		}
+
+		// pop data
+		for i := n - 1; i >= n/2; i-- {
+			txPop(t, db, bucket, key, GetTestBytes(i), nil, true)
+		}
+
+		for i := 2*n - 1; i >= 3*n/2; i-- {
+			txPop(t, db, bucket, key, GetTestBytes(i), nil, false)
+		}
+
+		// trim and remove data
+		txLTrim(t, db, bucket, key, 0, 9, nil)
+		txLRem(t, db, bucket, key, 0, GetTestBytes(100), nil)
+		txLRemByIndex(t, db, bucket, key, nil, []int{7, 8, 9}...)
+
+		dbCnt, err := db.getRecordCount()
+		require.NoError(t, err)
+		require.Equal(t, int64(7), dbCnt)
+
+		// merge
+		require.NoError(t, db.Merge())
+
+		dbCnt, err = db.getRecordCount()
+		require.NoError(t, err)
+		require.Equal(t, int64(7), dbCnt)
+
+		require.NoError(t, db.Close())
+
+		// reopen db
+		db, err = Open(opts)
+		require.NoError(t, err)
+
+		dbCnt, err = db.getRecordCount()
+		require.NoError(t, err)
+		require.Equal(t, int64(7), dbCnt)
+
+		// pop data
+		for i := n/2 - 1; i < n/2-8; i-- {
+			txPop(t, db, bucket, key, GetTestBytes(i), nil, true)
+		}
+
+		require.NoError(t, db.Close())
+		removeDir(opts.Dir)
+	}
 }

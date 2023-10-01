@@ -24,6 +24,8 @@ import (
 	"github.com/xujiajun/utils/strconv2"
 )
 
+var bucketKeySeqMap map[string]*HeadTailSeq
+
 // ErrSeparatorForListKey returns when list key contains the SeparatorForListKey.
 var ErrSeparatorForListKey = errors.Errorf("contain separator (%s) for List key", SeparatorForListKey)
 
@@ -80,35 +82,74 @@ func (tx *Tx) push(bucket string, key []byte, flag uint16, values ...[]byte) err
 	return nil
 }
 
+func (tx *Tx) getListNewKey(bucket string, key []byte, isLeft bool) []byte {
+	if bucketKeySeqMap == nil {
+		bucketKeySeqMap = make(map[string]*HeadTailSeq)
+	}
+
+	bucketKey := bucket + string(key)
+	if _, ok := bucketKeySeqMap[bucketKey]; !ok {
+		bucketKeySeqMap[bucketKey] = tx.getListHeadTailSeq(bucket, string(key))
+	}
+
+	seq := generateSeq(bucketKeySeqMap[bucketKey], isLeft)
+	return encodeListKey(key, seq)
+}
+
 // RPush inserts the values at the tail of the list stored in the bucket at given bucket,key and values.
 func (tx *Tx) RPush(bucket string, key []byte, values ...[]byte) error {
-	if err := tx.checkTxIsClosed(); err != nil {
+	if err := tx.isKeyValid(bucket, key); err != nil {
 		return err
 	}
-	if tx.CheckExpire(bucket, key) {
-		return ErrListNotFound
-	}
+
 	if strings.Contains(string(key), SeparatorForListKey) {
 		return ErrSeparatorForListKey
 	}
 
-	return tx.push(bucket, key, DataRPushFlag, values...)
+	newKey := tx.getListNewKey(bucket, key, false)
+	return tx.push(bucket, newKey, DataRPushFlag, values...)
 }
 
 // LPush inserts the values at the head of the list stored in the bucket at given bucket,key and values.
 func (tx *Tx) LPush(bucket string, key []byte, values ...[]byte) error {
-	if err := tx.checkTxIsClosed(); err != nil {
+	if err := tx.isKeyValid(bucket, key); err != nil {
 		return err
-	}
-	if tx.CheckExpire(bucket, key) {
-		return ErrListNotFound
 	}
 
 	if strings.Contains(string(key), SeparatorForListKey) {
 		return ErrSeparatorForListKey
 	}
 
+	newKey := tx.getListNewKey(bucket, key, true)
+	return tx.push(bucket, newKey, DataLPushFlag, values...)
+}
+
+func (tx *Tx) isKeyValid(bucket string, key []byte) error {
+	if err := tx.checkTxIsClosed(); err != nil {
+		return err
+	}
+
+	if tx.CheckExpire(bucket, key) {
+		return ErrListNotFound
+	}
+
+	return nil
+}
+
+func (tx *Tx) LPushRaw(bucket string, key []byte, values ...[]byte) error {
+	if err := tx.isKeyValid(bucket, key); err != nil {
+		return err
+	}
+
 	return tx.push(bucket, key, DataLPushFlag, values...)
+}
+
+func (tx *Tx) RPushRaw(bucket string, key []byte, values ...[]byte) error {
+	if err := tx.isKeyValid(bucket, key); err != nil {
+		return err
+	}
+
+	return tx.push(bucket, key, DataRPushFlag, values...)
 }
 
 // LPop removes and returns the first element of the list stored in the bucket at given bucket and key.
@@ -226,38 +267,6 @@ func (tx *Tx) LRem(bucket string, key []byte, count int, value []byte) error {
 	}
 
 	return nil
-}
-
-// LSet sets the list element at index to value.
-func (tx *Tx) LSet(bucket string, key []byte, index int, value []byte) error {
-	var (
-		err    error
-		buffer bytes.Buffer
-	)
-
-	if err = tx.checkTxIsClosed(); err != nil {
-		return err
-	}
-	l := tx.db.Index.list.getWithDefault(bucket)
-	if tx.CheckExpire(bucket, key) {
-		return ErrListNotFound
-	}
-	if _, ok := l.Items[string(key)]; !ok {
-		return ErrListNotFound
-	}
-
-	size, _ := tx.LSize(bucket, key)
-	if index < 0 || index >= size {
-		return ErrIndexOutOfRange
-	}
-
-	buffer.Write(key)
-	buffer.Write([]byte(SeparatorForListKey))
-	indexBytes := []byte(strconv2.IntToStr(index))
-	buffer.Write(indexBytes)
-	newKey := buffer.Bytes()
-
-	return tx.push(bucket, newKey, DataLSetFlag, value)
 }
 
 // LTrim trims an existing list so that it will contain only the specified range of elements specified.
