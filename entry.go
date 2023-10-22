@@ -64,7 +64,7 @@ func (meta *MetaData) PayloadSize() int64 {
 
 // Size returns the size of the entry.
 func (e *Entry) Size() int64 {
-	return int64(DataEntryHeaderSize + e.Meta.KeySize + e.Meta.ValueSize + e.Meta.BucketSize)
+	return DataEntryHeaderSize + int64(e.Meta.KeySize+e.Meta.ValueSize+e.Meta.BucketSize)
 }
 
 // Encode returns the slice after the entry be encoded.
@@ -84,9 +84,9 @@ func (e *Entry) Encode() []byte {
 	buf := make([]byte, e.Size())
 	buf = e.setEntryHeaderBuf(buf)
 	// set bucket\key\value
-	copy(buf[DataEntryHeaderSize:(DataEntryHeaderSize+bucketSize)], e.Bucket)
-	copy(buf[(DataEntryHeaderSize+bucketSize):(DataEntryHeaderSize+bucketSize+keySize)], e.Key)
-	copy(buf[(DataEntryHeaderSize+bucketSize+keySize):(DataEntryHeaderSize+bucketSize+keySize+valueSize)], e.Value)
+	copy(buf[DataEntryHeaderSize:(DataEntryHeaderSize+int64(bucketSize))], e.Bucket)
+	copy(buf[(DataEntryHeaderSize+int64(bucketSize)):(DataEntryHeaderSize+int64(bucketSize+keySize))], e.Key)
+	copy(buf[(DataEntryHeaderSize+int64(bucketSize+keySize)):(DataEntryHeaderSize+int64(bucketSize+keySize+valueSize))], e.Value)
 
 	c32 := crc32.ChecksumIEEE(buf[4:])
 	binary.LittleEndian.PutUint32(buf[0:4], c32)

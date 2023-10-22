@@ -31,12 +31,16 @@ var (
 	ErrEntryZero = errors.New("entry is zero ")
 )
 
+// DataEntryHeaderSize returns the entry header size
+var DataEntryHeaderSize int64
+
+func init() {
+	DataEntryHeaderSize = GetDiskSizeFromSingleObject(MetaData{})
+}
+
 const (
 	// DataSuffix returns the data suffix
 	DataSuffix = ".dat"
-
-	// DataEntryHeaderSize returns the entry header size
-	DataEntryHeaderSize = 42
 )
 
 // DataFile records about data file information.
@@ -76,7 +80,7 @@ func (df *DataFile) ReadAt(off int) (e *Entry, err error) {
 	}
 
 	meta := e.Meta
-	off += DataEntryHeaderSize
+	off += int(DataEntryHeaderSize)
 	dataSize := meta.PayloadSize()
 
 	dataBuf := make([]byte, dataSize)
