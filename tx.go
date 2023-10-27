@@ -17,13 +17,10 @@ package nutsdb
 import (
 	"bytes"
 	"errors"
-	"log"
-	"strings"
-	"sync/atomic"
-	"time"
-
 	"github.com/bwmarrin/snowflake"
 	"github.com/xujiajun/utils/strconv2"
+	"strings"
+	"sync/atomic"
 )
 
 const (
@@ -268,7 +265,7 @@ func (tx *Tx) Commit() (err error) {
 	}
 
 	if err := tx.buildIdxes(records); err != nil {
-		return err
+		panic(err.Error())
 	}
 	tx.db.RecordCount += curWriteCount
 
@@ -510,141 +507,6 @@ func (tx *Tx) allocCommitBuffer() *bytes.Buffer {
 	return buff
 }
 
-func (tx *Tx) buildTreeIdx(record *Record) {
-	bucket, key, meta, offset := record.Bucket, record.H.Key, record.H.Meta, record.H.DataPos
-
-	b := tx.db.Index.bTree.getWithDefault(bucket)
-
-	if meta.Flag == DataSetFlag {
-		var value []byte
-		if tx.db.opt.EntryIdxMode == HintKeyValAndRAMIdxMode {
-			value = record.V
-		}
-
-		if meta.TTL != Persistent {
-			db := tx.db
-
-			callback := func() {
-				err := db.Update(func(tx *Tx) error {
-					if db.tm.exist(bucket, string(key)) {
-						return tx.Delete(bucket, key)
-					}
-					return nil
-				})
-				if err != nil {
-					log.Printf("occur error when expired deletion, error: %v", err.Error())
-				}
-			}
-
-			now := time.UnixMilli(time.Now().UnixMilli())
-			expireTime := time.UnixMilli(int64(record.H.Meta.Timestamp))
-			expireTime = expireTime.Add(time.Duration(record.H.Meta.TTL) * time.Second)
-
-			if now.After(expireTime) {
-				return
-			}
-
-			tx.db.tm.add(bucket, string(key), expireTime.Sub(now), callback)
-		} else {
-			tx.db.tm.del(bucket, string(key))
-		}
-
-		hint := NewHint().WithFileId(tx.db.ActiveFile.fileID).WithKey(key).WithMeta(meta).WithDataPos(offset)
-		b.Insert(key, value, hint)
-	} else if meta.Flag == DataDeleteFlag {
-		tx.db.tm.del(bucket, string(key))
-		b.Delete(key)
-	}
-}
-
-func (tx *Tx) buildSetIdx(record *Record) {
-	bucket, key, value, meta := record.Bucket, record.H.Key, record.V, record.H.Meta
-
-	tx.db.resetRecordByMode(record)
-
-	s := tx.db.Index.set.getWithDefault(bucket)
-
-	if meta.Flag == DataDeleteFlag {
-		_ = s.SRem(string(key), value)
-	}
-
-	if meta.Flag == DataSetFlag {
-		_ = s.SAdd(string(key), [][]byte{value}, []*Record{record})
-	}
-}
-
-func (tx *Tx) buildSortedSetIdx(record *Record) {
-	bucket, key, value, meta := record.Bucket, record.H.Key, record.V, record.H.Meta
-
-	tx.db.resetRecordByMode(record)
-
-	ss := tx.db.Index.sortedSet.getWithDefault(bucket, tx.db)
-
-	switch meta.Flag {
-	case DataZAddFlag:
-		key, score := splitStringFloat64Str(string(key), SeparatorForZSetKey)
-		_ = ss.ZAdd(key, SCORE(score), value, record)
-	case DataZRemFlag:
-		_, _ = ss.ZRem(string(key), value)
-	case DataZRemRangeByRankFlag:
-		start, end := splitIntIntStr(string(value), SeparatorForZSetKey)
-		_ = ss.ZRemRangeByRank(string(key), start, end)
-	case DataZPopMaxFlag:
-		_, _, _ = ss.ZPopMax(string(key))
-	case DataZPopMinFlag:
-		_, _, _ = ss.ZPopMin(string(key))
-	}
-}
-
-func (tx *Tx) buildListIdx(record *Record) {
-	bucket, key, value, meta := record.Bucket, record.H.Key, record.V, record.H.Meta
-
-	tx.db.resetRecordByMode(record)
-
-	l := tx.db.Index.list.getWithDefault(bucket)
-
-	if IsExpired(meta.TTL, meta.Timestamp) {
-		return
-	}
-
-	switch meta.Flag {
-	case DataExpireListFlag:
-		t, _ := strconv2.StrToInt64(string(value))
-		ttl := uint32(t)
-		l.TTL[string(key)] = ttl
-		l.TimeStamp[string(key)] = meta.Timestamp
-	case DataLPushFlag:
-		_ = l.LPush(string(key), record)
-	case DataRPushFlag:
-		_ = l.RPush(string(key), record)
-	case DataLRemFlag:
-		tx.buildListLRemIdx(value, l, key)
-	case DataLPopFlag:
-		_, _ = l.LPop(string(key))
-	case DataRPopFlag:
-		_, _ = l.RPop(string(key))
-	case DataLTrimFlag:
-		newKey, start := splitStringIntStr(string(key), SeparatorForListKey)
-		end, _ := strconv2.StrToInt(string(value))
-		_ = l.LTrim(newKey, start, end)
-	case DataLRemByIndex:
-		indexes, _ := UnmarshalInts(value)
-		_ = l.LRemByIndex(string(key), indexes)
-	}
-}
-
-func (tx *Tx) buildListLRemIdx(value []byte, l *List, key []byte) {
-	count, newValue := splitIntStringStr(string(value), SeparatorForListKey)
-
-	_ = l.LRem(string(key), count, func(r *Record) (bool, error) {
-		v, err := tx.db.getValueByRecord(r)
-		if err != nil {
-			return false, err
-		}
-		return bytes.Equal([]byte(newValue), v), nil
-	})
-}
-
 // rotateActiveFile rotates log file when active file is not enough space to store the entry.
 func (tx *Tx) rotateActiveFile() error {
 	var err error
@@ -825,18 +687,19 @@ func (tx *Tx) isClosed() bool {
 }
 
 func (tx *Tx) buildIdxes(records []*Record) error {
+	var err error
 	for _, record := range records {
 		bucket, meta := record.Bucket, record.H.Meta
 
 		switch meta.Ds {
 		case DataStructureBTree:
-			tx.buildTreeIdx(record)
+			tx.db.buildBTreeIdx(record)
 		case DataStructureList:
-			tx.buildListIdx(record)
+			err = tx.db.buildListIdx(record)
 		case DataStructureSet:
-			tx.buildSetIdx(record)
+			err = tx.db.buildSetIdx(record)
 		case DataStructureSortedSet:
-			tx.buildSortedSetIdx(record)
+			err = tx.db.buildSortedSetIdx(record)
 		case DataStructureNone:
 			switch meta.Flag {
 			case DataBPTreeBucketDeleteFlag:
@@ -849,6 +712,11 @@ func (tx *Tx) buildIdxes(records []*Record) error {
 				tx.db.deleteBucket(DataStructureList, bucket)
 			}
 		}
+
+		if err != nil {
+			return err
+		}
+
 		tx.db.KeyCount++
 	}
 	return nil
