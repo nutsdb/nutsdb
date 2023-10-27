@@ -19,7 +19,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 	"path"
@@ -178,14 +177,14 @@ func open(opt Options) (*DB, error) {
 		}
 	}
 
-	flock := flock.New(filepath.Join(opt.Dir, FLockName))
-	if ok, err := flock.TryLock(); err != nil {
+	fileLock := flock.New(filepath.Join(opt.Dir, FLockName))
+	if ok, err := fileLock.TryLock(); err != nil {
 		return nil, err
 	} else if !ok {
 		return nil, ErrDirLocked
 	}
 
-	db.flock = flock
+	db.flock = fileLock
 
 	if err := db.buildIndexes(); err != nil {
 		return nil, fmt.Errorf("db.buildIndexes error: %s", err)
@@ -466,8 +465,8 @@ func (db *DB) doWrites() {
 
 // setActiveFile sets the ActiveFile (DataFile object).
 func (db *DB) setActiveFile() (err error) {
-	filepath := getDataPath(db.MaxFileID, db.opt.Dir)
-	db.ActiveFile, err = db.fm.getDataFile(filepath, db.opt.SegmentSize)
+	activeFilePath := getDataPath(db.MaxFileID, db.opt.Dir)
+	db.ActiveFile, err = db.fm.getDataFile(activeFilePath, db.opt.SegmentSize)
 	if err != nil {
 		return
 	}
@@ -479,21 +478,22 @@ func (db *DB) setActiveFile() (err error) {
 
 // getMaxFileIDAndFileIds returns max fileId and fileIds.
 func (db *DB) getMaxFileIDAndFileIDs() (maxFileID int64, dataFileIds []int) {
-	files, _ := ioutil.ReadDir(db.opt.Dir)
+	files, _ := os.ReadDir(db.opt.Dir)
+
 	if len(files) == 0 {
 		return 0, nil
 	}
 
-	for _, f := range files {
-		id := f.Name()
-		fileSuffix := path.Ext(path.Base(id))
+	for _, file := range files {
+		filename := file.Name()
+		fileSuffix := path.Ext(path.Base(filename))
 		if fileSuffix != DataSuffix {
 			continue
 		}
 
-		id = strings.TrimSuffix(id, DataSuffix)
-		idVal, _ := strconv2.StrToInt(id)
-		dataFileIds = append(dataFileIds, idVal)
+		filename = strings.TrimSuffix(filename, DataSuffix)
+		id, _ := strconv2.StrToInt(filename)
+		dataFileIds = append(dataFileIds, id)
 	}
 
 	if len(dataFileIds) == 0 {
@@ -670,30 +670,23 @@ func (db *DB) buildBTreeIdx(r *Record) {
 		b.Delete(key)
 	} else {
 		if meta.TTL != Persistent {
-			now := time.UnixMilli(time.Now().UnixMilli())
-			expireTime := time.UnixMilli(int64(meta.Timestamp))
-			expireTime = expireTime.Add(time.Duration(int64(meta.TTL)) * time.Second)
-			expire := expireTime.Sub(now)
+			expireTime := db.expireTime(meta.Timestamp, meta.TTL)
+			callback := db.buildExpireCallback(bucket, key)
 
-			callback := func() {
-				err := db.Update(func(tx *Tx) error {
-					if tx.db.tm.exist(bucket, string(key)) {
-						return tx.Delete(bucket, key)
-					}
-					return nil
-				})
-				if err != nil {
-					log.Printf("occur error when expired deletion, error: %v", err.Error())
-				}
-			}
-
-			db.tm.add(bucket, string(key), expire, callback)
+			db.tm.add(bucket, string(key), expireTime, callback)
 		} else {
 			db.tm.del(bucket, string(key))
 		}
 
 		b.Insert(key, r.V, r.H)
 	}
+}
+
+func (db *DB) expireTime(timestamp uint64, ttl uint32) time.Duration {
+	now := time.UnixMilli(time.Now().UnixMilli())
+	expireTime := time.UnixMilli(int64(timestamp))
+	expireTime = expireTime.Add(time.Duration(int64(ttl)) * time.Second)
+	return expireTime.Sub(now)
 }
 
 func (db *DB) buildIdxes(r *Record) error {
@@ -787,9 +780,7 @@ func (db *DB) buildSortedSetIdx(r *Record) error {
 	case DataZRemFlag:
 		_, err = ss.ZRem(string(key), val)
 	case DataZRemRangeByRankFlag:
-		startAndEnd := strings.Split(string(val), SeparatorForZSetKey)
-		start, _ := strconv2.StrToInt(startAndEnd[0])
-		end, _ := strconv2.StrToInt(startAndEnd[1])
+		start, end := splitIntIntStr(string(val), SeparatorForZSetKey)
 		err = ss.ZRemRangeByRank(string(key), start, end)
 	case DataZPopMaxFlag:
 		_, _, err = ss.ZPopMax(string(key))
@@ -828,33 +819,17 @@ func (db *DB) buildListIdx(r *Record) error {
 	case DataRPushFlag:
 		err = l.RPush(string(key), r)
 	case DataLRemFlag:
-		countAndValueIndex := strings.Split(string(val), SeparatorForListKey)
-		count, _ := strconv2.StrToInt(countAndValueIndex[0])
-		value := []byte(countAndValueIndex[1])
-
-		err = l.LRem(string(key), count, func(r *Record) (bool, error) {
-			v, err := db.getValueByRecord(r)
-			if err != nil {
-				return false, err
-			}
-			return bytes.Equal(value, v), nil
-		})
+		err = db.buildListLRemIdx(val, l, key)
 	case DataLPopFlag:
 		_, err = l.LPop(string(key))
 	case DataRPopFlag:
 		_, err = l.RPop(string(key))
 	case DataLTrimFlag:
-		keyAndStartIndex := strings.Split(string(key), SeparatorForListKey)
-		newKey := keyAndStartIndex[0]
-		start, _ := strconv2.StrToInt(keyAndStartIndex[1])
+		newKey, start := splitStringIntStr(string(key), SeparatorForListKey)
 		end, _ := strconv2.StrToInt(string(val))
 		err = l.LTrim(newKey, start, end)
 	case DataLRemByIndex:
-		var indexes []int
-		indexes, err = UnmarshalInts(val)
-		if err != nil {
-			break
-		}
+		indexes, _ := UnmarshalInts(val)
 		err = l.LRemByIndex(string(key), indexes)
 	}
 
@@ -863,6 +838,18 @@ func (db *DB) buildListIdx(r *Record) error {
 	}
 
 	return nil
+}
+
+func (db *DB) buildListLRemIdx(value []byte, l *List, key []byte) error {
+	count, newValue := splitIntStringStr(string(value), SeparatorForListKey)
+
+	return l.LRem(string(key), count, func(r *Record) (bool, error) {
+		v, err := db.getValueByRecord(r)
+		if err != nil {
+			return false, err
+		}
+		return bytes.Equal([]byte(newValue), v), nil
+	})
 }
 
 // buildIndexes builds indexes when db initialize resource.
@@ -947,4 +934,18 @@ func (db *DB) checkListExpired() {
 // IsClose return the value that represents the status of DB
 func (db *DB) IsClose() bool {
 	return db.closed
+}
+
+func (db *DB) buildExpireCallback(bucket string, key []byte) func() {
+	return func() {
+		err := db.Update(func(tx *Tx) error {
+			if db.tm.exist(bucket, string(key)) {
+				return tx.Delete(bucket, key)
+			}
+			return nil
+		})
+		if err != nil {
+			log.Printf("occur error when expired deletion, error: %v", err.Error())
+		}
+	}
 }
