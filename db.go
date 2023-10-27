@@ -19,7 +19,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 	"path"
@@ -479,21 +478,22 @@ func (db *DB) setActiveFile() (err error) {
 
 // getMaxFileIDAndFileIds returns max fileId and fileIds.
 func (db *DB) getMaxFileIDAndFileIDs() (maxFileID int64, dataFileIds []int) {
-	files, _ := ioutil.ReadDir(db.opt.Dir)
+	files, _ := os.ReadDir(db.opt.Dir)
+
 	if len(files) == 0 {
 		return 0, nil
 	}
 
-	for _, f := range files {
-		id := f.Name()
-		fileSuffix := path.Ext(path.Base(id))
+	for _, file := range files {
+		filename := file.Name()
+		fileSuffix := path.Ext(path.Base(filename))
 		if fileSuffix != DataSuffix {
 			continue
 		}
 
-		id = strings.TrimSuffix(id, DataSuffix)
-		idVal, _ := strconv2.StrToInt(id)
-		dataFileIds = append(dataFileIds, idVal)
+		filename = strings.TrimSuffix(filename, DataSuffix)
+		id, _ := strconv2.StrToInt(filename)
+		dataFileIds = append(dataFileIds, id)
 	}
 
 	if len(dataFileIds) == 0 {
