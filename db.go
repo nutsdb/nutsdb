@@ -178,14 +178,14 @@ func open(opt Options) (*DB, error) {
 		}
 	}
 
-	flock := flock.New(filepath.Join(opt.Dir, FLockName))
-	if ok, err := flock.TryLock(); err != nil {
+	fileLock := flock.New(filepath.Join(opt.Dir, FLockName))
+	if ok, err := fileLock.TryLock(); err != nil {
 		return nil, err
 	} else if !ok {
 		return nil, ErrDirLocked
 	}
 
-	db.flock = flock
+	db.flock = fileLock
 
 	if err := db.buildIndexes(); err != nil {
 		return nil, fmt.Errorf("db.buildIndexes error: %s", err)
@@ -466,8 +466,8 @@ func (db *DB) doWrites() {
 
 // setActiveFile sets the ActiveFile (DataFile object).
 func (db *DB) setActiveFile() (err error) {
-	filepath := getDataPath(db.MaxFileID, db.opt.Dir)
-	db.ActiveFile, err = db.fm.getDataFile(filepath, db.opt.SegmentSize)
+	activeFilePath := getDataPath(db.MaxFileID, db.opt.Dir)
+	db.ActiveFile, err = db.fm.getDataFile(activeFilePath, db.opt.SegmentSize)
 	if err != nil {
 		return
 	}
