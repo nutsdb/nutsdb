@@ -65,7 +65,7 @@ func (tx *Tx) DeleteBucket(ds uint16, bucket string) error {
 		return tx.put(bucket, []byte("1"), nil, Persistent, DataSortedSetBucketDeleteFlag, uint64(time.Now().Unix()), DataStructureNone)
 	}
 	if ds == DataStructureBTree {
-		return tx.put(bucket, []byte("2"), nil, Persistent, DataBPTreeBucketDeleteFlag, uint64(time.Now().Unix()), DataStructureNone)
+		return tx.put(bucket, []byte("2"), nil, Persistent, DataBTreeBucketDeleteFlag, uint64(time.Now().Unix()), DataStructureNone)
 	}
 	if ds == DataStructureList {
 		return tx.put(bucket, []byte("3"), nil, Persistent, DataListBucketDeleteFlag, uint64(time.Now().Unix()), DataStructureNone)

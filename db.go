@@ -80,16 +80,16 @@ const (
 	// DataSortedSetBucketDeleteFlag represents the delete Sorted Set bucket flag
 	DataSortedSetBucketDeleteFlag
 
-	// DataBPTreeBucketDeleteFlag represents the delete BPTree bucket flag
-	DataBPTreeBucketDeleteFlag
+	// DataBTreeBucketDeleteFlag represents the delete BTree bucket flag
+	DataBTreeBucketDeleteFlag
 
 	// DataListBucketDeleteFlag represents the delete List bucket flag
 	DataListBucketDeleteFlag
 
-	// LRemByIndex represents the data LRemByIndex flag
+	// DataLRemByIndex represents the data LRemByIndex flag
 	DataLRemByIndex
 
-	// DataListBucketDeleteFlag represents that set ttl for the list
+	// DataExpireListFlag represents that set ttl for the list
 	DataExpireListFlag
 )
 
@@ -291,8 +291,6 @@ func (db *DB) release() error {
 
 	db.tm.close()
 
-	db = nil
-
 	if GCEnable {
 		runtime.GC()
 	}
@@ -451,7 +449,7 @@ func (db *DB) doWrites() {
 			case r = <-db.writeCh:
 				reqs = append(reqs, r)
 			default:
-				pendingCh <- struct{}{} // Push to pending before doing a write.
+				pendingCh <- struct{}{} // Push to pending before doing write.
 				writeRequests(reqs)
 				return
 			}
@@ -716,7 +714,7 @@ func (db *DB) buildNotDSIdxes(r *Record) {
 	if r.H.Meta.Flag == DataSortedSetBucketDeleteFlag {
 		db.deleteBucket(DataStructureSortedSet, r.Bucket)
 	}
-	if r.H.Meta.Flag == DataBPTreeBucketDeleteFlag {
+	if r.H.Meta.Flag == DataBTreeBucketDeleteFlag {
 		db.deleteBucket(DataStructureBTree, r.Bucket)
 	}
 	if r.H.Meta.Flag == DataListBucketDeleteFlag {
@@ -910,8 +908,6 @@ func (db *DB) managed(writable bool, fn func(tx *Tx) error) (err error) {
 
 	return err
 }
-
-const bptDir = "bpt"
 
 func (db *DB) sendToWriteCh(tx *Tx) (*request, error) {
 	req := requestPool.Get().(*request)
