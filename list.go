@@ -27,12 +27,6 @@ var (
 	// ErrCount is returned when count is error.
 	ErrCount = errors.New("err count")
 
-	// ErrRangeSizeNotMatchRecordSize is range size not match record size
-	ErrRangeSizeNotMatchRecordSize = errors.New("the length of the specified range is not equal to the length of the list")
-
-	// ErrBuildListIndex  is returned when build list index error.
-	ErrBuildListIndex = errors.New("build list index error")
-
 	// ErrEmptyList is returned when the list is empty.
 	ErrEmptyList = errors.New("the list is empty")
 
@@ -46,7 +40,7 @@ const (
 
 // BTree represents the btree.
 
-// list head and tail seq num
+// HeadTailSeq list head and tail seq num
 type HeadTailSeq struct {
 	Head uint64
 	Tail uint64

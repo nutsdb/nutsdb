@@ -459,7 +459,7 @@ func (tx *Tx) getBucketDeleteRecordCount(entry *Entry) int64 {
 	var res int64
 
 	switch entry.Meta.Flag {
-	case DataBPTreeBucketDeleteFlag:
+	case DataBTreeBucketDeleteFlag:
 		if bTree, ok := tx.db.Index.bTree.idx[bucket]; ok {
 			res = int64(bTree.Count())
 		}
@@ -702,7 +702,7 @@ func (tx *Tx) buildIdxes(records []*Record) error {
 			err = tx.db.buildSortedSetIdx(record)
 		case DataStructureNone:
 			switch meta.Flag {
-			case DataBPTreeBucketDeleteFlag:
+			case DataBTreeBucketDeleteFlag:
 				tx.db.deleteBucket(DataStructureBTree, bucket)
 			case DataSetBucketDeleteFlag:
 				tx.db.deleteBucket(DataStructureSet, bucket)

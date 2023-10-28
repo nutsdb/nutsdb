@@ -23,7 +23,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/xujiajun/utils/filesystem"
 	"github.com/xujiajun/utils/strconv2"
 )
 
@@ -91,24 +90,6 @@ func getDataPath(fID int64, dir string) string {
 	return dir + separator + strconv2.Int64ToStr(fID) + DataSuffix
 }
 
-// getMetaPath returns the path for the meta file in the specified directory.
-func getMetaPath(dir string) string {
-	separator := string(filepath.Separator)
-	return dir + separator + "meta"
-}
-
-// getBucketMetaPath returns the path for the bucket meta file in the specified directory.
-func getBucketMetaPath(dir string) string {
-	separator := string(filepath.Separator)
-	return getMetaPath(dir) + separator + "bucket"
-}
-
-// getBPTDir returns the BPT directory path in the specified directory.
-func getBPTDir(dir string) string {
-	separator := string(filepath.Separator)
-	return dir + separator + bptDir
-}
-
 func OneOfUint16Array(value uint16, array []uint16) bool {
 	for _, v := range array {
 		if v == value {
@@ -116,15 +97,6 @@ func OneOfUint16Array(value uint16, array []uint16) bool {
 		}
 	}
 	return false
-}
-
-func createDirIfNotExist(dir string) error {
-	if ok := filesystem.PathIsExist(dir); !ok {
-		if err := os.MkdirAll(dir, os.ModePerm); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func splitIntStringStr(str, separator string) (int, string) {
