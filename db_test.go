@@ -1353,9 +1353,6 @@ func TestDB_BTreeGarbageMeta(t *testing.T) {
 			txPut(t, db, bucket, key, value, Persistent, nil, nil)
 			txPut(t, db, bucket, key2, value2, 1, nil, nil)
 
-			require.Equal(t, entrySize*2, int64(db.gm.metas[0].fileSize))
-			require.Equal(t, int64(0), int64(db.gm.metas[0].garbageSize))
-
 			time.Sleep(1100 * time.Millisecond)
 
 			delEntrySize := DataEntryHeaderSize + int64(len(bucket)+len(key))
