@@ -660,15 +660,13 @@ func (db *DB) buildBTreeIdx(r *Record) {
 	bTree := db.Index.bTree.getWithDefault(bucket)
 
 	oldRecord, find := bTree.Find(key)
+	// Whatever `r` is expired, or it's flag is DataDeleteFlag or DataSetFlag
+	// the `oldRecord` is invalid.
+	if find {
+		db.gm.updateGarbageMeta(oldRecord.H.FileID, 0, uint64(oldRecord.EntrySize()))
+	}
 
 	if r.IsExpired() || meta.Flag == DataDeleteFlag {
-		// If `r` is expired, means the flag of `r` is DataSetFlag.
-		// So we must check if `oldRecord` exists.
-		// But if the flag of `r` is DataDeleteFlag, then the `oldRecord` must exist.
-		if find {
-			db.gm.updateGarbageMeta(oldRecord.H.FileID, 0, uint64(oldRecord.EntrySize()))
-		}
-
 		if meta.Flag == DataDeleteFlag {
 			db.gm.updateGarbageMeta(db.ActiveFile.fileID, uint64(r.EntrySize()), uint64(r.EntrySize()))
 		}
@@ -676,9 +674,6 @@ func (db *DB) buildBTreeIdx(r *Record) {
 		db.tm.del(bucket, string(key))
 		bTree.Delete(key)
 	} else {
-		if find {
-			db.gm.updateGarbageMeta(oldRecord.H.FileID, 0, uint64(oldRecord.EntrySize()))
-		}
 		db.gm.updateGarbageMeta(db.ActiveFile.fileID, uint64(r.EntrySize()), 0)
 
 		if meta.TTL != Persistent {
@@ -758,10 +753,19 @@ func (db *DB) buildSetIdx(r *Record) error {
 
 	switch meta.Flag {
 	case DataSetFlag:
+		// If add an already existing member to the same Set, the index will not be modified,
+		// so the file size will only need to grow
+		db.gm.updateGarbageMeta(db.ActiveFile.fileID, uint64(r.EntrySize()), 0)
+
 		if err := s.SAdd(string(key), [][]byte{val}, []*Record{r}); err != nil {
 			return fmt.Errorf("when build SetIdx SAdd index err: %s", err)
 		}
 	case DataDeleteFlag:
+		// Removing will only be performed if the member to be deleted exists in the Set
+		oldRecord, _ := s.SGet(string(key), val)
+		db.gm.updateGarbageMeta(oldRecord.H.FileID, 0, uint64(oldRecord.EntrySize()))
+		db.gm.updateGarbageMeta(db.ActiveFile.fileID, uint64(r.EntrySize()), uint64(r.EntrySize()))
+
 		if err := s.SRem(string(key), val); err != nil {
 			return fmt.Errorf("when build SetIdx SRem index err: %s", err)
 		}

@@ -42,6 +42,23 @@ func NewSet() *Set {
 	}
 }
 
+func (s *Set) SGet(key string, value []byte) (*Record, error) {
+	set, ok := s.M[key]
+	if !ok {
+		return nil, ErrSetNotExist
+	}
+
+	hash, err := getFnv32(value)
+	if err != nil {
+		return nil, err
+	}
+
+	if record, ok := set[hash]; ok {
+		return record, nil
+	}
+	return nil, ErrSetMemberNotExist
+}
+
 // SAdd adds the specified members to the set stored at key.
 func (s *Set) SAdd(key string, values [][]byte, records []*Record) error {
 	set, ok := s.M[key]

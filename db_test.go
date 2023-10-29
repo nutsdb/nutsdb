@@ -108,6 +108,11 @@ func txDeleteBucket(t *testing.T, db *DB, ds uint16, bucket string, expectErr er
 	require.NoError(t, err)
 }
 
+func assertFileSizeAndGarbageSize(t *testing.T, actualFileSize, exceptFileSize, actualGarbageSize, exceptGarbageSize uint64) {
+	require.Equal(t, exceptFileSize, actualFileSize)
+	require.Equal(t, exceptGarbageSize, actualGarbageSize)
+}
+
 func InitOpt(fileDir string, isRemoveFiles bool) {
 	if fileDir == "" {
 		fileDir = "/tmp/nutsdbtest"
@@ -1323,8 +1328,8 @@ func TestDB_BTreeGarbageMeta(t *testing.T) {
 				txPut(t, db, bucket, key, value, Persistent, nil, nil)
 			}
 
-			require.Equal(t, 10*entrySize, int64(db.gm.metas[0].fileSize))
-			require.Equal(t, 9*entrySize, int64(db.gm.metas[0].garbageSize))
+			assertFileSizeAndGarbageSize(t, db.gm.metas[0].fileSize, uint64(10*entrySize),
+				db.gm.metas[0].garbageSize, uint64(9*entrySize))
 		})
 	})
 
@@ -1337,6 +1342,9 @@ func TestDB_BTreeGarbageMeta(t *testing.T) {
 
 			require.Equal(t, entrySize+delEntrySize, int64(db.gm.metas[0].fileSize))
 			require.Equal(t, entrySize+delEntrySize, int64(db.gm.metas[0].garbageSize))
+
+			assertFileSizeAndGarbageSize(t, db.gm.metas[0].fileSize, uint64(entrySize+delEntrySize),
+				db.gm.metas[0].garbageSize, uint64(entrySize+delEntrySize))
 		})
 	})
 
@@ -1352,12 +1360,55 @@ func TestDB_BTreeGarbageMeta(t *testing.T) {
 
 			delEntrySize := DataEntryHeaderSize + int64(len(bucket)+len(key))
 
-			require.Equal(t, entrySize*2+delEntrySize, int64(db.gm.metas[0].fileSize))
-			require.Equal(t, entrySize+delEntrySize, int64(db.gm.metas[0].garbageSize))
+			assertFileSizeAndGarbageSize(t, db.gm.metas[0].fileSize, uint64(entrySize*2+delEntrySize),
+				db.gm.metas[0].garbageSize, uint64(entrySize+delEntrySize))
 
 			txDel(t, db, bucket, key, nil)
-			require.Equal(t, entrySize*2+delEntrySize*2, int64(db.gm.metas[0].fileSize))
-			require.Equal(t, entrySize*2+delEntrySize*2, int64(db.gm.metas[0].garbageSize))
+
+			assertFileSizeAndGarbageSize(t, db.gm.metas[0].fileSize, uint64(entrySize*2+delEntrySize*2),
+				db.gm.metas[0].garbageSize, uint64(entrySize*2+delEntrySize*2))
+		})
+	})
+}
+
+func TestDB_SetGarbageMeta(t *testing.T) {
+	bucket := "bucket"
+	key := GetRandomBytes(24)
+	//key2 := GetRandomBytes(24)
+	value := GetRandomBytes(24)
+	value2 := GetRandomBytes(24)
+	entrySize := DataEntryHeaderSize + int64(len(bucket)+len(key)+len(value))
+
+	t.Run("SAdd duplicate record", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			txSAdd(t, db, bucket, key, value, nil, nil)
+			txSAdd(t, db, bucket, key, value2, nil, nil)
+
+			assertFileSizeAndGarbageSize(t, db.gm.metas[0].fileSize, uint64(entrySize*2),
+				db.gm.metas[0].garbageSize, uint64(0))
+
+			txSAdd(t, db, bucket, key, value, nil, nil)
+
+			assertFileSizeAndGarbageSize(t, db.gm.metas[0].fileSize, uint64(entrySize*2),
+				db.gm.metas[0].garbageSize, uint64(0))
+		})
+	})
+
+	t.Run("SRem record", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			txSAdd(t, db, bucket, key, value, nil, nil)
+			txSAdd(t, db, bucket, key, value2, nil, nil)
+
+			sRemEntrySize := DataEntryHeaderSize + int64(len(bucket)+len(key)+len(value))
+
+			txSRem(t, db, bucket, key, value, nil)
+
+			assertFileSizeAndGarbageSize(t, db.gm.metas[0].fileSize, uint64(entrySize*2+sRemEntrySize),
+				db.gm.metas[0].garbageSize, uint64(entrySize+sRemEntrySize))
+
+			txSRem(t, db, bucket, key, value2, nil)
+			assertFileSizeAndGarbageSize(t, db.gm.metas[0].fileSize, uint64(entrySize*2+sRemEntrySize*2),
+				db.gm.metas[0].garbageSize, uint64(entrySize*2+sRemEntrySize*2))
 		})
 	})
 }
