@@ -680,7 +680,7 @@ func (tx *Tx) isClosed() bool {
 func (tx *Tx) buildIdxes(records []*Record) error {
 	var err error
 	for _, record := range records {
-		bucket, meta := record.Bucket, record.H.Meta
+		meta := record.H.Meta
 
 		switch meta.Ds {
 		case DataStructureBTree:
@@ -692,16 +692,7 @@ func (tx *Tx) buildIdxes(records []*Record) error {
 		case DataStructureSortedSet:
 			err = tx.db.buildSortedSetIdx(record)
 		case DataStructureNone:
-			switch meta.Flag {
-			case DataBTreeBucketDeleteFlag:
-				tx.db.deleteBucket(DataStructureBTree, bucket)
-			case DataSetBucketDeleteFlag:
-				tx.db.deleteBucket(DataStructureSet, bucket)
-			case DataSortedSetBucketDeleteFlag:
-				tx.db.deleteBucket(DataStructureSortedSet, bucket)
-			case DataListBucketDeleteFlag:
-				tx.db.deleteBucket(DataStructureList, bucket)
-			}
+			tx.db.buildNotDSIdxes(record)
 		}
 
 		if err != nil {

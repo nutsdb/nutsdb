@@ -727,19 +727,45 @@ func (db *DB) buildNotDSIdxes(r *Record) {
 	if r.H.Meta.Flag == DataListBucketDeleteFlag {
 		db.deleteBucket(DataStructureList, r.Bucket)
 	}
+
+	db.gm.updateGarbageMeta(db.ActiveFile.fileID, r.EntrySize(), r.EntrySize())
 }
 
+// Delete all records in the specified bucket of the specified data structure and designate them as garbage records
 func (db *DB) deleteBucket(ds uint16, bucket string) {
 	if ds == DataStructureSet {
+		sets := db.Index.set.getWithDefault(bucket)
+		for _, set := range sets.M {
+			for _, record := range set {
+				db.gm.updateGarbageMeta(record.H.FileID, 0, record.EntrySize())
+			}
+		}
 		db.Index.set.delete(bucket)
 	}
 	if ds == DataStructureSortedSet {
+		sortedSets := db.Index.sortedSet.getWithDefault(bucket, db)
+		for key := range sortedSets.M {
+			members, _ := sortedSets.ZMembers(key)
+			for record := range members {
+				db.gm.updateGarbageMeta(record.H.FileID, 0, record.EntrySize())
+			}
+		}
 		db.Index.sortedSet.delete(bucket)
 	}
 	if ds == DataStructureBTree {
+		bTree := db.Index.bTree.getWithDefault(bucket)
+		for _, item := range bTree.AllItems() {
+			db.gm.updateGarbageMeta(item.r.H.FileID, 0, item.r.EntrySize())
+		}
 		db.Index.bTree.delete(bucket)
 	}
 	if ds == DataStructureList {
+		lists := db.Index.list.getWithDefault(bucket)
+		for _, list := range lists.Items {
+			for _, item := range list.AllItems() {
+				db.gm.updateGarbageMeta(item.r.H.FileID, 0, item.r.EntrySize())
+			}
+		}
 		db.Index.list.delete(bucket)
 	}
 }
@@ -864,7 +890,6 @@ func (db *DB) buildListIdx(r *Record) error {
 	case DataRPushFlag:
 		err = l.RPush(string(key), r)
 	case DataLRemFlag:
-		log.Printf("%v", r.EntrySize())
 		oldRecords, err = db.buildListLRemIdx(val, l, key)
 	case DataLPopFlag:
 		oldRecord, err = l.LPop(string(key))
