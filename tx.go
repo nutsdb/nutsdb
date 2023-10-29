@@ -34,12 +34,13 @@ const (
 
 // Tx represents a transaction.
 type Tx struct {
-	id            uint64
-	db            *DB
-	writable      bool
-	status        atomic.Value
-	pendingWrites []*Entry
-	size          int64
+	id                uint64
+	db                *DB
+	writable          bool
+	status            atomic.Value
+	pendingWrites     []*Entry
+	size              int64
+	pendingBucketList map[Ds]map[BucketName]*Bucket
 }
 
 type txnCb struct {
@@ -262,6 +263,10 @@ func (tx *Tx) Commit() (err error) {
 		record := NewRecord().WithBucket(bucket).WithValue(entry.Value).WithHint(hint)
 
 		records = append(records, record)
+	}
+
+	if err := tx.SubmitBucket(); err != nil {
+		return err
 	}
 
 	if err := tx.buildIdxes(records); err != nil {
@@ -720,4 +725,28 @@ func (tx *Tx) buildIdxes(records []*Record) error {
 		tx.db.KeyCount++
 	}
 	return nil
+}
+
+func (tx *Tx) putBucket(b *Bucket) error {
+	if _, exist := tx.pendingBucketList[b.Ds]; !exist {
+		tx.pendingBucketList[b.Ds] = map[BucketName]*Bucket{}
+	}
+	bucketInDs := tx.pendingBucketList[b.Ds]
+	bucketInDs[BucketName(b.Name)] = b
+	return nil
+}
+
+func (tx *Tx) SubmitBucket() error {
+	bucketReqs := make([]*bucketSubmitRequest, 0)
+	for ds, mapper := range tx.pendingBucketList {
+		for name, bucket := range mapper {
+			req := &bucketSubmitRequest{
+				ds:     ds,
+				name:   name,
+				bucket: bucket,
+			}
+			bucketReqs = append(bucketReqs, req)
+		}
+	}
+	return tx.db.bm.SubmitPendingBucketChange(bucketReqs)
 }

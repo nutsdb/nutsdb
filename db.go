@@ -148,6 +148,7 @@ type (
 		writeCh          chan *request
 		tm               *ttlManager
 		RecordCount      int64 // current valid record count, exclude deleted, repeated
+		bm               *BucketManager
 	}
 )
 
@@ -183,6 +184,12 @@ func open(opt Options) (*DB, error) {
 	}
 
 	db.flock = fileLock
+
+	if bm, err := NewBucketManager(opt.Dir); err == nil {
+		db.bm = bm
+	} else {
+		return nil, err
+	}
 
 	if err := db.buildIndexes(); err != nil {
 		return nil, fmt.Errorf("db.buildIndexes error: %s", err)

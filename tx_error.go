@@ -48,4 +48,6 @@ var (
 
 	// ErrTxnExceedWriteLimit is returned when this tx's write is exceed max write record
 	ErrTxnExceedWriteLimit = errors.New("Txn is exceed max write record count")
+
+	ErrBucketAlreadyExist = errors.New("bucket is already exist")
 )
