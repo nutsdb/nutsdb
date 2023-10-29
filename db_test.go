@@ -1308,3 +1308,33 @@ func TestDB_AllDsWriteRecordLimit(t *testing.T) {
 		})
 	}
 }
+
+func TestDB_BTreeGarbageMeta(t *testing.T) {
+	bucket := "bucket"
+	key := GetTestBytes(24)
+	value := GetTestBytes(24)
+	entrySize := DataEntryHeaderSize + int64(len(bucket)+len(key)+len(value))
+
+	t.Run("Put duplicate record", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			for i := 0; i < 10; i++ {
+				txPut(t, db, bucket, key, value, Persistent, nil, nil)
+			}
+
+			require.Equal(t, 10*entrySize, int64(db.gm.metas[0].fileSize))
+			require.Equal(t, 9*entrySize, int64(db.gm.metas[0].garbageSize))
+		})
+	})
+
+	t.Run("Delete record", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			txPut(t, db, bucket, key, value, Persistent, nil, nil)
+			txDel(t, db, bucket, key, nil)
+
+			delEntrySize := DataEntryHeaderSize + int64(len(bucket)+len(key))
+
+			require.Equal(t, entrySize+delEntrySize, int64(db.gm.metas[0].fileSize))
+			require.Equal(t, entrySize+delEntrySize, int64(db.gm.metas[0].garbageSize))
+		})
+	})
+}

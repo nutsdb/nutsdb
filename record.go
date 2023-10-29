@@ -30,6 +30,10 @@ func (r *Record) IsExpired() bool {
 	return IsExpired(r.H.Meta.TTL, r.H.Meta.Timestamp)
 }
 
+func (r *Record) EntrySize() int64 {
+	return DataEntryHeaderSize + int64(r.H.Meta.BucketSize+r.H.Meta.KeySize+r.H.Meta.ValueSize)
+}
+
 // IsExpired checks the ttl if expired or not.
 func IsExpired(ttl uint32, timestamp uint64) bool {
 	if ttl == Persistent {

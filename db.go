@@ -148,6 +148,7 @@ type (
 		writeCh          chan *request
 		tm               *ttlManager
 		RecordCount      int64 // current valid record count, exclude deleted, repeated
+		gm               *garbageManager
 	}
 )
 
@@ -165,6 +166,7 @@ func open(opt Options) (*DB, error) {
 		mergeWorkCloseCh: make(chan struct{}),
 		writeCh:          make(chan *request, KvWriteChCapacity),
 		tm:               newTTLManager(opt.ExpiredDeleteType),
+		gm:               newGarbageManager(),
 	}
 
 	commitBuffer := new(bytes.Buffer)
@@ -655,28 +657,37 @@ func (db *DB) buildBTreeIdx(r *Record) {
 	db.resetRecordByMode(r)
 
 	bucket, key, meta := r.Bucket, r.H.Key, r.H.Meta
-	b := db.Index.bTree.getWithDefault(bucket)
+	bTree := db.Index.bTree.getWithDefault(bucket)
 
 	if r.IsExpired() {
 		db.tm.del(bucket, string(key))
-		b.Delete(key)
+		bTree.Delete(key)
 		return
 	}
 
 	if meta.Flag == DataDeleteFlag {
+		oldRecord, _ := bTree.Find(key)
+		db.gm.updateGarbageMeta(oldRecord.H.FileID, 0, uint64(oldRecord.EntrySize()))
+		db.gm.updateGarbageMeta(db.ActiveFile.fileID, uint64(r.EntrySize()), uint64(r.EntrySize()))
+
 		db.tm.del(bucket, string(key))
-		b.Delete(key)
+		bTree.Delete(key)
 	} else {
+		oldRecord, find := bTree.Find(key)
+		if find {
+			db.gm.updateGarbageMeta(oldRecord.H.FileID, 0, uint64(oldRecord.EntrySize()))
+		}
+		db.gm.updateGarbageMeta(db.ActiveFile.fileID, uint64(r.EntrySize()), 0)
+
 		if meta.TTL != Persistent {
 			expireTime := db.expireTime(meta.Timestamp, meta.TTL)
 			callback := db.buildExpireCallback(bucket, key)
-
 			db.tm.add(bucket, string(key), expireTime, callback)
 		} else {
 			db.tm.del(bucket, string(key))
 		}
 
-		b.Insert(key, r.V, r.H)
+		bTree.Insert(key, r.V, r.H)
 	}
 }
 
