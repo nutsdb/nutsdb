@@ -192,14 +192,17 @@ func (z *SortedSet) ZRem(key string, value []byte) (*Record, error) {
 	return nil, ErrSortedSetNotFound
 }
 
-func (z *SortedSet) ZRemRangeByRank(key string, start int, end int) error {
+func (z *SortedSet) ZRemRangeByRank(key string, start int, end int) ([]*Record, error) {
 	if sortedSet, ok := z.M[key]; ok {
-
-		_ = sortedSet.GetByRankRange(start, end, true)
-		return nil
+		nodes := sortedSet.GetByRankRange(start, end, true)
+		records := make([]*Record, len(nodes))
+		for i, node := range nodes {
+			records[i] = node.record
+		}
+		return records, nil
 	}
 
-	return ErrSortedSetNotFound
+	return nil, ErrSortedSetNotFound
 }
 
 func (z *SortedSet) getZRemRangeByRankNodes(key string, start int, end int) ([]*SkipListNode, error) {

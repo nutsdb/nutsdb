@@ -1374,7 +1374,6 @@ func TestDB_BTreeGarbageMeta(t *testing.T) {
 func TestDB_SetGarbageMeta(t *testing.T) {
 	bucket := "bucket"
 	key := GetRandomBytes(24)
-	//key2 := GetRandomBytes(24)
 	value := GetRandomBytes(24)
 	value2 := GetRandomBytes(24)
 	entrySize := DataEntryHeaderSize + int64(len(bucket)+len(key)+len(value))
@@ -1409,6 +1408,84 @@ func TestDB_SetGarbageMeta(t *testing.T) {
 			txSRem(t, db, bucket, key, value2, nil)
 			assertFileSizeAndGarbageSize(t, db.gm.metas[0].fileSize, uint64(entrySize*2+sRemEntrySize*2),
 				db.gm.metas[0].garbageSize, uint64(entrySize*2+sRemEntrySize*2))
+		})
+	})
+}
+
+func TestDB_ZSetGarbageMeta(t *testing.T) {
+	bucket := "bucket"
+	key := GetRandomBytes(24)
+	value := GetRandomBytes(24)
+	value2 := GetRandomBytes(24)
+	value3 := GetRandomBytes(24)
+	value4 := GetRandomBytes(24)
+	entrySize := 98
+
+	t.Run("ZAdd", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			txZAdd(t, db, bucket, key, value, 0, nil, nil)
+			txZAdd(t, db, bucket, key, value2, 1, nil, nil)
+			assertFileSizeAndGarbageSize(t, db.gm.metas[0].fileSize, uint64(entrySize*2),
+				db.gm.metas[0].garbageSize, uint64(0))
+
+			txZAdd(t, db, bucket, key, value, 0, nil, nil)
+			assertFileSizeAndGarbageSize(t, db.gm.metas[0].fileSize, uint64(entrySize*3),
+				db.gm.metas[0].garbageSize, uint64(entrySize))
+
+			txZAdd(t, db, bucket, key, value, 0, nil, nil)
+			txZAdd(t, db, bucket, key, value3, 2, nil, nil)
+			txZAdd(t, db, bucket, key, value4, 3, nil, nil)
+			assertFileSizeAndGarbageSize(t, db.gm.metas[0].fileSize, uint64(entrySize*6),
+				db.gm.metas[0].garbageSize, uint64(entrySize*2))
+		})
+	})
+
+	t.Run("ZRem，ZPop", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			txZAdd(t, db, bucket, key, value, 0, nil, nil)
+			txZAdd(t, db, bucket, key, value2, 1, nil, nil)
+			txZAdd(t, db, bucket, key, value3, 2, nil, nil)
+			txZAdd(t, db, bucket, key, value4, 3, nil, nil)
+
+			zRemEntrySize := 96
+			txZRem(t, db, bucket, key, value2, nil)
+			assertFileSizeAndGarbageSize(t, db.gm.metas[0].fileSize, uint64(entrySize*4+zRemEntrySize),
+				db.gm.metas[0].garbageSize, uint64(entrySize+zRemEntrySize))
+
+			zPopEntrySize := 72
+			txZPop(t, db, bucket, key, true, value4, 3, nil)
+			assertFileSizeAndGarbageSize(t, db.gm.metas[0].fileSize, uint64(entrySize*4+zRemEntrySize+zPopEntrySize),
+				db.gm.metas[0].garbageSize, uint64(entrySize*2+zRemEntrySize+zPopEntrySize))
+
+			txZPop(t, db, bucket, key, false, value, 0, nil)
+			assertFileSizeAndGarbageSize(t, db.gm.metas[0].fileSize, uint64(entrySize*4+zRemEntrySize+zPopEntrySize*2),
+				db.gm.metas[0].garbageSize, uint64(entrySize*3+zRemEntrySize+zPopEntrySize*2))
+		})
+	})
+
+	t.Run("ZRemRangeByRank", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			txZAdd(t, db, bucket, key, value, 0, nil, nil)
+			txZAdd(t, db, bucket, key, value2, 1, nil, nil)
+			txZAdd(t, db, bucket, key, value3, 2, nil, nil)
+			txZAdd(t, db, bucket, key, value4, 3, nil, nil)
+
+			zRemRangeByRankEntrySize := 75
+
+			require.NoError(t, db.Update(func(tx *Tx) error {
+				require.NoError(t, tx.ZRemRangeByRank(bucket, key, 1, 3))
+				return nil
+			}))
+			assertFileSizeAndGarbageSize(t, db.gm.metas[0].fileSize, uint64(entrySize*4+zRemRangeByRankEntrySize),
+				db.gm.metas[0].garbageSize, uint64(entrySize*3+zRemRangeByRankEntrySize))
+
+			require.NoError(t, db.Update(func(tx *Tx) error {
+				require.NoError(t, tx.ZRemRangeByRank(bucket, key, 1, 1))
+				return nil
+			}))
+
+			assertFileSizeAndGarbageSize(t, db.gm.metas[0].fileSize, uint64(entrySize*4+zRemRangeByRankEntrySize*2),
+				db.gm.metas[0].garbageSize, uint64(entrySize*4+zRemRangeByRankEntrySize*2))
 		})
 	})
 }

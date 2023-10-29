@@ -781,7 +781,11 @@ func (db *DB) buildSortedSetIdx(r *Record) error {
 
 	ss := db.Index.sortedSet.getWithDefault(bucket, db)
 
-	var err error
+	var (
+		err        error
+		oldRecord  *Record
+		oldRecords []*Record
+	)
 
 	switch meta.Flag {
 	case DataZAddFlag:
@@ -789,21 +793,46 @@ func (db *DB) buildSortedSetIdx(r *Record) error {
 		if len(keyAndScore) == 2 {
 			key := keyAndScore[0]
 			score, _ := strconv2.StrToFloat64(keyAndScore[1])
+			// If there is a member with the same key and val,
+			// and their scores are different, there is a piece of garbage record
+			exist, _ := ss.ZExist(key, val)
+			if exist {
+				// The change score does not affect the length of the record,
+				// so `r` is used to assign `oldRecord` directly.
+				oldRecord = r
+			}
 			err = ss.ZAdd(key, SCORE(score), val, r)
 		}
 	case DataZRemFlag:
-		_, err = ss.ZRem(string(key), val)
+		oldRecord, err = ss.ZRem(string(key), val)
 	case DataZRemRangeByRankFlag:
+		log.Printf("%v", r.EntrySize())
 		start, end := splitIntIntStr(string(val), SeparatorForZSetKey)
-		err = ss.ZRemRangeByRank(string(key), start, end)
+		oldRecords, err = ss.ZRemRangeByRank(string(key), start, end)
 	case DataZPopMaxFlag:
-		_, _, err = ss.ZPopMax(string(key))
+		oldRecord, _, err = ss.ZPopMax(string(key))
 	case DataZPopMinFlag:
-		_, _, err = ss.ZPopMin(string(key))
+		oldRecord, _, err = ss.ZPopMin(string(key))
 	}
 
 	if err != nil {
 		return fmt.Errorf("when build sortedSetIdx err: %s", err)
+	}
+
+	switch meta.Flag {
+	case DataZAddFlag:
+		if oldRecord != nil {
+			db.gm.updateGarbageMeta(oldRecord.H.FileID, 0, uint64(oldRecord.EntrySize()))
+		}
+		db.gm.updateGarbageMeta(db.ActiveFile.fileID, uint64(r.EntrySize()), 0)
+	case DataZRemFlag, DataZPopMinFlag, DataZPopMaxFlag:
+		db.gm.updateGarbageMeta(oldRecord.H.FileID, 0, uint64(oldRecord.EntrySize()))
+		db.gm.updateGarbageMeta(db.ActiveFile.fileID, uint64(r.EntrySize()), uint64(r.EntrySize()))
+	case DataZRemRangeByRankFlag:
+		for _, oldRecord := range oldRecords {
+			db.gm.updateGarbageMeta(oldRecord.H.FileID, 0, uint64(oldRecord.EntrySize()))
+		}
+		db.gm.updateGarbageMeta(db.ActiveFile.fileID, uint64(r.EntrySize()), uint64(r.EntrySize()))
 	}
 
 	return nil
