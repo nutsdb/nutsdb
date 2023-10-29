@@ -1311,8 +1311,10 @@ func TestDB_AllDsWriteRecordLimit(t *testing.T) {
 
 func TestDB_BTreeGarbageMeta(t *testing.T) {
 	bucket := "bucket"
-	key := GetTestBytes(24)
-	value := GetTestBytes(24)
+	key := GetRandomBytes(24)
+	key2 := GetRandomBytes(24)
+	value := GetRandomBytes(24)
+	value2 := GetRandomBytes(24)
 	entrySize := DataEntryHeaderSize + int64(len(bucket)+len(key)+len(value))
 
 	t.Run("Put duplicate record", func(t *testing.T) {
@@ -1335,6 +1337,27 @@ func TestDB_BTreeGarbageMeta(t *testing.T) {
 
 			require.Equal(t, entrySize+delEntrySize, int64(db.gm.metas[0].fileSize))
 			require.Equal(t, entrySize+delEntrySize, int64(db.gm.metas[0].garbageSize))
+		})
+	})
+
+	t.Run("Expire record", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			txPut(t, db, bucket, key, value, Persistent, nil, nil)
+			txPut(t, db, bucket, key2, value2, 1, nil, nil)
+
+			require.Equal(t, entrySize*2, int64(db.gm.metas[0].fileSize))
+			require.Equal(t, int64(0), int64(db.gm.metas[0].garbageSize))
+
+			time.Sleep(1100 * time.Millisecond)
+
+			delEntrySize := DataEntryHeaderSize + int64(len(bucket)+len(key))
+
+			require.Equal(t, entrySize*2+delEntrySize, int64(db.gm.metas[0].fileSize))
+			require.Equal(t, entrySize+delEntrySize, int64(db.gm.metas[0].garbageSize))
+
+			txDel(t, db, bucket, key, nil)
+			require.Equal(t, entrySize*2+delEntrySize*2, int64(db.gm.metas[0].fileSize))
+			require.Equal(t, entrySize*2+delEntrySize*2, int64(db.gm.metas[0].garbageSize))
 		})
 	})
 }

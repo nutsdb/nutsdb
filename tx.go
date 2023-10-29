@@ -641,15 +641,6 @@ func (tx *Tx) put(bucket string, key, value []byte, ttl uint32, flag uint16, tim
 	return nil
 }
 
-func (tx *Tx) putDeleteLog(bucket string, key, value []byte, ttl uint32, flag uint16, timestamp uint64, ds uint16) {
-	meta := NewMetaData().WithTimeStamp(timestamp).WithKeySize(uint32(len(key))).WithValueSize(uint32(len(value))).WithFlag(flag).
-		WithTTL(ttl).WithBucketSize(uint32(len(bucket))).WithStatus(UnCommitted).WithDs(ds).WithTxID(tx.id)
-
-	e := NewEntry().WithKey(key).WithBucket([]byte(bucket)).WithMeta(meta).WithValue(value)
-	tx.pendingWrites = append(tx.pendingWrites, e)
-	tx.size += e.Size()
-}
-
 // setStatusCommitting will change the tx status to txStatusCommitting
 func (tx *Tx) setStatusCommitting() {
 	status := txStatusCommitting

@@ -659,21 +659,23 @@ func (db *DB) buildBTreeIdx(r *Record) {
 	bucket, key, meta := r.Bucket, r.H.Key, r.H.Meta
 	bTree := db.Index.bTree.getWithDefault(bucket)
 
-	if r.IsExpired() {
-		db.tm.del(bucket, string(key))
-		bTree.Delete(key)
-		return
-	}
+	oldRecord, find := bTree.Find(key)
 
-	if meta.Flag == DataDeleteFlag {
-		oldRecord, _ := bTree.Find(key)
-		db.gm.updateGarbageMeta(oldRecord.H.FileID, 0, uint64(oldRecord.EntrySize()))
-		db.gm.updateGarbageMeta(db.ActiveFile.fileID, uint64(r.EntrySize()), uint64(r.EntrySize()))
+	if r.IsExpired() || meta.Flag == DataDeleteFlag {
+		// If `r` is expired, means the flag of `r` is DataSetFlag.
+		// So we must check if `oldRecord` exists.
+		// But if the flag of `r` is DataDeleteFlag, then the `oldRecord` must exist.
+		if find {
+			db.gm.updateGarbageMeta(oldRecord.H.FileID, 0, uint64(oldRecord.EntrySize()))
+		}
+
+		if meta.Flag == DataDeleteFlag {
+			db.gm.updateGarbageMeta(db.ActiveFile.fileID, uint64(r.EntrySize()), uint64(r.EntrySize()))
+		}
 
 		db.tm.del(bucket, string(key))
 		bTree.Delete(key)
 	} else {
-		oldRecord, find := bTree.Find(key)
 		if find {
 			db.gm.updateGarbageMeta(oldRecord.H.FileID, 0, uint64(oldRecord.EntrySize()))
 		}
@@ -686,7 +688,6 @@ func (db *DB) buildBTreeIdx(r *Record) {
 		} else {
 			db.tm.del(bucket, string(key))
 		}
-
 		bTree.Insert(key, r.V, r.H)
 	}
 }

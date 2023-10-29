@@ -44,7 +44,6 @@ func (tx *Tx) Get(bucket string, key []byte) (e *Entry, err error) {
 		}
 
 		if r.IsExpired() {
-			tx.putDeleteLog(bucket, key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureBTree)
 			return nil, ErrNotFoundKey
 		}
 
@@ -183,7 +182,6 @@ func (tx *Tx) Delete(bucket string, key []byte) error {
 func (tx *Tx) getHintIdxDataItemsWrapper(records []*Record, limitNum int, es Entries) (Entries, error) {
 	for _, r := range records {
 		if r.IsExpired() {
-			tx.putDeleteLog(r.Bucket, r.H.Key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureBTree)
 			continue
 		}
 		if limitNum > 0 && len(es) < limitNum || limitNum == ScanNoLimit {
