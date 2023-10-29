@@ -15,8 +15,8 @@
 package nutsdb
 
 type garbageMeta struct {
-	fileSize    uint64
-	garbageSize uint64
+	fileSize    int64
+	garbageSize int64
 }
 
 type garbageManager struct {
@@ -27,7 +27,7 @@ func newGarbageManager() *garbageManager {
 	return &garbageManager{metas: map[int64]*garbageMeta{}}
 }
 
-func (gm *garbageManager) updateGarbageMeta(fid int64, fileSizeDelta uint64, garbageSizeDelta uint64) {
+func (gm *garbageManager) updateGarbageMeta(fid int64, fileSizeDelta int64, garbageSizeDelta int64) {
 	meta, ok := gm.metas[fid]
 
 	if !ok {

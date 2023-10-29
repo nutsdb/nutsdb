@@ -166,13 +166,13 @@ func TestList_LRem(t *testing.T) {
 	}
 
 	// r1 r1 r1 r2 r2
-	err := list.LRem(key, -1, cmp)
+	_, err := list.LRem(key, -1, cmp)
 	require.NoError(t, err)
 	expectRecords = append(expectRecords[0:4], expectRecords[5:]...)
 	ListCmp(t, list, key, expectRecords, false)
 
 	// r1 r2 r2
-	err = list.LRem(key, 2, cmp)
+	_, err = list.LRem(key, 2, cmp)
 	require.NoError(t, err)
 	expectRecords = expectRecords[2:]
 	ListCmp(t, list, key, expectRecords, false)
@@ -182,7 +182,7 @@ func TestList_LRem(t *testing.T) {
 	}
 
 	// r1
-	err = list.LRem(key, 0, cmp)
+	_, err = list.LRem(key, 0, cmp)
 	require.NoError(t, err)
 	expectRecords = expectRecords[0:1]
 	ListCmp(t, list, key, expectRecords, false)
@@ -202,7 +202,7 @@ func TestList_LTrim(t *testing.T) {
 		ListPush(t, list, string(newKey), expectRecords[i], false, nil)
 	}
 
-	err := list.LTrim(key, 1, 3)
+	_, err := list.LTrim(key, 1, 3)
 	require.NoError(t, err)
 	expectRecords = expectRecords[1 : len(expectRecords)-1]
 	ListCmp(t, list, key, expectRecords, false)
@@ -224,19 +224,19 @@ func TestList_LRemByIndex(t *testing.T) {
 	}
 
 	// r1 r2 r4 r5 r6 r7 r8
-	err := list.LRemByIndex(key, []int{2})
+	_, err := list.LRemByIndex(key, []int{2})
 	require.NoError(t, err)
 	expectRecords = append(expectRecords[0:2], expectRecords[3:]...)
 	ListCmp(t, list, key, expectRecords, false)
 
 	// r2 r6 r7 r8
-	err = list.LRemByIndex(key, []int{0, 2, 3})
+	_, err = list.LRemByIndex(key, []int{0, 2, 3})
 	require.NoError(t, err)
 	expectRecords = expectRecords[1:]
 	expectRecords = append(expectRecords[0:1], expectRecords[3:]...)
 	ListCmp(t, list, key, expectRecords, false)
 
-	err = list.LRemByIndex(key, []int{0, 0, 0})
+	_, err = list.LRemByIndex(key, []int{0, 0, 0})
 	require.NoError(t, err)
 	expectRecords = expectRecords[1:]
 	ListCmp(t, list, key, expectRecords, false)

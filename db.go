@@ -663,18 +663,18 @@ func (db *DB) buildBTreeIdx(r *Record) {
 	// Whatever `r` is expired, or it's flag is DataDeleteFlag or DataSetFlag
 	// the `oldRecord` is invalid.
 	if find {
-		db.gm.updateGarbageMeta(oldRecord.H.FileID, 0, uint64(oldRecord.EntrySize()))
+		db.gm.updateGarbageMeta(oldRecord.H.FileID, 0, oldRecord.EntrySize())
 	}
 
 	if r.IsExpired() || meta.Flag == DataDeleteFlag {
 		if meta.Flag == DataDeleteFlag {
-			db.gm.updateGarbageMeta(db.ActiveFile.fileID, uint64(r.EntrySize()), uint64(r.EntrySize()))
+			db.gm.updateGarbageMeta(db.ActiveFile.fileID, r.EntrySize(), r.EntrySize())
 		}
 
 		db.tm.del(bucket, string(key))
 		bTree.Delete(key)
 	} else {
-		db.gm.updateGarbageMeta(db.ActiveFile.fileID, uint64(r.EntrySize()), 0)
+		db.gm.updateGarbageMeta(db.ActiveFile.fileID, r.EntrySize(), 0)
 
 		if meta.TTL != Persistent {
 			expireTime := db.expireTime(meta.Timestamp, meta.TTL)
@@ -755,16 +755,15 @@ func (db *DB) buildSetIdx(r *Record) error {
 	case DataSetFlag:
 		// If add an already existing member to the same Set, the index will not be modified,
 		// so the file size will only need to grow
-		db.gm.updateGarbageMeta(db.ActiveFile.fileID, uint64(r.EntrySize()), 0)
-
+		db.gm.updateGarbageMeta(db.ActiveFile.fileID, r.EntrySize(), 0)
 		if err := s.SAdd(string(key), [][]byte{val}, []*Record{r}); err != nil {
 			return fmt.Errorf("when build SetIdx SAdd index err: %s", err)
 		}
 	case DataDeleteFlag:
 		// Removing will only be performed if the member to be deleted exists in the Set
 		oldRecord, _ := s.SGet(string(key), val)
-		db.gm.updateGarbageMeta(oldRecord.H.FileID, 0, uint64(oldRecord.EntrySize()))
-		db.gm.updateGarbageMeta(db.ActiveFile.fileID, uint64(r.EntrySize()), uint64(r.EntrySize()))
+		db.gm.updateGarbageMeta(oldRecord.H.FileID, 0, oldRecord.EntrySize())
+		db.gm.updateGarbageMeta(db.ActiveFile.fileID, r.EntrySize(), r.EntrySize())
 
 		if err := s.SRem(string(key), val); err != nil {
 			return fmt.Errorf("when build SetIdx SRem index err: %s", err)
@@ -806,7 +805,6 @@ func (db *DB) buildSortedSetIdx(r *Record) error {
 	case DataZRemFlag:
 		oldRecord, err = ss.ZRem(string(key), val)
 	case DataZRemRangeByRankFlag:
-		log.Printf("%v", r.EntrySize())
 		start, end := splitIntIntStr(string(val), SeparatorForZSetKey)
 		oldRecords, err = ss.ZRemRangeByRank(string(key), start, end)
 	case DataZPopMaxFlag:
@@ -822,17 +820,17 @@ func (db *DB) buildSortedSetIdx(r *Record) error {
 	switch meta.Flag {
 	case DataZAddFlag:
 		if oldRecord != nil {
-			db.gm.updateGarbageMeta(oldRecord.H.FileID, 0, uint64(oldRecord.EntrySize()))
+			db.gm.updateGarbageMeta(oldRecord.H.FileID, 0, oldRecord.EntrySize())
 		}
-		db.gm.updateGarbageMeta(db.ActiveFile.fileID, uint64(r.EntrySize()), 0)
+		db.gm.updateGarbageMeta(db.ActiveFile.fileID, r.EntrySize(), 0)
 	case DataZRemFlag, DataZPopMinFlag, DataZPopMaxFlag:
-		db.gm.updateGarbageMeta(oldRecord.H.FileID, 0, uint64(oldRecord.EntrySize()))
-		db.gm.updateGarbageMeta(db.ActiveFile.fileID, uint64(r.EntrySize()), uint64(r.EntrySize()))
+		db.gm.updateGarbageMeta(oldRecord.H.FileID, 0, oldRecord.EntrySize())
+		db.gm.updateGarbageMeta(db.ActiveFile.fileID, r.EntrySize(), r.EntrySize())
 	case DataZRemRangeByRankFlag:
 		for _, oldRecord := range oldRecords {
-			db.gm.updateGarbageMeta(oldRecord.H.FileID, 0, uint64(oldRecord.EntrySize()))
+			db.gm.updateGarbageMeta(oldRecord.H.FileID, 0, oldRecord.EntrySize())
 		}
-		db.gm.updateGarbageMeta(db.ActiveFile.fileID, uint64(r.EntrySize()), uint64(r.EntrySize()))
+		db.gm.updateGarbageMeta(db.ActiveFile.fileID, r.EntrySize(), r.EntrySize())
 	}
 
 	return nil
@@ -849,7 +847,11 @@ func (db *DB) buildListIdx(r *Record) error {
 		return nil
 	}
 
-	var err error
+	var (
+		err        error
+		oldRecord  *Record
+		oldRecords []*Record
+	)
 
 	switch meta.Flag {
 	case DataExpireListFlag:
@@ -862,28 +864,42 @@ func (db *DB) buildListIdx(r *Record) error {
 	case DataRPushFlag:
 		err = l.RPush(string(key), r)
 	case DataLRemFlag:
-		err = db.buildListLRemIdx(val, l, key)
+		log.Printf("%v", r.EntrySize())
+		oldRecords, err = db.buildListLRemIdx(val, l, key)
 	case DataLPopFlag:
-		_, err = l.LPop(string(key))
+		oldRecord, err = l.LPop(string(key))
 	case DataRPopFlag:
-		_, err = l.RPop(string(key))
+		oldRecord, err = l.RPop(string(key))
 	case DataLTrimFlag:
 		newKey, start := splitStringIntStr(string(key), SeparatorForListKey)
 		end, _ := strconv2.StrToInt(string(val))
-		err = l.LTrim(newKey, start, end)
+		oldRecords, err = l.LTrim(newKey, start, end)
 	case DataLRemByIndex:
 		indexes, _ := UnmarshalInts(val)
-		err = l.LRemByIndex(string(key), indexes)
+		oldRecords, err = l.LRemByIndex(string(key), indexes)
 	}
 
 	if err != nil {
 		return fmt.Errorf("when build listIdx err: %s", err)
 	}
 
+	switch meta.Flag {
+	case DataLPushFlag, DataRPushFlag:
+		db.gm.updateGarbageMeta(db.ActiveFile.fileID, r.EntrySize(), 0)
+	case DataLPopFlag, DataRPopFlag:
+		db.gm.updateGarbageMeta(oldRecord.H.FileID, 0, oldRecord.EntrySize())
+		db.gm.updateGarbageMeta(db.ActiveFile.fileID, r.EntrySize(), r.EntrySize())
+	case DataLRemFlag, DataLTrimFlag, DataLRemByIndex:
+		for _, oldRecord := range oldRecords {
+			db.gm.updateGarbageMeta(oldRecord.H.FileID, 0, oldRecord.EntrySize())
+		}
+		db.gm.updateGarbageMeta(db.ActiveFile.fileID, r.EntrySize(), r.EntrySize())
+	}
+
 	return nil
 }
 
-func (db *DB) buildListLRemIdx(value []byte, l *List, key []byte) error {
+func (db *DB) buildListLRemIdx(value []byte, l *List, key []byte) ([]*Record, error) {
 	count, newValue := splitIntStringStr(string(value), SeparatorForListKey)
 
 	return l.LRem(string(key), count, func(r *Record) (bool, error) {

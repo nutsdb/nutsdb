@@ -242,49 +242,58 @@ func (l *List) getRemoveIndexes(key string, count int, cmp func(r *Record) (bool
 // count > 0: Remove elements equal to value moving from head to tail.
 // count < 0: Remove elements equal to value moving from tail to head.
 // count = 0: Remove all elements equal to value.
-func (l *List) LRem(key string, count int, cmp func(r *Record) (bool, error)) error {
+func (l *List) LRem(key string, count int, cmp func(r *Record) (bool, error)) ([]*Record, error) {
 	removeIndexes, err := l.getRemoveIndexes(key, count, cmp)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
+	records := make([]*Record, len(removeIndexes))
+
 	list := l.Items[key]
-	for _, idx := range removeIndexes {
+	for i, idx := range removeIndexes {
+		record, _ := list.Find(idx)
+		records[i] = record
 		list.Delete(idx)
 	}
 
-	return nil
+	return records, nil
 }
 
 // LTrim trim an existing list so that it will contain only the specified range of elements specified.
-func (l *List) LTrim(key string, start, end int) error {
+func (l *List) LTrim(key string, start, end int) ([]*Record, error) {
 	if l.IsExpire(key) {
-		return ErrListNotFound
+		return nil, ErrListNotFound
 	}
 	if _, ok := l.Items[key]; !ok {
-		return ErrListNotFound
+		return nil, ErrListNotFound
 	}
+
+	records := make([]*Record, 0)
 
 	list := l.Items[key]
 	allItems := list.AllItems()
 	for i, item := range allItems {
 		if i < start || i > end {
 			list.Delete(item.key)
+			records = append(records, item.r)
 		}
 	}
 
-	return nil
+	return records, nil
 }
 
 // LRemByIndex remove the list element at specified index
-func (l *List) LRemByIndex(key string, indexes []int) error {
+func (l *List) LRemByIndex(key string, indexes []int) ([]*Record, error) {
 	if l.IsExpire(key) {
-		return ErrListNotFound
+		return nil, ErrListNotFound
 	}
+
+	records := make([]*Record, 0)
 
 	idxes := l.getValidIndexes(key, indexes)
 	if len(idxes) == 0 {
-		return nil
+		return records, nil
 	}
 
 	list := l.Items[key]
@@ -292,10 +301,11 @@ func (l *List) LRemByIndex(key string, indexes []int) error {
 	for i, item := range allItems {
 		if _, ok := idxes[i]; ok {
 			list.Delete(item.key)
+			records = append(records, item.r)
 		}
 	}
 
-	return nil
+	return records, nil
 }
 
 func (l *List) getValidIndexes(key string, indexes []int) map[int]struct{} {
