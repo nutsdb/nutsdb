@@ -118,6 +118,9 @@ type Options struct {
 
 	// max write record num
 	MaxWriteRecordCount int64
+
+	// MergeThreshold means that files exceeding this garbage record ratio threshold will be merged.
+	MergeThreshold float64
 }
 
 const (
@@ -143,6 +146,7 @@ var DefaultOptions = func() Options {
 		SyncEnable:        true,
 		CommitBufferSize:  4 * MB,
 		MergeInterval:     2 * time.Hour,
+		MergeThreshold:    0.5,
 		MaxBatchSize:      (15 * defaultSegmentSize / 4) / 100,
 		MaxBatchCount:     (15 * defaultSegmentSize / 4) / 100 / 100,
 		ExpiredDeleteType: TimeWheel,
