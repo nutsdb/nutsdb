@@ -47,12 +47,15 @@ func (tx *Tx) NewBucket(ds uint16, name string) (success bool, err error) {
 		return false, ErrBucketAlreadyExist
 	}
 	bucket := &Bucket{
-		meta: &BucketMeta{
+		Meta: &BucketMeta{
 			Op: BucketInsertOperation,
 		},
 		Id:   tx.db.bm.Gen.GenId(),
 		Ds:   Ds(ds),
 		Name: name,
+	}
+	if _, exist := tx.pendingBucketList[Ds(ds)]; !exist {
+		tx.pendingBucketList[Ds(ds)] = map[BucketName]*Bucket{}
 	}
 	tx.pendingBucketList[Ds(ds)][BucketName(name)] = bucket
 	return true, nil
@@ -70,7 +73,7 @@ func (tx *Tx) DeleteBucket(ds uint16, bucket string) error {
 	}
 
 	b := &Bucket{
-		meta: &BucketMeta{
+		Meta: &BucketMeta{
 			Op: BucketDeleteOperation,
 		},
 		Id:   tx.db.bm.Gen.GenId(),

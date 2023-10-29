@@ -27,7 +27,7 @@ func init() {
 	BucketMetaSize = GetDiskSizeFromSingleObject(BucketMeta{})
 }
 
-// BucketMeta stores the meta info of a Bucket. E.g. the size of bucket it store in disk.
+// BucketMeta stores the Meta info of a Bucket. E.g. the size of bucket it store in disk.
 type BucketMeta struct {
 	Crc  uint32
 	Size uint32
@@ -36,7 +36,7 @@ type BucketMeta struct {
 
 // Bucket is the disk structure of bucket
 type Bucket struct {
-	meta *BucketMeta
+	Meta *BucketMeta
 	Id   uint64
 	Ds   Ds
 	Name string
@@ -59,12 +59,12 @@ func (b *Bucket) Encode() []byte {
 	binary.LittleEndian.PutUint16(buf[BucketMetaSize+IdSize:BucketMetaSize+IdSize+DsSize], uint16(b.Ds))
 	copy(buf[BucketMetaSize+IdSize:], b.Name)
 	c32 := crc32.ChecksumIEEE(buf[4:])
-	b.meta.Crc = c32
+	b.Meta.Crc = c32
 	return buf
 }
 
 func (b *Bucket) Decode(bytes []byte) error {
-	crc := b.meta.Crc
+	crc := b.Meta.Crc
 	crcInDisk := crc32.ChecksumIEEE(bytes[4:])
 	if crc != crcInDisk {
 		return ErrBucketCrcInvalid

@@ -37,6 +37,8 @@ func TestTx_PutAndGet(t *testing.T) {
 		withDefaultDB(t, func(t *testing.T, db *DB) {
 
 			{
+				txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
 				tx, err := db.Begin(true)
 				require.NoError(t, err)
 

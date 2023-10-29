@@ -93,9 +93,10 @@ func newTx(db *DB, writable bool) (tx *Tx, err error) {
 	var txID uint64
 
 	tx = &Tx{
-		db:            db,
-		writable:      writable,
-		pendingWrites: []*Entry{},
+		db:                db,
+		writable:          writable,
+		pendingWrites:     []*Entry{},
+		pendingBucketList: make(map[Ds]map[BucketName]*Bucket),
 	}
 
 	txID, err = tx.getTxID()
@@ -211,8 +212,9 @@ func (tx *Tx) Commit() (err error) {
 	defer tx.setStatusClosed()
 
 	writesLen := len(tx.pendingWrites)
+	writesBucketLen := len(tx.pendingBucketList)
 
-	if writesLen == 0 {
+	if writesLen == 0 && writesBucketLen == 0 {
 		return nil
 	}
 
@@ -287,6 +289,39 @@ func (tx *Tx) getNewAddRecordCount() (int64, error) {
 			return res, err
 		}
 		res += curRecordCnt
+	}
+
+	for _, bucketsInDs := range tx.pendingBucketList {
+		for _, bucket := range bucketsInDs {
+			if bucket.Meta.Op == BucketDeleteOperation {
+				switch bucket.Ds {
+				case Ds(DataStructureBTree):
+					if bTree, ok := tx.db.Index.bTree.idx[bucket.Name]; ok {
+						res -= int64(bTree.Count())
+					}
+				case Ds(DataStructureSet):
+					if set, ok := tx.db.Index.set.idx[bucket.Name]; ok {
+						for key := range set.M {
+							res -= int64(set.SCard(key))
+						}
+					}
+				case Ds(DataStructureSortedSet):
+					if sortedSet, ok := tx.db.Index.sortedSet.idx[bucket.Name]; ok {
+						for key := range sortedSet.M {
+							curLen, _ := sortedSet.ZCard(key)
+							res -= int64(curLen)
+						}
+					}
+				case Ds(DataStructureList):
+					if list, ok := tx.db.Index.list.idx[bucket.Name]; ok {
+						for key := range list.Items {
+							curLen, _ := list.Size(key)
+							res -= int64(curLen)
+						}
+					}
+				}
+			}
+		}
 	}
 
 	return res, nil
@@ -450,10 +485,6 @@ func (tx *Tx) getEntryNewAddRecordCount(entry *Entry) (int64, error) {
 
 	if entry.Meta.Ds == DataStructureSortedSet {
 		res, err = tx.getSortedSetEntryNewAddRecordCount(entry)
-	}
-
-	if entry.Meta.Ds == DataStructureNone {
-		res -= tx.getBucketDeleteRecordCount(entry)
 	}
 
 	return res, err
@@ -625,6 +656,10 @@ func (tx *Tx) checkTxIsClosed() error {
 func (tx *Tx) put(bucket string, key, value []byte, ttl uint32, flag uint16, timestamp uint64, ds uint16) error {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return err
+	}
+
+	if !tx.db.bm.ExistBucket(Ds(ds), BucketName(bucket)) {
+		return ErrorBucketNotExist
 	}
 
 	if !tx.writable {

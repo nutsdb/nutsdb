@@ -124,6 +124,8 @@ func TestIsDBClosed(t *testing.T) {
 	db, err = Open(opt)
 
 	t.Run("db can be used before closed", func(t *testing.T) {
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
 		err = db.Update(
 			func(tx *Tx) error {
 				return tx.Put(bucket, key, val, Persistent)
@@ -148,6 +150,7 @@ func TestIsPrefixScan(t *testing.T) {
 		withDefaultDB(t, func(t *testing.T, db *DB) {
 			{
 				tx, err := db.Begin(true)
+				txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 				require.NoError(t, err)
 				for i := 0; i <= 10; i++ {
 					key := []byte("key_" + fmt.Sprintf("%07d", i))
@@ -187,6 +190,8 @@ func TestIsPrefixSearchScan(t *testing.T) {
 	t.Run("if prefix and search scanning not found the result return true", func(t *testing.T) {
 		withDefaultDB(t, func(t *testing.T, db *DB) {
 			{
+				txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
 				tx, err := db.Begin(true)
 				require.NoError(t, err)
 				for i := 0; i <= 10; i++ {

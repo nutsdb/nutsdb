@@ -7,14 +7,15 @@ import (
 
 var ErrBucketNotExist = errors.New("bucket not exist")
 
-const BucketStoreFileName = "bucket.meta"
+const BucketStoreFileName = "bucket.Meta"
 
 type Ds uint16
 type Id uint64
 type BucketName string
 
 type BucketManager struct {
-	fd               *os.File
+	fd *os.File
+	// BucketInfoMapper BucketID => Bucket itself
 	BucketInfoMapper map[Id]*Bucket
 
 	BucketIDMarker map[BucketName]map[Ds]Id
@@ -54,11 +55,22 @@ func (bm *BucketManager) SubmitPendingBucketChange(reqs []*bucketSubmitRequest) 
 	for _, req := range reqs {
 		bs := req.bucket.Encode()
 		bytes = append(bytes, bs...)
+		// update the marker info
 		bm.BucketInfoMapper[Id(req.bucket.Id)] = req.bucket
 		if _, exist := bm.BucketIDMarker[req.name]; !exist {
 			bm.BucketIDMarker[req.name] = map[Ds]Id{}
 		}
-		bm.BucketIDMarker[req.name][req.bucket.Ds] = Id(req.bucket.Id)
+		switch req.bucket.Meta.Op {
+		case BucketInsertOperation:
+			bm.BucketIDMarker[req.name][req.bucket.Ds] = Id(req.bucket.Id)
+		case BucketDeleteOperation:
+			if len(bm.BucketIDMarker[req.name]) == 1 {
+				delete(bm.BucketIDMarker, req.name)
+			} else {
+				delete(bm.BucketIDMarker[req.name], req.bucket.Ds)
+			}
+			bm.BucketInfoMapper[Id(req.bucket.Id)] = req.bucket
+		}
 	}
 	_, err := bm.fd.Write(bytes)
 	return err

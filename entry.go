@@ -24,7 +24,7 @@ import (
 	"github.com/xujiajun/utils/strconv2"
 )
 
-var payLoadSizeMismatchErr = errors.New("the payload size in meta mismatch with the payload size needed")
+var payLoadSizeMismatchErr = errors.New("the payload size in Meta mismatch with the payload size needed")
 
 type (
 	// Entry represents the data item.
@@ -43,7 +43,7 @@ type (
 		DataPos uint64
 	}
 
-	// MetaData represents the meta information of the data item.
+	// MetaData represents the Meta information of the data item.
 	MetaData struct {
 		KeySize    uint32
 		ValueSize  uint32
@@ -155,7 +155,7 @@ func (e *Entry) checkPayloadSize(size int64) error {
 	return nil
 }
 
-// ParseMeta parse meta object to entry
+// ParseMeta parse Meta object to entry
 func (e *Entry) ParseMeta(buf []byte) error {
 	e.Meta = NewMetaData().WithCrc(binary.LittleEndian.Uint32(buf[0:4])).
 		WithTimeStamp(binary.LittleEndian.Uint64(buf[4:12])).WithKeySize(binary.LittleEndian.Uint32(buf[12:16])).
@@ -241,7 +241,7 @@ func (e *Entry) WithValue(value []byte) *Entry {
 	return e
 }
 
-// WithMeta set meta to Entry
+// WithMeta set Meta to Entry
 func (e *Entry) WithMeta(meta *MetaData) *Entry {
 	e.Meta = meta
 	return e

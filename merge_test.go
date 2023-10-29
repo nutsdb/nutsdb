@@ -31,6 +31,7 @@ func TestDB_MergeForString(t *testing.T) {
 	for _, idxMode := range []EntryIdxMode{HintKeyValAndRAMIdxMode, HintKeyAndRAMIdxMode} {
 		opts.EntryIdxMode = idxMode
 		db, err := Open(opts)
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 		require.NoError(t, err)
 
 		// Merge is not needed
@@ -99,6 +100,8 @@ func TestDB_MergeForSet(t *testing.T) {
 	for _, idxMode := range []EntryIdxMode{HintKeyValAndRAMIdxMode, HintKeyAndRAMIdxMode} {
 		opts.EntryIdxMode = idxMode
 		db, err := Open(opts)
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
 		require.NoError(t, err)
 
 		// Merge is not needed
@@ -191,8 +194,11 @@ func TestDB_MergeForZSet(t *testing.T) {
 
 	// test different EntryIdxMode
 	for _, idxMode := range []EntryIdxMode{HintKeyValAndRAMIdxMode, HintKeyAndRAMIdxMode} {
+
 		opts.EntryIdxMode = idxMode
 		db, err := Open(opts)
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
 		require.NoError(t, err)
 
 		// add items
@@ -292,6 +298,8 @@ func TestDB_MergeForList(t *testing.T) {
 	for _, idxMode := range []EntryIdxMode{HintKeyValAndRAMIdxMode, HintKeyAndRAMIdxMode} {
 		opts.EntryIdxMode = idxMode
 		db, err := Open(opts)
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
 		require.NoError(t, err)
 
 		// check that we don't need merge

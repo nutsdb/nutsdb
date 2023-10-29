@@ -108,6 +108,16 @@ func txDeleteBucket(t *testing.T, db *DB, ds uint16, bucket string, expectErr er
 	require.NoError(t, err)
 }
 
+func txCreateBucket(t *testing.T, db *DB, ds uint16, bucket string, expectErr error) {
+	err := db.Update(func(tx *Tx) error {
+		succeed, err := tx.NewBucket(ds, bucket)
+		assertErr(t, err, expectErr)
+		assert.Equal(t, true, succeed)
+		return nil
+	})
+	require.NoError(t, err)
+}
+
 func InitOpt(fileDir string, isRemoveFiles bool) {
 	if fileDir == "" {
 		fileDir = "/tmp/nutsdbtest"
@@ -135,6 +145,7 @@ func InitOpt(fileDir string, isRemoveFiles bool) {
 func TestDB_Basic(t *testing.T) {
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		bucket := "bucket"
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 		key0 := GetTestBytes(0)
 		val0 := GetRandomBytes(24)
 
@@ -180,6 +191,8 @@ func TestDB_Flock(t *testing.T) {
 func TestDB_DeleteANonExistKey(t *testing.T) {
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		testBucket := "test_bucket"
+		txCreateBucket(t, db, DataStructureBTree, testBucket, nil)
+
 		txDel(t, db, testBucket, GetTestBytes(0), ErrNotFoundBucket)
 		txPut(t, db, testBucket, GetTestBytes(1), GetRandomBytes(24), Persistent, nil, nil)
 		txDel(t, db, testBucket, GetTestBytes(0), ErrKeyNotFound)
@@ -189,6 +202,8 @@ func TestDB_DeleteANonExistKey(t *testing.T) {
 func TestDB_CheckListExpired(t *testing.T) {
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		testBucket := "test_bucket"
+		txCreateBucket(t, db, DataStructureBTree, testBucket, nil)
+
 		txPut(t, db, testBucket, GetTestBytes(0), GetTestBytes(1), Persistent, nil, nil)
 		txPut(t, db, testBucket, GetTestBytes(1), GetRandomBytes(24), 1, nil, nil)
 
@@ -647,6 +662,7 @@ func txIterateBuckets(t *testing.T, db *DB, ds uint16, pattern string, f func(ke
 func TestDB_GetKeyNotFound(t *testing.T) {
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		bucket := "bucket"
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 		txGet(t, db, bucket, GetTestBytes(0), nil, ErrBucketNotFound)
 		txPut(t, db, bucket, GetTestBytes(1), GetRandomBytes(24), Persistent, nil, nil)
 		txGet(t, db, bucket, GetTestBytes(0), nil, ErrKeyNotFound)
@@ -743,7 +759,7 @@ func TestDB_CommitBuffer(t *testing.T) {
 		// When the database starts, the commit buffer should be allocated with the size of CommitBufferSize.
 		require.Equal(t, 0, db.commitBuffer.Len())
 		require.Equal(t, db.opt.CommitBufferSize, int64(db.commitBuffer.Cap()))
-
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 		txPut(t, db, bucket, GetTestBytes(0), GetRandomBytes(24), Persistent, nil, nil)
 
 		// When tx is committed, content of commit buffer should be empty, but do not release memory
@@ -756,6 +772,7 @@ func TestDB_CommitBuffer(t *testing.T) {
 	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
 		require.Equal(t, int64(1*KB), db.opt.CommitBufferSize)
 
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 		err := db.Update(func(tx *Tx) error {
 			// making this tx big enough, it should not use the commit buffer
 			for i := 0; i < 1000; i++ {
@@ -774,17 +791,14 @@ func TestDB_CommitBuffer(t *testing.T) {
 func TestDB_DeleteBucket(t *testing.T) {
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		bucket := "bucket"
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 		key := GetTestBytes(0)
 		val := GetTestBytes(0)
-
-		txDeleteBucket(t, db, DataStructureBTree, bucket, ErrBucketNotFound)
-
 		txPut(t, db, bucket, key, val, Persistent, nil, nil)
 		txGet(t, db, bucket, key, val, nil)
 
 		txDeleteBucket(t, db, DataStructureBTree, bucket, nil)
-		txGet(t, db, bucket, key, nil, ErrBucketNotFound)
-		txDeleteBucket(t, db, DataStructureBTree, bucket, ErrBucketNotFound)
+		txPut(t, db, bucket, key, val, Persistent, ErrorBucketNotExist, nil)
 	})
 }
 
@@ -822,6 +836,8 @@ func TestDB_HintKeyValAndRAMIdxMode_RestartDB(t *testing.T) {
 	opts := DefaultOptions
 	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
 		bucket := "bucket"
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
 		key := GetTestBytes(0)
 		val := GetTestBytes(0)
 
@@ -841,6 +857,7 @@ func TestDB_HintKeyAndRAMIdxMode_RestartDB(t *testing.T) {
 	opts.EntryIdxMode = HintKeyAndRAMIdxMode
 	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
 		bucket := "bucket"
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 		key := GetTestBytes(0)
 		val := GetTestBytes(0)
 
@@ -863,6 +880,10 @@ func TestDB_ChangeMode_RestartDB(t *testing.T) {
 
 		runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
 			bucket := "bucket"
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureList, bucket, nil)
+			txCreateBucket(t, db, DataStructureSet, bucket, nil)
+			txCreateBucket(t, db, DataStructureSortedSet, bucket, nil)
 
 			// k-v
 			for i := 0; i < 10; i++ {
@@ -910,6 +931,11 @@ func TestDB_ChangeMode_RestartDB(t *testing.T) {
 			opts.EntryIdxMode = secondMode
 			db, err = Open(opts)
 			require.NoError(t, err)
+
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureList, bucket, nil)
+			txCreateBucket(t, db, DataStructureSet, bucket, nil)
+			txCreateBucket(t, db, DataStructureSortedSet, bucket, nil)
 
 			// k-v
 			for i := 0; i < 10; i++ {
@@ -962,6 +988,8 @@ func TestTx_SmallFile(t *testing.T) {
 	opts.EntryIdxMode = HintKeyAndRAMIdxMode
 	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
 		bucket := "bucket"
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
 		err := db.Update(func(tx *Tx) error {
 			for i := 0; i < 100; i++ {
 				err := tx.Put(bucket, GetTestBytes(i), GetTestBytes(i), Persistent)
@@ -989,6 +1017,9 @@ func TestDB_DataStructureBTreeWriteRecordLimit(t *testing.T) {
 	for _, idxMode := range []EntryIdxMode{HintKeyValAndRAMIdxMode, HintKeyAndRAMIdxMode} {
 		opts.EntryIdxMode = idxMode
 		runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
+			txCreateBucket(t, db, DataStructureBTree, bucket1, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket2, nil)
+
 			// Add limitCount records
 			err := db.Update(func(tx *Tx) error {
 				for i := 0; i < int(limitCount); i++ {
@@ -1039,8 +1070,11 @@ func TestDB_DataStructureListWriteRecordLimit(t *testing.T) {
 	bucket2 := "bucket2"
 	// Iterate over EntryIdxMode options
 	for _, idxMode := range []EntryIdxMode{HintKeyValAndRAMIdxMode, HintKeyAndRAMIdxMode} {
+
 		opts.EntryIdxMode = idxMode
 		runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
+			txCreateBucket(t, db, DataStructureList, bucket1, nil)
+			txCreateBucket(t, db, DataStructureList, bucket2, nil)
 			// Add limitCount records
 			err := db.Update(func(tx *Tx) error {
 				for i := 0; i < int(limitCount); i++ {
@@ -1140,6 +1174,9 @@ func TestDB_DataStructureSetWriteRecordLimit(t *testing.T) {
 	for _, idxMode := range []EntryIdxMode{HintKeyValAndRAMIdxMode, HintKeyAndRAMIdxMode} {
 		opts.EntryIdxMode = idxMode
 		runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
+			txCreateBucket(t, db, DataStructureSet, bucket1, nil)
+			txCreateBucket(t, db, DataStructureSet, bucket2, nil)
+
 			// Add limitCount records to bucket1.
 			err := db.Update(func(tx *Tx) error {
 				for i := 0; i < int(limitCount); i++ {
@@ -1204,6 +1241,7 @@ func TestDB_DataStructureSortedSetWriteRecordLimit(t *testing.T) {
 	for _, idxMode := range []EntryIdxMode{HintKeyValAndRAMIdxMode, HintKeyAndRAMIdxMode} {
 		opts.EntryIdxMode = idxMode
 		runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
+			txCreateBucket(t, db, DataStructureSortedSet, bucket1, nil)
 			// Add limitCount records
 			err := db.Update(func(tx *Tx) error {
 				for i := 0; i < int(limitCount); i++ {
@@ -1242,6 +1280,8 @@ func TestDB_DataStructureSortedSetWriteRecordLimit(t *testing.T) {
 			// Delete bucket
 			txDeleteBucket(t, db, DataStructureSortedSet, bucket1, nil)
 			// Add data to another bucket
+			txCreateBucket(t, db, DataStructureSortedSet, bucket1, nil)
+			txCreateBucket(t, db, DataStructureSortedSet, bucket2, nil)
 			txZAdd(t, db, bucket2, []byte("key1"), []byte("value1"), score, nil, nil)
 			// Add data to bucket1
 			err = db.Update(func(tx *Tx) error {
@@ -1273,6 +1313,12 @@ func TestDB_AllDsWriteRecordLimit(t *testing.T) {
 	for _, idxMode := range []EntryIdxMode{HintKeyValAndRAMIdxMode, HintKeyAndRAMIdxMode} {
 		opts.EntryIdxMode = idxMode
 		runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
+			txCreateBucket(t, db, DataStructureBTree, bucket1, nil)
+			txCreateBucket(t, db, DataStructureList, bucket1, nil)
+			txCreateBucket(t, db, DataStructureSet, bucket1, nil)
+			txCreateBucket(t, db, DataStructureSortedSet, bucket1, nil)
+			txCreateBucket(t, db, DataStructureList, bucket2, nil)
+
 			// Add limitCount records
 			err := db.Update(func(tx *Tx) error {
 				for i := 0; i < int(limitCount); i++ {

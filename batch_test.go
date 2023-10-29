@@ -70,6 +70,7 @@ func TestBatchWrite(t *testing.T) {
 	}
 
 	testWrite := func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 		key := func(i int) []byte {
 			return []byte(fmt.Sprintf("%10d", i))
 		}

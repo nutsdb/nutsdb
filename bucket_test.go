@@ -52,7 +52,7 @@ func TestBucket_Decode(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			b := &Bucket{
-				meta: tt.fields.meta,
+				Meta: tt.fields.meta,
 				Id:   tt.fields.Id,
 				Name: tt.fields.Name,
 			}
@@ -77,7 +77,7 @@ func TestBucket_Encode(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			b := &Bucket{
-				meta: tt.fields.meta,
+				Meta: tt.fields.meta,
 				Id:   tt.fields.Id,
 				Name: tt.fields.Name,
 			}
@@ -102,7 +102,7 @@ func TestBucket_GetEntrySize(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			b := &Bucket{
-				meta: tt.fields.meta,
+				Meta: tt.fields.meta,
 				Id:   tt.fields.Id,
 				Name: tt.fields.Name,
 			}
@@ -127,7 +127,7 @@ func TestBucket_GetPayloadSize(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			b := &Bucket{
-				meta: tt.fields.meta,
+				Meta: tt.fields.meta,
 				Id:   tt.fields.Id,
 				Name: tt.fields.Name,
 			}
