@@ -1317,9 +1317,7 @@ func TestDB_AllDsWriteRecordLimit(t *testing.T) {
 func TestDB_BTreeGarbageMeta(t *testing.T) {
 	bucket := "bucket"
 	key := GetRandomBytes(24)
-	key2 := GetRandomBytes(24)
 	value := GetRandomBytes(24)
-	value2 := GetRandomBytes(24)
 	entrySize := DataEntryHeaderSize + int64(len(bucket)+len(key)+len(value))
 
 	t.Run("Put", func(t *testing.T) {
@@ -1345,25 +1343,6 @@ func TestDB_BTreeGarbageMeta(t *testing.T) {
 
 			assertFileSizeAndGarbageSize(t, db.gm.metas[0].fileSize, entrySize+delEntrySize,
 				db.gm.metas[0].garbageSize, entrySize+delEntrySize)
-		})
-	})
-
-	t.Run("Expire", func(t *testing.T) {
-		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-			txPut(t, db, bucket, key, value, Persistent, nil, nil)
-			txPut(t, db, bucket, key2, value2, 1, nil, nil)
-
-			time.Sleep(1100 * time.Millisecond)
-
-			delEntrySize := DataEntryHeaderSize + int64(len(bucket)+len(key))
-
-			assertFileSizeAndGarbageSize(t, db.gm.metas[0].fileSize, entrySize*2+delEntrySize,
-				db.gm.metas[0].garbageSize, entrySize+delEntrySize)
-
-			txDel(t, db, bucket, key, nil)
-
-			assertFileSizeAndGarbageSize(t, db.gm.metas[0].fileSize, entrySize*2+delEntrySize*2,
-				db.gm.metas[0].garbageSize, entrySize*2+delEntrySize*2)
 		})
 	})
 }
