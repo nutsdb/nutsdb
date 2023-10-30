@@ -39,18 +39,18 @@ func (gm *garbageManager) updateGarbageMeta(fid int64, fileSizeDelta int64, garb
 	meta.garbageSize += garbageSizeDelta
 }
 
-func (gm *garbageManager) removeGarbageMeta(fid int64) {
-	delete(gm.metas, fid)
-}
-
-func (gm *garbageManager) exceedThresholdFids(threshold float64) []int64 {
-	fids := make([]int64, 0)
-
-	for fid, meta := range gm.metas {
-		if (float64(meta.garbageSize) / float64(meta.fileSize)) >= threshold {
-			fids = append(fids, fid)
-		}
-	}
-
-	return fids
-}
+//func (gm *garbageManager) removeGarbageMeta(fid int64) {
+//	delete(gm.metas, fid)
+//}
+//
+//func (gm *garbageManager) exceedThresholdFids(threshold float64) []int64 {
+//	fids := make([]int64, 0)
+//
+//	for fid, meta := range gm.metas {
+//		if (float64(meta.garbageSize) / float64(meta.fileSize)) >= threshold {
+//			fids = append(fids, fid)
+//		}
+//	}
+//
+//	return fids
+//}
