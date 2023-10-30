@@ -167,7 +167,7 @@ func open(opt Options) (*DB, error) {
 		tm:               newTTLManager(opt.ExpiredDeleteType),
 	}
 
-	db.commitBuffer = createNewBufferWithSize(db.opt.CommitBufferSize)
+	db.commitBuffer = createNewBufferWithSize(int(db.opt.CommitBufferSize))
 
 	if ok := filesystem.PathIsExist(db.opt.Dir); !ok {
 		if err := os.MkdirAll(db.opt.Dir, os.ModePerm); err != nil {

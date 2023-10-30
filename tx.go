@@ -496,7 +496,7 @@ func (tx *Tx) allocCommitBuffer() *bytes.Buffer {
 
 	var buff *bytes.Buffer
 
-	if txSize < int64(tx.db.opt.CommitBufferSize) {
+	if txSize < tx.db.opt.CommitBufferSize {
 		buff = tx.db.commitBuffer
 	} else {
 		buff = new(bytes.Buffer)

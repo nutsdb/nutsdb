@@ -88,7 +88,7 @@ type Options struct {
 	GCWhenClose bool
 
 	// CommitBufferSize represent allocated memory for tx
-	CommitBufferSize int
+	CommitBufferSize int64
 
 	// ErrorHandler handles an error occurred during transaction.
 	// Example:
@@ -229,7 +229,7 @@ func WithErrorHandler(errorHandler ErrorHandler) Option {
 	}
 }
 
-func WithCommitBufferSize(commitBufferSize int) Option {
+func WithCommitBufferSize(commitBufferSize int64) Option {
 	return func(opt *Options) {
 		opt.CommitBufferSize = commitBufferSize
 	}
