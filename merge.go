@@ -268,8 +268,12 @@ func (db *DB) isPendingSetEntry(entry *Entry) bool {
 		return false
 	}
 
-	isMember, err := setIdx.SIsMember(string(entry.Key), entry.Value)
-	if err != nil || !isMember {
+	record, err := setIdx.SGet(string(entry.Key), entry.Value)
+	if err != nil {
+		return false
+	}
+
+	if record.H.Meta.TxID != entry.Meta.TxID || record.H.Meta.Timestamp != entry.Meta.Timestamp {
 		return false
 	}
 
@@ -277,13 +281,18 @@ func (db *DB) isPendingSetEntry(entry *Entry) bool {
 }
 
 func (db *DB) isPendingZSetEntry(entry *Entry) bool {
-	key, score := splitStringFloat64Str(string(entry.Key), SeparatorForZSetKey)
+	key, exceptScore := splitStringFloat64Str(string(entry.Key), SeparatorForZSetKey)
 	sortedSetIdx, exist := db.Index.sortedSet.exist(string(entry.Bucket))
 	if !exist {
 		return false
 	}
-	s, err := sortedSetIdx.ZScore(key, entry.Value)
-	if err != nil || s != score {
+
+	record, score, err := sortedSetIdx.ZGet(key, entry.Value)
+	if err != nil {
+		return false
+	}
+
+	if record.H.Meta.TxID != entry.Meta.TxID || record.H.Meta.Timestamp != entry.Meta.Timestamp || exceptScore != score {
 		return false
 	}
 

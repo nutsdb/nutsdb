@@ -266,6 +266,20 @@ func (z *SortedSet) ZExist(key string, value []byte) (bool, error) {
 	return false, ErrSortedSetNotFound
 }
 
+func (z *SortedSet) ZGet(key string, value []byte) (*Record, float64, error) {
+	if sortedSet, ok := z.M[key]; ok {
+		hash, err := getFnv32(value)
+		if err != nil {
+			return nil, 0, err
+		}
+		if node, ok := sortedSet.dict[hash]; ok {
+			return node.record, float64(node.score), nil
+		}
+		return nil, 0, ErrSortedSetMemberNotExist
+	}
+	return nil, 0, ErrSortedSetNotFound
+}
+
 // SCORE represents the score type.
 type SCORE float64
 
