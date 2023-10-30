@@ -163,3 +163,9 @@ func generateSeq(seq *HeadTailSeq, isLeft bool) uint64 {
 
 	return res
 }
+
+func createNewBufferWithSize(size int) *bytes.Buffer {
+	buf := new(bytes.Buffer)
+	buf.Grow(int(size))
+	return buf
+}
