@@ -653,28 +653,18 @@ func (db *DB) buildBTreeIdx(r *Record) {
 	db.resetRecordByMode(r)
 
 	bucket, key, meta := r.Bucket, r.H.Key, r.H.Meta
-	b := db.Index.bTree.getWithDefault(bucket)
+	bTree := db.Index.bTree.getWithDefault(bucket)
 
-	if r.IsExpired() {
+	if r.IsExpired() || meta.Flag == DataDeleteFlag {
 		db.tm.del(bucket, string(key))
-		b.Delete(key)
-		return
-	}
-
-	if meta.Flag == DataDeleteFlag {
-		db.tm.del(bucket, string(key))
-		b.Delete(key)
+		bTree.Delete(key)
 	} else {
 		if meta.TTL != Persistent {
-			expireTime := db.expireTime(meta.Timestamp, meta.TTL)
-			callback := db.buildExpireCallback(bucket, key)
-
-			db.tm.add(bucket, string(key), expireTime, callback)
+			db.tm.add(bucket, string(key), db.expireTime(meta.Timestamp, meta.TTL), db.buildExpireCallback(bucket, key))
 		} else {
 			db.tm.del(bucket, string(key))
 		}
-
-		b.Insert(key, r.V, r.H)
+		bTree.Insert(key, r.V, r.H)
 	}
 }
 
