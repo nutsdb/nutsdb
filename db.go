@@ -195,6 +195,10 @@ func open(opt Options) (*DB, error) {
 		return nil, fmt.Errorf("db.buildIndexes error: %s", err)
 	}
 
+	if err := db.rebuildBucketManager(); err != nil {
+		return nil, fmt.Errorf("db.rebuildBucketManager err:%s", err)
+	}
+
 	go db.mergeWorker()
 	go db.doWrites()
 	go db.tm.run()
@@ -939,4 +943,8 @@ func (db *DB) buildExpireCallback(bucket string, key []byte) func() {
 			log.Printf("occur error when expired deletion, error: %v", err.Error())
 		}
 	}
+}
+
+func (db *DB) rebuildBucketManager() error {
+	return nil
 }
