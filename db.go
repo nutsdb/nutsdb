@@ -191,12 +191,12 @@ func open(opt Options) (*DB, error) {
 		return nil, err
 	}
 
-	if err := db.buildIndexes(); err != nil {
-		return nil, fmt.Errorf("db.buildIndexes error: %s", err)
-	}
-
 	if err := db.rebuildBucketManager(); err != nil {
 		return nil, fmt.Errorf("db.rebuildBucketManager err:%s", err)
+	}
+
+	if err := db.buildIndexes(); err != nil {
+		return nil, fmt.Errorf("db.buildIndexes error: %s", err)
 	}
 
 	go db.mergeWorker()
@@ -946,5 +946,36 @@ func (db *DB) buildExpireCallback(bucket string, key []byte) func() {
 }
 
 func (db *DB) rebuildBucketManager() error {
+	bucketFilePath := db.opt.Dir + "/" + BucketStoreFileName
+	f, err := newFileRecovery(bucketFilePath, db.opt.BufferSizeOfRecovery)
+	if err != nil {
+		return nil
+	}
+	bucketRequest := make([]*bucketSubmitRequest, 0)
+
+	for {
+		bucket, err := f.readBucket()
+		if err != nil {
+			// whatever which logic branch it will choose, we will release the fd.
+			_ = f.release()
+			if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+				break
+			} else {
+				return err
+			}
+		}
+		bucketRequest = append(bucketRequest, &bucketSubmitRequest{
+			ds:     bucket.Ds,
+			name:   BucketName(bucket.Name),
+			bucket: bucket,
+		})
+	}
+
+	if len(bucketRequest) > 0 {
+		err = db.bm.SubmitPendingBucketChange(bucketRequest)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }

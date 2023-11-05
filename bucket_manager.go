@@ -56,12 +56,12 @@ func (bm *BucketManager) SubmitPendingBucketChange(reqs []*bucketSubmitRequest) 
 		bs := req.bucket.Encode()
 		bytes = append(bytes, bs...)
 		// update the marker info
-		bm.BucketInfoMapper[Id(req.bucket.Id)] = req.bucket
 		if _, exist := bm.BucketIDMarker[req.name]; !exist {
 			bm.BucketIDMarker[req.name] = map[Ds]Id{}
 		}
 		switch req.bucket.Meta.Op {
 		case BucketInsertOperation:
+			bm.BucketInfoMapper[Id(req.bucket.Id)] = req.bucket
 			bm.BucketIDMarker[req.name][req.bucket.Ds] = Id(req.bucket.Id)
 		case BucketDeleteOperation:
 			if len(bm.BucketIDMarker[req.name]) == 1 {
@@ -69,7 +69,7 @@ func (bm *BucketManager) SubmitPendingBucketChange(reqs []*bucketSubmitRequest) 
 			} else {
 				delete(bm.BucketIDMarker[req.name], req.bucket.Ds)
 			}
-			bm.BucketInfoMapper[Id(req.bucket.Id)] = req.bucket
+			delete(bm.BucketInfoMapper, Id(req.bucket.Id))
 		}
 	}
 	_, err := bm.fd.Write(bytes)

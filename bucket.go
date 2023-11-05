@@ -30,8 +30,8 @@ func init() {
 // BucketMeta stores the Meta info of a Bucket. E.g. the size of bucket it store in disk.
 type BucketMeta struct {
 	Crc  uint32
-	Size uint32
 	Op   BucketOperation
+	Size uint32
 }
 
 // Bucket is the disk structure of bucket
@@ -42,38 +42,40 @@ type Bucket struct {
 	Name string
 }
 
+// Decode : CRC | op | size
 func (meta *BucketMeta) Decode(bytes []byte) {
-	_ = bytes[BucketMetaSize]
+	_ = bytes[BucketMetaSize-1]
 	crc := binary.LittleEndian.Uint32(bytes[:4])
-	size := binary.LittleEndian.Uint32(bytes[4:8])
-	op := binary.LittleEndian.Uint16(bytes[8:10])
+	op := binary.LittleEndian.Uint16(bytes[4:6])
+	size := binary.LittleEndian.Uint32(bytes[6:10])
 	meta.Crc = crc
 	meta.Size = size
 	meta.Op = BucketOperation(op)
 }
 
+// Encode : Meta | Id | Ds | BucketName
 func (b *Bucket) Encode() []byte {
 	entrySize := b.GetEntrySize()
 	buf := make([]byte, entrySize)
+	b.Meta.Size = uint32(b.GetPayloadSize())
+	binary.LittleEndian.PutUint16(buf[4:6], uint16(b.Meta.Op))
+	binary.LittleEndian.PutUint32(buf[6:10], b.Meta.Size)
 	binary.LittleEndian.PutUint64(buf[BucketMetaSize:BucketMetaSize+IdSize], b.Id)
 	binary.LittleEndian.PutUint16(buf[BucketMetaSize+IdSize:BucketMetaSize+IdSize+DsSize], uint16(b.Ds))
-	copy(buf[BucketMetaSize+IdSize:], b.Name)
+	copy(buf[BucketMetaSize+IdSize+DsSize:], b.Name)
 	c32 := crc32.ChecksumIEEE(buf[4:])
 	b.Meta.Crc = c32
+	binary.LittleEndian.PutUint32(buf[0:4], c32)
+
 	return buf
 }
 
+// Decode : Meta | Id | Ds | BucketName
 func (b *Bucket) Decode(bytes []byte) error {
-	crc := b.Meta.Crc
-	crcInDisk := crc32.ChecksumIEEE(bytes[4:])
-	if crc != crcInDisk {
-		return ErrBucketCrcInvalid
-	}
-
 	// parse the payload
-	id := binary.LittleEndian.Uint64(bytes[BucketMetaSize : BucketMetaSize+IdSize])
-	ds := binary.LittleEndian.Uint16(bytes[BucketMetaSize+IdSize : BucketMetaSize+IdSize+DsSize])
-	name := bytes[BucketMetaSize+IdSize+DsSize:]
+	id := binary.LittleEndian.Uint64(bytes[:IdSize])
+	ds := binary.LittleEndian.Uint16(bytes[IdSize : IdSize+DsSize])
+	name := bytes[IdSize+DsSize:]
 	b.Id = id
 	b.Name = string(name)
 	b.Ds = Ds(ds)
@@ -82,6 +84,12 @@ func (b *Bucket) Decode(bytes []byte) error {
 
 func (b *Bucket) GetEntrySize() int {
 	return int(BucketMetaSize) + b.GetPayloadSize()
+}
+
+func (b *Bucket) GetCRC(headerBuf []byte, dataBuf []byte) uint32 {
+	crc := crc32.ChecksumIEEE(headerBuf[4:])
+	crc = crc32.Update(crc, crc32.IEEETable, dataBuf)
+	return crc
 }
 
 func (b *Bucket) GetPayloadSize() int {

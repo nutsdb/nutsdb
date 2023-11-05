@@ -1,137 +1,32 @@
 package nutsdb
 
 import (
-	"fmt"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
-func TestBucketMeta_Decode(t *testing.T) {
-	type fields struct {
-		Crc  uint32
-		Size uint32
+func TestBucket_DecodeAndDecode(t *testing.T) {
+	bucket := &Bucket{
+		Meta: &BucketMeta{
+			Op: BucketInsertOperation,
+		},
+		Id:   1,
+		Ds:   Ds(DataStructureBTree),
+		Name: "bucket_1",
 	}
-	type args struct {
-		bytes []byte
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		args   args
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			meta := &BucketMeta{
-				Crc:  tt.fields.Crc,
-				Size: tt.fields.Size,
-			}
-			meta.Decode(tt.args.bytes)
-		})
-	}
-}
+	bytes := bucket.Encode()
 
-func TestBucket_Decode(t *testing.T) {
-	type fields struct {
-		meta *BucketMeta
-		Id   uint64
-		Name string
-	}
-	type args struct {
-		bytes []byte
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		wantErr assert.ErrorAssertionFunc
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			b := &Bucket{
-				Meta: tt.fields.meta,
-				Id:   tt.fields.Id,
-				Name: tt.fields.Name,
-			}
-			tt.wantErr(t, b.Decode(tt.args.bytes), fmt.Sprintf("Decode(%v)", tt.args.bytes))
-		})
-	}
-}
+	bucketMeta := &BucketMeta{}
+	bucketMeta.Decode(bytes[:BucketMetaSize])
+	assert.Equal(t, bucketMeta.Op, BucketOperation(BucketInsertOperation))
+	assert.Equal(t, int64(8+2+8), int64(bucketMeta.Size))
+	decodeBucket := &Bucket{Meta: bucketMeta}
 
-func TestBucket_Encode(t *testing.T) {
-	type fields struct {
-		meta *BucketMeta
-		Id   uint64
-		Name string
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		want   []byte
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			b := &Bucket{
-				Meta: tt.fields.meta,
-				Id:   tt.fields.Id,
-				Name: tt.fields.Name,
-			}
-			assert.Equalf(t, tt.want, b.Encode(), "Encode()")
-		})
-	}
-}
+	err := decodeBucket.Decode(bytes[BucketMetaSize:])
+	assert.Nil(t, err)
+	assert.Equal(t, uint64(1), decodeBucket.Id)
+	assert.Equal(t, decodeBucket.Name, "bucket_1")
 
-func TestBucket_GetEntrySize(t *testing.T) {
-	type fields struct {
-		meta *BucketMeta
-		Id   uint64
-		Name string
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		want   int
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			b := &Bucket{
-				Meta: tt.fields.meta,
-				Id:   tt.fields.Id,
-				Name: tt.fields.Name,
-			}
-			assert.Equalf(t, tt.want, b.GetEntrySize(), "GetEntrySize()")
-		})
-	}
-}
-
-func TestBucket_GetPayloadSize(t *testing.T) {
-	type fields struct {
-		meta *BucketMeta
-		Id   uint64
-		Name string
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		want   int
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			b := &Bucket{
-				Meta: tt.fields.meta,
-				Id:   tt.fields.Id,
-				Name: tt.fields.Name,
-			}
-			assert.Equalf(t, tt.want, b.GetPayloadSize(), "GetPayloadSize()")
-		})
-	}
+	crc := decodeBucket.GetCRC(bytes[:BucketMetaSize], bytes[BucketMetaSize:])
+	assert.Equal(t, decodeBucket.Meta.Crc, crc)
 }
