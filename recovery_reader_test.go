@@ -48,14 +48,17 @@ func Test_fileRecovery_readBucket(t *testing.T) {
 
 	fd, err := os.OpenFile(filePath, os.O_RDWR|os.O_CREATE, os.ModePerm)
 	defer func() {
-		fd.Close()
-		os.Remove(filePath)
+		err = fd.Close()
+		assert.Nil(t, err)
+		err = os.Remove(filePath)
+		assert.Nil(t, nil)
 	}()
 	assert.Nil(t, err)
 	_, err = fd.Write(bytes)
 	assert.Nil(t, err)
 
 	fr, err := newFileRecovery(filePath, 4*MB)
+	assert.Nil(t, err)
 	readBucket, err := fr.readBucket()
 	assert.Nil(t, err)
 	assert.Equal(t, readBucket.Meta.Op, BucketOperation(BucketInsertOperation))
