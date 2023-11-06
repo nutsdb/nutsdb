@@ -159,13 +159,7 @@ func (db *DB) merge() error {
 				}
 
 			} else {
-				if err == io.EOF {
-					break
-				}
-				if err == ErrIndexOutOfBound {
-					break
-				}
-				if err == io.ErrUnexpectedEOF {
+				if errors.Is(err, io.EOF) || errors.Is(err, ErrIndexOutOfBound) || errors.Is(err, io.ErrUnexpectedEOF) {
 					break
 				}
 				return fmt.Errorf("when merge operation build hintIndex readAt err: %s", err)
