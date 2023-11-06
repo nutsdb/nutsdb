@@ -527,7 +527,7 @@ func (db *DB) parseDataFiles(dataFileIds []int) (err error) {
 			// This method is entered when the commit record of a transaction is read
 			// So all records of this transaction should be committed
 			h.Meta.Status = Committed
-			r := NewRecord().WithBucket(entry.GetBucketString()).WithValue(entry.Value).WithHint(h)
+			r := NewRecord().WithValue(entry.Value).WithHint(h)
 
 			if r.H.Meta.Ds == DataStructureNone {
 				db.buildNotDSIdxes(r)
@@ -660,23 +660,29 @@ func (db *DB) getRecordCount() (int64, error) {
 	return res, nil
 }
 
-func (db *DB) buildBTreeIdx(r *Record) {
+func (db *DB) buildBTreeIdx(r *Record) error {
 	db.resetRecordByMode(r)
 
-	bucket, key, meta := r.Bucket, r.H.Key, r.H.Meta
-	bTree := db.Index.bTree.getWithDefault(bucket)
+	key, meta := r.H.Key, r.H.Meta
+	bucket, err := db.bm.GetBucketById(meta.BucketId)
+	if err != nil {
+		return err
+	}
+	bucketName := bucket.Name
+	bTree := db.Index.bTree.getWithDefault(bucketName)
 
-	if r.IsExpired() || meta.Flag == DataDeleteFlag {
-		db.tm.del(bucket, string(key))
+	if r.IsExpired()|| meta.Flag == DataDeleteFlag {
+		db.tm.del(bucketName, string(key))
 		bTree.Delete(key)
 	} else {
 		if meta.TTL != Persistent {
-			db.tm.add(bucket, string(key), db.expireTime(meta.Timestamp, meta.TTL), db.buildExpireCallback(bucket, key))
+			db.tm.add(bucketName, string(key), db.expireTime(meta.Timestamp, meta.TTL), db.buildExpireCallback(bucketName, key))
 		} else {
-			db.tm.del(bucket, string(key))
+			db.tm.del(bucketName, string(key))
 		}
 		bTree.Insert(key, r.V, r.H)
 	}
+	return nil
 }
 
 func (db *DB) expireTime(timestamp uint64, ttl uint32) time.Duration {
@@ -689,7 +695,7 @@ func (db *DB) expireTime(timestamp uint64, ttl uint32) time.Duration {
 func (db *DB) buildIdxes(r *Record) error {
 	switch r.H.Meta.Ds {
 	case DataStructureBTree:
-		db.buildBTreeIdx(r)
+		return db.buildBTreeIdx(r)
 	case DataStructureList:
 		if err := db.buildListIdx(r); err != nil {
 			return err
@@ -706,19 +712,25 @@ func (db *DB) buildIdxes(r *Record) error {
 	return nil
 }
 
-func (db *DB) buildNotDSIdxes(r *Record) {
+func (db *DB) buildNotDSIdxes(r *Record) error {
+	bucket, err := db.bm.GetBucketById(r.H.Meta.BucketId)
+	if err != nil {
+		return err
+	}
+	bucketName := bucket.Name
 	if r.H.Meta.Flag == DataSetBucketDeleteFlag {
-		db.deleteBucket(DataStructureSet, r.Bucket)
+		db.deleteBucket(DataStructureSet, bucketName)
 	}
 	if r.H.Meta.Flag == DataSortedSetBucketDeleteFlag {
-		db.deleteBucket(DataStructureSortedSet, r.Bucket)
+		db.deleteBucket(DataStructureSortedSet, bucketName)
 	}
 	if r.H.Meta.Flag == DataBTreeBucketDeleteFlag {
-		db.deleteBucket(DataStructureBTree, r.Bucket)
+		db.deleteBucket(DataStructureBTree, bucketName)
 	}
 	if r.H.Meta.Flag == DataListBucketDeleteFlag {
-		db.deleteBucket(DataStructureList, r.Bucket)
+		db.deleteBucket(DataStructureList, bucketName)
 	}
+	return nil
 }
 
 func (db *DB) deleteBucket(ds uint16, bucket string) {
@@ -738,10 +750,16 @@ func (db *DB) deleteBucket(ds uint16, bucket string) {
 
 // buildSetIdx builds set index when opening the DB.
 func (db *DB) buildSetIdx(r *Record) error {
-	bucket, key, val, meta := r.Bucket, r.H.Key, r.V, r.H.Meta
+	key, val, meta := r.H.Key, r.V, r.H.Meta
 	db.resetRecordByMode(r)
 
-	s := db.Index.set.getWithDefault(bucket)
+	bucket, err := db.bm.GetBucketById(r.H.Meta.BucketId)
+	if err != nil {
+		return err
+	}
+	bucketName := bucket.Name
+
+	s := db.Index.set.getWithDefault(bucketName)
 
 	switch meta.Flag {
 	case DataSetFlag:
@@ -759,12 +777,16 @@ func (db *DB) buildSetIdx(r *Record) error {
 
 // buildSortedSetIdx builds sorted set index when opening the DB.
 func (db *DB) buildSortedSetIdx(r *Record) error {
-	bucket, key, val, meta := r.Bucket, r.H.Key, r.V, r.H.Meta
+	key, val, meta := r.H.Key, r.V, r.H.Meta
 	db.resetRecordByMode(r)
 
-	ss := db.Index.sortedSet.getWithDefault(bucket, db)
+	bucket, err := db.bm.GetBucketById(r.H.Meta.BucketId)
+	if err != nil {
+		return err
+	}
+	bucketName := bucket.Name
 
-	var err error
+	ss := db.Index.sortedSet.getWithDefault(bucketName, db)
 
 	switch meta.Flag {
 	case DataZAddFlag:
@@ -794,16 +816,20 @@ func (db *DB) buildSortedSetIdx(r *Record) error {
 
 // buildListIdx builds List index when opening the DB.
 func (db *DB) buildListIdx(r *Record) error {
-	bucket, key, val, meta := r.Bucket, r.H.Key, r.V, r.H.Meta
+	key, val, meta := r.H.Key, r.V, r.H.Meta
 	db.resetRecordByMode(r)
 
-	l := db.Index.list.getWithDefault(bucket)
+	bucket, err := db.bm.GetBucketById(r.H.Meta.BucketId)
+	if err != nil {
+		return err
+	}
+	bucketName := bucket.Name
+
+	l := db.Index.list.getWithDefault(bucketName)
 
 	if IsExpired(meta.TTL, meta.Timestamp) {
 		return nil
 	}
-
-	var err error
 
 	switch meta.Flag {
 	case DataExpireListFlag:

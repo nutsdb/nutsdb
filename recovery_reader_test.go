@@ -13,10 +13,10 @@ func Test_readEntry(t *testing.T) {
 	fd, err := os.OpenFile(path, os.O_TRUNC|os.O_CREATE|os.O_RDWR, os.ModePerm)
 	require.NoError(t, err)
 	meta := NewMetaData().WithKeySize(uint32(len("key"))).
-		WithValueSize(uint32(len("val"))).WithTimeStamp(1547707905).WithTTL(Persistent).
-		WithBucketSize(uint32(len("Test_readEntry"))).WithFlag(DataSetFlag)
+		WithValueSize(uint32(len("val"))).WithTimeStamp(1547707905).
+		WithTTL(Persistent).WithFlag(DataSetFlag).WithBucketId(1)
 
-	expect := NewEntry().WithKey([]byte("key")).WithMeta(meta).WithValue([]byte("val")).WithBucket([]byte("Test_readEntry"))
+	expect := NewEntry().WithKey([]byte("key")).WithMeta(meta).WithValue([]byte("val"))
 
 	_, err = fd.Write(expect.Encode())
 	require.NoError(t, err)

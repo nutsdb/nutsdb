@@ -49,7 +49,7 @@ func (tx *Tx) Get(bucket string, key []byte) (e *Entry, err error) {
 		}
 
 		if idxMode == HintKeyValAndRAMIdxMode {
-			return NewEntry().WithBucket([]byte(r.Bucket)).WithKey(r.H.Key).WithValue(r.V).WithMeta(r.H.Meta), nil
+			return NewEntry().WithKey(r.H.Key).WithValue(r.V).WithMeta(r.H.Meta), nil
 		}
 
 		if idxMode == HintKeyAndRAMIdxMode {
@@ -182,8 +182,12 @@ func (tx *Tx) Delete(bucket string, key []byte) error {
 // getHintIdxDataItemsWrapper returns wrapped entries when prefix scanning or range scanning.
 func (tx *Tx) getHintIdxDataItemsWrapper(records []*Record, limitNum int, es Entries) (Entries, error) {
 	for _, r := range records {
+		bucket, err := tx.db.bm.GetBucketById(r.H.Meta.BucketId)
+		if err != nil {
+			return nil, err
+		}
 		if r.IsExpired() {
-			tx.putDeleteLog(r.Bucket, r.H.Key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureBTree)
+			tx.putDeleteLog(bucket.Name, r.H.Key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureBTree)
 			continue
 		}
 		if limitNum > 0 && len(es) < limitNum || limitNum == ScanNoLimit {
@@ -197,7 +201,7 @@ func (tx *Tx) getHintIdxDataItemsWrapper(records []*Record, limitNum int, es Ent
 					return nil, err
 				}
 			} else {
-				e = NewEntry().WithBucket([]byte(r.Bucket)).WithKey(r.H.Key).WithValue(r.V).WithMeta(r.H.Meta)
+				e = NewEntry().WithKey(r.H.Key).WithValue(r.V).WithMeta(r.H.Meta)
 			}
 			es = append(es, e)
 		}

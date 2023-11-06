@@ -109,3 +109,19 @@ func (bm *BucketManager) GetBucket(ds Ds, name BucketName) (b *Bucket, err error
 		return nil, ErrBucketNotExist
 	}
 }
+
+func (bm *BucketManager) GetBucketById(id uint64) (*Bucket, error) {
+	if bucket, exist := bm.BucketInfoMapper[Id(id)]; exist {
+		return bucket, nil
+	} else {
+		return nil, ErrBucketNotExist
+	}
+}
+
+func (bm *BucketManager) GetBucketID(ds Ds, name BucketName) (uint64, error) {
+	if bucket, err := bm.GetBucket(ds, name); err != nil {
+		return 0, err
+	} else {
+		return bucket.Id, nil
+	}
+}

@@ -29,10 +29,9 @@ var payLoadSizeMismatchErr = errors.New("the payload size in Meta mismatch with 
 type (
 	// Entry represents the data item.
 	Entry struct {
-		Key    []byte
-		Value  []byte
-		Bucket []byte
-		Meta   *MetaData
+		Key   []byte
+		Value []byte
+		Meta  *MetaData
 	}
 
 	// Hint represents the index of the key
@@ -45,26 +44,26 @@ type (
 
 	// MetaData represents the Meta information of the data item.
 	MetaData struct {
-		KeySize    uint32
-		ValueSize  uint32
-		Timestamp  uint64
-		TTL        uint32
-		Flag       uint16 // delete / set
-		BucketSize uint32
-		TxID       uint64
-		Status     uint16 // committed / uncommitted
-		Ds         uint16 // data structure
-		Crc        uint32
+		KeySize   uint32
+		ValueSize uint32
+		Timestamp uint64
+		TTL       uint32
+		Flag      uint16 // delete / set
+		TxID      uint64
+		Status    uint16 // committed / uncommitted
+		Ds        uint16 // data structure
+		Crc       uint32
+		BucketId  uint64
 	}
 )
 
 func (meta *MetaData) PayloadSize() int64 {
-	return int64(meta.BucketSize) + int64(meta.KeySize) + int64(meta.ValueSize)
+	return int64(meta.KeySize) + int64(meta.ValueSize)
 }
 
 // Size returns the size of the entry.
 func (e *Entry) Size() int64 {
-	return DataEntryHeaderSize + int64(e.Meta.KeySize+e.Meta.ValueSize+e.Meta.BucketSize)
+	return DataEntryHeaderSize + int64(e.Meta.KeySize+e.Meta.ValueSize)
 }
 
 // Encode returns the slice after the entry be encoded.
@@ -78,15 +77,13 @@ func (e *Entry) Size() int64 {
 func (e *Entry) Encode() []byte {
 	keySize := e.Meta.KeySize
 	valueSize := e.Meta.ValueSize
-	bucketSize := e.Meta.BucketSize
 
 	// set DataItemHeader buf
 	buf := make([]byte, e.Size())
 	buf = e.setEntryHeaderBuf(buf)
 	// set bucket\key\value
-	copy(buf[DataEntryHeaderSize:(DataEntryHeaderSize+int64(bucketSize))], e.Bucket)
-	copy(buf[(DataEntryHeaderSize+int64(bucketSize)):(DataEntryHeaderSize+int64(bucketSize+keySize))], e.Key)
-	copy(buf[(DataEntryHeaderSize+int64(bucketSize+keySize)):(DataEntryHeaderSize+int64(bucketSize+keySize+valueSize))], e.Value)
+	copy(buf[DataEntryHeaderSize:(DataEntryHeaderSize+int64(keySize))], e.Key)
+	copy(buf[(DataEntryHeaderSize+int64(keySize)):(DataEntryHeaderSize+int64(keySize+valueSize))], e.Value)
 
 	c32 := crc32.ChecksumIEEE(buf[4:])
 	binary.LittleEndian.PutUint32(buf[0:4], c32)
@@ -102,10 +99,10 @@ func (e *Entry) setEntryHeaderBuf(buf []byte) []byte {
 	binary.LittleEndian.PutUint32(buf[16:20], e.Meta.ValueSize)
 	binary.LittleEndian.PutUint16(buf[20:22], e.Meta.Flag)
 	binary.LittleEndian.PutUint32(buf[22:26], e.Meta.TTL)
-	binary.LittleEndian.PutUint32(buf[26:30], e.Meta.BucketSize)
-	binary.LittleEndian.PutUint16(buf[30:32], e.Meta.Status)
-	binary.LittleEndian.PutUint16(buf[32:34], e.Meta.Ds)
-	binary.LittleEndian.PutUint64(buf[34:42], e.Meta.TxID)
+	binary.LittleEndian.PutUint16(buf[26:28], e.Meta.Status)
+	binary.LittleEndian.PutUint16(buf[28:30], e.Meta.Ds)
+	binary.LittleEndian.PutUint64(buf[30:38], e.Meta.TxID)
+	binary.LittleEndian.PutUint64(buf[38:46], e.Meta.BucketId)
 
 	return buf
 }
@@ -121,7 +118,6 @@ func (e *Entry) IsZero() bool {
 // GetCrc returns the crc at given buf slice.
 func (e *Entry) GetCrc(buf []byte) uint32 {
 	crc := crc32.ChecksumIEEE(buf[4:])
-	crc = crc32.Update(crc, crc32.IEEETable, e.Bucket)
 	crc = crc32.Update(crc, crc32.IEEETable, e.Key)
 	crc = crc32.Update(crc, crc32.IEEETable, e.Value)
 
@@ -131,15 +127,11 @@ func (e *Entry) GetCrc(buf []byte) uint32 {
 // ParsePayload means this function will parse a byte array to bucket, key, size of an entry
 func (e *Entry) ParsePayload(data []byte) error {
 	meta := e.Meta
-	bucketLowBound := 0
-	bucketHighBound := meta.BucketSize
-	keyLowBound := bucketHighBound
-	keyHighBound := meta.BucketSize + meta.KeySize
+	keyLowBound := 0
+	keyHighBound := meta.KeySize
 	valueLowBound := keyHighBound
-	valueHighBound := meta.BucketSize + meta.KeySize + meta.ValueSize
+	valueHighBound := meta.KeySize + meta.ValueSize
 
-	// parse bucket
-	e.Bucket = data[bucketLowBound:bucketHighBound]
 	// parse key
 	e.Key = data[keyLowBound:keyHighBound]
 	// parse value
@@ -160,9 +152,9 @@ func (e *Entry) ParseMeta(buf []byte) error {
 	e.Meta = NewMetaData().WithCrc(binary.LittleEndian.Uint32(buf[0:4])).
 		WithTimeStamp(binary.LittleEndian.Uint64(buf[4:12])).WithKeySize(binary.LittleEndian.Uint32(buf[12:16])).
 		WithValueSize(binary.LittleEndian.Uint32(buf[16:20])).WithFlag(binary.LittleEndian.Uint16(buf[20:22])).
-		WithTTL(binary.LittleEndian.Uint32(buf[22:26])).WithBucketSize(binary.LittleEndian.Uint32(buf[26:30])).
-		WithStatus(binary.LittleEndian.Uint16(buf[30:32])).WithDs(binary.LittleEndian.Uint16(buf[32:34])).
-		WithTxID(binary.LittleEndian.Uint64(buf[34:42]))
+		WithTTL(binary.LittleEndian.Uint32(buf[22:26])).
+		WithStatus(binary.LittleEndian.Uint16(buf[26:28])).WithDs(binary.LittleEndian.Uint16(buf[28:30])).
+		WithTxID(binary.LittleEndian.Uint64(buf[30:38])).WithBucketId(binary.LittleEndian.Uint64(buf[38:46]))
 	return nil
 }
 
@@ -189,7 +181,7 @@ func (e *Entry) valid() error {
 	if len(e.Key) == 0 {
 		return ErrKeyEmpty
 	}
-	if len(e.Bucket) > MAX_SIZE || len(e.Key) > MAX_SIZE || len(e.Value) > MAX_SIZE {
+	if len(e.Key) > MAX_SIZE || len(e.Value) > MAX_SIZE {
 		return ErrDataSizeExceed
 	}
 	return nil
@@ -247,17 +239,6 @@ func (e *Entry) WithMeta(meta *MetaData) *Entry {
 	return e
 }
 
-// WithBucket set bucket to Entry
-func (e *Entry) WithBucket(bucket []byte) *Entry {
-	e.Bucket = bucket
-	return e
-}
-
-// GetBucketString return the string of bucket
-func (e *Entry) GetBucketString() string {
-	return string(e.Bucket)
-}
-
 // GetTxIDBytes return the bytes of TxID
 func (e *Entry) GetTxIDBytes() []byte {
 	return []byte(strconv2.Int64ToStr(int64(e.Meta.TxID)))
@@ -292,13 +273,13 @@ func (meta *MetaData) WithFlag(flag uint16) *MetaData {
 	return meta
 }
 
-func (meta *MetaData) WithBucketSize(bucketSize uint32) *MetaData {
-	meta.BucketSize = bucketSize
+func (meta *MetaData) WithTxID(txID uint64) *MetaData {
+	meta.TxID = txID
 	return meta
 }
 
-func (meta *MetaData) WithTxID(txID uint64) *MetaData {
-	meta.TxID = txID
+func (meta *MetaData) WithBucketId(bucketID uint64) *MetaData {
+	meta.BucketId = bucketID
 	return meta
 }
 

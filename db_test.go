@@ -932,11 +932,6 @@ func TestDB_ChangeMode_RestartDB(t *testing.T) {
 			db, err = Open(opts)
 			require.NoError(t, err)
 
-			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
-			txCreateBucket(t, db, DataStructureList, bucket, nil)
-			txCreateBucket(t, db, DataStructureSet, bucket, nil)
-			txCreateBucket(t, db, DataStructureSortedSet, bucket, nil)
-
 			// k-v
 			for i := 0; i < 10; i++ {
 				txGet(t, db, bucket, GetTestBytes(i), GetTestBytes(i), nil)

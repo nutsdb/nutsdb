@@ -31,14 +31,12 @@ type EntryTestSuite struct {
 
 func (suite *EntryTestSuite) SetupSuite() {
 	suite.entry = Entry{
-		Key:    []byte("key_0001"),
-		Value:  []byte("val_0001"),
-		Bucket: []byte("test_entry"),
+		Key:   []byte("key_0001"),
+		Value: []byte("val_0001"),
 		Meta: NewMetaData().WithKeySize(uint32(len("key_0001"))).
-			WithValueSize(uint32(len("val_0001"))).WithTimeStamp(1547707905).WithTTL(Persistent).
-			WithBucketSize(uint32(len("test_entry"))).WithFlag(DataSetFlag),
+			WithValueSize(uint32(len("val_0001"))).WithTimeStamp(1547707905).WithTTL(Persistent).WithFlag(DataSetFlag).WithBucketId(1),
 	}
-	suite.expectedEncode = []byte{48, 176, 185, 16, 1, 38, 64, 92, 0, 0, 0, 0, 8, 0, 0, 0, 8, 0, 0, 0, 1, 0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 116, 101, 115, 116, 95, 101, 110, 116, 114, 121, 107, 101, 121, 95, 48, 48, 48, 49, 118, 97, 108, 95, 48, 48, 48, 49}
+	suite.expectedEncode = []byte{228, 252, 145, 200, 1, 38, 64, 92, 0, 0, 0, 0, 8, 0, 0, 0, 8, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 107, 101, 121, 95, 48, 48, 48, 49, 118, 97, 108, 95, 48, 48, 48, 49}
 }
 
 func (suite *EntryTestSuite) TestEncode() {
@@ -56,7 +54,7 @@ func (suite *EntryTestSuite) TestIsZero() {
 
 func (suite *EntryTestSuite) TestGetCrc() {
 
-	crc1 := suite.entry.GetCrc(suite.expectedEncode[:42])
+	crc1 := suite.entry.GetCrc(suite.expectedEncode[:DataEntryHeaderSize])
 	crc2 := binary.LittleEndian.Uint32(suite.expectedEncode[:4])
 
 	if crc1 != crc2 {
