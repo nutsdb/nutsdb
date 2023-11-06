@@ -100,7 +100,9 @@ func TestDB_MergeForSet(t *testing.T) {
 	for _, idxMode := range []EntryIdxMode{HintKeyValAndRAMIdxMode, HintKeyAndRAMIdxMode} {
 		opts.EntryIdxMode = idxMode
 		db, err := Open(opts)
-		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+		if exist := db.bm.ExistBucket(Ds(DataStructureSet), BucketName(bucket)); !exist {
+			txCreateBucket(t, db, DataStructureSet, bucket, nil)
+		}
 
 		require.NoError(t, err)
 
@@ -197,8 +199,9 @@ func TestDB_MergeForZSet(t *testing.T) {
 
 		opts.EntryIdxMode = idxMode
 		db, err := Open(opts)
-		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
-
+		if exist := db.bm.ExistBucket(Ds(DataStructureSortedSet), BucketName(bucket)); !exist {
+			txCreateBucket(t, db, DataStructureSortedSet, bucket, nil)
+		}
 		require.NoError(t, err)
 
 		// add items
@@ -298,7 +301,9 @@ func TestDB_MergeForList(t *testing.T) {
 	for _, idxMode := range []EntryIdxMode{HintKeyValAndRAMIdxMode, HintKeyAndRAMIdxMode} {
 		opts.EntryIdxMode = idxMode
 		db, err := Open(opts)
-		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+		if exist := db.bm.ExistBucket(Ds(DataStructureList), BucketName(bucket)); !exist {
+			txCreateBucket(t, db, DataStructureList, bucket, nil)
+		}
 
 		require.NoError(t, err)
 

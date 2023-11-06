@@ -39,6 +39,7 @@ func TestTx_RPush(t *testing.T) {
 	// 1. Insert values for some keys by using RPush
 	// 2. Validate values for these keys by using RPop
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureList, bucket, nil)
 		pushDataByStartEnd(t, db, bucket, 0, 0, 9, false)
 		pushDataByStartEnd(t, db, bucket, 1, 10, 19, false)
 		pushDataByStartEnd(t, db, bucket, 2, 20, 29, false)
@@ -61,6 +62,8 @@ func TestTx_LPush(t *testing.T) {
 	// 1. Insert values for some keys by using LPush
 	// 2. Validate values for these keys by using LPop
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureList, bucket, nil)
+
 		pushDataByStartEnd(t, db, bucket, 0, 0, 9, true)
 		pushDataByStartEnd(t, db, bucket, 1, 10, 19, true)
 		pushDataByStartEnd(t, db, bucket, 2, 20, 29, true)
@@ -82,6 +85,8 @@ func TestTx_LPush(t *testing.T) {
 func TestTx_LPushRaw(t *testing.T) {
 	bucket := "bucket"
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureList, bucket, nil)
+
 		seq := uint64(100000)
 		for i := 0; i <= 100; i++ {
 			key := encodeListKey([]byte("0"), seq)
@@ -99,6 +104,7 @@ func TestTx_LPushRaw(t *testing.T) {
 func TestTx_RPushRaw(t *testing.T) {
 	bucket := "bucket"
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureList, bucket, nil)
 		seq := uint64(100000)
 		for i := 0; i <= 100; i++ {
 			key := encodeListKey([]byte("0"), seq)
@@ -120,11 +126,13 @@ func TestTx_LPop(t *testing.T) {
 
 	// Calling LPop on a non-existent list
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureList, bucket, nil)
 		txPop(t, db, bucket, GetTestBytes(0), nil, ErrListNotFound, true)
 	})
 
 	// Insert some values for a key and validate them by using LPop
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureList, bucket, nil)
 		pushDataByStartEnd(t, db, bucket, 0, 0, 2, true)
 		for i := 0; i < 3; i++ {
 			txPop(t, db, bucket, GetTestBytes(0), GetTestBytes(2-i), nil, true)
@@ -137,11 +145,13 @@ func TestTx_RPop(t *testing.T) {
 
 	// Calling RPop on a non-existent list
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureList, bucket, nil)
 		txPop(t, db, bucket, GetTestBytes(0), nil, ErrListNotFound, false)
 	})
 
 	// Calling RPop on a list with added data
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureList, bucket, nil)
 		pushDataByStartEnd(t, db, bucket, 0, 0, 2, false)
 
 		txPop(t, db, "fake_bucket", GetTestBytes(0), nil, ErrListNotFound, false)
@@ -159,11 +169,15 @@ func TestTx_LRange(t *testing.T) {
 
 	// Calling LRange on a non-existent list
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureList, bucket, nil)
+
 		txLRange(t, db, bucket, GetTestBytes(0), 0, -1, 0, nil, ErrListNotFound)
 	})
 
 	// Calling LRange on a list with added data
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureList, bucket, nil)
+
 		pushDataByStartEnd(t, db, bucket, 0, 0, 2, true)
 
 		txLRange(t, db, bucket, GetTestBytes(0), 0, -1, 3, [][]byte{
@@ -183,11 +197,14 @@ func TestTx_LRem(t *testing.T) {
 
 	// Calling LRem on a non-existent list
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureList, bucket, nil)
 		txLRem(t, db, bucket, GetTestBytes(0), 1, GetTestBytes(0), ErrListNotFound)
 	})
 
 	// A basic calling for LRem
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureList, bucket, nil)
+
 		pushDataByStartEnd(t, db, bucket, 0, 0, 3, true)
 
 		txLRem(t, db, bucket, GetTestBytes(0), 1, GetTestBytes(0), nil)
@@ -200,6 +217,8 @@ func TestTx_LRem(t *testing.T) {
 
 	// Calling LRem with count > 0
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureList, bucket, nil)
+
 		count := 3
 
 		pushDataByValues(t, db, bucket, 1, true, 0, 1, 0, 1, 0, 1, 0, 1)
@@ -216,6 +235,7 @@ func TestTx_LRem(t *testing.T) {
 
 	// Calling LRem with count == 0
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureList, bucket, nil)
 		count := 0
 
 		pushDataByValues(t, db, bucket, 1, true, 0, 1, 0, 1, 0, 1, 0, 1)
@@ -232,6 +252,8 @@ func TestTx_LRem(t *testing.T) {
 
 	// Calling LRem with count < 0
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureList, bucket, nil)
+
 		count := -3
 
 		pushDataByValues(t, db, bucket, 1, true, 0, 1, 0, 1, 0, 1, 0, 1)
@@ -252,11 +274,13 @@ func TestTx_LTrim(t *testing.T) {
 
 	// Calling LTrim on a non-existent list
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureList, bucket, nil)
 		txLTrim(t, db, bucket, GetTestBytes(0), 0, 1, ErrListNotFound)
 	})
 
 	// Calling LTrim on a list with added data and use LRange to validate it
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureList, bucket, nil)
 		pushDataByStartEnd(t, db, bucket, 0, 0, 2, true)
 		txLTrim(t, db, bucket, GetTestBytes(0), 0, 1, nil)
 
@@ -267,6 +291,8 @@ func TestTx_LTrim(t *testing.T) {
 
 	// Calling LTrim with incorrect start and end
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureList, bucket, nil)
+
 		for i := 0; i < 3; i++ {
 			txPush(t, db, bucket, GetTestBytes(2), GetTestBytes(i), true, nil, nil)
 		}
@@ -279,11 +305,13 @@ func TestTx_LSize(t *testing.T) {
 
 	// Calling LSize on a non-existent list
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureList, bucket, nil)
 		txLSize(t, db, bucket, GetTestBytes(0), 0, ErrListNotFound)
 	})
 
 	// Calling LSize after adding some values
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureList, bucket, nil)
 		pushDataByStartEnd(t, db, bucket, 0, 0, 2, false)
 		txLSize(t, db, bucket, GetTestBytes(0), 3, nil)
 	})
@@ -294,17 +322,20 @@ func TestTx_LRemByIndex(t *testing.T) {
 
 	// Calling LRemByIndex on a non-existent list
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureList, bucket, nil)
 		txLRemByIndex(t, db, bucket, GetTestBytes(0), ErrListNotFound)
 	})
 
 	// Calling LRemByIndex with len(indexes) == 0
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureList, bucket, nil)
 		pushDataByValues(t, db, bucket, 0, true, 0)
 		txLRemByIndex(t, db, bucket, GetTestBytes(0), nil)
 	})
 
 	// Calling LRemByIndex with a expired bucket name
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureList, bucket, nil)
 		pushDataByValues(t, db, bucket, 0, true, 0)
 		txExpireList(t, db, bucket, GetTestBytes(0), 1, nil)
 		time.Sleep(3 * time.Second)
@@ -313,6 +344,7 @@ func TestTx_LRemByIndex(t *testing.T) {
 
 	// Calling LRemByIndex on a list with added data and use LRange to validate it
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureList, bucket, nil)
 		pushDataByStartEnd(t, db, bucket, 0, 0, 2, false)
 		txLRemByIndex(t, db, bucket, GetTestBytes(0), nil, 1, 0, 8, -8, 88, -88)
 		txLRange(t, db, bucket, GetTestBytes(0), 0, -1, 1, [][]byte{
@@ -326,6 +358,7 @@ func TestTx_ExpireList(t *testing.T) {
 
 	// Verify that the list with expiration time expires normally
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureList, bucket, nil)
 		pushDataByStartEnd(t, db, bucket, 0, 0, 3, false)
 		txLRange(t, db, bucket, GetTestBytes(0), 0, -1, 4, [][]byte{
 			GetTestBytes(0), GetTestBytes(1), GetTestBytes(2), GetTestBytes(3),
@@ -338,6 +371,7 @@ func TestTx_ExpireList(t *testing.T) {
 
 	// Verify that the list with persistent time
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureList, bucket, nil)
 		pushDataByStartEnd(t, db, bucket, 0, 0, 3, false)
 		txExpireList(t, db, bucket, GetTestBytes(0), Persistent, nil)
 		time.Sleep(time.Second)
@@ -352,6 +386,7 @@ func TestTx_LKeys(t *testing.T) {
 
 	// Calling LKeys after adding some keys
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureList, bucket, nil)
 		pushDataByValues(t, db, bucket, 10, false, 0)
 		pushDataByValues(t, db, bucket, 11, false, 1)
 		pushDataByValues(t, db, bucket, 12, false, 2)
@@ -376,6 +411,7 @@ func TestTx_GetListTTL(t *testing.T) {
 
 	// Verify TTL of list
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureList, bucket, nil)
 		pushDataByStartEnd(t, db, bucket, 0, 0, 3, false)
 
 		txGetListTTL(t, db, bucket, GetTestBytes(0), uint32(0), nil)
@@ -396,6 +432,7 @@ func TestTx_ListEntryIdxMode_HintKeyValAndRAMIdxMode(t *testing.T) {
 
 	// HintKeyValAndRAMIdxMode
 	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureList, bucket, nil)
 		err := db.Update(func(tx *Tx) error {
 			err := tx.LPush(bucket, key, []byte("d"), []byte("c"), []byte("b"), []byte("a"))
 			require.NoError(t, err)
@@ -422,6 +459,7 @@ func TestTx_ListEntryIdxMode_HintKeyAndRAMIdxMode(t *testing.T) {
 
 	// HintKeyAndRAMIdxMode
 	runNutsDBTest(t, opts, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureList, bucket, nil)
 		err := db.Update(func(tx *Tx) error {
 			err := tx.LPush(bucket, key, []byte("d"), []byte("c"), []byte("b"), []byte("a"))
 			require.NoError(t, err)
