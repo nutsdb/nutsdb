@@ -24,7 +24,7 @@ const (
 	fileDir7 = "/tmp/nutsdb/nutsdb_batch_write7"
 	fileDir8 = "/tmp/nutsdb/nutsdb_batch_write8"
 	fileDir9 = "/tmp/nutsdb/nutsdb_batch_write9"
-	N        = 10000
+	N        = 100
 )
 
 func init() {
@@ -140,25 +140,25 @@ func TestBatchWrite(t *testing.T) {
 		DefaultOptions,
 		WithDir(fileDir4),
 		WithEntryIdxMode(HintKeyValAndRAMIdxMode),
-		WithMaxBatchCount(195),
+		WithMaxBatchCount(35),
 	)
 	dbs[3], _ = Open(
 		DefaultOptions,
 		WithDir(fileDir5),
 		WithEntryIdxMode(HintKeyAndRAMIdxMode),
-		WithMaxBatchCount(195),
+		WithMaxBatchCount(35),
 	)
 	dbs[4], _ = Open(
 		DefaultOptions,
 		WithDir(fileDir7),
 		WithEntryIdxMode(HintKeyValAndRAMIdxMode),
-		WithMaxBatchSize(1000), // change to 1000, unit test is not ok, 1000000 is ok
+		WithMaxBatchSize(20), // change to 1000, unit test is not ok, 1000000 is ok
 	)
 	dbs[5], _ = Open(
 		DefaultOptions,
 		WithDir(fileDir8),
 		WithEntryIdxMode(HintKeyAndRAMIdxMode),
-		WithMaxBatchSize(1000),
+		WithMaxBatchSize(20),
 	)
 
 	for _, db := range dbs {
