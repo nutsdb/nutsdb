@@ -274,6 +274,10 @@ func (tx *Tx) Commit() (err error) {
 	}
 	tx.db.RecordCount += curWriteCount
 
+	if err := tx.DeleteBucketInIndex(); err != nil {
+
+	}
+
 	return nil
 }
 
@@ -764,4 +768,26 @@ func (tx *Tx) SubmitBucket() error {
 		}
 	}
 	return tx.db.bm.SubmitPendingBucketChange(bucketReqs)
+}
+
+func (tx *Tx) DeleteBucketInIndex() error {
+	for _, mapper := range tx.pendingBucketList {
+		for _, bucket := range mapper {
+			if bucket.Meta.Op == BucketDeleteOperation {
+				switch bucket.Ds {
+				case Ds(DataStructureBTree):
+					tx.db.Index.bTree.delete(bucket.Name)
+				case Ds(DataStructureList):
+					tx.db.Index.list.delete(bucket.Name)
+				case Ds(DataStructureSet):
+					tx.db.Index.set.delete(bucket.Name)
+				case Ds(DataStructureSortedSet):
+					tx.db.Index.sortedSet.delete(bucket.Name)
+				default:
+					return errors.New("unsupported data structure")
+				}
+			}
+		}
+	}
+	return nil
 }
