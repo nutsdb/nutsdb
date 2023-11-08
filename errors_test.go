@@ -145,7 +145,6 @@ func TestIsDBClosed(t *testing.T) {
 }
 
 func TestIsPrefixScan(t *testing.T) {
-	t.Skip()
 	bucket := "test_prefix_scan"
 	t.Run("if prefix scanning not found the result return true", func(t *testing.T) {
 		withDefaultDB(t, func(t *testing.T, db *DB) {

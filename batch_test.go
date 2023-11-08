@@ -46,7 +46,6 @@ func init() {
 }
 
 func TestBatchWrite(t *testing.T) {
-	t.Skip()
 	TestFlushPanic := func(t *testing.T, db *DB) {
 		wb, err := db.NewWriteBatch()
 		require.NoError(t, err)
