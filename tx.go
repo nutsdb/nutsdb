@@ -784,7 +784,7 @@ func (tx *Tx) DeleteBucketInIndex() error {
 				case Ds(DataStructureSortedSet):
 					tx.db.Index.sortedSet.delete(bucket.Name)
 				default:
-					return errors.New("unsupported data structure")
+					return ErrDataStructureNotSupported
 				}
 			}
 		}

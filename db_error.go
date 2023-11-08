@@ -18,9 +18,6 @@ var (
 	// ErrDataStructureNotSupported is returned when pass a not supported data structure
 	ErrDataStructureNotSupported = errors.New("this data structure is not supported for now")
 
-	// ErrNotSupportHintBPTSparseIdxMode is returned not support mode `HintBPTSparseIdxMode`
-	ErrNotSupportHintBPTSparseIdxMode = errors.New("not support mode `HintBPTSparseIdxMode`")
-
 	// ErrDirLocked is returned when can't get the file lock of dir
 	ErrDirLocked = errors.New("the dir of db is locked")
 
