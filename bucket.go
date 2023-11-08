@@ -16,9 +16,9 @@ const (
 type BucketOperation uint16
 
 const (
-	BucketInsertOperation = 1
-	BucketUpdateOperation = 2
-	BucketDeleteOperation = 3
+	BucketInsertOperation BucketOperation = 1
+	BucketUpdateOperation BucketOperation = 2
+	BucketDeleteOperation BucketOperation = 3
 )
 
 var ErrBucketCrcInvalid = errors.New("bucket crc invalid")
@@ -29,16 +29,24 @@ func init() {
 
 // BucketMeta stores the Meta info of a Bucket. E.g. the size of bucket it store in disk.
 type BucketMeta struct {
-	Crc  uint32
-	Op   BucketOperation
+	Crc uint32
+	// Op: Mark the latest operation (e.g. delete, insert, update) for this bucket.
+	Op BucketOperation
+	// Size: the size of payload.
 	Size uint32
 }
 
 // Bucket is the disk structure of bucket
 type Bucket struct {
+	// Meta: the metadata for this bucket
 	Meta *BucketMeta
-	Id   uint64
-	Ds   Ds
+	// Id: is the marker for this bucket, every bucket creation activity will generate a new Id for it.
+	// for example. If you have a bucket called "bucket_1", and you just delete bucket and create it again.
+	// the last bucket will have a different Id from the previous one.
+	Id uint64
+	// Ds: the data structure for this bucket. (List, Set, SortSet, String)
+	Ds Ds
+	// Name: the name of this bucket.
 	Name string
 }
 

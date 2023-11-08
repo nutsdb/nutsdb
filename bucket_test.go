@@ -18,7 +18,7 @@ func TestBucket_DecodeAndDecode(t *testing.T) {
 
 	bucketMeta := &BucketMeta{}
 	bucketMeta.Decode(bytes[:BucketMetaSize])
-	assert.Equal(t, bucketMeta.Op, BucketOperation(BucketInsertOperation))
+	assert.Equal(t, bucketMeta.Op, BucketInsertOperation)
 	assert.Equal(t, int64(8+2+8), int64(bucketMeta.Size))
 	decodeBucket := &Bucket{Meta: bucketMeta}
 
