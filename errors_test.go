@@ -149,8 +149,8 @@ func TestIsPrefixScan(t *testing.T) {
 	t.Run("if prefix scanning not found the result return true", func(t *testing.T) {
 		withDefaultDB(t, func(t *testing.T, db *DB) {
 			{
-				tx, err := db.Begin(true)
 				txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+				tx, err := db.Begin(true)
 				require.NoError(t, err)
 				for i := 0; i <= 10; i++ {
 					key := []byte("key_" + fmt.Sprintf("%07d", i))

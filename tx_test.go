@@ -24,15 +24,12 @@ import (
 
 // todo to check is there any deadlock here?
 func TestTx_Rollback(t *testing.T) {
-	t.Skip()
 
 	withDefaultDB(t, func(t *testing.T, db *DB) {
-
-		tx, err := db.Begin(true)
-		assert.NoError(t, err)
-
 		bucket := "bucket_rollback_test"
 		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+		tx, err := db.Begin(true)
+		assert.NoError(t, err)
 
 		for i := 0; i < 10; i++ {
 			key := []byte("key_" + fmt.Sprintf("%03d", i))
