@@ -83,7 +83,7 @@ func TestBucketManager_DeleteBucketIsolation(t *testing.T) {
 		txCreateBucket(t, db, DataStructureBTree, bucket1, nil)
 		txPut(t, db, bucket1, []byte("key_1"), []byte("value_1"), Persistent, nil, nil)
 		txDeleteBucket(t, db, DataStructureBTree, bucket1, nil)
-		txGet(t, db, bucket1, []byte("key_1"), nil, ErrBucketNotFound)
+		txGet(t, db, bucket1, []byte("key_1"), nil, ErrBucketNotExist)
 	})
 }
 

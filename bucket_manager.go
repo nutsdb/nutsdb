@@ -10,15 +10,15 @@ var ErrBucketNotExist = errors.New("bucket not exist")
 const BucketStoreFileName = "bucket.Meta"
 
 type Ds uint16
-type Id uint64
+type BucketId uint64
 type BucketName string
 
 type BucketManager struct {
 	fd *os.File
 	// BucketInfoMapper BucketID => Bucket itself
-	BucketInfoMapper map[Id]*Bucket
+	BucketInfoMapper map[BucketId]*Bucket
 
-	BucketIDMarker map[BucketName]map[Ds]Id
+	BucketIDMarker map[BucketName]map[Ds]BucketId
 
 	// IDGenerator helps generates an ID for every single bucket
 	Gen *IDGenerator
@@ -26,8 +26,8 @@ type BucketManager struct {
 
 func NewBucketManager(dir string) (*BucketManager, error) {
 	bm := &BucketManager{
-		BucketInfoMapper: map[Id]*Bucket{},
-		BucketIDMarker:   map[BucketName]map[Ds]Id{},
+		BucketInfoMapper: map[BucketId]*Bucket{},
+		BucketIDMarker:   map[BucketName]map[Ds]BucketId{},
 	}
 	bucketFilePath := dir + "/" + BucketStoreFileName
 	_, err := os.Stat(bucketFilePath)
@@ -57,19 +57,19 @@ func (bm *BucketManager) SubmitPendingBucketChange(reqs []*bucketSubmitRequest) 
 		bytes = append(bytes, bs...)
 		// update the marker info
 		if _, exist := bm.BucketIDMarker[req.name]; !exist {
-			bm.BucketIDMarker[req.name] = map[Ds]Id{}
+			bm.BucketIDMarker[req.name] = map[Ds]BucketId{}
 		}
 		switch req.bucket.Meta.Op {
 		case BucketInsertOperation:
-			bm.BucketInfoMapper[Id(req.bucket.Id)] = req.bucket
-			bm.BucketIDMarker[req.name][req.bucket.Ds] = Id(req.bucket.Id)
+			bm.BucketInfoMapper[BucketId(req.bucket.Id)] = req.bucket
+			bm.BucketIDMarker[req.name][req.bucket.Ds] = BucketId(req.bucket.Id)
 		case BucketDeleteOperation:
 			if len(bm.BucketIDMarker[req.name]) == 1 {
 				delete(bm.BucketIDMarker, req.name)
 			} else {
 				delete(bm.BucketIDMarker[req.name], req.bucket.Ds)
 			}
-			delete(bm.BucketInfoMapper, Id(req.bucket.Id))
+			delete(bm.BucketInfoMapper, BucketId(req.bucket.Id))
 		}
 	}
 	_, err := bm.fd.Write(bytes)
@@ -111,14 +111,14 @@ func (bm *BucketManager) GetBucket(ds Ds, name BucketName) (b *Bucket, err error
 }
 
 func (bm *BucketManager) GetBucketById(id uint64) (*Bucket, error) {
-	if bucket, exist := bm.BucketInfoMapper[Id(id)]; exist {
+	if bucket, exist := bm.BucketInfoMapper[BucketId(id)]; exist {
 		return bucket, nil
 	} else {
 		return nil, ErrBucketNotExist
 	}
 }
 
-func (bm *BucketManager) GetBucketID(ds Ds, name BucketName) (uint64, error) {
+func (bm *BucketManager) GetBucketID(ds Ds, name BucketName) (BucketId, error) {
 	if bucket, err := bm.GetBucket(ds, name); err != nil {
 		return 0, err
 	} else {

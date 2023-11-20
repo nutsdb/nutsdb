@@ -25,7 +25,7 @@ var tx *Tx
 func TestTx_ZCheck(t *testing.T) {
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		err := db.View(func(tx *Tx) error {
-			require.Equal(t, ErrBucket, tx.ZCheck("fake bucket"))
+			require.Equal(t, ErrBucketNotExist, tx.ZCheck("fake bucket"))
 			return nil
 		})
 		require.NoError(t, err)
@@ -354,7 +354,7 @@ func TestTx_ZSetEntryIdxMode_HintKeyValAndRAMIdxMode(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		zset := db.Index.sortedSet.getWithDefault(bucket, db).M[string(key)]
+		zset := db.Index.sortedSet.getWithDefault(1, db).M[string(key)]
 		hash, _ := getFnv32(value)
 		node := zset.dict[hash]
 
@@ -382,7 +382,7 @@ func TestTx_ZSetEntryIdxMode_HintKeyAndRAMIdxMode(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		zset := db.Index.sortedSet.getWithDefault(bucket, db).M[string(key)]
+		zset := db.Index.sortedSet.getWithDefault(1, db).M[string(key)]
 		hash, _ := getFnv32(value)
 		node := zset.dict[hash]
 

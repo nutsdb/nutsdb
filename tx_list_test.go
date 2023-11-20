@@ -154,7 +154,7 @@ func TestTx_RPop(t *testing.T) {
 		txCreateBucket(t, db, DataStructureList, bucket, nil)
 		pushDataByStartEnd(t, db, bucket, 0, 0, 2, false)
 
-		txPop(t, db, "fake_bucket", GetTestBytes(0), nil, ErrListNotFound, false)
+		txPop(t, db, "fake_bucket", GetTestBytes(0), nil, ErrBucketNotExist, false)
 
 		for i := 0; i < 3; i++ {
 			txPop(t, db, bucket, GetTestBytes(0), GetTestBytes(2-i), nil, false)
@@ -441,7 +441,7 @@ func TestTx_ListEntryIdxMode_HintKeyValAndRAMIdxMode(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		listIdx := db.Index.list.getWithDefault(bucket)
+		listIdx := db.Index.list.getWithDefault(1)
 		item, ok := listIdx.Items[string(key)].PopMin()
 		r := item.r
 		require.True(t, ok)
@@ -468,7 +468,7 @@ func TestTx_ListEntryIdxMode_HintKeyAndRAMIdxMode(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		listIdx := db.Index.list.getWithDefault(bucket)
+		listIdx := db.Index.list.getWithDefault(1)
 		item, ok := listIdx.Items[string(key)].PopMin()
 		r := item.r
 		require.True(t, ok)

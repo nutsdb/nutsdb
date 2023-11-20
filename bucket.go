@@ -43,7 +43,7 @@ type Bucket struct {
 	// Id: is the marker for this bucket, every bucket creation activity will generate a new Id for it.
 	// for example. If you have a bucket called "bucket_1", and you just delete bucket and create it again.
 	// the last bucket will have a different Id from the previous one.
-	Id uint64
+	Id BucketId
 	// Ds: the data structure for this bucket. (List, Set, SortSet, String)
 	Ds Ds
 	// Name: the name of this bucket.
@@ -61,14 +61,14 @@ func (meta *BucketMeta) Decode(bytes []byte) {
 	meta.Op = BucketOperation(op)
 }
 
-// Encode : Meta | Id | Ds | BucketName
+// Encode : Meta | BucketId | Ds | BucketName
 func (b *Bucket) Encode() []byte {
 	entrySize := b.GetEntrySize()
 	buf := make([]byte, entrySize)
 	b.Meta.Size = uint32(b.GetPayloadSize())
 	binary.LittleEndian.PutUint16(buf[4:6], uint16(b.Meta.Op))
 	binary.LittleEndian.PutUint32(buf[6:10], b.Meta.Size)
-	binary.LittleEndian.PutUint64(buf[BucketMetaSize:BucketMetaSize+IdSize], b.Id)
+	binary.LittleEndian.PutUint64(buf[BucketMetaSize:BucketMetaSize+IdSize], uint64(b.Id))
 	binary.LittleEndian.PutUint16(buf[BucketMetaSize+IdSize:BucketMetaSize+IdSize+DsSize], uint16(b.Ds))
 	copy(buf[BucketMetaSize+IdSize+DsSize:], b.Name)
 	c32 := crc32.ChecksumIEEE(buf[4:])
@@ -78,13 +78,13 @@ func (b *Bucket) Encode() []byte {
 	return buf
 }
 
-// Decode : Meta | Id | Ds | BucketName
+// Decode : Meta | BucketId | Ds | BucketName
 func (b *Bucket) Decode(bytes []byte) error {
 	// parse the payload
 	id := binary.LittleEndian.Uint64(bytes[:IdSize])
 	ds := binary.LittleEndian.Uint16(bytes[IdSize : IdSize+DsSize])
 	name := bytes[IdSize+DsSize:]
-	b.Id = id
+	b.Id = BucketId(id)
 	b.Name = string(name)
 	b.Ds = Ds(ds)
 	return nil

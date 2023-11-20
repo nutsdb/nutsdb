@@ -103,7 +103,7 @@ func TestTx_SMembers(t *testing.T) {
 		txSIsMember(t, db, bucket, key, val1, true)
 		txSIsMember(t, db, bucket, key, val1, true)
 
-		txSMembers(t, db, fakeBucket, key, 0, ErrBucketNotFound)
+		txSMembers(t, db, fakeBucket, key, 0, ErrBucketNotExist)
 	})
 }
 
@@ -123,7 +123,7 @@ func TestTx_SCard(t *testing.T) {
 
 		txSCard(t, db, bucket, key, 3, nil)
 
-		txSCard(t, db, fakeBucket, key, 0, ErrBucketNotFound)
+		txSCard(t, db, fakeBucket, key, 0, ErrBucketNotExist)
 	})
 }
 
@@ -151,7 +151,7 @@ func TestTx_SDiffByOneBucket(t *testing.T) {
 
 		diff := [][]byte{val1, val2}
 		txSDiffByOneBucket(t, db, bucket, key1, key2, diff, nil)
-		txSDiffByOneBucket(t, db, fakeBucket, key2, key1, nil, ErrBucketNotFound)
+		txSDiffByOneBucket(t, db, fakeBucket, key2, key1, nil, ErrBucketNotExist)
 
 		txSAdd(t, db, bucket, key3, val1, nil, nil)
 		txSAdd(t, db, bucket, key3, val2, nil, nil)
@@ -192,8 +192,8 @@ func TestTx_SDiffByTwoBuckets(t *testing.T) {
 		diff := [][]byte{val1, val2}
 		txSDiffByTwoBucket(t, db, bucket1, key1, bucket2, key2, diff, nil)
 
-		txSDiffByTwoBucket(t, db, fmt.Sprintf(fakeBucket, 1), key1, bucket2, key2, nil, ErrBucketNotFound)
-		txSDiffByTwoBucket(t, db, bucket1, key1, fmt.Sprintf(fakeBucket, 2), key2, nil, ErrBucketNotFound)
+		txSDiffByTwoBucket(t, db, fmt.Sprintf(fakeBucket, 1), key1, bucket2, key2, nil, ErrBucketNotExist)
+		txSDiffByTwoBucket(t, db, bucket1, key1, fmt.Sprintf(fakeBucket, 2), key2, nil, ErrBucketNotExist)
 
 		txSAdd(t, db, bucket3, key3, val1, nil, nil)
 		txSAdd(t, db, bucket3, key3, val2, nil, nil)
@@ -222,7 +222,7 @@ func TestTx_SPop(t *testing.T) {
 		txSPop(t, db, bucket, key, nil)
 		txSCard(t, db, bucket, key, 2, nil)
 
-		txSPop(t, db, fakeBucket, key, ErrBucketNotFound)
+		txSPop(t, db, fakeBucket, key, ErrBucketNotExist)
 	})
 
 }
@@ -247,7 +247,7 @@ func TestTx_SMoveByOneBucket(t *testing.T) {
 		txSIsMember(t, db, bucket, key1, val2, false)
 		txSIsMember(t, db, bucket, key2, val2, true)
 
-		txSMoveByOneBucket(t, db, fakeBucket, key1, key2, val2, false, ErrBucket)
+		txSMoveByOneBucket(t, db, fakeBucket, key1, key2, val2, false, ErrBucketNotExist)
 	})
 }
 
@@ -277,9 +277,9 @@ func TestTx_SMoveByTwoBuckets(t *testing.T) {
 
 		txSMoveByTwoBuckets(t, db, bucket1, fakeKey1, bucket2, key2, val2, false, ErrNotFoundKey)
 		txSMoveByTwoBuckets(t, db, bucket1, key1, bucket2, fakeKey2, val2, false, ErrNotFoundKey)
-		txSMoveByTwoBuckets(t, db, fmt.Sprintf(fakeBucket, 1), key1, bucket2, key2, val2, false, ErrBucketNotFound)
-		txSMoveByTwoBuckets(t, db, bucket1, key1, fmt.Sprintf(fakeBucket, 2), key2, val2, false, ErrBucketNotFound)
-		txSMoveByTwoBuckets(t, db, fmt.Sprintf(fakeBucket, 1), key1, fmt.Sprintf(fakeBucket, 2), key2, val2, false, ErrBucketNotFound)
+		txSMoveByTwoBuckets(t, db, fmt.Sprintf(fakeBucket, 1), key1, bucket2, key2, val2, false, ErrBucketNotExist)
+		txSMoveByTwoBuckets(t, db, bucket1, key1, fmt.Sprintf(fakeBucket, 2), key2, val2, false, ErrBucketNotExist)
+		txSMoveByTwoBuckets(t, db, fmt.Sprintf(fakeBucket, 1), key1, fmt.Sprintf(fakeBucket, 2), key2, val2, false, ErrBucketNotExist)
 	})
 }
 
@@ -308,7 +308,7 @@ func TestTx_SUnionByOneBucket(t *testing.T) {
 			txSIsMember(t, db, bucket, key3, item, true)
 		}
 
-		txSUnionByOneBucket(t, db, fakeBucket, key1, key2, nil, ErrBucket)
+		txSUnionByOneBucket(t, db, fakeBucket, key1, key2, nil, ErrBucketNotExist)
 	})
 }
 
@@ -334,8 +334,8 @@ func TestTx_SUnionByTwoBuckets(t *testing.T) {
 		all := [][]byte{val1, val2, val3}
 		txSUnionByTwoBuckets(t, db, bucket1, key1, bucket2, key2, all, nil)
 
-		txSUnionByTwoBuckets(t, db, fmt.Sprintf(fakeBucket, 1), key1, bucket2, key2, nil, ErrBucketNotFound)
-		txSUnionByTwoBuckets(t, db, bucket1, key1, fmt.Sprintf(fakeBucket, 2), key2, nil, ErrBucketNotFound)
+		txSUnionByTwoBuckets(t, db, fmt.Sprintf(fakeBucket, 1), key1, bucket2, key2, nil, ErrBucketNotExist)
+		txSUnionByTwoBuckets(t, db, bucket1, key1, fmt.Sprintf(fakeBucket, 2), key2, nil, ErrBucketNotExist)
 		txSUnionByTwoBuckets(t, db, bucket1, fakeKey1, bucket2, key2, nil, ErrNotFoundKey)
 		txSUnionByTwoBuckets(t, db, bucket1, key1, bucket2, fakeKey2, nil, ErrNotFoundKey)
 	})

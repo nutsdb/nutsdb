@@ -24,7 +24,7 @@ func TestBucket_DecodeAndDecode(t *testing.T) {
 
 	err := decodeBucket.Decode(bytes[BucketMetaSize:])
 	assert.Nil(t, err)
-	assert.Equal(t, uint64(1), decodeBucket.Id)
+	assert.Equal(t, BucketId(1), decodeBucket.Id)
 	assert.Equal(t, decodeBucket.Name, "bucket_1")
 
 	crc := decodeBucket.GetCRC(bytes[:BucketMetaSize], bytes[BucketMetaSize:])
