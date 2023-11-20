@@ -528,13 +528,16 @@ func (db *DB) parseDataFiles(dataFileIds []int) (err error) {
 			// So all records of this transaction should be committed
 			h.Meta.Status = Committed
 			r := NewRecord().WithValue(entry.Value).WithHint(h)
+			// if this bucket is not existed in bucket manager right now
+			// its because it already deleted in the feature WAL log.
+			// so we can just ignore here.
+			bucketId := r.H.Meta.BucketId
+			if b, err := db.bm.GetBucketById(bucketId); b == nil && err == nil {
+				continue
+			}
 
-			if r.H.Meta.Ds == DataStructureNone {
-				db.buildNotDSIdxes(r)
-			} else {
-				if err = db.buildIdxes(r); err != nil {
-					return err
-				}
+			if err = db.buildIdxes(r); err != nil {
+				return err
 			}
 
 			db.KeyCount++
