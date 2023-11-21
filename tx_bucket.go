@@ -17,7 +17,7 @@ package nutsdb
 import "time"
 
 // IterateBuckets iterate over all the bucket depends on ds (represents the data structure)
-func (tx *Tx) IterateBuckets(ds uint16, pattern string, f func(key string) bool) error {
+func (tx *Tx) IterateBuckets(ds uint16, pattern string, f func(bucket string) bool) error {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return err
 	}

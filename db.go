@@ -36,61 +36,61 @@ import (
 
 const (
 	// DataDeleteFlag represents the data delete flag
-	DataDeleteFlag uint16 = iota
+	DataDeleteFlag = 0
 
 	// DataSetFlag represents the data set flag
-	DataSetFlag
+	DataSetFlag = 1
 
 	// DataLPushFlag represents the data LPush flag
-	DataLPushFlag
+	DataLPushFlag = 2
 
 	// DataRPushFlag represents the data RPush flag
-	DataRPushFlag
+	DataRPushFlag = 3
 
 	// DataLRemFlag represents the data LRem flag
-	DataLRemFlag
+	DataLRemFlag = 4
 
 	// DataLPopFlag represents the data LPop flag
-	DataLPopFlag
+	DataLPopFlag = 5
 
 	// DataRPopFlag represents the data RPop flag
-	DataRPopFlag
+	DataRPopFlag = 6
 
 	// DataLTrimFlag represents the data LTrim flag
-	DataLTrimFlag
+	DataLTrimFlag = 8
 
 	// DataZAddFlag represents the data ZAdd flag
-	DataZAddFlag
+	DataZAddFlag = 9
 
 	// DataZRemFlag represents the data ZRem flag
-	DataZRemFlag
+	DataZRemFlag = 10
 
 	// DataZRemRangeByRankFlag represents the data ZRemRangeByRank flag
-	DataZRemRangeByRankFlag
+	DataZRemRangeByRankFlag = 11
 
 	// DataZPopMaxFlag represents the data ZPopMax flag
-	DataZPopMaxFlag
+	DataZPopMaxFlag = 12
 
 	// DataZPopMinFlag represents the data aZPopMin flag
-	DataZPopMinFlag
+	DataZPopMinFlag = 13
 
 	// DataSetBucketDeleteFlag represents the delete Set bucket flag
-	DataSetBucketDeleteFlag
+	DataSetBucketDeleteFlag = 14
 
 	// DataSortedSetBucketDeleteFlag represents the delete Sorted Set bucket flag
-	DataSortedSetBucketDeleteFlag
+	DataSortedSetBucketDeleteFlag = 15
 
 	// DataBTreeBucketDeleteFlag represents the delete BTree bucket flag
-	DataBTreeBucketDeleteFlag
+	DataBTreeBucketDeleteFlag = 16
 
 	// DataListBucketDeleteFlag represents the delete List bucket flag
-	DataListBucketDeleteFlag
+	DataListBucketDeleteFlag = 17
 
 	// DataLRemByIndex represents the data LRemByIndex flag
-	DataLRemByIndex
+	DataLRemByIndex = 18
 
 	// DataExpireListFlag represents that set ttl for the list
-	DataExpireListFlag
+	DataExpireListFlag = 19
 )
 
 const (
