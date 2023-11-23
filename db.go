@@ -890,8 +890,9 @@ func (db *DB) managed(writable bool, fn func(tx *Tx) error) (err error) {
 			db.opt.ErrorHandler.HandleError(err)
 		}
 
-		errRollback := tx.Rollback()
-		err = fmt.Errorf("%v. Rollback err: %v", err, errRollback)
+		if errRollback := tx.Rollback(); errRollback != nil {
+			err = fmt.Errorf("%v. Rollback err: %v", err, errRollback)
+		}
 	}
 
 	return err
