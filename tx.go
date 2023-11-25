@@ -275,7 +275,7 @@ func (tx *Tx) Commit() (err error) {
 	tx.db.RecordCount += curWriteCount
 
 	if err := tx.DeleteBucketInIndex(); err != nil {
-
+		return err
 	}
 
 	return nil
@@ -719,7 +719,7 @@ func (tx *Tx) buildIdxes(records []*Record) error {
 
 		switch meta.Ds {
 		case DataStructureBTree:
-			tx.db.buildBTreeIdx(record)
+			err = tx.db.buildBTreeIdx(record)
 		case DataStructureList:
 			err = tx.db.buildListIdx(record)
 		case DataStructureSet:

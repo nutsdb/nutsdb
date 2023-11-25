@@ -715,27 +715,6 @@ func (db *DB) buildIdxes(r *Record) error {
 	return nil
 }
 
-func (db *DB) buildNotDSIdxes(r *Record) error {
-	bucket, err := db.bm.GetBucketById(r.H.Meta.BucketId)
-	if err != nil {
-		return err
-	}
-	bucketId := bucket.Id
-	if r.H.Meta.Flag == DataSetBucketDeleteFlag {
-		db.deleteBucket(DataStructureSet, bucketId)
-	}
-	if r.H.Meta.Flag == DataSortedSetBucketDeleteFlag {
-		db.deleteBucket(DataStructureSortedSet, bucketId)
-	}
-	if r.H.Meta.Flag == DataBTreeBucketDeleteFlag {
-		db.deleteBucket(DataStructureBTree, bucketId)
-	}
-	if r.H.Meta.Flag == DataListBucketDeleteFlag {
-		db.deleteBucket(DataStructureList, bucketId)
-	}
-	return nil
-}
-
 func (db *DB) deleteBucket(ds uint16, bucket BucketId) {
 	if ds == DataStructureSet {
 		db.Index.set.delete(bucket)
