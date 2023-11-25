@@ -22,14 +22,14 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// todo to check is there any deadlock here?
 func TestTx_Rollback(t *testing.T) {
 
 	withDefaultDB(t, func(t *testing.T, db *DB) {
-
+		bucket := "bucket_rollback_test"
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 		tx, err := db.Begin(true)
 		assert.NoError(t, err)
-
-		bucket := "bucket_rollback_test"
 
 		for i := 0; i < 10; i++ {
 			key := []byte("key_" + fmt.Sprintf("%03d", i))
@@ -148,6 +148,7 @@ func TestTx_CommittedStatus(t *testing.T) {
 		bucket := "bucket_committed_status"
 
 		{ // setup data
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 			tx, err := db.Begin(true)
 			assert.NoError(t, err)
 
@@ -187,6 +188,8 @@ func TestTx_PutWithTimestamp(t *testing.T) {
 		timestamps := []uint64{1547707905, 1547707910, uint64(time.Now().Unix())}
 
 		{ // put with timestamp
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
 			tx, err := db.Begin(true)
 			assert.NoError(t, err)
 			for i, timestamp := range timestamps {

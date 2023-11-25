@@ -47,5 +47,9 @@ var (
 	ErrTxnTooBig = errors.New("Txn is too big to fit into one request")
 
 	// ErrTxnExceedWriteLimit is returned when this tx's write is exceed max write record
-	ErrTxnExceedWriteLimit = errors.New("Txn is exceed max write record count")
+	ErrTxnExceedWriteLimit = errors.New("txn is exceed max write record count")
+
+	ErrBucketAlreadyExist = errors.New("bucket is already exist")
+
+	ErrorBucketNotExist = errors.New("bucket is not exist yet, please use NewBucket function to create this bucket first")
 )

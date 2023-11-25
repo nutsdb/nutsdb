@@ -36,20 +36,26 @@ func (tx *Tx) Get(bucket string, key []byte) (e *Entry, err error) {
 	}
 
 	idxMode := tx.db.opt.EntryIdxMode
+	b, err := tx.db.bm.GetBucket(Ds(DataStructureBTree), BucketName(bucket))
+	if err != nil {
+		return nil, err
+	}
+	bucketName := b.Name
+	bucketId := b.Id
 
-	if idx, ok := tx.db.Index.bTree.exist(bucket); ok {
+	if idx, ok := tx.db.Index.bTree.exist(bucketId); ok {
 		r, found := idx.Find(key)
 		if !found {
 			return nil, ErrKeyNotFound
 		}
 
 		if r.IsExpired() {
-			tx.putDeleteLog(bucket, key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureBTree)
+			tx.putDeleteLog(bucketId, key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureBTree)
 			return nil, ErrNotFoundKey
 		}
 
 		if idxMode == HintKeyValAndRAMIdxMode {
-			return NewEntry().WithBucket([]byte(r.Bucket)).WithKey(r.H.Key).WithValue(r.V).WithMeta(r.H.Meta), nil
+			return NewEntry().WithKey(r.H.Key).WithValue(r.V).WithMeta(r.H.Meta), nil
 		}
 
 		if idxMode == HintKeyAndRAMIdxMode {
@@ -63,7 +69,7 @@ func (tx *Tx) Get(bucket string, key []byte) (e *Entry, err error) {
 		return nil, ErrNotFoundBucket
 	}
 
-	return nil, ErrBucketAndKey(bucket, key)
+	return nil, ErrBucketAndKey(bucketName, key)
 }
 
 // GetAll returns all keys and values of the bucket stored at given bucket.
@@ -73,8 +79,13 @@ func (tx *Tx) GetAll(bucket string) (entries Entries, err error) {
 	}
 
 	entries = Entries{}
+	b, err := tx.db.bm.GetBucket(Ds(DataStructureBTree), BucketName(bucket))
+	if err != nil {
+		return nil, err
+	}
+	bucketId := b.Id
 
-	if index, ok := tx.db.Index.bTree.exist(bucket); ok {
+	if index, ok := tx.db.Index.bTree.exist(bucketId); ok {
 		records := index.All()
 		if len(records) == 0 {
 			return nil, ErrBucketEmpty
@@ -98,8 +109,13 @@ func (tx *Tx) RangeScan(bucket string, start, end []byte) (es Entries, err error
 	if err := tx.checkTxIsClosed(); err != nil {
 		return nil, err
 	}
+	b, err := tx.db.bm.GetBucket(Ds(DataStructureBTree), BucketName(bucket))
+	if err != nil {
+		return nil, err
+	}
+	bucketId := b.Id
 
-	if index, ok := tx.db.Index.bTree.exist(bucket); ok {
+	if index, ok := tx.db.Index.bTree.exist(bucketId); ok {
 		records := index.Range(start, end)
 		if err != nil {
 			return nil, ErrRangeScan
@@ -124,8 +140,13 @@ func (tx *Tx) PrefixScan(bucket string, prefix []byte, offsetNum int, limitNum i
 	if err := tx.checkTxIsClosed(); err != nil {
 		return nil, err
 	}
+	b, err := tx.db.bm.GetBucket(Ds(DataStructureBTree), BucketName(bucket))
+	if err != nil {
+		return nil, err
+	}
+	bucketId := b.Id
 
-	if idx, ok := tx.db.Index.bTree.exist(bucket); ok {
+	if idx, ok := tx.db.Index.bTree.exist(bucketId); ok {
 		records := idx.PrefixScan(prefix, offsetNum, limitNum)
 		es, err = tx.getHintIdxDataItemsWrapper(records, limitNum, es)
 		if err != nil {
@@ -146,8 +167,13 @@ func (tx *Tx) PrefixSearchScan(bucket string, prefix []byte, reg string, offsetN
 	if err := tx.checkTxIsClosed(); err != nil {
 		return nil, err
 	}
+	b, err := tx.db.bm.GetBucket(Ds(DataStructureBTree), BucketName(bucket))
+	if err != nil {
+		return nil, err
+	}
+	bucketId := b.Id
 
-	if idx, ok := tx.db.Index.bTree.exist(bucket); ok {
+	if idx, ok := tx.db.Index.bTree.exist(bucketId); ok {
 		records := idx.PrefixSearchScan(prefix, reg, offsetNum, limitNum)
 		es, err = tx.getHintIdxDataItemsWrapper(records, limitNum, es)
 		if err != nil {
@@ -167,8 +193,13 @@ func (tx *Tx) Delete(bucket string, key []byte) error {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return err
 	}
+	b, err := tx.db.bm.GetBucket(Ds(DataStructureBTree), BucketName(bucket))
+	if err != nil {
+		return err
+	}
+	bucketId := b.Id
 
-	if idx, ok := tx.db.Index.bTree.exist(bucket); ok {
+	if idx, ok := tx.db.Index.bTree.exist(bucketId); ok {
 		if _, found := idx.Find(key); !found {
 			return ErrKeyNotFound
 		}
@@ -182,8 +213,12 @@ func (tx *Tx) Delete(bucket string, key []byte) error {
 // getHintIdxDataItemsWrapper returns wrapped entries when prefix scanning or range scanning.
 func (tx *Tx) getHintIdxDataItemsWrapper(records []*Record, limitNum int, es Entries) (Entries, error) {
 	for _, r := range records {
+		bucket, err := tx.db.bm.GetBucketById(r.H.Meta.BucketId)
+		if err != nil {
+			return nil, err
+		}
 		if r.IsExpired() {
-			tx.putDeleteLog(r.Bucket, r.H.Key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureBTree)
+			tx.putDeleteLog(bucket.Id, r.H.Key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureBTree)
 			continue
 		}
 		if limitNum > 0 && len(es) < limitNum || limitNum == ScanNoLimit {
@@ -197,7 +232,7 @@ func (tx *Tx) getHintIdxDataItemsWrapper(records []*Record, limitNum int, es Ent
 					return nil, err
 				}
 			} else {
-				e = NewEntry().WithBucket([]byte(r.Bucket)).WithKey(r.H.Key).WithValue(r.V).WithMeta(r.H.Meta)
+				e = NewEntry().WithKey(r.H.Key).WithValue(r.V).WithMeta(r.H.Meta)
 			}
 			es = append(es, e)
 		}

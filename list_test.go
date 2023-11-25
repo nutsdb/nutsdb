@@ -243,7 +243,6 @@ func TestList_LRemByIndex(t *testing.T) {
 }
 
 func generateRecords(count int) []*Record {
-	bucket := []byte("bucket")
 	rand.Seed(time.Now().UnixNano())
 	records := make([]*Record, count)
 	for i := 0; i < count; i++ {
@@ -251,16 +250,16 @@ func generateRecords(count int) []*Record {
 		val := GetRandomBytes(24)
 
 		metaData := &MetaData{
-			KeySize:    uint32(len(key)),
-			ValueSize:  uint32(len(val)),
-			Timestamp:  uint64(time.Now().Unix()),
-			TTL:        uint32(rand.Intn(3600)),
-			Flag:       uint16(rand.Intn(2)),
-			BucketSize: uint32(len(bucket)),
-			TxID:       uint64(rand.Intn(1000)),
-			Status:     uint16(rand.Intn(2)),
-			Ds:         uint16(rand.Intn(3)),
-			Crc:        rand.Uint32(),
+			KeySize:   uint32(len(key)),
+			ValueSize: uint32(len(val)),
+			Timestamp: uint64(time.Now().Unix()),
+			TTL:       uint32(rand.Intn(3600)),
+			Flag:      uint16(rand.Intn(2)),
+			TxID:      uint64(rand.Intn(1000)),
+			Status:    uint16(rand.Intn(2)),
+			Ds:        uint16(rand.Intn(3)),
+			Crc:       rand.Uint32(),
+			BucketId:  1,
 		}
 
 		record := &Record{
@@ -270,8 +269,7 @@ func generateRecords(count int) []*Record {
 				Meta:    metaData,
 				DataPos: uint64(rand.Uint32()),
 			},
-			V:      val,
-			Bucket: string(bucket),
+			V: val,
 		}
 		records[i] = record
 	}

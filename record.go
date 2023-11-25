@@ -20,9 +20,8 @@ import (
 
 // Record records entry and hint.
 type Record struct {
-	H      *Hint
-	V      []byte
-	Bucket string
+	H *Hint
+	V []byte
 }
 
 // IsExpired returns the record if expired or not.
@@ -65,11 +64,5 @@ func (r *Record) WithHint(hint *Hint) *Record {
 // WithValue set the Value to Record
 func (r *Record) WithValue(v []byte) *Record {
 	r.V = v
-	return r
-}
-
-// WithBucket set the Bucket to Record
-func (r *Record) WithBucket(bucket string) *Record {
-	r.Bucket = bucket
 	return r
 }
