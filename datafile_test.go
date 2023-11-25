@@ -62,23 +62,8 @@ func TestDataFile1(t *testing.T) {
 		t.Error("err TestDataFile_All WriteAt")
 	}
 
-	e, err := df.ReadAt(n)
-	if e != nil || err != nil {
-		t.Error("err TestDataFile_All ReadAt")
-	}
-
-	e, err = df.ReadAt(0)
-	if err != nil || string(e.Key) != "key_0001" || string(e.Value) != "val_0001" || e.Meta.Timestamp != 1547707905 {
-		t.Error("err TestDataFile_All ReadAt")
-	}
-
-	e, err = df.ReadAt(1)
-	if err == nil || e != nil {
-		t.Error("err TestDataFile_All ReadAt")
-	}
-
 	payloadSize := entry.Meta.PayloadSize()
-	e, err = df.ReadRecord(n, payloadSize)
+	e, err := df.ReadRecord(n, payloadSize)
 	assert.Nil(t, e)
 	assert.Error(t, err, ErrEntryZero)
 
@@ -106,13 +91,8 @@ func TestDataFile2(t *testing.T) {
 		t.Error("err TestDataFile_All WriteAt")
 	}
 
-	e, err := df.ReadAt(0)
-	if err == nil || e != nil {
-		t.Error("err TestDataFile_All ReadAt")
-	}
-
 	payloadSize := entry.Meta.PayloadSize()
-	e, err = df.ReadRecord(0, payloadSize)
+	e, err := df.ReadRecord(0, payloadSize)
 	if err == nil || e != nil {
 		t.Error("err TestDataFile_All ReadAt")
 	}
@@ -127,11 +107,6 @@ func TestDataFile2(t *testing.T) {
 	_, err = df2.WriteAt(content, 0)
 	assert.Nil(t, err)
 
-	e, err = df2.ReadAt(0)
-	if err == nil || e != nil {
-		t.Error("err TestDataFile_All ReadAt")
-	}
-
 	e, err = df2.ReadRecord(0, payloadSize)
 	if err == nil || e != nil {
 		t.Error("err TestDataFile_All ReadAt")
@@ -143,32 +118,6 @@ func TestDataFile2(t *testing.T) {
 	assert.Nil(t, err)
 	err = fm.close()
 	assert.Nil(t, err)
-}
-
-func TestDataFile_ReadAt(t *testing.T) {
-	fm := newFileManager(FileIO, 1024, 0.5)
-	filePath4 := "/tmp/foo4"
-	df, err := fm.getDataFile(filePath4, 1024)
-	defer func() {
-		err = df.Release()
-		assert.Nil(t, err)
-		err = fm.close()
-		assert.Nil(t, err)
-	}()
-	assert.Nil(t, err)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	e, err := df.ReadAt(0)
-	if err != nil && e != nil {
-		t.Error("err ReadAt")
-	}
-
-	e, err = df.ReadAt(1025)
-	if err == nil && e != nil {
-		t.Error("err ReadAt")
-	}
 }
 
 func TestDataFile_ReadRecord(t *testing.T) {
@@ -231,12 +180,8 @@ func TestDataFile_Crc_Err(t *testing.T) {
 	_, err = df.WriteAt(errContent, 0)
 	assert.Nil(t, err)
 
-	e, err := df.ReadAt(0)
-	if err == nil || e != nil {
-		t.Error("err TestDataFile_All ReadAt")
-	}
 	payloadSize := entry.Meta.PayloadSize()
-	e, err = df.ReadRecord(0, payloadSize)
+	e, err := df.ReadRecord(0, payloadSize)
 	if err == nil || e != nil {
 		t.Error("err TestDataFile_All ReadAt")
 	}
@@ -254,101 +199,4 @@ func TestFileManager1(t *testing.T) {
 		assert.Nil(t, err)
 		os.Remove(filePath)
 	}()
-}
-
-func Benchmark_Read(b *testing.B) {
-	b.Run("benchmarkReadRecord_FileIO", benchmarkReadRecord_FileIO)
-	b.Run("benchmarkReadAt_FileIO", benchmarkReadAt_FileIO)
-	b.Run("benchmarkReadRecord_MMap", benchmarkReadRecord_MMap)
-	b.Run("benchmarkReadAt_MMap", benchmarkReadAt_MMap)
-}
-
-func benchmarkReadAt_FileIO(b *testing.B) {
-	fm := newFileManager(FileIO, 1024, 0.5)
-	defer fm.close()
-	df, err := fm.getDataFile(filePath, 1024)
-	defer os.Remove(filePath)
-	if err != nil {
-		b.Fatal(err)
-	}
-
-	_, err = df.WriteAt(entry.Encode(), 0)
-	if err != nil {
-		b.Error("err benchmarkReadAt_FileIO WriteAt")
-	}
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		e, err := df.ReadAt(0)
-		if err != nil || string(e.Key) != "key_0001" || string(e.Value) != "val_0001" || e.Meta.Timestamp != 1547707905 {
-			b.Error("err benchmarkReadAt_FileIO ReadAt")
-		}
-	}
-}
-
-func benchmarkReadRecord_FileIO(b *testing.B) {
-	fm := newFileManager(FileIO, 1024, 0.5)
-	defer fm.close()
-	df, err := fm.getDataFile(filePath, 1024)
-	defer os.Remove(filePath)
-	if err != nil {
-		b.Fatal(err)
-	}
-
-	_, err = df.WriteAt(entry.Encode(), 0)
-	if err != nil {
-		b.Error("err benchmarkReadRecord_FileIO WriteAt")
-	}
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		payloadSize := entry.Meta.PayloadSize()
-		e, err := df.ReadRecord(0, payloadSize)
-		if err != nil || string(e.Key) != "key_0001" || string(e.Value) != "val_0001" || e.Meta.Timestamp != 1547707905 {
-			b.Error("err benchmarkReadRecord_FileIO ReadAt")
-		}
-	}
-}
-
-func benchmarkReadAt_MMap(b *testing.B) {
-	fm := newFileManager(MMap, 1024, 0.5)
-	defer fm.close()
-	df, err := fm.getDataFile(filePath, 1024)
-	defer os.Remove(filePath)
-	if err != nil {
-		b.Fatal(err)
-	}
-
-	_, err = df.WriteAt(entry.Encode(), 0)
-	if err != nil {
-		b.Error("err benchmarkReadAt_MMap WriteAt")
-	}
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		e, err := df.ReadAt(0)
-		if err != nil || string(e.Key) != "key_0001" || string(e.Value) != "val_0001" || e.Meta.Timestamp != 1547707905 {
-			b.Error("err benchmarkReadAt_MMap ReadAt")
-		}
-	}
-}
-
-func benchmarkReadRecord_MMap(b *testing.B) {
-	fm := newFileManager(MMap, 1024, 0.5)
-	defer fm.close()
-	df, err := fm.getDataFile(filePath, 1024)
-	defer os.Remove(filePath)
-	if err != nil {
-		b.Fatal(err)
-	}
-
-	_, err = df.WriteAt(entry.Encode(), 0)
-	if err != nil {
-		b.Error("err benchmarkReadRecord_MMap WriteAt")
-	}
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		payloadSize := entry.Meta.PayloadSize()
-		e, err := df.ReadRecord(0, payloadSize)
-		if err != nil || string(e.Key) != "key_0001" || string(e.Value) != "val_0001" || e.Meta.Timestamp != 1547707905 {
-			b.Error("err benchmarkReadRecord_MMap ReadAt")
-		}
-	}
 }
