@@ -149,6 +149,7 @@ type (
 		tm               *ttlManager
 		RecordCount      int64 // current valid record count, exclude deleted, repeated
 		bm               *BucketManager
+		hintKeyAndRAMIdxModeLru    *LRUCache  // lru cache for HintKeyAndRAMIdxMode
 	}
 )
 
@@ -166,6 +167,7 @@ func open(opt Options) (*DB, error) {
 		mergeWorkCloseCh: make(chan struct{}),
 		writeCh:          make(chan *request, KvWriteChCapacity),
 		tm:               newTTLManager(opt.ExpiredDeleteType),
+		hintKeyAndRAMIdxModeLru: NewLruCache(opt.HintKeyAndRAMIdxCacheSize),
 	}
 
 	db.commitBuffer = createNewBufferWithSize(int(db.opt.CommitBufferSize))
@@ -325,6 +327,11 @@ func (db *DB) getValueByRecord(r *Record) ([]byte, error) {
 }
 
 func (db *DB) getEntryByHint(h *Hint) (*Entry, error) {
+	// firstly we find data in cache
+	if db.hintKeyAndRAMIdxModeLru.Get(h) != nil {
+		return db.hintKeyAndRAMIdxModeLru.Get(h).(*Entry), nil
+	}
+
 	dirPath := getDataPath(h.FileID, db.opt.Dir)
 	df, err := db.fm.getDataFile(dirPath, db.opt.SegmentSize)
 	if err != nil {
@@ -343,6 +350,8 @@ func (db *DB) getEntryByHint(h *Hint) (*Entry, error) {
 		return nil, fmt.Errorf("read err. pos %d, key %s, err %s", h.DataPos, string(h.Key), err)
 	}
 
+	// saved in cache
+	db.hintKeyAndRAMIdxModeLru.Add(h, item)
 	return item, nil
 }
 
@@ -411,6 +420,10 @@ func (db *DB) getMaxBatchSize() int64 {
 
 func (db *DB) getMaxWriteRecordCount() int64 {
 	return db.opt.MaxWriteRecordCount
+}
+
+func (db *DB) getHintKeyAndRAMIdxCacheSize() int {
+	return db.opt.HintKeyAndRAMIdxCacheSize
 }
 
 func (db *DB) doWrites() {
