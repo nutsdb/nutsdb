@@ -95,6 +95,7 @@ func txNewBucket(t *testing.T, db *DB, bucket string, ds uint16, expectErr error
 		return nil
 	})
 	assertErr(t, err, finalExpectErr)
+
 }
 
 func txDeleteBucketFunc(t *testing.T, db *DB, bucket string, ds uint16, expectErr error, finalExpectErr error) {
