@@ -107,7 +107,7 @@ func (db *DB) merge() error {
 		}
 
 		for {
-			if entry, err := fr.readEntry(); err == nil {
+			if entry, err := fr.readEntry(off); err == nil {
 				if entry == nil {
 					break
 				}
@@ -164,7 +164,7 @@ func (db *DB) merge() error {
 				}
 
 			} else {
-				if errors.Is(err, io.EOF) || errors.Is(err, ErrIndexOutOfBound) || errors.Is(err, io.ErrUnexpectedEOF) {
+				if errors.Is(err, io.EOF) || errors.Is(err, ErrIndexOutOfBound) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, ErrHeaderSizeOutOfBounds) {
 					break
 				}
 				return fmt.Errorf("when merge operation build hintIndex readAt err: %s", err)

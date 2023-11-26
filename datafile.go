@@ -19,9 +19,6 @@ import (
 )
 
 var (
-	// ErrCrcZero is returned when crc is 0
-	ErrCrcZero = errors.New("error crc is 0")
-
 	// ErrCrc is returned when crc is error
 	ErrCrc = errors.New("crc error")
 
@@ -30,13 +27,6 @@ var (
 
 	ErrEntryZero = errors.New("entry is zero ")
 )
-
-// DataEntryHeaderSize returns the entry header size
-var DataEntryHeaderSize int64
-
-func init() {
-	DataEntryHeaderSize = GetDiskSizeFromSingleObject(MetaData{})
-}
 
 const (
 	// DataSuffix returns the data suffix
@@ -61,61 +51,28 @@ func NewDataFile(path string, rwManager RWManager) *DataFile {
 	return dataFile
 }
 
-// ReadAt returns entry at the given off(offset).
-func (df *DataFile) ReadAt(off int) (e *Entry, err error) {
-	buf := make([]byte, DataEntryHeaderSize)
-
-	if _, err := df.rwManager.ReadAt(buf, int64(off)); err != nil {
-		return nil, err
-	}
-
-	e = NewEntry()
-	err = e.ParseMeta(buf)
-	if err != nil {
-		return nil, err
-	}
-
-	if e.IsZero() {
-		return nil, nil
-	}
-
-	meta := e.Meta
-	off += int(DataEntryHeaderSize)
-	dataSize := meta.PayloadSize()
-
-	dataBuf := make([]byte, dataSize)
-	_, err = df.rwManager.ReadAt(dataBuf, int64(off))
-	if err != nil {
-		return nil, err
-	}
-
-	err = e.ParsePayload(dataBuf)
-	if err != nil {
-		return nil, err
-	}
-
-	crc := e.GetCrc(buf)
-	if crc != e.Meta.Crc {
-		return nil, ErrCrc
-	}
-
-	return
-}
-
-// ReadRecord returns entry at the given off(offset).
+// ReadEntry returns entry at the given off(offset).
 // payloadSize = bucketSize + keySize + valueSize
-func (df *DataFile) ReadRecord(off int, payloadSize int64) (e *Entry, err error) {
-	buf := make([]byte, DataEntryHeaderSize+payloadSize)
+func (df *DataFile) ReadEntry(off int, payloadSize int64) (e *Entry, err error) {
+	size := MaxEntryHeaderSize + payloadSize
+	// Since MaxEntryHeaderSize + payloadSize may be larger than the actual entry size, it needs to be calculated
+	if int64(off)+size > df.rwManager.Size() {
+		size = df.rwManager.Size() - int64(off)
+	}
+	buf := make([]byte, size)
 
 	if _, err := df.rwManager.ReadAt(buf, int64(off)); err != nil {
 		return nil, err
 	}
 
 	e = new(Entry)
-	err = e.ParseMeta(buf)
+	headerSize, err := e.ParseMeta(buf)
 	if err != nil {
 		return nil, err
 	}
+
+	// Remove the content after the Header
+	buf = buf[:int(headerSize+payloadSize)]
 
 	if e.IsZero() {
 		return nil, ErrEntryZero
@@ -125,12 +82,12 @@ func (df *DataFile) ReadRecord(off int, payloadSize int64) (e *Entry, err error)
 		return nil, err
 	}
 
-	err = e.ParsePayload(buf[DataEntryHeaderSize:])
+	err = e.ParsePayload(buf[headerSize:])
 	if err != nil {
 		return nil, err
 	}
 
-	crc := e.GetCrc(buf[:DataEntryHeaderSize])
+	crc := e.GetCrc(buf[:headerSize])
 	if crc != e.Meta.Crc {
 		return nil, ErrCrc
 	}

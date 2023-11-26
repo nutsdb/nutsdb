@@ -501,19 +501,14 @@ func (tx *Tx) getEntryNewAddRecordCount(entry *Entry) (int64, error) {
 }
 
 func (tx *Tx) allocCommitBuffer() *bytes.Buffer {
-	var txSize int64
-	for i := 0; i < len(tx.pendingWrites); i++ {
-		txSize += tx.pendingWrites[i].Size()
-	}
-
 	var buff *bytes.Buffer
 
-	if txSize < tx.db.opt.CommitBufferSize {
+	if tx.size < tx.db.opt.CommitBufferSize {
 		buff = tx.db.commitBuffer
 	} else {
 		buff = new(bytes.Buffer)
 		// avoid grow
-		buff.Grow(int(txSize))
+		buff.Grow(int(tx.size))
 	}
 
 	return buff
