@@ -38,42 +38,44 @@ func (fr *fileRecovery) readEntry(off int64) (e *Entry, err error) {
 		size = fr.size - off
 	}
 
-	headerBuf := make([]byte, size)
+	buf := make([]byte, size)
 	_, err = fr.fd.Seek(off, 0)
 	if err != nil {
 		return nil, err
 	}
 
-	_, err = fr.fd.Read(headerBuf)
+	_, err = fr.fd.Read(buf)
 	if err != nil {
 		return nil, err
 	}
 
 	e = new(Entry)
-	headerSize, err := e.ParseMeta(headerBuf)
+	headerSize, err := e.ParseMeta(buf)
 	if err != nil {
 		return nil, err
 	}
-
-	// Remove the content after the Header
-	headerBuf = headerBuf[:headerSize]
 
 	if e.IsZero() {
 		return nil, nil
 	}
 
-	meta := e.Meta
-	dataSize := meta.PayloadSize()
-	dataBuf := make([]byte, dataSize)
-	// Seek to read the Key and Value after the Header
-	_, err = fr.fd.Seek(off+int64(headerSize), 0)
-	if err != nil {
-		return nil, err
+	headerBuf := buf[:headerSize]
+	remainingBuf := buf[headerSize:]
+
+	payloadSize := e.Meta.PayloadSize()
+	dataBuf := make([]byte, payloadSize)
+	excessSize := MaxEntryHeaderSize - headerSize
+
+	if payloadSize <= excessSize {
+		copy(dataBuf, remainingBuf[:payloadSize])
+	} else {
+		copy(dataBuf, remainingBuf)
+		_, err := fr.fd.Read(dataBuf[excessSize:])
+		if err != nil {
+			return nil, err
+		}
 	}
-	_, err = fr.fd.Read(dataBuf)
-	if err != nil {
-		return nil, err
-	}
+
 	err = e.ParsePayload(dataBuf)
 	if err != nil {
 		return nil, err

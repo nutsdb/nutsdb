@@ -72,7 +72,7 @@ func (df *DataFile) ReadEntry(off int, payloadSize int64) (e *Entry, err error) 
 	}
 
 	// Remove the content after the Header
-	buf = buf[:headerSize+int(payloadSize)]
+	buf = buf[:int(headerSize+payloadSize)]
 
 	if e.IsZero() {
 		return nil, ErrEntryZero

@@ -177,7 +177,7 @@ func (e *Entry) checkPayloadSize(size int64) error {
 }
 
 // ParseMeta parse Meta object to entry
-func (e *Entry) ParseMeta(buf []byte) (int, error) {
+func (e *Entry) ParseMeta(buf []byte) (int64, error) {
 	// If the length of the header is less than MinEntryHeaderSize,
 	// it means that the final remaining capacity of the file is not enough to write a record,
 	// and an error needs to be returned.
@@ -221,7 +221,7 @@ func (e *Entry) ParseMeta(buf []byte) (int, error) {
 		WithTxID(txId).
 		WithBucketId(bucketId)
 
-	return index, nil
+	return int64(index), nil
 }
 
 // isFilter to confirm if this entry is can be filtered
