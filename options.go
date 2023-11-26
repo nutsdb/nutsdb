@@ -118,6 +118,9 @@ type Options struct {
 
 	// max write record num
 	MaxWriteRecordCount int64
+
+	// cache size for HintKeyAndRAMIdxMode
+	HintKeyAndRAMIdxCacheSize int
 }
 
 const (
@@ -145,6 +148,7 @@ var DefaultOptions = func() Options {
 		MergeInterval:     2 * time.Hour,
 		MaxBatchSize:      (15 * defaultSegmentSize / 4) / 100,
 		MaxBatchCount:     (15 * defaultSegmentSize / 4) / 100 / 100,
+		HintKeyAndRAMIdxCacheSize: 50000,
 		ExpiredDeleteType: TimeWheel,
 	}
 }()
@@ -179,6 +183,12 @@ func WithMaxBatchCount(count int64) Option {
 	return func(opt *Options) {
 		opt.MaxBatchCount = count
 	}
+}
+
+func WithHintKeyAndRAMIdxCacheSize(size int) Option {
+    return func(opt *Options) {
+        opt.HintKeyAndRAMIdxCacheSize = size
+    }
 }
 
 func WithMaxBatchSize(size int64) Option {
