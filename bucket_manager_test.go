@@ -89,8 +89,7 @@ func TestBucketManager_DeleteBucketIsolation(t *testing.T) {
 
 func txNewBucket(t *testing.T, db *DB, bucket string, ds uint16, expectErr error, finalExpectErr error) {
 	err := db.Update(func(tx *Tx) error {
-		success, err2 := tx.NewBucket(ds, bucket)
-		assert.Equal(t, true, success)
+		err2 := tx.NewBucket(ds, bucket)
 		assertErr(t, expectErr, err2)
 		return nil
 	})
