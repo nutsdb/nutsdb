@@ -29,12 +29,11 @@ var (
 func init() {
 	filePath = "/tmp/foo"
 	entry = Entry{
-		Key:    []byte("key_0001"),
-		Value:  []byte("val_0001"),
-		Bucket: []byte("test_DataFile"),
+		Key:   []byte("key_0001"),
+		Value: []byte("val_0001"),
 		Meta: NewMetaData().WithKeySize(uint32(len("key_0001"))).
-			WithValueSize(uint32(len("val_0001"))).WithTimeStamp(1547707905).WithTTL(Persistent).
-			WithBucketSize(uint32(len("test_datafile"))).WithFlag(DataSetFlag),
+			WithValueSize(uint32(len("val_0001"))).WithTimeStamp(1547707905).
+			WithTTL(Persistent).WithFlag(DataSetFlag).WithBucketId(1),
 	}
 }
 

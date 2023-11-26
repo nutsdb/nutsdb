@@ -26,7 +26,13 @@ func (tx *Tx) sPut(bucket string, key []byte, dataFlag uint16, values ...[]byte)
 
 		filter := make(map[uint32]struct{})
 
-		if set, ok := tx.db.Index.set.exist(bucket); ok {
+		b1, err := tx.db.bm.GetBucket(Ds(DataStructureSet), BucketName(bucket))
+		if err != nil {
+			return err
+		}
+		bucketId := b1.Id
+
+		if set, ok := tx.db.Index.set.exist(bucketId); ok {
 
 			if _, ok := set.M[string(key)]; ok {
 				for hash := range set.M[string(key)] {
@@ -78,7 +84,12 @@ func (tx *Tx) SRem(bucket string, key []byte, items ...[]byte) error {
 		return err
 	}
 
-	if set, ok := tx.db.Index.set.exist(bucket); ok {
+	b, err := tx.db.bm.GetBucket(Ds(DataStructureSet), BucketName(bucket))
+	if err != nil {
+		return err
+	}
+	bucketId := b.Id
+	if set, ok := tx.db.Index.set.exist(bucketId); ok {
 		ok, err := set.SAreMembers(string(key), items...)
 		if err != nil {
 			return err
@@ -96,8 +107,12 @@ func (tx *Tx) SAreMembers(bucket string, key []byte, items ...[]byte) (bool, err
 	if err := tx.checkTxIsClosed(); err != nil {
 		return false, err
 	}
-
-	if set, ok := tx.db.Index.set.exist(bucket); ok {
+	b, err := tx.db.bm.GetBucket(Ds(DataStructureSet), BucketName(bucket))
+	if err != nil {
+		return false, err
+	}
+	bucketId := b.Id
+	if set, ok := tx.db.Index.set.exist(bucketId); ok {
 		return set.SAreMembers(string(key), items...)
 	}
 
@@ -109,8 +124,12 @@ func (tx *Tx) SIsMember(bucket string, key, item []byte) (bool, error) {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return false, err
 	}
-
-	if set, ok := tx.db.Index.set.exist(bucket); ok {
+	b, err := tx.db.bm.GetBucket(Ds(DataStructureSet), BucketName(bucket))
+	if err != nil {
+		return false, err
+	}
+	bucketId := b.Id
+	if set, ok := tx.db.Index.set.exist(bucketId); ok {
 		isMember, err := set.SIsMember(string(key), item)
 		if err != nil {
 			return false, err
@@ -126,8 +145,12 @@ func (tx *Tx) SMembers(bucket string, key []byte) ([][]byte, error) {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return nil, err
 	}
-
-	if set, ok := tx.db.Index.set.exist(bucket); ok {
+	b, err := tx.db.bm.GetBucket(Ds(DataStructureSet), BucketName(bucket))
+	if err != nil {
+		return nil, err
+	}
+	bucketId := b.Id
+	if set, ok := tx.db.Index.set.exist(bucketId); ok {
 		items, err := set.SMembers(string(key))
 		if err != nil {
 			return nil, err
@@ -153,8 +176,12 @@ func (tx *Tx) SHasKey(bucket string, key []byte) (bool, error) {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return false, err
 	}
-
-	if set, ok := tx.db.Index.set.exist(bucket); ok {
+	b, err := tx.db.bm.GetBucket(Ds(DataStructureSet), BucketName(bucket))
+	if err != nil {
+		return false, err
+	}
+	bucketId := b.Id
+	if set, ok := tx.db.Index.set.exist(bucketId); ok {
 		return set.SHasKey(string(key)), nil
 	}
 
@@ -167,7 +194,13 @@ func (tx *Tx) SPop(bucket string, key []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	if set, ok := tx.db.Index.set.exist(bucket); ok {
+	b, err := tx.db.bm.GetBucket(Ds(DataStructureSet), BucketName(bucket))
+	if err != nil {
+		return nil, err
+	}
+	bucketId := b.Id
+
+	if set, ok := tx.db.Index.set.exist(bucketId); ok {
 		for _, items := range set.M[string(key)] {
 			value, err := tx.db.getValueByRecord(items)
 			if err != nil {
@@ -189,8 +222,12 @@ func (tx *Tx) SCard(bucket string, key []byte) (int, error) {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return 0, err
 	}
-
-	if set, ok := tx.db.Index.set.exist(bucket); ok {
+	b, err := tx.db.bm.GetBucket(Ds(DataStructureSet), BucketName(bucket))
+	if err != nil {
+		return 0, err
+	}
+	bucketId := b.Id
+	if set, ok := tx.db.Index.set.exist(bucketId); ok {
 		return set.SCard(string(key)), nil
 	}
 
@@ -203,8 +240,12 @@ func (tx *Tx) SDiffByOneBucket(bucket string, key1, key2 []byte) ([][]byte, erro
 	if err := tx.checkTxIsClosed(); err != nil {
 		return nil, err
 	}
-
-	if set, ok := tx.db.Index.set.exist(bucket); ok {
+	b, err := tx.db.bm.GetBucket(Ds(DataStructureSet), BucketName(bucket))
+	if err != nil {
+		return nil, err
+	}
+	bucketId := b.Id
+	if set, ok := tx.db.Index.set.exist(bucketId); ok {
 		items, err := set.SDiff(string(key1), string(key2))
 		if err != nil {
 			return nil, err
@@ -235,11 +276,23 @@ func (tx *Tx) SDiffByTwoBuckets(bucket1 string, key1 []byte, bucket2 string, key
 		ok         bool
 	)
 
-	if set1, ok = tx.db.Index.set.exist(bucket1); !ok {
+	b1, err := tx.db.bm.GetBucket(Ds(DataStructureSet), BucketName(bucket1))
+	if err != nil {
+		return nil, err
+	}
+	bucketId1 := b1.Id
+
+	b2, err := tx.db.bm.GetBucket(Ds(DataStructureSet), BucketName(bucket2))
+	if err != nil {
+		return nil, err
+	}
+	bucketId2 := b2.Id
+
+	if set1, ok = tx.db.Index.set.exist(bucketId1); !ok {
 		return nil, ErrBucketAndKey(bucket1, key1)
 	}
 
-	if set2, ok = tx.db.Index.set.exist(bucket2); !ok {
+	if set2, ok = tx.db.Index.set.exist(bucketId2); !ok {
 		return nil, ErrBucketAndKey(bucket2, key2)
 	}
 
@@ -264,7 +317,12 @@ func (tx *Tx) SMoveByOneBucket(bucket string, key1, key2, item []byte) (bool, er
 		return false, err
 	}
 
-	if set, ok := tx.db.Index.set.exist(bucket); ok {
+	b, err := tx.db.bm.GetBucket(Ds(DataStructureSet), BucketName(bucket))
+	if err != nil {
+		return false, err
+	}
+	bucketId := b.Id
+	if set, ok := tx.db.Index.set.exist(bucketId); ok {
 		return set.SMove(string(key1), string(key2), item)
 	}
 
@@ -282,11 +340,23 @@ func (tx *Tx) SMoveByTwoBuckets(bucket1 string, key1 []byte, bucket2 string, key
 		ok         bool
 	)
 
-	if set1, ok = tx.db.Index.set.exist(bucket1); !ok {
+	b1, err := tx.db.bm.GetBucket(Ds(DataStructureSet), BucketName(bucket1))
+	if err != nil {
+		return false, err
+	}
+	bucketId1 := b1.Id
+
+	b2, err := tx.db.bm.GetBucket(Ds(DataStructureSet), BucketName(bucket2))
+	if err != nil {
+		return false, err
+	}
+	bucketId2 := b2.Id
+
+	if set1, ok = tx.db.Index.set.exist(bucketId1); !ok {
 		return false, ErrBucketAndKey(bucket1, key1)
 	}
 
-	if set2, ok = tx.db.Index.set.exist(bucket2); !ok {
+	if set2, ok = tx.db.Index.set.exist(bucketId2); !ok {
 		return false, ErrBucketAndKey(bucket2, key1)
 	}
 
@@ -323,8 +393,13 @@ func (tx *Tx) SUnionByOneBucket(bucket string, key1, key2 []byte) ([][]byte, err
 	if err := tx.checkTxIsClosed(); err != nil {
 		return nil, err
 	}
+	b1, err := tx.db.bm.GetBucket(Ds(DataStructureSet), BucketName(bucket))
+	if err != nil {
+		return nil, err
+	}
+	bucketId := b1.Id
 
-	if set, ok := tx.db.Index.set.exist(bucket); ok {
+	if set, ok := tx.db.Index.set.exist(bucketId); ok {
 		items, err := set.SUnion(string(key1), string(key2))
 		if err != nil {
 			return nil, err
@@ -355,13 +430,24 @@ func (tx *Tx) SUnionByTwoBuckets(bucket1 string, key1 []byte, bucket2 string, ke
 		set1, set2 *Set
 		ok         bool
 	)
+	b1, err := tx.db.bm.GetBucket(Ds(DataStructureSet), BucketName(bucket1))
+	if err != nil {
+		return nil, err
+	}
+	bucketId1 := b1.Id
 
-	if set1, ok = tx.db.Index.set.exist(bucket1); !ok {
+	b2, err := tx.db.bm.GetBucket(Ds(DataStructureSet), BucketName(bucket2))
+	if err != nil {
+		return nil, err
+	}
+	bucketId2 := b2.Id
+
+	if set1, ok = tx.db.Index.set.exist(bucketId1); !ok {
 		return nil, ErrBucketAndKey(bucket1, key1)
 	}
 
-	if set2, ok = tx.db.Index.set.exist(bucket2); !ok {
-		return nil, ErrBucketAndKey(bucket2, key1)
+	if set2, ok = tx.db.Index.set.exist(bucketId2); !ok {
+		return nil, ErrBucketAndKey(bucket2, key2)
 	}
 
 	if !set1.SHasKey(string(key1)) {
@@ -400,7 +486,12 @@ func (tx *Tx) SKeys(bucket, pattern string, f func(key string) bool) error {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return err
 	}
-	if set, ok := tx.db.Index.set.exist(bucket); !ok {
+	b, err := tx.db.bm.GetBucket(Ds(DataStructureSet), BucketName(bucket))
+	if err != nil {
+		return err
+	}
+	bucketId := b.Id
+	if set, ok := tx.db.Index.set.exist(bucketId); !ok {
 		return ErrBucket
 	} else {
 		for key := range set.M {

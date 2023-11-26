@@ -14,10 +14,8 @@
 
 package nutsdb
 
-import "time"
-
 // IterateBuckets iterate over all the bucket depends on ds (represents the data structure)
-func (tx *Tx) IterateBuckets(ds uint16, pattern string, f func(key string) bool) error {
+func (tx *Tx) IterateBuckets(ds uint16, pattern string, f func(bucket string) bool) error {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return err
 	}
@@ -30,18 +28,61 @@ func (tx *Tx) IterateBuckets(ds uint16, pattern string, f func(key string) bool)
 	}
 	var err error
 	if ds == DataStructureSet {
-		err = tx.db.Index.set.handleIdxBucket(handle)
+		for bucketId := range tx.db.Index.set.idx {
+			bucket, err := tx.db.bm.GetBucketById(uint64(bucketId))
+			if err != nil {
+				return err
+			}
+			return handle(bucket.Name)
+		}
 	}
 	if ds == DataStructureSortedSet {
-		err = tx.db.Index.sortedSet.handleIdxBucket(handle)
+		for bucketId := range tx.db.Index.sortedSet.idx {
+			bucket, err := tx.db.bm.GetBucketById(uint64(bucketId))
+			if err != nil {
+				return err
+			}
+			return handle(bucket.Name)
+		}
 	}
 	if ds == DataStructureList {
-		err = tx.db.Index.list.handleIdxBucket(handle)
+		for bucketId := range tx.db.Index.list.idx {
+			bucket, err := tx.db.bm.GetBucketById(uint64(bucketId))
+			if err != nil {
+				return err
+			}
+			return handle(bucket.Name)
+		}
 	}
 	if ds == DataStructureBTree {
-		err = tx.db.Index.bTree.handleIdxBucket(handle)
+		for bucketId := range tx.db.Index.bTree.idx {
+			bucket, err := tx.db.bm.GetBucketById(uint64(bucketId))
+			if err != nil {
+				return err
+			}
+			return handle(bucket.Name)
+		}
 	}
 	return err
+}
+
+func (tx *Tx) NewBucket(ds uint16, name string) (success bool, err error) {
+	if tx.ExistBucket(ds, name) {
+		return false, ErrBucketAlreadyExist
+	}
+	bucket := &Bucket{
+		Meta: &BucketMeta{
+			Op: BucketInsertOperation,
+		},
+		Id:   BucketId(tx.db.bm.Gen.GenId()),
+		Ds:   Ds(ds),
+		Name: name,
+	}
+	if _, exist := tx.pendingBucketList[Ds(ds)]; !exist {
+		tx.pendingBucketList[Ds(ds)] = map[BucketName]*Bucket{}
+	}
+	tx.pendingBucketList[Ds(ds)][BucketName(name)] = bucket
+	return true, nil
 }
 
 // DeleteBucket delete bucket depends on ds (represents the data structure)
@@ -50,44 +91,23 @@ func (tx *Tx) DeleteBucket(ds uint16, bucket string) error {
 		return err
 	}
 
-	ok, err := tx.ExistBucket(ds, bucket)
+	b, err := tx.db.bm.GetBucket(Ds(ds), BucketName(bucket))
 	if err != nil {
-		return err
-	}
-	if !ok {
 		return ErrBucketNotFound
 	}
 
-	if ds == DataStructureSet {
-		return tx.put(bucket, []byte("0"), nil, Persistent, DataSetBucketDeleteFlag, uint64(time.Now().Unix()), DataStructureNone)
+	deleteBucket := &Bucket{
+		Meta: &BucketMeta{
+			Op: BucketDeleteOperation,
+		},
+		Id:   b.Id,
+		Ds:   Ds(ds),
+		Name: bucket,
 	}
-	if ds == DataStructureSortedSet {
-		return tx.put(bucket, []byte("1"), nil, Persistent, DataSortedSetBucketDeleteFlag, uint64(time.Now().Unix()), DataStructureNone)
-	}
-	if ds == DataStructureBTree {
-		return tx.put(bucket, []byte("2"), nil, Persistent, DataBTreeBucketDeleteFlag, uint64(time.Now().Unix()), DataStructureNone)
-	}
-	if ds == DataStructureList {
-		return tx.put(bucket, []byte("3"), nil, Persistent, DataListBucketDeleteFlag, uint64(time.Now().Unix()), DataStructureNone)
-	}
-	return nil
+
+	return tx.putBucket(deleteBucket)
 }
 
-func (tx *Tx) ExistBucket(ds uint16, bucket string) (bool, error) {
-	var ok bool
-
-	switch ds {
-	case DataStructureSet:
-		_, ok = tx.db.Index.set.exist(bucket)
-	case DataStructureSortedSet:
-		_, ok = tx.db.Index.sortedSet.exist(bucket)
-	case DataStructureBTree:
-		_, ok = tx.db.Index.bTree.exist(bucket)
-	case DataStructureList:
-		_, ok = tx.db.Index.list.exist(bucket)
-	default:
-		return false, ErrDataStructureNotSupported
-	}
-
-	return ok, nil
+func (tx *Tx) ExistBucket(ds uint16, bucket string) bool {
+	return tx.db.bm.ExistBucket(Ds(ds), BucketName(bucket))
 }

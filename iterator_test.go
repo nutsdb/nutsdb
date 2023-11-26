@@ -23,6 +23,8 @@ func TestIterator(t *testing.T) {
 	bucket := "bucket"
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
 		for i := 0; i < 100; i++ {
 			txPut(t, db, bucket, GetTestBytes(i), GetTestBytes(i), Persistent, nil, nil)
 		}
@@ -51,6 +53,8 @@ func TestIterator_Reverse(t *testing.T) {
 	bucket := "bucket"
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
 		for i := 0; i < 100; i++ {
 			txPut(t, db, bucket, GetTestBytes(i), GetTestBytes(i), Persistent, nil, nil)
 		}
@@ -78,6 +82,8 @@ func TestIterator_Seek(t *testing.T) {
 	bucket := "bucket"
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
 		for i := 0; i < 100; i++ {
 			txPut(t, db, bucket, GetTestBytes(i), GetTestBytes(i), Persistent, nil, nil)
 		}

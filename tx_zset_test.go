@@ -25,7 +25,7 @@ var tx *Tx
 func TestTx_ZCheck(t *testing.T) {
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		err := db.View(func(tx *Tx) error {
-			require.Equal(t, ErrBucket, tx.ZCheck("fake bucket"))
+			require.Equal(t, ErrBucketNotExist, tx.ZCheck("fake bucket"))
 			return nil
 		})
 		require.NoError(t, err)
@@ -37,6 +37,7 @@ func TestTx_ZAdd(t *testing.T) {
 	bucket := "bucket"
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureSortedSet, bucket, nil)
 		for i := 0; i < 10; i++ {
 			txZAdd(t, db, bucket, GetTestBytes(0), GetTestBytes(i), float64(i), nil, nil)
 		}
@@ -49,6 +50,7 @@ func TestTx_ZScore(t *testing.T) {
 	bucket := "bucket"
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureSortedSet, bucket, nil)
 		for i := 0; i < 10; i++ {
 			txZAdd(t, db, bucket, GetTestBytes(0), GetTestBytes(i), float64(i), nil, nil)
 		}
@@ -70,6 +72,8 @@ func TestTx_ZRem(t *testing.T) {
 	bucket := "bucket"
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureSortedSet, bucket, nil)
+
 		for i := 0; i < 10; i++ {
 			txZAdd(t, db, bucket, GetTestBytes(0), GetTestBytes(i), float64(i), nil, nil)
 		}
@@ -96,6 +100,8 @@ func TestTx_ZMembers(t *testing.T) {
 	key := GetTestBytes(0)
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureSortedSet, bucket, nil)
+
 		for i := 0; i < 10; i++ {
 			txZAdd(t, db, bucket, key, GetTestBytes(i), float64(i), nil, nil)
 		}
@@ -122,6 +128,8 @@ func TestTx_ZCount(t *testing.T) {
 	key := GetTestBytes(0)
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureSortedSet, bucket, nil)
+
 		for i := 0; i < 30; i++ {
 			txZAdd(t, db, bucket, key, GetRandomBytes(24), float64(i), nil, nil)
 		}
@@ -143,6 +151,7 @@ func TestTx_ZPop(t *testing.T) {
 	key := GetTestBytes(0)
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureSortedSet, bucket, nil)
 
 		txZPop(t, db, bucket, key, true, nil, 0, ErrBucket)
 		txZPop(t, db, bucket, key, false, nil, 0, ErrBucket)
@@ -170,6 +179,7 @@ func TestTx_ZRangeByRank(t *testing.T) {
 	key := GetTestBytes(0)
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureSortedSet, bucket, nil)
 
 		err := db.View(func(tx *Tx) error {
 			_, err := tx.ZRangeByRank(bucket, key, 1, 10)
@@ -227,6 +237,7 @@ func TestTx_ZRemRangeByRank(t *testing.T) {
 	key := GetTestBytes(0)
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureSortedSet, bucket, nil)
 
 		err := db.Update(func(tx *Tx) error {
 			err := tx.ZRemRangeByRank(bucket, key, 1, 10)
@@ -299,6 +310,8 @@ func TestTx_ZRank(t *testing.T) {
 	key := GetTestBytes(0)
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureSortedSet, bucket, nil)
+
 		txZRank(t, db, bucket, key, GetTestBytes(0), true, 0, ErrBucket)
 		txZRank(t, db, bucket, key, GetTestBytes(0), false, 0, ErrBucket)
 
@@ -331,6 +344,8 @@ func TestTx_ZSetEntryIdxMode_HintKeyValAndRAMIdxMode(t *testing.T) {
 
 	// HintKeyValAndRAMIdxMode
 	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureSortedSet, bucket, nil)
+
 		err := db.Update(func(tx *Tx) error {
 			err := tx.ZAdd(bucket, key, float64(0), value)
 			require.NoError(t, err)
@@ -339,7 +354,7 @@ func TestTx_ZSetEntryIdxMode_HintKeyValAndRAMIdxMode(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		zset := db.Index.sortedSet.getWithDefault(bucket, db).M[string(key)]
+		zset := db.Index.sortedSet.getWithDefault(1, db).M[string(key)]
 		hash, _ := getFnv32(value)
 		node := zset.dict[hash]
 
@@ -358,6 +373,7 @@ func TestTx_ZSetEntryIdxMode_HintKeyAndRAMIdxMode(t *testing.T) {
 
 	// HintKeyValAndRAMIdxMode
 	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureSortedSet, bucket, nil)
 		err := db.Update(func(tx *Tx) error {
 			err := tx.ZAdd(bucket, key, float64(0), value)
 			require.NoError(t, err)
@@ -366,7 +382,7 @@ func TestTx_ZSetEntryIdxMode_HintKeyAndRAMIdxMode(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		zset := db.Index.sortedSet.getWithDefault(bucket, db).M[string(key)]
+		zset := db.Index.sortedSet.getWithDefault(1, db).M[string(key)]
 		hash, _ := getFnv32(value)
 		node := zset.dict[hash]
 

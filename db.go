@@ -36,61 +36,61 @@ import (
 
 const (
 	// DataDeleteFlag represents the data delete flag
-	DataDeleteFlag uint16 = iota
+	DataDeleteFlag = 0
 
 	// DataSetFlag represents the data set flag
-	DataSetFlag
+	DataSetFlag = 1
 
 	// DataLPushFlag represents the data LPush flag
-	DataLPushFlag
+	DataLPushFlag = 2
 
 	// DataRPushFlag represents the data RPush flag
-	DataRPushFlag
+	DataRPushFlag = 3
 
 	// DataLRemFlag represents the data LRem flag
-	DataLRemFlag
+	DataLRemFlag = 4
 
 	// DataLPopFlag represents the data LPop flag
-	DataLPopFlag
+	DataLPopFlag = 5
 
 	// DataRPopFlag represents the data RPop flag
-	DataRPopFlag
+	DataRPopFlag = 6
 
 	// DataLTrimFlag represents the data LTrim flag
-	DataLTrimFlag
+	DataLTrimFlag = 8
 
 	// DataZAddFlag represents the data ZAdd flag
-	DataZAddFlag
+	DataZAddFlag = 9
 
 	// DataZRemFlag represents the data ZRem flag
-	DataZRemFlag
+	DataZRemFlag = 10
 
 	// DataZRemRangeByRankFlag represents the data ZRemRangeByRank flag
-	DataZRemRangeByRankFlag
+	DataZRemRangeByRankFlag = 11
 
 	// DataZPopMaxFlag represents the data ZPopMax flag
-	DataZPopMaxFlag
+	DataZPopMaxFlag = 12
 
 	// DataZPopMinFlag represents the data aZPopMin flag
-	DataZPopMinFlag
+	DataZPopMinFlag = 13
 
 	// DataSetBucketDeleteFlag represents the delete Set bucket flag
-	DataSetBucketDeleteFlag
+	DataSetBucketDeleteFlag = 14
 
 	// DataSortedSetBucketDeleteFlag represents the delete Sorted Set bucket flag
-	DataSortedSetBucketDeleteFlag
+	DataSortedSetBucketDeleteFlag = 15
 
 	// DataBTreeBucketDeleteFlag represents the delete BTree bucket flag
-	DataBTreeBucketDeleteFlag
+	DataBTreeBucketDeleteFlag = 16
 
 	// DataListBucketDeleteFlag represents the delete List bucket flag
-	DataListBucketDeleteFlag
+	DataListBucketDeleteFlag = 17
 
 	// DataLRemByIndex represents the data LRemByIndex flag
-	DataLRemByIndex
+	DataLRemByIndex = 18
 
 	// DataExpireListFlag represents that set ttl for the list
-	DataExpireListFlag
+	DataExpireListFlag = 19
 )
 
 const (
@@ -148,6 +148,7 @@ type (
 		writeCh          chan *request
 		tm               *ttlManager
 		RecordCount      int64 // current valid record count, exclude deleted, repeated
+		bm               *BucketManager
 	}
 )
 
@@ -183,6 +184,16 @@ func open(opt Options) (*DB, error) {
 	}
 
 	db.flock = fileLock
+
+	if bm, err := NewBucketManager(opt.Dir); err == nil {
+		db.bm = bm
+	} else {
+		return nil, err
+	}
+
+	if err := db.rebuildBucketManager(); err != nil {
+		return nil, fmt.Errorf("db.rebuildBucketManager err:%s", err)
+	}
 
 	if err := db.buildIndexes(); err != nil {
 		return nil, fmt.Errorf("db.buildIndexes error: %s", err)
@@ -516,14 +527,17 @@ func (db *DB) parseDataFiles(dataFileIds []int) (err error) {
 			// This method is entered when the commit record of a transaction is read
 			// So all records of this transaction should be committed
 			h.Meta.Status = Committed
-			r := NewRecord().WithBucket(entry.GetBucketString()).WithValue(entry.Value).WithHint(h)
+			r := NewRecord().WithValue(entry.Value).WithHint(h)
+			// if this bucket is not existed in bucket manager right now
+			// its because it already deleted in the feature WAL log.
+			// so we can just ignore here.
+			bucketId := r.H.Meta.BucketId
+			if b, err := db.bm.GetBucketById(bucketId); b == nil && err == nil {
+				continue
+			}
 
-			if r.H.Meta.Ds == DataStructureNone {
-				db.buildNotDSIdxes(r)
-			} else {
-				if err = db.buildIdxes(r); err != nil {
-					return err
-				}
+			if err = db.buildIdxes(r); err != nil {
+				return err
 			}
 
 			db.KeyCount++
@@ -649,23 +663,29 @@ func (db *DB) getRecordCount() (int64, error) {
 	return res, nil
 }
 
-func (db *DB) buildBTreeIdx(r *Record) {
+func (db *DB) buildBTreeIdx(r *Record) error {
 	db.resetRecordByMode(r)
 
-	bucket, key, meta := r.Bucket, r.H.Key, r.H.Meta
-	bTree := db.Index.bTree.getWithDefault(bucket)
+	key, meta := r.H.Key, r.H.Meta
+	bucket, err := db.bm.GetBucketById(meta.BucketId)
+	if err != nil {
+		return err
+	}
+	bucketId := bucket.Id
+	bTree := db.Index.bTree.getWithDefault(bucketId)
 
 	if r.IsExpired() || meta.Flag == DataDeleteFlag {
-		db.tm.del(bucket, string(key))
+		db.tm.del(bucketId, string(key))
 		bTree.Delete(key)
 	} else {
 		if meta.TTL != Persistent {
-			db.tm.add(bucket, string(key), db.expireTime(meta.Timestamp, meta.TTL), db.buildExpireCallback(bucket, key))
+			db.tm.add(bucketId, string(key), db.expireTime(meta.Timestamp, meta.TTL), db.buildExpireCallback(bucket.Name, key))
 		} else {
-			db.tm.del(bucket, string(key))
+			db.tm.del(bucketId, string(key))
 		}
 		bTree.Insert(key, r.V, r.H)
 	}
+	return nil
 }
 
 func (db *DB) expireTime(timestamp uint64, ttl uint32) time.Duration {
@@ -678,7 +698,7 @@ func (db *DB) expireTime(timestamp uint64, ttl uint32) time.Duration {
 func (db *DB) buildIdxes(r *Record) error {
 	switch r.H.Meta.Ds {
 	case DataStructureBTree:
-		db.buildBTreeIdx(r)
+		return db.buildBTreeIdx(r)
 	case DataStructureList:
 		if err := db.buildListIdx(r); err != nil {
 			return err
@@ -695,22 +715,7 @@ func (db *DB) buildIdxes(r *Record) error {
 	return nil
 }
 
-func (db *DB) buildNotDSIdxes(r *Record) {
-	if r.H.Meta.Flag == DataSetBucketDeleteFlag {
-		db.deleteBucket(DataStructureSet, r.Bucket)
-	}
-	if r.H.Meta.Flag == DataSortedSetBucketDeleteFlag {
-		db.deleteBucket(DataStructureSortedSet, r.Bucket)
-	}
-	if r.H.Meta.Flag == DataBTreeBucketDeleteFlag {
-		db.deleteBucket(DataStructureBTree, r.Bucket)
-	}
-	if r.H.Meta.Flag == DataListBucketDeleteFlag {
-		db.deleteBucket(DataStructureList, r.Bucket)
-	}
-}
-
-func (db *DB) deleteBucket(ds uint16, bucket string) {
+func (db *DB) deleteBucket(ds uint16, bucket BucketId) {
 	if ds == DataStructureSet {
 		db.Index.set.delete(bucket)
 	}
@@ -727,10 +732,16 @@ func (db *DB) deleteBucket(ds uint16, bucket string) {
 
 // buildSetIdx builds set index when opening the DB.
 func (db *DB) buildSetIdx(r *Record) error {
-	bucket, key, val, meta := r.Bucket, r.H.Key, r.V, r.H.Meta
+	key, val, meta := r.H.Key, r.V, r.H.Meta
 	db.resetRecordByMode(r)
 
-	s := db.Index.set.getWithDefault(bucket)
+	bucket, err := db.bm.GetBucketById(r.H.Meta.BucketId)
+	if err != nil {
+		return err
+	}
+	bucketId := bucket.Id
+
+	s := db.Index.set.getWithDefault(bucketId)
 
 	switch meta.Flag {
 	case DataSetFlag:
@@ -748,12 +759,16 @@ func (db *DB) buildSetIdx(r *Record) error {
 
 // buildSortedSetIdx builds sorted set index when opening the DB.
 func (db *DB) buildSortedSetIdx(r *Record) error {
-	bucket, key, val, meta := r.Bucket, r.H.Key, r.V, r.H.Meta
+	key, val, meta := r.H.Key, r.V, r.H.Meta
 	db.resetRecordByMode(r)
 
-	ss := db.Index.sortedSet.getWithDefault(bucket, db)
+	bucket, err := db.bm.GetBucketById(r.H.Meta.BucketId)
+	if err != nil {
+		return err
+	}
+	bucketId := bucket.Id
 
-	var err error
+	ss := db.Index.sortedSet.getWithDefault(bucketId, db)
 
 	switch meta.Flag {
 	case DataZAddFlag:
@@ -783,16 +798,20 @@ func (db *DB) buildSortedSetIdx(r *Record) error {
 
 // buildListIdx builds List index when opening the DB.
 func (db *DB) buildListIdx(r *Record) error {
-	bucket, key, val, meta := r.Bucket, r.H.Key, r.V, r.H.Meta
+	key, val, meta := r.H.Key, r.V, r.H.Meta
 	db.resetRecordByMode(r)
 
-	l := db.Index.list.getWithDefault(bucket)
+	bucket, err := db.bm.GetBucketById(r.H.Meta.BucketId)
+	if err != nil {
+		return err
+	}
+	bucketId := bucket.Id
+
+	l := db.Index.list.getWithDefault(bucketId)
 
 	if IsExpired(meta.TTL, meta.Timestamp) {
 		return nil
 	}
-
-	var err error
 
 	switch meta.Flag {
 	case DataExpireListFlag:
@@ -890,8 +909,9 @@ func (db *DB) managed(writable bool, fn func(tx *Tx) error) (err error) {
 			db.opt.ErrorHandler.HandleError(err)
 		}
 
-		errRollback := tx.Rollback()
-		err = fmt.Errorf("%v. Rollback err: %v", err, errRollback)
+		if errRollback := tx.Rollback(); errRollback != nil {
+			err = fmt.Errorf("%v. Rollback err: %v", err, errRollback)
+		}
 	}
 
 	return err
@@ -923,7 +943,12 @@ func (db *DB) IsClose() bool {
 func (db *DB) buildExpireCallback(bucket string, key []byte) func() {
 	return func() {
 		err := db.Update(func(tx *Tx) error {
-			if db.tm.exist(bucket, string(key)) {
+			b, err := tx.db.bm.GetBucket(Ds(DataStructureBTree), BucketName(bucket))
+			if err != nil {
+				return err
+			}
+			bucketId := b.Id
+			if db.tm.exist(bucketId, string(key)) {
 				return tx.Delete(bucket, key)
 			}
 			return nil
@@ -932,4 +957,39 @@ func (db *DB) buildExpireCallback(bucket string, key []byte) func() {
 			log.Printf("occur error when expired deletion, error: %v", err.Error())
 		}
 	}
+}
+
+func (db *DB) rebuildBucketManager() error {
+	bucketFilePath := db.opt.Dir + "/" + BucketStoreFileName
+	f, err := newFileRecovery(bucketFilePath, db.opt.BufferSizeOfRecovery)
+	if err != nil {
+		return nil
+	}
+	bucketRequest := make([]*bucketSubmitRequest, 0)
+
+	for {
+		bucket, err := f.readBucket()
+		if err != nil {
+			// whatever which logic branch it will choose, we will release the fd.
+			_ = f.release()
+			if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+				break
+			} else {
+				return err
+			}
+		}
+		bucketRequest = append(bucketRequest, &bucketSubmitRequest{
+			ds:     bucket.Ds,
+			name:   BucketName(bucket.Name),
+			bucket: bucket,
+		})
+	}
+
+	if len(bucketRequest) > 0 {
+		err = db.bm.SubmitPendingBucketChange(bucketRequest)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

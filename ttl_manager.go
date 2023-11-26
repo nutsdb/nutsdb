@@ -26,10 +26,10 @@ func newNodesInBucket() nodesInBucket {
 	return make(map[string]timer.TimeNoder)
 }
 
-type nodes map[string]nodesInBucket // bucket to nodes that in a bucket
+type nodes map[BucketId]nodesInBucket // bucket to nodes that in a bucket
 
-func (n nodes) getNode(bucket, key string) (timer.TimeNoder, bool) {
-	nib, ok := n[bucket]
+func (n nodes) getNode(bucketId BucketId, key string) (timer.TimeNoder, bool) {
+	nib, ok := n[bucketId]
 	if !ok {
 		return nil, false
 	}
@@ -37,17 +37,17 @@ func (n nodes) getNode(bucket, key string) (timer.TimeNoder, bool) {
 	return node, ok
 }
 
-func (n nodes) addNode(bucket, key string, node timer.TimeNoder) {
-	nib, ok := n[bucket]
+func (n nodes) addNode(bucketId BucketId, key string, node timer.TimeNoder) {
+	nib, ok := n[bucketId]
 	if !ok {
 		nib = newNodesInBucket()
-		n[bucket] = nib
+		n[bucketId] = nib
 	}
 	nib[key] = node
 }
 
-func (n nodes) delNode(bucket, key string) {
-	if nib, ok := n[bucket]; ok {
+func (n nodes) delNode(bucketId BucketId, key string) {
+	if nib, ok := n[bucketId]; ok {
 		delete(nib, key)
 	}
 }
@@ -79,21 +79,21 @@ func (tm *ttlManager) run() {
 	tm.t.Run()
 }
 
-func (tm *ttlManager) exist(bucket, key string) bool {
-	_, ok := tm.timerNodes.getNode(bucket, key)
+func (tm *ttlManager) exist(bucketId BucketId, key string) bool {
+	_, ok := tm.timerNodes.getNode(bucketId, key)
 	return ok
 }
 
-func (tm *ttlManager) add(bucket, key string, expire time.Duration, callback func()) {
-	if node, ok := tm.timerNodes.getNode(bucket, key); ok {
+func (tm *ttlManager) add(bucketId BucketId, key string, expire time.Duration, callback func()) {
+	if node, ok := tm.timerNodes.getNode(bucketId, key); ok {
 		node.Stop()
 	}
 
 	node := tm.t.AfterFunc(expire, callback)
-	tm.timerNodes.addNode(bucket, key, node)
+	tm.timerNodes.addNode(bucketId, key, node)
 }
 
-func (tm *ttlManager) del(bucket, key string) {
+func (tm *ttlManager) del(bucket BucketId, key string) {
 	tm.timerNodes.delNode(bucket, key)
 }
 

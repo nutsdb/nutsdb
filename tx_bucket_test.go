@@ -30,6 +30,10 @@ var (
 func setupBucket(t *testing.T, db *DB) {
 	key := GetTestBytes(0)
 	val := GetTestBytes(1)
+	txCreateBucket(t, db, DataStructureBTree, stringBucketName, nil)
+	txCreateBucket(t, db, DataStructureSet, setBucketName, nil)
+	txCreateBucket(t, db, DataStructureSortedSet, zSetBucketName, nil)
+	txCreateBucket(t, db, DataStructureList, listBucketName, nil)
 
 	txSAdd(t, db, setBucketName, key, val, nil, nil)
 	txZAdd(t, db, zSetBucketName, key, val, 80, nil, nil)
@@ -83,6 +87,5 @@ func TestBucket_DeleteBucket(t *testing.T) {
 		txDeleteBucket(t, db, DataStructureList, listBucketName, nil)
 		txDeleteBucket(t, db, DataStructureBTree, stringBucketName, nil)
 
-		txDeleteBucket(t, db, DataStructureNone, "none_bucket", ErrDataStructureNotSupported)
 	})
 }

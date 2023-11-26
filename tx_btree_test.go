@@ -37,6 +37,8 @@ func TestTx_PutAndGet(t *testing.T) {
 		withDefaultDB(t, func(t *testing.T, db *DB) {
 
 			{
+				txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
 				tx, err := db.Begin(true)
 				require.NoError(t, err)
 
@@ -95,7 +97,7 @@ func TestTx_GetAll(t *testing.T) {
 
 			{
 				// setup the data
-
+				txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 				tx, err := db.Begin(true)
 				require.NoError(t, err)
 
@@ -143,6 +145,7 @@ func TestTx_RangeScan_Err(t *testing.T) {
 
 		{
 			// setup the data
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 			tx, err := db.Begin(true)
 			require.NoError(t, err)
@@ -180,6 +183,7 @@ func TestTx_RangeScan(t *testing.T) {
 
 		{
 			// setup the data
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 			tx, err := db.Begin(true)
 			require.NoError(t, err)
@@ -237,7 +241,7 @@ func TestTx_PrefixScan(t *testing.T) {
 
 		{
 			// setup the data
-
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 			tx, err := db.Begin(true)
 			require.NoError(t, err)
 
@@ -285,6 +289,8 @@ func TestTx_PrefixSearchScan(t *testing.T) {
 	bucket := "bucket_for_prefix_search_scan"
 
 	withDefaultDB(t, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
 		regs := "1"
 
 		tx, err := db.Begin(true)
@@ -335,6 +341,7 @@ func TestTx_DeleteAndGet(t *testing.T) {
 		bucket := "bucket_delete_test"
 
 		{
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 			tx, err := db.Begin(true)
 			require.NoError(t, err)
 
@@ -372,6 +379,7 @@ func TestTx_DeleteAndGet(t *testing.T) {
 func TestTx_DeleteFromMemory(t *testing.T) {
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		bucket := "bucket"
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 		for i := 0; i < 10; i++ {
 			txPut(t, db, bucket, GetTestBytes(i), GetTestBytes(i), Persistent, nil, nil)
@@ -384,7 +392,7 @@ func TestTx_DeleteFromMemory(t *testing.T) {
 		txDel(t, db, bucket, GetTestBytes(3), nil)
 
 		err := db.View(func(tx *Tx) error {
-			r, ok := db.Index.bTree.getWithDefault(bucket).Find(GetTestBytes(3))
+			r, ok := db.Index.bTree.getWithDefault(1).Find(GetTestBytes(3))
 			require.Nil(t, r)
 			require.False(t, ok)
 
@@ -399,6 +407,8 @@ func TestTx_GetAndScansFromHintKey(t *testing.T) {
 
 	bucket := "bucket_get_test"
 	withRAMIdxDB(t, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
 		// write tx begin
 		tx, err := db.Begin(true)
 		require.NoError(t, err)
@@ -455,6 +465,8 @@ func TestTx_Put_Err(t *testing.T) {
 	t.Run("write with read only tx", func(t *testing.T) {
 		withDefaultDB(t, func(t *testing.T, db *DB) {
 			// write tx begin err setting here
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
 			tx, err := db.Begin(false) // tx not writable
 			require.NoError(t, err)
 
@@ -469,6 +481,8 @@ func TestTx_Put_Err(t *testing.T) {
 
 	t.Run("write with empty key", func(t *testing.T) {
 		withDefaultDB(t, func(t *testing.T, db *DB) {
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
 			tx, err := db.Begin(true)
 			require.NoError(t, err)
 
@@ -483,6 +497,7 @@ func TestTx_Put_Err(t *testing.T) {
 
 	t.Run("write with TOO big size", func(t *testing.T) {
 		withDefaultDB(t, func(t *testing.T, db *DB) {
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 			tx, err := db.Begin(true)
 			require.NoError(t, err)
 
@@ -503,6 +518,8 @@ func TestTx_Put_Err(t *testing.T) {
 func TestTx_PrefixScan_NotFound(t *testing.T) {
 	t.Run("prefix scan in empty bucket", func(t *testing.T) {
 		withDefaultDB(t, func(t *testing.T, db *DB) {
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
 			tx, err := db.Begin(false)
 			assert.NoError(t, err)
 
@@ -520,6 +537,7 @@ func TestTx_PrefixScan_NotFound(t *testing.T) {
 
 		withDefaultDB(t, func(t *testing.T, db *DB) {
 			{ // write tx begin
+				txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 				tx, err := db.Begin(true)
 				require.NoError(t, err)
@@ -576,6 +594,8 @@ func TestTx_PrefixSearchScan_NotFound(t *testing.T) {
 
 	t.Run("prefix search in empty bucket", func(t *testing.T) {
 		withDefaultDB(t, func(t *testing.T, db *DB) {
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
 			tx, err := db.Begin(false)
 			require.NoError(t, err)
 
@@ -591,6 +611,8 @@ func TestTx_PrefixSearchScan_NotFound(t *testing.T) {
 
 		withDefaultDB(t, func(t *testing.T, db *DB) {
 			{ // set up the data
+				txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
 				tx, err = db.Begin(true) // write tx begin
 				require.NoError(t, err)
 
@@ -634,6 +656,8 @@ func TestTx_RangeScan_NotFound(t *testing.T) {
 	bucket := "bucket_range_scan_test"
 
 	withDefaultDB(t, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
 		tx, err := db.Begin(true) // write tx begin
 		require.NoError(t, err)
 
@@ -662,6 +686,8 @@ func TestTx_ExpiredDeletion(t *testing.T) {
 
 	t.Run("expired deletion", func(t *testing.T) {
 		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
 			txPut(t, db, bucket, GetTestBytes(0), GetTestBytes(0), 1, nil, nil)
 			txPut(t, db, bucket, GetTestBytes(1), GetTestBytes(1), 2, nil, nil)
 			txPut(t, db, bucket, GetTestBytes(2), GetTestBytes(2), 3, nil, nil)
@@ -683,11 +709,11 @@ func TestTx_ExpiredDeletion(t *testing.T) {
 			// this entry will be deleted
 			txGet(t, db, bucket, GetTestBytes(1), nil, ErrKeyNotFound)
 
-			r, ok := db.Index.bTree.getWithDefault(bucket).Find(GetTestBytes(0))
+			r, ok := db.Index.bTree.getWithDefault(1).Find(GetTestBytes(0))
 			require.Nil(t, r)
 			require.False(t, ok)
 
-			r, ok = db.Index.bTree.getWithDefault(bucket).Find(GetTestBytes(1))
+			r, ok = db.Index.bTree.getWithDefault(1).Find(GetTestBytes(1))
 			require.Nil(t, r)
 			require.False(t, ok)
 		})
@@ -695,6 +721,8 @@ func TestTx_ExpiredDeletion(t *testing.T) {
 
 	t.Run("update expire time", func(t *testing.T) {
 		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
 			txPut(t, db, bucket, GetTestBytes(0), GetTestBytes(0), 1, nil, nil)
 			time.Sleep(500 * time.Millisecond)
 
@@ -710,6 +738,8 @@ func TestTx_ExpiredDeletion(t *testing.T) {
 
 	t.Run("persist expire time", func(t *testing.T) {
 		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
 			txPut(t, db, bucket, GetTestBytes(0), GetTestBytes(0), 1, nil, nil)
 			time.Sleep(500 * time.Millisecond)
 
@@ -726,6 +756,8 @@ func TestTx_ExpiredDeletion(t *testing.T) {
 	t.Run("expired deletion when open", func(t *testing.T) {
 		opts := DefaultOptions
 		runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
 			txPut(t, db, bucket, GetTestBytes(0), GetTestBytes(0), 1, nil, nil)
 			txPut(t, db, bucket, GetTestBytes(1), GetTestBytes(1), 3, nil, nil)
 			txPut(t, db, bucket, GetTestBytes(2), GetTestBytes(2), 3, nil, nil)
@@ -765,6 +797,8 @@ func TestTx_ExpiredDeletion(t *testing.T) {
 		opts.SegmentSize = 1 * 100
 		runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
 			bucket := "bucket"
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
 			txPut(t, db, bucket, GetTestBytes(0), GetTestBytes(0), Persistent, nil, nil)
 			txPut(t, db, bucket, GetTestBytes(1), GetTestBytes(1), Persistent, nil, nil)
 			txPut(t, db, bucket, GetTestBytes(2), GetTestBytes(2), 1, nil, nil)
@@ -777,7 +811,7 @@ func TestTx_ExpiredDeletion(t *testing.T) {
 			txGet(t, db, bucket, GetTestBytes(1), GetTestBytes(1), nil)
 			txGet(t, db, bucket, GetTestBytes(2), nil, ErrKeyNotFound)
 
-			r, ok := db.Index.bTree.getWithDefault(bucket).Find(GetTestBytes(2))
+			r, ok := db.Index.bTree.getWithDefault(1).Find(GetTestBytes(2))
 			require.Nil(t, r)
 			require.False(t, ok)
 		})
@@ -787,6 +821,7 @@ func TestTx_ExpiredDeletion(t *testing.T) {
 		opts := DefaultOptions
 		opts.ExpiredDeleteType = TimeHeap
 		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 			txPut(t, db, bucket, GetTestBytes(0), GetTestBytes(0), 1, nil, nil)
 			txPut(t, db, bucket, GetTestBytes(1), GetTestBytes(1), 2, nil, nil)
 			txGet(t, db, bucket, GetTestBytes(0), GetTestBytes(0), nil)
@@ -804,11 +839,11 @@ func TestTx_ExpiredDeletion(t *testing.T) {
 			// this entry will be deleted
 			txGet(t, db, bucket, GetTestBytes(1), nil, ErrKeyNotFound)
 
-			r, ok := db.Index.bTree.getWithDefault(bucket).Find(GetTestBytes(0))
+			r, ok := db.Index.bTree.getWithDefault(1).Find(GetTestBytes(0))
 			require.Nil(t, r)
 			require.False(t, ok)
 
-			r, ok = db.Index.bTree.getWithDefault(bucket).Find(GetTestBytes(1))
+			r, ok = db.Index.bTree.getWithDefault(1).Find(GetTestBytes(1))
 			require.Nil(t, r)
 			require.False(t, ok)
 		})
