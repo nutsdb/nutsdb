@@ -21,7 +21,7 @@ func TestRWManager_FileIO_All(t *testing.T) {
 			require.NoError(t, err)
 		}
 
-		rwManager := &FileIORWManager{fd, filePath, fdm}
+		rwManager := &FileIORWManager{fd, filePath, fdm, 256 * MB}
 		b := []byte("hello")
 		off := int64(3)
 		_, err = rwManager.WriteAt(b, off)

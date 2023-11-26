@@ -10,6 +10,7 @@ import (
 type fileRecovery struct {
 	fd     *os.File
 	reader *bufio.Reader
+	size   int64
 }
 
 func newFileRecovery(path string, bufSize int) (fr *fileRecovery, err error) {
@@ -18,25 +19,44 @@ func newFileRecovery(path string, bufSize int) (fr *fileRecovery, err error) {
 		return nil, err
 	}
 	bufSize = calBufferSize(bufSize)
+	fileInfo, err := fd.Stat()
+	if err != nil {
+		return nil, err
+	}
 	return &fileRecovery{
 		fd:     fd,
 		reader: bufio.NewReaderSize(fd, bufSize),
+		size:   fileInfo.Size(),
 	}, nil
 }
 
 // readEntry will read an Entry from disk.
-func (fr *fileRecovery) readEntry() (e *Entry, err error) {
-	buf := make([]byte, DataEntryHeaderSize)
-	_, err = io.ReadFull(fr.reader, buf)
+func (fr *fileRecovery) readEntry(off int64) (e *Entry, err error) {
+	var size int64 = MaxEntryHeaderSize
+	// Since MaxEntryHeaderSize may be larger than the actual Header, it needs to be calculated
+	if off+size > fr.size {
+		size = fr.size - off
+	}
+
+	headerBuf := make([]byte, size)
+	_, err = fr.fd.Seek(off, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = fr.fd.Read(headerBuf)
 	if err != nil {
 		return nil, err
 	}
 
 	e = new(Entry)
-	err = e.ParseMeta(buf)
+	headerSize, err := e.ParseMeta(headerBuf)
 	if err != nil {
 		return nil, err
 	}
+
+	// Remove the content after the Header
+	headerBuf = headerBuf[:headerSize]
 
 	if e.IsZero() {
 		return nil, nil
@@ -45,7 +65,12 @@ func (fr *fileRecovery) readEntry() (e *Entry, err error) {
 	meta := e.Meta
 	dataSize := meta.PayloadSize()
 	dataBuf := make([]byte, dataSize)
-	_, err = io.ReadFull(fr.reader, dataBuf)
+	// Seek to read the Key and Value after the Header
+	_, err = fr.fd.Seek(off+int64(headerSize), 0)
+	if err != nil {
+		return nil, err
+	}
+	_, err = fr.fd.Read(dataBuf)
 	if err != nil {
 		return nil, err
 	}
@@ -54,7 +79,7 @@ func (fr *fileRecovery) readEntry() (e *Entry, err error) {
 		return nil, err
 	}
 
-	crc := e.GetCrc(buf)
+	crc := e.GetCrc(headerBuf)
 	if crc != e.Meta.Crc {
 		return nil, ErrCrc
 	}

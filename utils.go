@@ -169,3 +169,12 @@ func createNewBufferWithSize(size int) *bytes.Buffer {
 	buf.Grow(int(size))
 	return buf
 }
+
+func UvarintSize(x uint64) int {
+	i := 0
+	for x >= 0x80 {
+		x >>= 7
+		i++
+	}
+	return i + 1
+}

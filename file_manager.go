@@ -6,15 +6,17 @@ import (
 
 // fileManager holds the fd cache and file-related operations go through the manager to obtain the file processing object
 type fileManager struct {
-	rwMode RWMode
-	fdm    *fdManager
+	rwMode      RWMode
+	fdm         *fdManager
+	segmentSize int64
 }
 
 // newFileManager will create a newFileManager object
-func newFileManager(rwMode RWMode, maxFdNums int, cleanThreshold float64) (fm *fileManager) {
+func newFileManager(rwMode RWMode, maxFdNums int, cleanThreshold float64, segmentSize int64) (fm *fileManager) {
 	fm = &fileManager{
-		rwMode: rwMode,
-		fdm:    newFdm(maxFdNums, cleanThreshold),
+		rwMode:      rwMode,
+		fdm:         newFdm(maxFdNums, cleanThreshold),
+		segmentSize: segmentSize,
 	}
 	return fm
 }
@@ -28,14 +30,14 @@ func (fm *fileManager) getDataFile(path string, capacity int64) (datafile *DataF
 	var rwManager RWManager
 
 	if fm.rwMode == FileIO {
-		rwManager, err = fm.getFileRWManager(path, capacity)
+		rwManager, err = fm.getFileRWManager(path, capacity, fm.segmentSize)
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	if fm.rwMode == MMap {
-		rwManager, err = fm.getMMapRWManager(path, capacity)
+		rwManager, err = fm.getMMapRWManager(path, capacity, fm.segmentSize)
 		if err != nil {
 			return nil, err
 		}
@@ -45,7 +47,7 @@ func (fm *fileManager) getDataFile(path string, capacity int64) (datafile *DataF
 }
 
 // getFileRWManager will return a FileIORWManager Object
-func (fm *fileManager) getFileRWManager(path string, capacity int64) (*FileIORWManager, error) {
+func (fm *fileManager) getFileRWManager(path string, capacity int64, segmentSize int64) (*FileIORWManager, error) {
 	fd, err := fm.fdm.getFd(path)
 	if err != nil {
 		return nil, err
@@ -55,11 +57,11 @@ func (fm *fileManager) getFileRWManager(path string, capacity int64) (*FileIORWM
 		return nil, err
 	}
 
-	return &FileIORWManager{fd: fd, path: path, fdm: fm.fdm}, nil
+	return &FileIORWManager{fd: fd, path: path, fdm: fm.fdm, segmentSize: segmentSize}, nil
 }
 
 // getMMapRWManager will return a MMapRWManager Object
-func (fm *fileManager) getMMapRWManager(path string, capacity int64) (*MMapRWManager, error) {
+func (fm *fileManager) getMMapRWManager(path string, capacity int64, segmentSize int64) (*MMapRWManager, error) {
 	fd, err := fm.fdm.getFd(path)
 	if err != nil {
 		return nil, err
@@ -75,7 +77,7 @@ func (fm *fileManager) getMMapRWManager(path string, capacity int64) (*MMapRWMan
 		return nil, err
 	}
 
-	return &MMapRWManager{m: m, path: path, fdm: fm.fdm}, nil
+	return &MMapRWManager{m: m, path: path, fdm: fm.fdm, segmentSize: segmentSize}, nil
 }
 
 // close will close fdm resource
