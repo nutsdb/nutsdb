@@ -66,9 +66,25 @@ func (tx *Tx) IterateBuckets(ds uint16, pattern string, f func(bucket string) bo
 	return err
 }
 
-func (tx *Tx) NewBucket(ds uint16, name string) (success bool, err error) {
+func (tx *Tx) NewKVBucket(name string) error {
+	return tx.NewBucket(DataStructureBTree, name)
+}
+
+func (tx *Tx) NewListBucket(name string) error {
+	return tx.NewBucket(DataStructureList, name)
+}
+
+func (tx *Tx) NewSetBucket(name string) error {
+	return tx.NewBucket(DataStructureSet, name)
+}
+
+func (tx *Tx) NewSortSetBucket(name string) error {
+	return tx.NewBucket(DataStructureSortedSet, name)
+}
+
+func (tx *Tx) NewBucket(ds uint16, name string) (err error) {
 	if tx.ExistBucket(ds, name) {
-		return false, ErrBucketAlreadyExist
+		return ErrBucketAlreadyExist
 	}
 	bucket := &Bucket{
 		Meta: &BucketMeta{
@@ -82,7 +98,7 @@ func (tx *Tx) NewBucket(ds uint16, name string) (success bool, err error) {
 		tx.pendingBucketList[Ds(ds)] = map[BucketName]*Bucket{}
 	}
 	tx.pendingBucketList[Ds(ds)][BucketName(name)] = bucket
-	return true, nil
+	return nil
 }
 
 // DeleteBucket delete bucket depends on ds (represents the data structure)

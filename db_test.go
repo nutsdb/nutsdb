@@ -110,9 +110,8 @@ func txDeleteBucket(t *testing.T, db *DB, ds uint16, bucket string, expectErr er
 
 func txCreateBucket(t *testing.T, db *DB, ds uint16, bucket string, expectErr error) {
 	err := db.Update(func(tx *Tx) error {
-		succeed, err := tx.NewBucket(ds, bucket)
+		err := tx.NewBucket(ds, bucket)
 		assertErr(t, err, expectErr)
-		assert.Equal(t, true, succeed)
 		return nil
 	})
 	require.NoError(t, err)
