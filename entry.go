@@ -42,14 +42,6 @@ type (
 		Meta  *MetaData
 	}
 
-	// Hint represents the index of the key
-	Hint struct {
-		Key     []byte
-		FileID  int64
-		Meta    *MetaData
-		DataPos uint64
-	}
-
 	// MetaData represents the Meta information of the data item.
 	MetaData struct {
 		KeySize   uint32
@@ -251,35 +243,6 @@ func (e *Entry) valid() error {
 		return ErrDataSizeExceed
 	}
 	return nil
-}
-
-// NewHint new Hint object
-func NewHint() *Hint {
-	return new(Hint)
-}
-
-// WithKey set key to Hint
-func (h *Hint) WithKey(key []byte) *Hint {
-	h.Key = key
-	return h
-}
-
-// WithFileId set FileID to Hint
-func (h *Hint) WithFileId(fid int64) *Hint {
-	h.FileID = fid
-	return h
-}
-
-// WithMeta set Meta to Hint
-func (h *Hint) WithMeta(meta *MetaData) *Hint {
-	h.Meta = meta
-	return h
-}
-
-// WithDataPos set DataPos to Hint
-func (h *Hint) WithDataPos(pos uint64) *Hint {
-	h.DataPos = pos
-	return h
 }
 
 // NewEntry new Entry Object

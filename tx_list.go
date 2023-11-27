@@ -67,7 +67,7 @@ func (tx *Tx) RPeek(bucket string, key []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	v, err := tx.db.getValueByRecord(item.r)
+	v, err := tx.db.getValueByRecord(item.record)
 	if err != nil {
 		return nil, err
 	}
@@ -196,7 +196,7 @@ func (tx *Tx) LPeek(bucket string, key []byte) (item []byte, err error) {
 		return nil, err
 	}
 
-	v, err := tx.db.getValueByRecord(r.r)
+	v, err := tx.db.getValueByRecord(r.record)
 	if err != nil {
 		return nil, err
 	}

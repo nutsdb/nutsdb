@@ -76,8 +76,7 @@ func TestList_LPush(t *testing.T) {
 	for i := 0; i < len(expectRecords); i++ {
 		seq := generateSeq(&seqInfo, true)
 		newKey := encodeListKey([]byte(key), seq)
-		expectRecords[i].H.Key = newKey
-		expectRecords[i].H.Meta.KeySize = uint32(len(newKey))
+		expectRecords[i].Key = newKey
 		ListPush(t, list, string(newKey), expectRecords[i], true, nil)
 	}
 
@@ -93,8 +92,7 @@ func TestList_RPush(t *testing.T) {
 	for i := 0; i < len(expectRecords); i++ {
 		seq := generateSeq(&seqInfo, false)
 		newKey := encodeListKey([]byte(key), seq)
-		expectRecords[i].H.Key = newKey
-		expectRecords[i].H.Meta.KeySize = uint32(len(newKey))
+		expectRecords[i].Key = newKey
 		ListPush(t, list, string(newKey), expectRecords[i], false, nil)
 	}
 
@@ -112,8 +110,7 @@ func TestList_Pop(t *testing.T) {
 	for i := 0; i < len(expectRecords); i++ {
 		seq := generateSeq(&seqInfo, false)
 		newKey := encodeListKey([]byte(key), seq)
-		expectRecords[i].H.Key = newKey
-		expectRecords[i].H.Meta.KeySize = uint32(len(newKey))
+		expectRecords[i].Key = newKey
 		ListPush(t, list, string(newKey), expectRecords[i], false, nil)
 	}
 
@@ -135,34 +132,30 @@ func TestList_LRem(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		seq := generateSeq(&seqInfo, false)
 		newKey := encodeListKey([]byte(key), seq)
-		records[0].H.Key = newKey
-		records[0].H.Meta.KeySize = uint32(len(newKey))
+		records[0].Key = newKey
 		ListPush(t, list, string(newKey), records[0], false, nil)
 	}
 
 	seq := generateSeq(&seqInfo, false)
 	newKey := encodeListKey([]byte(key), seq)
-	records[1].H.Key = newKey
-	records[1].H.Meta.KeySize = uint32(len(newKey))
+	records[1].Key = newKey
 	ListPush(t, list, string(newKey), records[1], false, nil)
 
 	seq = generateSeq(&seqInfo, false)
 	newKey = encodeListKey([]byte(key), seq)
-	records[0].H.Key = newKey
-	records[0].H.Meta.KeySize = uint32(len(newKey))
+	records[0].Key = newKey
 	ListPush(t, list, string(newKey), records[0], false, nil)
 
 	seq = generateSeq(&seqInfo, false)
 	newKey = encodeListKey([]byte(key), seq)
-	records[1].H.Key = newKey
-	records[1].H.Meta.KeySize = uint32(len(newKey))
+	records[1].Key = newKey
 	ListPush(t, list, string(newKey), records[1], false, nil)
 
 	// r1 r1 r1 r2 r1 r2
 	expectRecords := []*Record{records[0], records[0], records[0], records[1], records[0], records[1]}
 
 	cmp := func(r *Record) (bool, error) {
-		return bytes.Equal(r.V, records[0].V), nil
+		return bytes.Equal(r.Value, records[0].Value), nil
 	}
 
 	// r1 r1 r1 r2 r2
@@ -178,7 +171,7 @@ func TestList_LRem(t *testing.T) {
 	ListCmp(t, list, key, expectRecords, false)
 
 	cmp = func(r *Record) (bool, error) {
-		return bytes.Equal(r.V, records[1].V), nil
+		return bytes.Equal(r.Value, records[1].Value), nil
 	}
 
 	// r1
@@ -197,8 +190,7 @@ func TestList_LTrim(t *testing.T) {
 	for i := 0; i < len(expectRecords); i++ {
 		seq := generateSeq(&seqInfo, false)
 		newKey := encodeListKey([]byte(key), seq)
-		expectRecords[i].H.Key = newKey
-		expectRecords[i].H.Meta.KeySize = uint32(len(newKey))
+		expectRecords[i].Key = newKey
 		ListPush(t, list, string(newKey), expectRecords[i], false, nil)
 	}
 
@@ -218,8 +210,7 @@ func TestList_LRemByIndex(t *testing.T) {
 	for i := 0; i < 8; i++ {
 		seq := generateSeq(&seqInfo, false)
 		newKey := encodeListKey([]byte(key), seq)
-		expectRecords[i].H.Key = newKey
-		expectRecords[i].H.Meta.KeySize = uint32(len(newKey))
+		expectRecords[i].Key = newKey
 		ListPush(t, list, string(newKey), expectRecords[i], false, nil)
 	}
 
@@ -249,27 +240,15 @@ func generateRecords(count int) []*Record {
 		key := GetTestBytes(i)
 		val := GetRandomBytes(24)
 
-		metaData := &MetaData{
-			KeySize:   uint32(len(key)),
+		record := &Record{
+			Key:       key,
+			Value:     val,
+			FileID:    int64(i),
+			DataPos:   uint64(rand.Uint32()),
 			ValueSize: uint32(len(val)),
 			Timestamp: uint64(time.Now().Unix()),
 			TTL:       uint32(rand.Intn(3600)),
-			Flag:      uint16(rand.Intn(2)),
 			TxID:      uint64(rand.Intn(1000)),
-			Status:    uint16(rand.Intn(2)),
-			Ds:        uint16(rand.Intn(3)),
-			Crc:       rand.Uint32(),
-			BucketId:  1,
-		}
-
-		record := &Record{
-			H: &Hint{
-				Key:     key,
-				FileID:  int64(i),
-				Meta:    metaData,
-				DataPos: uint64(rand.Uint32()),
-			},
-			V: val,
 		}
 		records[i] = record
 	}

@@ -26,7 +26,7 @@ func TestSet_SAdd(t *testing.T) {
 
 	values := make([][]byte, 3)
 	for i := range expectRecords {
-		values[i] = expectRecords[i].V
+		values[i] = expectRecords[i].Value
 	}
 
 	require.NoError(t, set.SAdd(key, values, expectRecords))
@@ -42,7 +42,7 @@ func TestSet_SRem(t *testing.T) {
 	expectRecords := generateRecords(4)
 	values := make([][]byte, 4)
 	for i := range expectRecords {
-		values[i] = expectRecords[i].V
+		values[i] = expectRecords[i].Value
 	}
 
 	require.NoError(t, set.SAdd(key, values, expectRecords))
@@ -69,7 +69,7 @@ func TestSet_SDiff(t *testing.T) {
 
 	values := make([][]byte, 10)
 	for i := range expectRecords {
-		values[i] = expectRecords[i].V
+		values[i] = expectRecords[i].Value
 	}
 
 	require.NoError(t, set.SAdd(key1, values[:5], expectRecords[:5]))
@@ -120,7 +120,7 @@ func TestSet_SCard(t *testing.T) {
 
 	values := make([][]byte, 10)
 	for i := range expectRecords {
-		values[i] = expectRecords[i].V
+		values[i] = expectRecords[i].Value
 	}
 
 	require.NoError(t, set.SAdd(key1, values[:5], expectRecords[:5]))
@@ -160,7 +160,7 @@ func TestSet_SInter(t *testing.T) {
 
 	values := make([][]byte, 10)
 	for i := range expectRecords {
-		values[i] = expectRecords[i].V
+		values[i] = expectRecords[i].Value
 	}
 
 	require.NoError(t, set.SAdd(key1, values[:5], expectRecords[:5]))
@@ -208,7 +208,7 @@ func TestSet_SMembers(t *testing.T) {
 
 	values := make([][]byte, 3)
 	for i := range expectRecords {
-		values[i] = expectRecords[i].V
+		values[i] = expectRecords[i].Value
 	}
 
 	require.NoError(t, set.SAdd(key, values, expectRecords))
@@ -246,7 +246,7 @@ func TestSet_SMove(t *testing.T) {
 	expectRecords := generateRecords(3)
 	values := make([][]byte, 3)
 	for i := range expectRecords {
-		values[i] = expectRecords[i].V
+		values[i] = expectRecords[i].Value
 	}
 
 	require.NoError(t, set.SAdd(key1, values[:2], expectRecords[:2]))
@@ -296,7 +296,7 @@ func TestSet_SPop(t *testing.T) {
 	expectRecords := generateRecords(2)
 	values := make([][]byte, 2)
 	for i := range expectRecords {
-		values[i] = expectRecords[i].V
+		values[i] = expectRecords[i].Value
 	}
 	m := map[*Record]struct{}{}
 	for _, expectRecord := range expectRecords {
@@ -331,7 +331,7 @@ func TestSet_SIsMember(t *testing.T) {
 	key := "key"
 
 	expectRecords := generateRecords(1)
-	values := [][]byte{expectRecords[0].V}
+	values := [][]byte{expectRecords[0].Value}
 
 	require.NoError(t, set.SAdd(key, values, expectRecords))
 	tests := []struct {
@@ -362,7 +362,7 @@ func TestSet_SAreMembers(t *testing.T) {
 	expectRecords := generateRecords(4)
 	values := make([][]byte, 4)
 	for i := range expectRecords {
-		values[i] = expectRecords[i].V
+		values[i] = expectRecords[i].Value
 	}
 
 	require.NoError(t, set.SAdd(key, values, expectRecords))
@@ -400,7 +400,7 @@ func TestSet_SUnion(t *testing.T) {
 
 	values := make([][]byte, 10)
 	for i := range expectRecords {
-		values[i] = expectRecords[i].V
+		values[i] = expectRecords[i].Value
 	}
 
 	require.NoError(t, set.SAdd(key1, values[:5], expectRecords[:5]))

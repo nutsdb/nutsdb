@@ -51,7 +51,6 @@ func removeDir(dir string) {
 func runNutsDBTest(t *testing.T, opts *Options, test func(t *testing.T, db *DB)) {
 	if opts == nil {
 		opts = &DefaultOptions
-		opts.EntryIdxMode = HintKeyAndRAMIdxMode
 	}
 	if opts.Dir == "" {
 		opts.Dir = NutsDBTestDirPath
@@ -79,12 +78,12 @@ func txPut(t *testing.T, db *DB, bucket string, key, value []byte, ttl uint32, e
 
 func txGet(t *testing.T, db *DB, bucket string, key []byte, expectVal []byte, expectErr error) {
 	err := db.View(func(tx *Tx) error {
-		e, err := tx.Get(bucket, key)
+		value, err := tx.Get(bucket, key)
 		if expectErr != nil {
 			require.Equal(t, expectErr, err)
 		} else {
 			require.NoError(t, err)
-			require.EqualValuesf(t, expectVal, e.Value, "err Tx Get. got %s want %s", string(e.Value), string(expectVal))
+			require.EqualValuesf(t, expectVal, value, "err Tx Get. got %s want %s", string(value), string(expectVal))
 		}
 		return nil
 	})
