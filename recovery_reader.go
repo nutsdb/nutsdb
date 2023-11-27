@@ -64,7 +64,7 @@ func (fr *fileRecovery) readEntry(off int64) (e *Entry, err error) {
 
 	payloadSize := e.Meta.PayloadSize()
 	dataBuf := make([]byte, payloadSize)
-	excessSize := MaxEntryHeaderSize - headerSize
+	excessSize := size - headerSize
 
 	if payloadSize <= excessSize {
 		copy(dataBuf, remainingBuf[:payloadSize])
