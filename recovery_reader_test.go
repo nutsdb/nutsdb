@@ -24,10 +24,10 @@ func Test_readEntry(t *testing.T) {
 	f, err := newFileRecovery(path, 4096)
 	require.NoError(t, err)
 
-	get, err := f.readEntry()
+	entry, err := f.readEntry(0)
 	require.NoError(t, err)
 
-	assert.Equal(t, expect.Encode(), get.Encode())
+	assert.Equal(t, expect.Encode(), entry.Encode())
 
 	err = fd.Close()
 	require.NoError(t, err)

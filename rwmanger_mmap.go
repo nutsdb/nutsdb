@@ -22,9 +22,10 @@ import (
 
 // MMapRWManager represents the RWManager which using mmap.
 type MMapRWManager struct {
-	path string
-	fdm  *fdManager
-	m    mmap.MMap
+	path        string
+	fdm         *fdManager
+	m           mmap.MMap
+	segmentSize int64
 }
 
 var (
@@ -68,6 +69,10 @@ func (mm *MMapRWManager) Sync() (err error) {
 func (mm *MMapRWManager) Release() (err error) {
 	mm.fdm.reduceUsing(mm.path)
 	return mm.m.Unmap()
+}
+
+func (mm *MMapRWManager) Size() int64 {
+	return mm.segmentSize
 }
 
 // Close will remove the cache in the fdm of the specified path, and call the close method of the os of the file

@@ -20,9 +20,10 @@ import (
 
 // FileIORWManager represents the RWManager which using standard I/O.
 type FileIORWManager struct {
-	fd   *os.File
-	path string
-	fdm  *fdManager
+	fd          *os.File
+	path        string
+	fdm         *fdManager
+	segmentSize int64
 }
 
 // WriteAt writes len(b) bytes to the File starting at byte offset off.
@@ -49,6 +50,10 @@ func (fm *FileIORWManager) Sync() (err error) {
 func (fm *FileIORWManager) Release() (err error) {
 	fm.fdm.reduceUsing(fm.path)
 	return nil
+}
+
+func (fm *FileIORWManager) Size() int64 {
+	return fm.segmentSize
 }
 
 // Close will remove the cache in the fdm of the specified path, and call the close method of the os of the file

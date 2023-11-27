@@ -161,7 +161,7 @@ func open(opt Options) (*DB, error) {
 		KeyCount:         0,
 		closed:           false,
 		Index:            newIndex(),
-		fm:               newFileManager(opt.RWMode, opt.MaxFdNumsInCache, opt.CleanFdsCacheThreshold),
+		fm:               newFileManager(opt.RWMode, opt.MaxFdNumsInCache, opt.CleanFdsCacheThreshold, opt.SegmentSize),
 		mergeStartCh:     make(chan struct{}),
 		mergeEndCh:       make(chan error),
 		mergeWorkCloseCh: make(chan struct{}),
@@ -345,7 +345,7 @@ func (db *DB) getEntryByHint(h *Hint) (*Entry, error) {
 	}(df.rwManager)
 
 	payloadSize := h.Meta.PayloadSize()
-	item, err := df.ReadRecord(int(h.DataPos), payloadSize)
+	item, err := df.ReadEntry(int(h.DataPos), payloadSize)
 	if err != nil {
 		return nil, fmt.Errorf("read err. pos %d, key %s, err %s", h.DataPos, string(h.Key), err)
 	}
@@ -561,11 +561,11 @@ func (db *DB) parseDataFiles(dataFileIds []int) (err error) {
 
 	readEntriesFromFile := func() error {
 		for {
-			entry, err := f.readEntry()
+			entry, err := f.readEntry(off)
 			if err != nil {
 				// whatever which logic branch it will choose, we will release the fd.
 				_ = f.release()
-				if errors.Is(err, io.EOF) || errors.Is(err, ErrIndexOutOfBound) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, ErrEntryZero) {
+				if errors.Is(err, io.EOF) || errors.Is(err, ErrIndexOutOfBound) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, ErrEntryZero) || errors.Is(err, ErrHeaderSizeOutOfBounds) {
 					break
 				}
 				if off >= db.opt.SegmentSize {
