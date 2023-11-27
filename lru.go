@@ -2,11 +2,12 @@ package nutsdb
 
 import (
 	"container/list"
+	"sync"
 )
 
 // LRUCache is a least recently used (LRU) cache.
 type LRUCache struct {
-	m   map[interface{}]*list.Element
+	m   *sync.Map
 	l   *list.List
 	cap int
 }
@@ -14,7 +15,7 @@ type LRUCache struct {
 // New creates a new LRUCache with the specified capacity.
 func NewLruCache(cap int) *LRUCache {
 	return &LRUCache{
-		m:   make(map[interface{}]*list.Element),
+		m:   &sync.Map{},
 		l:   list.New(),
 		cap: cap,
 	}
@@ -26,7 +27,7 @@ func (c *LRUCache) Add(key interface{}, value interface{}) {
 		return
 	}
 
-	if len(c.m) >= c.cap {
+	if c.l.Len() >= c.cap {
 		c.removeOldest()
 	}
 
@@ -36,15 +37,17 @@ func (c *LRUCache) Add(key interface{}, value interface{}) {
 	}
 	entry := c.l.PushFront(e)
 
-	c.m[key] = entry
+	c.m.Store(key, entry)
 }
 
 // Get returns the entry associated with the given key, or nil if the key is not in the cache.
 func (c *LRUCache) Get(key interface{}) interface{} {
-	entry, ok := c.m[key]
+	value, ok := c.m.Load(key)
 	if !ok {
 		return nil
 	}
+
+	entry := value.(*list.Element)
 
 	c.l.MoveToFront(entry)
 	return entry.Value.(*LruEntry).Value
@@ -52,24 +55,26 @@ func (c *LRUCache) Get(key interface{}) interface{} {
 
 // Remove removes the entry associated with the given key from the cache.
 func (c *LRUCache) Remove(key interface{}) {
-	entry, ok := c.m[key]
+	value, ok := c.m.Load(key)
 	if !ok {
 		return
 	}
 
+	entry := value.(*list.Element)
+
 	c.l.Remove(entry)
-	delete(c.m, key)
+	c.m.Delete(key)
 }
 
 // Len returns the number of entries in the cache.
 func (c *LRUCache) Len() int {
-	return len(c.m)
+	return c.l.Len()
 }
 
 // Clear clears the cache.
 func (c *LRUCache) Clear() {
 	c.l.Init()
-	c.m = make(map[interface{}]*list.Element)
+	c.m = &sync.Map{}
 }
 
 // removeOldest removes the oldest entry from the cache.
@@ -80,7 +85,7 @@ func (c *LRUCache) removeOldest() {
 	}
 
 	key := entry.Value.(*LruEntry).Key
-	delete(c.m, key)
+	c.m.Delete(key)
 
 	c.l.Remove(entry)
 }
