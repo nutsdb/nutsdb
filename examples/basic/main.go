@@ -92,11 +92,11 @@ func read() {
 	if err := db.View(
 		func(tx *nutsdb.Tx) error {
 			key := []byte("name1")
-			e, err := tx.Get(bucket, key)
+			value, err := tx.Get(bucket, key)
 			if err != nil {
 				return err
 			}
-			fmt.Println("val:", string(e.Value))
+			fmt.Println("val:", string(value))
 
 			return nil
 		}); err != nil {

@@ -64,11 +64,11 @@ func main() {
 		key := gorouter.GetParam(r, "key")
 		if err := db.View(
 			func(tx *nutsdb.Tx) error {
-				e, err := tx.Get(bucket, []byte(key))
+				value, err := tx.Get(bucket, []byte(key))
 				if err != nil {
 					return err
 				}
-				fmt.Println("read data val:", string(e.Value))
+				fmt.Println("read data val:", string(value))
 				return nil
 			}); err != nil {
 			log.Fatal(err)
