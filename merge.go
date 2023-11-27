@@ -249,7 +249,7 @@ func (db *DB) isPendingBtreeEntry(bucketId BucketId, entry *Entry) bool {
 	}
 
 	r, ok := idx.Find(entry.Key)
-	if !ok || r.H.Meta.Flag != DataSetFlag {
+	if !ok {
 		return false
 	}
 
@@ -259,7 +259,7 @@ func (db *DB) isPendingBtreeEntry(bucketId BucketId, entry *Entry) bool {
 		return false
 	}
 
-	if r.H.Meta.TxID != entry.Meta.TxID || r.H.Meta.Timestamp != entry.Meta.Timestamp {
+	if r.TxID != entry.Meta.TxID || r.Timestamp != entry.Meta.Timestamp {
 		return false
 	}
 
@@ -341,7 +341,7 @@ func (db *DB) isPendingListEntry(bucketId BucketId, entry *Entry) bool {
 			return false
 		}
 
-		if !bytes.Equal(r.H.Key, entry.Key) || r.H.Meta.TxID != entry.Meta.TxID || r.H.Meta.Timestamp != entry.Meta.Timestamp {
+		if !bytes.Equal(r.Key, entry.Key) || r.TxID != entry.Meta.TxID || r.Timestamp != entry.Meta.Timestamp {
 			return false
 		}
 

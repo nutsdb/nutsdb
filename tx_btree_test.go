@@ -52,11 +52,11 @@ func TestTx_PutAndGet(t *testing.T) {
 				tx, err = db.Begin(false)
 				require.NoError(t, err)
 
-				e, err := tx.Get(bucket, key)
+				value, err := tx.Get(bucket, key)
 				assert.NoError(t, err)
 				assert.NoError(t, tx.Commit())
 
-				assert.Equal(t, val, e.Value)
+				assert.Equal(t, val, value)
 			}
 
 		})
@@ -120,15 +120,12 @@ func TestTx_GetAll(t *testing.T) {
 				tx, err = db.Begin(false)
 				require.NoError(t, err)
 
-				entries, err := tx.GetAll(bucket)
+				values, err := tx.GetAll(bucket)
 				assert.NoError(t, err)
 
-				for i, entry := range entries {
-					wantKey := []byte("key_" + fmt.Sprintf("%07d", i))
+				for i, value := range values {
 					wantVal := []byte("val" + fmt.Sprintf("%07d", i))
-
-					assert.Equal(t, wantKey, entry.Key)
-					assert.Equal(t, wantVal, entry.Value)
+					assert.Equal(t, wantVal, value)
 				}
 
 				assert.NoError(t, tx.Commit())
@@ -211,22 +208,22 @@ func TestTx_RangeScan(t *testing.T) {
 			start := []byte(fmt.Sprintf("key_%07d", s))
 			end := []byte(fmt.Sprintf("key_%07d", e))
 
-			entries, err := tx.RangeScan(bucket, start, end)
+			values, err := tx.RangeScan(bucket, start, end)
 			assert.NoError(t, err)
 			assert.NoError(t, tx.Commit()) // tx commit
 
 			wantCount := (e - s) + 1 // the range: [5, 8]
-			assert.Equal(t, wantCount, len(entries))
+			assert.Equal(t, wantCount, len(values))
 
-			for i, e := range entries {
+			for i, value := range values {
 
-				wantKey := []byte("key_" + fmt.Sprintf("%07d", i+s))
-				assert.Equal(t, wantKey, e.Key)
+				wantValue := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", i+s))
+				assert.Equal(t, wantValue, value)
 			}
 
-			entries, err = tx.RangeScan(bucket, start, end)
+			values, err = tx.RangeScan(bucket, start, end)
 			assert.Error(t, err)
-			assert.Empty(t, entries)
+			assert.Empty(t, values)
 		}
 
 	})
@@ -245,10 +242,10 @@ func TestTx_PrefixScan(t *testing.T) {
 			tx, err := db.Begin(true)
 			require.NoError(t, err)
 
-			for _, prefix := range []string{"key1_", "key2_"} {
-				for i := 0; i < 10; i++ {
-					key := []byte(prefix + fmt.Sprintf("%07d", i))
-					val := []byte("foobar" + fmt.Sprintf("%07d", i))
+			for i, prefix := range []string{"key1_", "key2_"} {
+				for j := 0; j < 10; j++ {
+					key := []byte(prefix + fmt.Sprintf("%07d", j))
+					val := []byte("foobar" + fmt.Sprintf("%d%07d", i+1, j))
 					err = tx.Put(bucket, key, val, Persistent)
 					assert.NoError(t, err)
 				}
@@ -267,19 +264,18 @@ func TestTx_PrefixScan(t *testing.T) {
 			)
 
 			prefix := []byte("key1_")
-			entries, err := tx.PrefixScan(bucket, prefix, offset, limit)
+			values, err := tx.PrefixScan(bucket, prefix, offset, limit)
 			assert.NoError(t, err)
 
 			assert.NoError(t, tx.Commit())
 
-			assert.Equal(t, limit, len(entries))
+			assert.Equal(t, limit, len(values))
 
 			for i := 0; i < limit; i++ {
-				keyIndex := offset + i
+				valIndex := offset + i
 
-				wantKey := []byte("key1_" + fmt.Sprintf("%07d", keyIndex))
-				gotEntry := entries[i]
-				assert.Equal(t, wantKey, gotEntry.Key)
+				wantVal := []byte("foobar" + fmt.Sprintf("%d%07d", 1, valIndex))
+				assert.Equal(t, wantVal, values[i])
 			}
 		}
 	})
@@ -317,16 +313,16 @@ func TestTx_PrefixSearchScan(t *testing.T) {
 		require.NoError(t, err)
 
 		prefix := []byte("key_")
-		entries, err := tx.PrefixSearchScan(bucket, prefix, regs, 0, 1)
+		values, err := tx.PrefixSearchScan(bucket, prefix, regs, 0, 1)
 		assert.NoError(t, err)
 
 		assert.NoError(t, tx.Commit()) // tx commit
 
 		c := 0
-		for _, entry := range entries {
-			key := []byte("key_" + fmt.Sprintf("%07d", 1))
+		for _, value := range values {
+			wantVal := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 1))
 
-			assert.Equal(t, key, entry.Key)
+			assert.Equal(t, wantVal, value)
 			c++
 		}
 
@@ -426,11 +422,11 @@ func TestTx_GetAndScansFromHintKey(t *testing.T) {
 			require.NoError(t, err)
 
 			key := []byte("key_" + fmt.Sprintf("%07d", i))
-			entry, err := tx.Get(bucket, key)
+			value, err := tx.Get(bucket, key)
 			assert.NoError(t, err)
 
 			wantValue := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", i))
-			assert.Equal(t, wantValue, entry.Value)
+			assert.Equal(t, wantValue, value)
 
 			// tx commit
 			assert.NoError(t, tx.Commit())
@@ -441,13 +437,13 @@ func TestTx_GetAndScansFromHintKey(t *testing.T) {
 
 		start := []byte("key_0000001")
 		end := []byte("key_0000010")
-		entries, err := tx.RangeScan(bucket, start, end)
+		values, err := tx.RangeScan(bucket, start, end)
 		assert.NoError(t, err)
 
 		j := 0
 		for i := 1; i <= 10; i++ {
-			wantKey := []byte("key_" + fmt.Sprintf("%07d", i))
-			assert.Equal(t, wantKey, entries[j].Key)
+			wantVal := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", i))
+			assert.Equal(t, wantVal, values[j])
 
 			j++
 		}

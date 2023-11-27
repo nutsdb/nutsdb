@@ -19,11 +19,11 @@ func readWorker(id int, jobs <-chan int, results chan<- struct{}) {
 		key := strconv2.IntToStr(j)
 		if err := db.View(
 			func(tx *nutsdb.Tx) error {
-				e, err := tx.Get(bucket, []byte(key))
+				value, err := tx.Get(bucket, []byte(key))
 				if err != nil {
 					return err
 				}
-				fmt.Println("val:", string(e.Value))
+				fmt.Println("val:", string(value))
 
 				return nil
 			}); err != nil {
