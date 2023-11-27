@@ -43,10 +43,10 @@ if err := db.View(
 func(tx *nutsdb.Tx) error {
     key := []byte("name1")
     bucket := "bucket1"
-    if e, err := tx.Get(bucket, key); err != nil {
+    if value, err := tx.Get(bucket, key); err != nil {
         return err
     } else {
-        fmt.Println(string(e.Value)) // "val1-modify"
+        fmt.Println(string(value)) // "val1-modify"
     }
     return nil
 }); err != nil {

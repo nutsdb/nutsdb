@@ -28,6 +28,8 @@ It supports fully serializable transactions and many data structures such as lis
 
 📢 Note: Starting from v0.9.0, **defaultSegmentSize** in **DefaultOptions** has been adjusted from **8MB** to **256MB**. The original value is the default value, which needs to be manually changed to 8MB, otherwise the original data will not be parsed. The reason for the size adjustment here is that there is a cache for file descriptors starting from v0.9.0 (detail see https://github.com/nutsdb/nutsdb/pull/164 ), so users need to look at the number of fds they use on the server, which can be set manually. If you have any questions, you can open an issue.
 
+After **nutsdb v1.0.0**, due to changes in the underlying data storage protocol, **the data of the old version is not compatible**. Please rewrite it before using the new version. And the current Bucket needs to be created manually. Please see the Bucket usage [documentation](./docs/user_guides/use-buckets.md) for details.
+
 ## Architecture
 ![nutsdb-架构图](./docs/img/nutsdb-架构图.png)
 
