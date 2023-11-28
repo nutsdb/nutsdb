@@ -17,10 +17,10 @@ NutsDB 是一个用纯 Go 编写的简单、快速、可嵌入且持久的键/�
 
 
 ### 公告
+* v0.14.3 发布，详情见： [https://github.com/nutsdb/nutsdb/releases/tag/v1.0.0](https://github.com/nutsdb/nutsdb/releases/tag/v1.0.0)
 * v0.14.3 发布，详情见： [https://github.com/nutsdb/nutsdb/releases/tag/v0.14.3](https://github.com/nutsdb/nutsdb/releases/tag/v0.14.3)
 * v0.14.2 发布，详情见：[https://github.com/nutsdb/nutsdb/releases/tag/v0.14.2](https://github.com/nutsdb/nutsdb/releases/tag/v0.14.2)
 * v0.14.1 发布，详情见：[https://github.com/nutsdb/nutsdb/releases/tag/v0.14.1](https://github.com/nutsdb/nutsdb/releases/tag/v0.14.1)
-* v0.14.0 发布，详情见：[https://github.com/nutsdb/nutsdb/releases/tag/v0.14.0](https://github.com/nutsdb/nutsdb/releases/tag/v0.14.0)
 
 📢 注意：从v0.9.0开始，**DefaultOptions** 里面的 **defaultSegmentSize** 做了调整从原来的 **8MB** 变成了 **256MB**，如果你原来设置 256MB 不用改，如果原来使用的是默认值的，需要手动改成 8MB，不然原来的数据不会解析。这边的大小调整原因是从 v0.9.0 开始有对文件描述符的缓存（详解见PR https://github.com/nutsdb/nutsdb/issues/164 ），所以需要用户看下自己的文件描述符数量，有不清楚可以提issue或者群里问。
 
