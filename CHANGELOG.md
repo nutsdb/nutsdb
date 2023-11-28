@@ -311,3 +311,19 @@
 ### BugFix
 
 - fix: use constants instead of iota to prevent forward compatibility. by [@bigboss2063](https://github.com/bigboss2063) in [#490](https://github.com/nutsdb/nutsdb/pull/490)
+
+## v1.0.0 (2023-11-27)
+
+### Features
+
+- [feat]Serperate bucket from entry and build the bucket management system by [@elliotchenzichang](https://github.com/elliotchenzichang) in [#484](https://github.com/nutsdb/nutsdb/pull/484)
+- add lru cache for second index mode of HintKeyAndRAMIdxMode by [@damotiansheng](https://github.com/damotiansheng) in [#495](https://github.com/nutsdb/nutsdb/pull/495)
+- add more api for bucket by [@elliotchenzichang](https://github.com/elliotchenzichang) in [#502](https://github.com/nutsdb/nutsdb/pull/502)
+- feat: use variable length storage to implement storage protocols to save disk space by [@bigboss2063](https://github.com/bigboss2063) in [#501](https://github.com/nutsdb/nutsdb/pull/501)
+- pref: reduce unnecessary fields in Record and save memory by [@bigboss2063](https://github.com/bigboss2063) in [#506](https://github.com/nutsdb/nutsdb/pull/506)
+
+### BugFix
+
+- Only overwrite the managed error when a rollback error occurs by [@xy3](https://github.com/xy3) in [#493](https://github.com/nutsdb/nutsdb/pull/493)
+- add lru cache when commit only for HintKeyAndRAMIdxMode by [@damotiansheng](https://github.com/damotiansheng) in [#504](https://github.com/nutsdb/nutsdb/pull/504)
+- fix: use sync.Map to avoid data race by [@bigboss2063](https://github.com/bigboss2063) in [#509](https://github.com/nutsdb/nutsdb/pull/509)
