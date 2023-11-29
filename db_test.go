@@ -78,12 +78,12 @@ func txPut(t *testing.T, db *DB, bucket string, key, value []byte, ttl uint32, e
 
 func txGet(t *testing.T, db *DB, bucket string, key []byte, expectVal []byte, expectErr error) {
 	err := db.View(func(tx *Tx) error {
-		e, err := tx.Get(bucket, key)
+		value, err := tx.Get(bucket, key)
 		if expectErr != nil {
 			require.Equal(t, expectErr, err)
 		} else {
 			require.NoError(t, err)
-			require.EqualValuesf(t, expectVal, e.Value, "err Tx Get. got %s want %s", string(e.Value), string(expectVal))
+			require.EqualValuesf(t, expectVal, value, "err Tx Get. got %s want %s", string(value), string(expectVal))
 		}
 		return nil
 	})
@@ -110,9 +110,8 @@ func txDeleteBucket(t *testing.T, db *DB, ds uint16, bucket string, expectErr er
 
 func txCreateBucket(t *testing.T, db *DB, ds uint16, bucket string, expectErr error) {
 	err := db.Update(func(tx *Tx) error {
-		succeed, err := tx.NewBucket(ds, bucket)
+		err := tx.NewBucket(ds, bucket)
 		assertErr(t, err, expectErr)
-		assert.Equal(t, true, succeed)
 		return nil
 	})
 	require.NoError(t, err)
@@ -869,6 +868,23 @@ func TestDB_HintKeyAndRAMIdxMode_RestartDB(t *testing.T) {
 		db, err := Open(db.opt)
 		require.NoError(t, err)
 		txGet(t, db, bucket, key, val, nil)
+	})
+}
+
+func TestDB_HintKeyAndRAMIdxMode_LruCache(t *testing.T) {
+	opts := DefaultOptions
+	opts.EntryIdxMode = HintKeyAndRAMIdxMode
+	//opts.HintKeyAndRAMIdxCacheSize = 0
+	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
+		bucket := "bucket"
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+		for i := 0; i < 10000; i++ {
+			key := []byte(fmt.Sprintf("%10d", i))
+			val := []byte(fmt.Sprintf("%10d", i))
+			txPut(t, db, bucket, key, val, Persistent, nil, nil)
+			txGet(t, db, bucket, key, val, nil)
+		}
+		db.Close()
 	})
 }
 

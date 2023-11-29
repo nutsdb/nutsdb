@@ -24,7 +24,15 @@ import (
 	"github.com/xujiajun/utils/strconv2"
 )
 
-var payLoadSizeMismatchErr = errors.New("the payload size in Meta mismatch with the payload size needed")
+var (
+	ErrPayLoadSizeMismatch   = errors.New("the payload size in Meta mismatch with the payload size needed")
+	ErrHeaderSizeOutOfBounds = errors.New("the header size is out of bounds")
+)
+
+const (
+	MaxEntryHeaderSize = 4 + binary.MaxVarintLen32*3 + binary.MaxVarintLen64*3 + binary.MaxVarintLen16*3
+	MinEntryHeaderSize = 4 + 9
+)
 
 type (
 	// Entry represents the data item.
@@ -32,14 +40,6 @@ type (
 		Key   []byte
 		Value []byte
 		Meta  *MetaData
-	}
-
-	// Hint represents the index of the key
-	Hint struct {
-		Key     []byte
-		FileID  int64
-		Meta    *MetaData
-		DataPos uint64
 	}
 
 	// MetaData represents the Meta information of the data item.
@@ -57,33 +57,53 @@ type (
 	}
 )
 
+func (meta *MetaData) Size() int64 {
+	// CRC
+	size := 4
+
+	size += UvarintSize(uint64(meta.KeySize))
+	size += UvarintSize(uint64(meta.ValueSize))
+	size += UvarintSize(meta.Timestamp)
+	size += UvarintSize(uint64(meta.TTL))
+	size += UvarintSize(uint64(meta.Flag))
+	size += UvarintSize(meta.TxID)
+	size += UvarintSize(uint64(meta.Status))
+	size += UvarintSize(uint64(meta.Ds))
+	size += UvarintSize(meta.BucketId)
+
+	return int64(size)
+}
+
 func (meta *MetaData) PayloadSize() int64 {
 	return int64(meta.KeySize) + int64(meta.ValueSize)
 }
 
 // Size returns the size of the entry.
 func (e *Entry) Size() int64 {
-	return DataEntryHeaderSize + int64(e.Meta.KeySize+e.Meta.ValueSize)
+	return e.Meta.Size() + int64(e.Meta.KeySize+e.Meta.ValueSize)
 }
 
 // Encode returns the slice after the entry be encoded.
 //
 //	the entry stored format:
-//	|----------------------------------------------------------------------------------------------------------------|
-//	|  crc  | timestamp | ksz | valueSize | flag  | TTL  |bucketSize| status | ds   | txId |  bucket |  key  | value |
-//	|----------------------------------------------------------------------------------------------------------------|
-//	| uint32| uint64  |uint32 |  uint32 | uint16  | uint32| uint32 | uint16 | uint16 |uint64 |[]byte|[]byte | []byte |
-//	|----------------------------------------------------------------------------------------------------------------|
+//	|----------------------------------------------------------------------------------------------------------|
+//	|  crc  | timestamp | ksz | valueSize | flag  | TTL  | status | ds   | txId |  bucketId |  key  | value    |
+//	|----------------------------------------------------------------------------------------------------------|
+//	| uint32| uint64  |uint32 |  uint32 | uint16  | uint32| uint16 | uint16 |uint64 | uint64 | []byte | []byte |
+//	|----------------------------------------------------------------------------------------------------------|
 func (e *Entry) Encode() []byte {
 	keySize := e.Meta.KeySize
 	valueSize := e.Meta.ValueSize
 
-	// set DataItemHeader buf
-	buf := make([]byte, e.Size())
-	buf = e.setEntryHeaderBuf(buf)
-	// set bucket\key\value
-	copy(buf[DataEntryHeaderSize:(DataEntryHeaderSize+int64(keySize))], e.Key)
-	copy(buf[(DataEntryHeaderSize+int64(keySize)):(DataEntryHeaderSize+int64(keySize+valueSize))], e.Value)
+	buf := make([]byte, MaxEntryHeaderSize+keySize+valueSize)
+
+	index := e.setEntryHeaderBuf(buf)
+	copy(buf[index:], e.Key)
+	index += int(keySize)
+	copy(buf[index:], e.Value)
+	index += int(valueSize)
+
+	buf = buf[:index]
 
 	c32 := crc32.ChecksumIEEE(buf[4:])
 	binary.LittleEndian.PutUint32(buf[0:4], c32)
@@ -92,19 +112,20 @@ func (e *Entry) Encode() []byte {
 }
 
 // setEntryHeaderBuf sets the entry header buff.
-func (e *Entry) setEntryHeaderBuf(buf []byte) []byte {
-	binary.LittleEndian.PutUint32(buf[0:4], e.Meta.Crc)
-	binary.LittleEndian.PutUint64(buf[4:12], e.Meta.Timestamp)
-	binary.LittleEndian.PutUint32(buf[12:16], e.Meta.KeySize)
-	binary.LittleEndian.PutUint32(buf[16:20], e.Meta.ValueSize)
-	binary.LittleEndian.PutUint16(buf[20:22], e.Meta.Flag)
-	binary.LittleEndian.PutUint32(buf[22:26], e.Meta.TTL)
-	binary.LittleEndian.PutUint16(buf[26:28], e.Meta.Status)
-	binary.LittleEndian.PutUint16(buf[28:30], e.Meta.Ds)
-	binary.LittleEndian.PutUint64(buf[30:38], e.Meta.TxID)
-	binary.LittleEndian.PutUint64(buf[38:46], e.Meta.BucketId)
+func (e *Entry) setEntryHeaderBuf(buf []byte) int {
+	index := 4
 
-	return buf
+	index += binary.PutUvarint(buf[index:], e.Meta.Timestamp)
+	index += binary.PutUvarint(buf[index:], uint64(e.Meta.KeySize))
+	index += binary.PutUvarint(buf[index:], uint64(e.Meta.ValueSize))
+	index += binary.PutUvarint(buf[index:], uint64(e.Meta.Flag))
+	index += binary.PutUvarint(buf[index:], uint64(e.Meta.TTL))
+	index += binary.PutUvarint(buf[index:], uint64(e.Meta.Status))
+	index += binary.PutUvarint(buf[index:], uint64(e.Meta.Ds))
+	index += binary.PutUvarint(buf[index:], e.Meta.TxID)
+	index += binary.PutUvarint(buf[index:], e.Meta.BucketId)
+
+	return index
 }
 
 // IsZero checks if the entry is zero or not.
@@ -142,20 +163,57 @@ func (e *Entry) ParsePayload(data []byte) error {
 // checkPayloadSize checks the payload size
 func (e *Entry) checkPayloadSize(size int64) error {
 	if e.Meta.PayloadSize() != size {
-		return payLoadSizeMismatchErr
+		return ErrPayLoadSizeMismatch
 	}
 	return nil
 }
 
 // ParseMeta parse Meta object to entry
-func (e *Entry) ParseMeta(buf []byte) error {
-	e.Meta = NewMetaData().WithCrc(binary.LittleEndian.Uint32(buf[0:4])).
-		WithTimeStamp(binary.LittleEndian.Uint64(buf[4:12])).WithKeySize(binary.LittleEndian.Uint32(buf[12:16])).
-		WithValueSize(binary.LittleEndian.Uint32(buf[16:20])).WithFlag(binary.LittleEndian.Uint16(buf[20:22])).
-		WithTTL(binary.LittleEndian.Uint32(buf[22:26])).
-		WithStatus(binary.LittleEndian.Uint16(buf[26:28])).WithDs(binary.LittleEndian.Uint16(buf[28:30])).
-		WithTxID(binary.LittleEndian.Uint64(buf[30:38])).WithBucketId(binary.LittleEndian.Uint64(buf[38:46]))
-	return nil
+func (e *Entry) ParseMeta(buf []byte) (int64, error) {
+	// If the length of the header is less than MinEntryHeaderSize,
+	// it means that the final remaining capacity of the file is not enough to write a record,
+	// and an error needs to be returned.
+	if len(buf) < MinEntryHeaderSize {
+		return 0, ErrHeaderSizeOutOfBounds
+	}
+
+	e.Meta = NewMetaData()
+
+	e.Meta.WithCrc(binary.LittleEndian.Uint32(buf[0:4]))
+
+	index := 4
+
+	timestamp, n := binary.Uvarint(buf[index:])
+	index += n
+	keySize, n := binary.Uvarint(buf[index:])
+	index += n
+	valueSize, n := binary.Uvarint(buf[index:])
+	index += n
+	flag, n := binary.Uvarint(buf[index:])
+	index += n
+	ttl, n := binary.Uvarint(buf[index:])
+	index += n
+	status, n := binary.Uvarint(buf[index:])
+	index += n
+	ds, n := binary.Uvarint(buf[index:])
+	index += n
+	txId, n := binary.Uvarint(buf[index:])
+	index += n
+	bucketId, n := binary.Uvarint(buf[index:])
+	index += n
+
+	e.Meta.
+		WithTimeStamp(timestamp).
+		WithKeySize(uint32(keySize)).
+		WithValueSize(uint32(valueSize)).
+		WithFlag(uint16(flag)).
+		WithTTL(uint32(ttl)).
+		WithStatus(uint16(status)).
+		WithDs(uint16(ds)).
+		WithTxID(txId).
+		WithBucketId(bucketId)
+
+	return int64(index), nil
 }
 
 // isFilter to confirm if this entry is can be filtered
@@ -185,35 +243,6 @@ func (e *Entry) valid() error {
 		return ErrDataSizeExceed
 	}
 	return nil
-}
-
-// NewHint new Hint object
-func NewHint() *Hint {
-	return new(Hint)
-}
-
-// WithKey set key to Hint
-func (h *Hint) WithKey(key []byte) *Hint {
-	h.Key = key
-	return h
-}
-
-// WithFileId set FileID to Hint
-func (h *Hint) WithFileId(fid int64) *Hint {
-	h.FileID = fid
-	return h
-}
-
-// WithMeta set Meta to Hint
-func (h *Hint) WithMeta(meta *MetaData) *Hint {
-	h.Meta = meta
-	return h
-}
-
-// WithDataPos set DataPos to Hint
-func (h *Hint) WithDataPos(pos uint64) *Hint {
-	h.DataPos = pos
-	return h
 }
 
 // NewEntry new Entry Object

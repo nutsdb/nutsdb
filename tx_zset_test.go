@@ -358,8 +358,8 @@ func TestTx_ZSetEntryIdxMode_HintKeyValAndRAMIdxMode(t *testing.T) {
 		hash, _ := getFnv32(value)
 		node := zset.dict[hash]
 
-		require.NotNil(t, node.record.V)
-		require.Equal(t, value, node.record.V)
+		require.NotNil(t, node.record.Value)
+		require.Equal(t, value, node.record.Value)
 	})
 }
 
@@ -386,8 +386,7 @@ func TestTx_ZSetEntryIdxMode_HintKeyAndRAMIdxMode(t *testing.T) {
 		hash, _ := getFnv32(value)
 		node := zset.dict[hash]
 
-		require.NotNil(t, node.record.H)
-		require.Nil(t, node.record.V)
+		require.Nil(t, node.record.Value)
 
 		v, err := db.getValueByRecord(node.record)
 		require.NoError(t, err)

@@ -26,8 +26,8 @@ import (
 var ErrKeyNotFound = errors.New("key not found")
 
 type Item struct {
-	key []byte
-	r   *Record
+	key    []byte
+	record *Record
 }
 
 type BTree struct {
@@ -45,19 +45,18 @@ func NewBTree() *BTree {
 func (bt *BTree) Find(key []byte) (*Record, bool) {
 	item, ok := bt.btree.Get(&Item{key: key})
 	if ok {
-		return item.r, ok
+		return item.record, ok
 	}
 	return nil, ok
 }
 
-func (bt *BTree) Insert(key []byte, v []byte, h *Hint) bool {
-	r := NewRecord().WithValue(v).WithHint(h)
-	_, replaced := bt.btree.Set(&Item{key: key, r: r})
+func (bt *BTree) Insert(record *Record) bool {
+	_, replaced := bt.btree.Set(&Item{key: record.Key, record: record})
 	return replaced
 }
 
-func (bt *BTree) InsertRecord(key []byte, r *Record) bool {
-	_, replaced := bt.btree.Set(&Item{key: key, r: r})
+func (bt *BTree) InsertRecord(key []byte, record *Record) bool {
+	_, replaced := bt.btree.Set(&Item{key: key, record: record})
 	return replaced
 }
 
@@ -71,7 +70,7 @@ func (bt *BTree) All() []*Record {
 
 	records := make([]*Record, len(items))
 	for i, item := range items {
-		records[i] = item.r
+		records[i] = item.record
 	}
 
 	return records
@@ -89,7 +88,7 @@ func (bt *BTree) Range(start, end []byte) []*Record {
 		if bytes.Compare(item.key, end) > 0 {
 			return false
 		}
-		records = append(records, item.r)
+		records = append(records, item.record)
 		return true
 	})
 
@@ -109,7 +108,7 @@ func (bt *BTree) PrefixScan(prefix []byte, offset, limitNum int) []*Record {
 			return true
 		}
 
-		records = append(records, item.r)
+		records = append(records, item.record)
 
 		limitNum--
 		return limitNum != 0
@@ -137,7 +136,7 @@ func (bt *BTree) PrefixSearchScan(prefix []byte, reg string, offset, limitNum in
 			return true
 		}
 
-		records = append(records, item.r)
+		records = append(records, item.record)
 
 		limitNum--
 		return limitNum != 0

@@ -161,23 +161,6 @@ func TestTx_CommittedStatus(t *testing.T) {
 			err = tx.Commit()
 			assert.NoError(t, err)
 		}
-
-		{ // check data
-
-			tx, err := db.Begin(false)
-			assert.NoError(t, err)
-
-			entry1, err := tx.Get(bucket, []byte("key1"))
-			assert.NoError(t, err)
-			assert.Equalf(t, UnCommitted, entry1.Meta.Status, "not the last entry should be uncommitted")
-
-			entry2, err := tx.Get(bucket, []byte("key2"))
-			assert.NoError(t, err)
-			assert.Equalf(t, Committed, entry2.Meta.Status, "the last entry should be committed")
-
-			err = tx.Commit()
-			assert.NoError(t, err)
-		}
 	})
 }
 
@@ -200,24 +183,6 @@ func TestTx_PutWithTimestamp(t *testing.T) {
 				assert.NoError(t, err)
 
 			}
-			err = tx.Commit()
-			assert.NoError(t, err)
-		}
-
-		{ // check timestamp
-			tx, err := db.Begin(false)
-			assert.NoError(t, err)
-
-			for i, timestamp := range timestamps {
-				key := []byte("key_" + fmt.Sprintf("%03d", i))
-
-				entry, err := tx.Get(bucket, key)
-				assert.NoError(t, err)
-
-				assert.Equalf(t, entry.Meta.Timestamp, timestamp, "entry has wrong timestamp")
-
-			}
-
 			err = tx.Commit()
 			assert.NoError(t, err)
 		}

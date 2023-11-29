@@ -18,15 +18,21 @@ import (
 	"time"
 )
 
-// Record records entry and hint.
+// Record means item of indexes in memory
 type Record struct {
-	H *Hint
-	V []byte
+	Key       []byte
+	Value     []byte
+	FileID    int64
+	DataPos   uint64
+	ValueSize uint32
+	Timestamp uint64
+	TTL       uint32
+	TxID      uint64
 }
 
 // IsExpired returns the record if expired or not.
 func (r *Record) IsExpired() bool {
-	return IsExpired(r.H.Meta.TTL, r.H.Meta.Timestamp)
+	return IsExpired(r.TTL, r.Timestamp)
 }
 
 // IsExpired checks the ttl if expired or not.
@@ -42,27 +48,50 @@ func IsExpired(ttl uint32, timestamp uint64) bool {
 	return expireTime.Before(now)
 }
 
-// UpdateRecord updates the record.
-func (r *Record) UpdateRecord(h *Hint, v []byte) error {
-	r.V = v
-	r.H = h
-
-	return nil
-}
-
 // NewRecord generate a record Obj
 func NewRecord() *Record {
 	return new(Record)
 }
 
-// WithHint set the Hint to Record
-func (r *Record) WithHint(hint *Hint) *Record {
-	r.H = hint
+func (r *Record) WithKey(k []byte) *Record {
+	r.Key = k
 	return r
 }
 
 // WithValue set the Value to Record
 func (r *Record) WithValue(v []byte) *Record {
-	r.V = v
+	r.Value = v
+	return r
+}
+
+// WithFileId set FileID to Record
+func (r *Record) WithFileId(fid int64) *Record {
+	r.FileID = fid
+	return r
+}
+
+// WithDataPos set DataPos to Record
+func (r *Record) WithDataPos(pos uint64) *Record {
+	r.DataPos = pos
+	return r
+}
+
+func (r *Record) WithValueSize(valueSize uint32) *Record {
+	r.ValueSize = valueSize
+	return r
+}
+
+func (r *Record) WithTimestamp(timestamp uint64) *Record {
+	r.Timestamp = timestamp
+	return r
+}
+
+func (r *Record) WithTTL(ttl uint32) *Record {
+	r.TTL = ttl
+	return r
+}
+
+func (r *Record) WithTxID(txID uint64) *Record {
+	r.TxID = txID
 	return r
 }

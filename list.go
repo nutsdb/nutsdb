@@ -113,7 +113,7 @@ func (l *List) LPop(key string) (*Record, error) {
 
 	l.Items[key].Delete(item.key)
 	l.Seq[key].Head = ConvertBigEndianBytesToUint64(item.key)
-	return item.r, nil
+	return item.record, nil
 }
 
 // RPop removes and returns the last element of the list stored at key.
@@ -125,7 +125,7 @@ func (l *List) RPop(key string) (*Record, error) {
 
 	l.Items[key].Delete(item.key)
 	l.Seq[key].Tail = ConvertBigEndianBytesToUint64(item.key)
-	return item.r, nil
+	return item.record, nil
 }
 
 func (l *List) LPeek(key string) (*Item, error) {
@@ -207,7 +207,7 @@ func (l *List) getRemoveIndexes(key string, count int, cmp func(r *Record) (bool
 			if count <= 0 {
 				break
 			}
-			r := item.r
+			r := item.record
 			ok, err := cmp(r)
 			if err != nil {
 				return nil, err
@@ -222,7 +222,7 @@ func (l *List) getRemoveIndexes(key string, count int, cmp func(r *Record) (bool
 			if count >= 0 {
 				break
 			}
-			r := allItems[i].r
+			r := allItems[i].record
 			ok, err := cmp(r)
 			if err != nil {
 				return nil, err

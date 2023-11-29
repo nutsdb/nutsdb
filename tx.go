@@ -259,8 +259,12 @@ func (tx *Tx) Commit() (err error) {
 			}
 		}
 
-		hint := NewHint().WithKey(entry.Key).WithFileId(tx.db.ActiveFile.fileID).WithMeta(entry.Meta).WithDataPos(uint64(offset))
-		record := NewRecord().WithValue(entry.Value).WithHint(hint)
+		record := tx.db.createRecordByModeWithFidAndOff(tx.db.ActiveFile.fileID, uint64(offset), entry)
+
+		// add to cache
+		if tx.db.opt.EntryIdxMode == HintKeyAndRAMIdxMode {
+			tx.db.hintKeyAndRAMIdxModeLru.Add(string(entry.Value), entry)
+		}
 
 		records = append(records, record)
 	}
@@ -269,7 +273,7 @@ func (tx *Tx) Commit() (err error) {
 		return err
 	}
 
-	if err := tx.buildIdxes(records); err != nil {
+	if err := tx.buildIdxes(records, tx.pendingWrites); err != nil {
 		panic(err.Error())
 	}
 	tx.db.RecordCount += curWriteCount
@@ -498,19 +502,14 @@ func (tx *Tx) getEntryNewAddRecordCount(entry *Entry) (int64, error) {
 }
 
 func (tx *Tx) allocCommitBuffer() *bytes.Buffer {
-	var txSize int64
-	for i := 0; i < len(tx.pendingWrites); i++ {
-		txSize += tx.pendingWrites[i].Size()
-	}
-
 	var buff *bytes.Buffer
 
-	if txSize < tx.db.opt.CommitBufferSize {
+	if tx.size < tx.db.opt.CommitBufferSize {
 		buff = tx.db.commitBuffer
 	} else {
 		buff = new(bytes.Buffer)
 		// avoid grow
-		buff.Grow(int(txSize))
+		buff.Grow(int(tx.size))
 	}
 
 	return buff
@@ -708,10 +707,10 @@ func (tx *Tx) isClosed() bool {
 	return status == txStatusClosed
 }
 
-func (tx *Tx) buildIdxes(records []*Record) error {
-	for _, record := range records {
-		meta := record.H.Meta
-		bucket, err := tx.db.bm.GetBucketById(record.H.Meta.BucketId)
+func (tx *Tx) buildIdxes(records []*Record, entries []*Entry) error {
+	for i, entry := range entries {
+		meta := entry.Meta
+		bucket, err := tx.db.bm.GetBucketById(entry.Meta.BucketId)
 		if err != nil {
 			return err
 		}
@@ -719,13 +718,13 @@ func (tx *Tx) buildIdxes(records []*Record) error {
 
 		switch meta.Ds {
 		case DataStructureBTree:
-			err = tx.db.buildBTreeIdx(record)
+			err = tx.db.buildBTreeIdx(records[i], entry)
 		case DataStructureList:
-			err = tx.db.buildListIdx(record)
+			err = tx.db.buildListIdx(records[i], entry)
 		case DataStructureSet:
-			err = tx.db.buildSetIdx(record)
+			err = tx.db.buildSetIdx(records[i], entry)
 		case DataStructureSortedSet:
-			err = tx.db.buildSortedSetIdx(record)
+			err = tx.db.buildSortedSetIdx(records[i], entry)
 		case DataStructureNone:
 			switch meta.Flag {
 			case DataBTreeBucketDeleteFlag:

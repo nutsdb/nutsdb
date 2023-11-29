@@ -77,5 +77,5 @@ func (it *Iterator) Key() []byte {
 }
 
 func (it *Iterator) Value() ([]byte, error) {
-	return it.tx.db.getValueByRecord(it.iter.Item().r)
+	return it.tx.db.getValueByRecord(it.iter.Item().record)
 }

@@ -107,7 +107,7 @@ func (db *DB) merge() error {
 		}
 
 		for {
-			if entry, err := fr.readEntry(); err == nil {
+			if entry, err := fr.readEntry(off); err == nil {
 				if entry == nil {
 					break
 				}
@@ -164,7 +164,7 @@ func (db *DB) merge() error {
 				}
 
 			} else {
-				if errors.Is(err, io.EOF) || errors.Is(err, ErrIndexOutOfBound) || errors.Is(err, io.ErrUnexpectedEOF) {
+				if errors.Is(err, io.EOF) || errors.Is(err, ErrIndexOutOfBound) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, ErrHeaderSizeOutOfBounds) {
 					break
 				}
 				return fmt.Errorf("when merge operation build hintIndex readAt err: %s", err)
@@ -249,7 +249,7 @@ func (db *DB) isPendingBtreeEntry(bucketId BucketId, entry *Entry) bool {
 	}
 
 	r, ok := idx.Find(entry.Key)
-	if !ok || r.H.Meta.Flag != DataSetFlag {
+	if !ok {
 		return false
 	}
 
@@ -259,7 +259,7 @@ func (db *DB) isPendingBtreeEntry(bucketId BucketId, entry *Entry) bool {
 		return false
 	}
 
-	if r.H.Meta.TxID != entry.Meta.TxID || r.H.Meta.Timestamp != entry.Meta.Timestamp {
+	if r.TxID != entry.Meta.TxID || r.Timestamp != entry.Meta.Timestamp {
 		return false
 	}
 
@@ -341,7 +341,7 @@ func (db *DB) isPendingListEntry(bucketId BucketId, entry *Entry) bool {
 			return false
 		}
 
-		if !bytes.Equal(r.H.Key, entry.Key) || r.H.Meta.TxID != entry.Meta.TxID || r.H.Meta.Timestamp != entry.Meta.Timestamp {
+		if !bytes.Equal(r.Key, entry.Key) || r.TxID != entry.Meta.TxID || r.Timestamp != entry.Meta.Timestamp {
 			return false
 		}
 

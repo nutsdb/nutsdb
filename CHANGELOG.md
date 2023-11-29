@@ -223,7 +223,6 @@
 * [Docs] doc: add a new option and update the default option by @bigboss2063 in #396
 * [Chore] chore: add error handler for error occurred during transaction by @lyl156 in #383
 ## v0.14.0 (2023-9-1)
-## Changelog
 ### Features
 - feat: make Set support HintKeyAndRAMIdxMode by @bigboss2063 in https://github.com/nutsdb/nutsdb/pull/397
 - add batch write by @damotiansheng in https://github.com/nutsdb/nutsdb/pull/398
@@ -266,3 +265,65 @@
 - test: refactor `tx_bucket_test` by @G-XD in https://github.com/nutsdb/nutsdb/pull/446
 - [ref]move the tx error to separated file by @elliotchenzichang in https://github.com/nutsdb/nutsdb/pull/447
 - refactor: remove func ErrWhenBuildListIdx by @TremblingV5 in https://github.com/nutsdb/nutsdb/pull/443
+
+## v0.14.1 (2023-9-16)
+
+### Features
+
+- add max write records control by [@damotiansheng](https://github.com/damotiansheng) in [#459](https://github.com/nutsdb/nutsdb/pull/459)
+- feat(doc): organize README.md by [@hanxuanliang](https://github.com/hanxuanliang) in [#461](https://github.com/nutsdb/nutsdb/pull/461)
+
+### BugFix
+
+- fix: deadlock when test failed by [@G-XD](https://github.com/G-XD) in [#464](https://github.com/nutsdb/nutsdb/pull/464)
+- fix: fix the bug of ttl when restart by [@bigboss2063](https://github.com/bigboss2063) in [#466](https://github.com/nutsdb/nutsdb/pull/466)
+
+### Other
+
+- refactor: Remove the 3rd mode by [@bigboss2063](https://github.com/bigboss2063) in [#456](https://github.com/nutsdb/nutsdb/pull/456)
+- style: reduce duplicate code by [@bigboss2063](https://github.com/bigboss2063) in [#458](https://github.com/nutsdb/nutsdb/pull/458)
+- refactor: refactor index by generics by [@G-XD](https://github.com/G-XD) in [#462](https://github.com/nutsdb/nutsdb/pull/462)
+
+## v0.14.2 (2023-11-06)
+
+### Features
+
+- finish auto merge by [@damotiansheng](https://github.com/damotiansheng) in [#471](https://github.com/nutsdb/nutsdb/pull/471)
+
+### BugFix
+
+- fix: return ErrListNotFound when calling tx.LRemByIndex with non-existent bucket name by [@TremblingV5](https://github.com/TremblingV5) in [#470](https://github.com/nutsdb/nutsdb/pull/470)
+
+### Other
+
+- list index refractor by [@damotiansheng](https://github.com/damotiansheng) in [#467](https://github.com/nutsdb/nutsdb/pull/467)
+- refactor: refactor unit test of tx_list by [@TremblingV5](https://github.com/TremblingV5) in [#468](https://github.com/nutsdb/nutsdb/pull/468)
+- [ref]add a function that can automatically get the disk size of meta header by [@elliotchenzichang](https://github.com/elliotchenzichang) in [#478](https://github.com/nutsdb/nutsdb/pull/478)
+- refactor: Optimize the code structure so that DB and Tx use a set of indexing processes by [@bigboss2063](https://github.com/bigboss2063) in [#479](https://github.com/nutsdb/nutsdb/pull/479)
+- style: rename or remove some code by [@bigboss2063](https://github.com/bigboss2063) in [#480](https://github.com/nutsdb/nutsdb/pull/480)
+- [ref]add a common function to get the special size buffer object by [@elliotchenzichang](https://github.com/elliotchenzichang) in [#482](https://github.com/nutsdb/nutsdb/pull/482)
+- ref: refactor `buildBTreeIdx` method by [@bigboss2063](https://github.com/bigboss2063) in [#483](https://github.com/nutsdb/nutsdb/pull/483)
+- ref: use errors.Is to remove useless code by [@bigboss2063](https://github.com/bigboss2063) in [#485](https://github.com/nutsdb/nutsdb/pull/485)
+- decrease batch write unit test time by [@damotiansheng](https://github.com/damotiansheng) in [#487](https://github.com/nutsdb/nutsdb/pull/487)
+
+## v0.14.3 (2023-11-21)
+
+### BugFix
+
+- fix: use constants instead of iota to prevent forward compatibility. by [@bigboss2063](https://github.com/bigboss2063) in [#490](https://github.com/nutsdb/nutsdb/pull/490)
+
+## v1.0.0 (2023-11-27)
+
+### Features
+
+- [feat]Serperate bucket from entry and build the bucket management system by [@elliotchenzichang](https://github.com/elliotchenzichang) in [#484](https://github.com/nutsdb/nutsdb/pull/484)
+- add lru cache for second index mode of HintKeyAndRAMIdxMode by [@damotiansheng](https://github.com/damotiansheng) in [#495](https://github.com/nutsdb/nutsdb/pull/495)
+- add more api for bucket by [@elliotchenzichang](https://github.com/elliotchenzichang) in [#502](https://github.com/nutsdb/nutsdb/pull/502)
+- feat: use variable length storage to implement storage protocols to save disk space by [@bigboss2063](https://github.com/bigboss2063) in [#501](https://github.com/nutsdb/nutsdb/pull/501)
+- pref: reduce unnecessary fields in Record and save memory by [@bigboss2063](https://github.com/bigboss2063) in [#506](https://github.com/nutsdb/nutsdb/pull/506)
+
+### BugFix
+
+- Only overwrite the managed error when a rollback error occurs by [@xy3](https://github.com/xy3) in [#493](https://github.com/nutsdb/nutsdb/pull/493)
+- add lru cache when commit only for HintKeyAndRAMIdxMode by [@damotiansheng](https://github.com/damotiansheng) in [#504](https://github.com/nutsdb/nutsdb/pull/504)
+- fix: use sync.Map to avoid data race by [@bigboss2063](https://github.com/bigboss2063) in [#509](https://github.com/nutsdb/nutsdb/pull/509)

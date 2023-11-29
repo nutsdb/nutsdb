@@ -21,15 +21,17 @@ It supports fully serializable transactions and many data structures such as lis
 
 ## Announcement
 
-* v0.14.0 release, see for details: [https://github.com/nutsdb/nutsdb/releases/tag/v0.14.0](https://github.com/nutsdb/nutsdb/releases/tag/v0.14.0)
-* v0.13.0 release, see for details: [https://github.com/nutsdb/nutsdb/releases/tag/v0.13.0](https://github.com/nutsdb/nutsdb/releases/tag/v0.13.0)
-* v0.12.6 release, see for details: [https://github.com/nutsdb/nutsdb/releases/tag/v0.12.6](https://github.com/nutsdb/nutsdb/releases/tag/v0.12.6)
-* v0.12.4 release, see for details: [https://github.com/nutsdb/nutsdb/releases/tag/v0.12.4](https://github.com/nutsdb/nutsdb/releases/tag/v0.12.4)
+* v1.0.0 release, see for details: [https://github.com/nutsdb/nutsdb/releases/tag/v1.0.0](https://github.com/nutsdb/nutsdb/releases/tag/v1.0.0)
+* v0.14.3 release, see for details: [https://github.com/nutsdb/nutsdb/releases/tag/v0.14.3](https://github.com/nutsdb/nutsdb/releases/tag/v0.14.3)
+* v0.14.2 release, see for details: [https://github.com/nutsdb/nutsdb/releases/tag/v0.14.2](https://github.com/nutsdb/nutsdb/releases/tag/v0.14.2)
+* v0.14.1 release, see for details: [https://github.com/nutsdb/nutsdb/releases/tag/v0.14.1](https://github.com/nutsdb/nutsdb/releases/tag/v0.14.1)
 
 📢 Note: Starting from v0.9.0, **defaultSegmentSize** in **DefaultOptions** has been adjusted from **8MB** to **256MB**. The original value is the default value, which needs to be manually changed to 8MB, otherwise the original data will not be parsed. The reason for the size adjustment here is that there is a cache for file descriptors starting from v0.9.0 (detail see https://github.com/nutsdb/nutsdb/pull/164 ), so users need to look at the number of fds they use on the server, which can be set manually. If you have any questions, you can open an issue.
 
+After **nutsdb v1.0.0**, due to changes in the underlying data storage protocol, **the data of the old version is not compatible**. Please rewrite it before using the new version. And the current Bucket needs to be created manually. Please see the Bucket usage [documentation](./docs/user_guides/use-buckets.md) for details.
+
 ## Architecture
-![image](https://user-images.githubusercontent.com/6065007/163713248-73a80478-8d6a-4c53-927c-71ba34569ae7.png)
+![nutsdb-架构图](./docs/img/nutsdb-架构图.png)
 
 
  Welcome [contributions to NutsDB](https://github.com/nutsdb/nutsdb#contributing).
@@ -38,7 +40,7 @@ It supports fully serializable transactions and many data structures such as lis
 
 ### Install NutsDB
 
-To start using NutsDB, first needs [Go](https://golang.org/dl/) installed (version 1.11+ is required).  and run go get:
+To start using NutsDB, first needs [Go](https://golang.org/dl/) installed (version 1.18+ is required).  and run go get:
 
 ```
 go get -u github.com/nutsdb/nutsdb

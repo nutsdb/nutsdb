@@ -91,11 +91,11 @@ func TestBatchWrite(t *testing.T) {
 			func(tx *Tx) error {
 				for i := 0; i < N; i++ {
 					key := key(i)
-					e, err := tx.Get(bucket, key)
+					value, err := tx.Get(bucket, key)
 					if err != nil {
 						return err
 					}
-					require.Equal(t, val(i), e.Value)
+					require.Equal(t, val(i), value)
 				}
 				return nil
 			}); err != nil {
