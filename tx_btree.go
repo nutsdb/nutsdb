@@ -36,7 +36,7 @@ func (tx *Tx) Get(bucket string, key []byte) (value []byte, err error) {
 	}
 
 	idxMode := tx.db.opt.EntryIdxMode
-	b, err := tx.db.bm.GetBucket(Ds(DataStructureBTree), BucketName(bucket))
+	b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +78,7 @@ func (tx *Tx) GetAll(bucket string) (values [][]byte, err error) {
 		return nil, err
 	}
 
-	b, err := tx.db.bm.GetBucket(Ds(DataStructureBTree), BucketName(bucket))
+	b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +109,7 @@ func (tx *Tx) RangeScan(bucket string, start, end []byte) (values [][]byte, err 
 	if err := tx.checkTxIsClosed(); err != nil {
 		return nil, err
 	}
-	b, err := tx.db.bm.GetBucket(Ds(DataStructureBTree), BucketName(bucket))
+	b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
 	if err != nil {
 		return nil, err
 	}
@@ -140,7 +140,7 @@ func (tx *Tx) PrefixScan(bucket string, prefix []byte, offsetNum int, limitNum i
 	if err := tx.checkTxIsClosed(); err != nil {
 		return nil, err
 	}
-	b, err := tx.db.bm.GetBucket(Ds(DataStructureBTree), BucketName(bucket))
+	b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
 	if err != nil {
 		return nil, err
 	}
@@ -167,7 +167,7 @@ func (tx *Tx) PrefixSearchScan(bucket string, prefix []byte, reg string, offsetN
 	if err := tx.checkTxIsClosed(); err != nil {
 		return nil, err
 	}
-	b, err := tx.db.bm.GetBucket(Ds(DataStructureBTree), BucketName(bucket))
+	b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
 	if err != nil {
 		return nil, err
 	}
@@ -193,7 +193,7 @@ func (tx *Tx) Delete(bucket string, key []byte) error {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return err
 	}
-	b, err := tx.db.bm.GetBucket(Ds(DataStructureBTree), BucketName(bucket))
+	b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
 	if err != nil {
 		return err
 	}
@@ -213,7 +213,7 @@ func (tx *Tx) Delete(bucket string, key []byte) error {
 // getHintIdxDataItemsWrapper returns wrapped entries when prefix scanning or range scanning.
 func (tx *Tx) getHintIdxDataItemsWrapper(records []*Record, limitNum int, bucketId BucketId) (values [][]byte, err error) {
 	for _, record := range records {
-		bucket, err := tx.db.bm.GetBucketById(uint64(bucketId))
+		bucket, err := tx.db.bm.GetBucketById(bucketId)
 		if err != nil {
 			return nil, err
 		}

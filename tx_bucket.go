@@ -90,14 +90,14 @@ func (tx *Tx) NewBucket(ds uint16, name string) (err error) {
 		Meta: &BucketMeta{
 			Op: BucketInsertOperation,
 		},
-		Id:   BucketId(tx.db.bm.Gen.GenId()),
-		Ds:   Ds(ds),
+		Id:   tx.db.bm.Gen.GenId(),
+		Ds:   ds,
 		Name: name,
 	}
-	if _, exist := tx.pendingBucketList[Ds(ds)]; !exist {
-		tx.pendingBucketList[Ds(ds)] = map[BucketName]*Bucket{}
+	if _, exist := tx.pendingBucketList[ds]; !exist {
+		tx.pendingBucketList[ds] = map[BucketName]*Bucket{}
 	}
-	tx.pendingBucketList[Ds(ds)][BucketName(name)] = bucket
+	tx.pendingBucketList[ds][name] = bucket
 	return nil
 }
 
@@ -107,7 +107,7 @@ func (tx *Tx) DeleteBucket(ds uint16, bucket string) error {
 		return err
 	}
 
-	b, err := tx.db.bm.GetBucket(Ds(ds), BucketName(bucket))
+	b, err := tx.db.bm.GetBucket(ds, bucket)
 	if err != nil {
 		return ErrBucketNotFound
 	}
@@ -117,7 +117,7 @@ func (tx *Tx) DeleteBucket(ds uint16, bucket string) error {
 			Op: BucketDeleteOperation,
 		},
 		Id:   b.Id,
-		Ds:   Ds(ds),
+		Ds:   ds,
 		Name: bucket,
 	}
 
@@ -125,5 +125,5 @@ func (tx *Tx) DeleteBucket(ds uint16, bucket string) error {
 }
 
 func (tx *Tx) ExistBucket(ds uint16, bucket string) bool {
-	return tx.db.bm.ExistBucket(Ds(ds), BucketName(bucket))
+	return tx.db.bm.ExistBucket(ds, bucket)
 }

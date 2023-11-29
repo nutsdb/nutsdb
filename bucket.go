@@ -84,7 +84,7 @@ func (b *Bucket) Decode(bytes []byte) error {
 	id := binary.LittleEndian.Uint64(bytes[:IdSize])
 	ds := binary.LittleEndian.Uint16(bytes[IdSize : IdSize+DsSize])
 	name := bytes[IdSize+DsSize:]
-	b.Id = BucketId(id)
+	b.Id = id
 	b.Name = string(name)
 	b.Ds = Ds(ds)
 	return nil
