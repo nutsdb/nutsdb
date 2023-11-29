@@ -29,7 +29,7 @@ type IteratorOptions struct {
 }
 
 func NewIterator(tx *Tx, bucket string, options IteratorOptions) *Iterator {
-	b, err := tx.db.bm.GetBucket(Ds(DataStructureBTree), BucketName(bucket))
+	b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
 	if err != nil {
 		return nil
 	}

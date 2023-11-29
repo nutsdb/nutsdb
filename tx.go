@@ -302,30 +302,32 @@ func (tx *Tx) getNewAddRecordCount() (int64, error) {
 			bucketId := bucket.Id
 			if bucket.Meta.Op == BucketDeleteOperation {
 				switch bucket.Ds {
-				case Ds(DataStructureBTree):
+				case DataStructureBTree:
 					if bTree, ok := tx.db.Index.bTree.idx[bucketId]; ok {
 						res -= int64(bTree.Count())
 					}
-				case Ds(DataStructureSet):
+				case DataStructureSet:
 					if set, ok := tx.db.Index.set.idx[bucketId]; ok {
 						for key := range set.M {
 							res -= int64(set.SCard(key))
 						}
 					}
-				case Ds(DataStructureSortedSet):
+				case DataStructureSortedSet:
 					if sortedSet, ok := tx.db.Index.sortedSet.idx[bucketId]; ok {
 						for key := range sortedSet.M {
 							curLen, _ := sortedSet.ZCard(key)
 							res -= int64(curLen)
 						}
 					}
-				case Ds(DataStructureList):
+				case DataStructureList:
 					if list, ok := tx.db.Index.list.idx[bucketId]; ok {
 						for key := range list.Items {
 							curLen, _ := list.Size(key)
 							res -= int64(curLen)
 						}
 					}
+				default:
+					panic("unhandled default case")
 				}
 			}
 		}
@@ -630,7 +632,7 @@ func (tx *Tx) put(bucket string, key, value []byte, ttl uint32, flag uint16, tim
 		return err
 	}
 
-	if !tx.db.bm.ExistBucket(Ds(ds), BucketName(bucket)) {
+	if !tx.db.bm.ExistBucket(ds, bucket) {
 		return ErrorBucketNotExist
 	}
 
@@ -638,13 +640,13 @@ func (tx *Tx) put(bucket string, key, value []byte, ttl uint32, flag uint16, tim
 		return ErrTxNotWritable
 	}
 
-	bucketId, err := tx.db.bm.GetBucketID(Ds(ds), BucketName(bucket))
+	bucketId, err := tx.db.bm.GetBucketID(ds, bucket)
 	if err != nil {
 		return err
 	}
 
 	meta := NewMetaData().WithTimeStamp(timestamp).WithKeySize(uint32(len(key))).WithValueSize(uint32(len(value))).WithFlag(flag).
-		WithTTL(ttl).WithStatus(UnCommitted).WithDs(ds).WithTxID(tx.id).WithBucketId(uint64(bucketId))
+		WithTTL(ttl).WithStatus(UnCommitted).WithDs(ds).WithTxID(tx.id).WithBucketId(bucketId)
 
 	e := NewEntry().WithKey(key).WithMeta(meta).WithValue(value)
 
@@ -659,12 +661,12 @@ func (tx *Tx) put(bucket string, key, value []byte, ttl uint32, flag uint16, tim
 }
 
 func (tx *Tx) putDeleteLog(bucketId BucketId, key, value []byte, ttl uint32, flag uint16, timestamp uint64, ds uint16) {
-	bucket, err := tx.db.bm.GetBucketById(uint64(bucketId))
+	bucket, err := tx.db.bm.GetBucketById(bucketId)
 	if err != nil {
 		return
 	}
 	meta := NewMetaData().WithTimeStamp(timestamp).WithKeySize(uint32(len(key))).WithValueSize(uint32(len(value))).WithFlag(flag).
-		WithTTL(ttl).WithStatus(UnCommitted).WithDs(ds).WithTxID(tx.id).WithBucketId(uint64(bucket.Id))
+		WithTTL(ttl).WithStatus(UnCommitted).WithDs(ds).WithTxID(tx.id).WithBucketId(bucket.Id)
 
 	e := NewEntry().WithKey(key).WithMeta(meta).WithValue(value)
 	tx.pendingWrites = append(tx.pendingWrites, e)
@@ -752,7 +754,7 @@ func (tx *Tx) putBucket(b *Bucket) error {
 		tx.pendingBucketList[b.Ds] = map[BucketName]*Bucket{}
 	}
 	bucketInDs := tx.pendingBucketList[b.Ds]
-	bucketInDs[BucketName(b.Name)] = b
+	bucketInDs[b.Name] = b
 	return nil
 }
 
@@ -776,13 +778,13 @@ func (tx *Tx) DeleteBucketInIndex() error {
 		for _, bucket := range mapper {
 			if bucket.Meta.Op == BucketDeleteOperation {
 				switch bucket.Ds {
-				case Ds(DataStructureBTree):
+				case DataStructureBTree:
 					tx.db.Index.bTree.delete(bucket.Id)
-				case Ds(DataStructureList):
+				case DataStructureList:
 					tx.db.Index.list.delete(bucket.Id)
-				case Ds(DataStructureSet):
+				case DataStructureSet:
 					tx.db.Index.set.delete(bucket.Id)
-				case Ds(DataStructureSortedSet):
+				case DataStructureSortedSet:
 					tx.db.Index.sortedSet.delete(bucket.Id)
 				default:
 					return ErrDataStructureNotSupported
