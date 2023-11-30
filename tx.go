@@ -17,6 +17,7 @@ package nutsdb
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"github.com/bwmarrin/snowflake"
 	"github.com/xujiajun/utils/strconv2"
 	"strings"
@@ -327,7 +328,7 @@ func (tx *Tx) getNewAddRecordCount() (int64, error) {
 						}
 					}
 				default:
-					panic("unhandled default case")
+					panic(fmt.Sprintf("there is an unexpected data structure that is unimplemented in our database.:%d", bucket.Ds))
 				}
 			}
 		}

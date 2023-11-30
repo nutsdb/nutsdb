@@ -713,6 +713,8 @@ func (db *DB) buildIdxes(record *Record, entry *Entry) error {
 		if err := db.buildSortedSetIdx(record, entry); err != nil {
 			return err
 		}
+	default:
+		panic(fmt.Sprintf("there is an unexpected data structure that is unimplemented in our database.:%d", meta.Ds))
 	}
 	return nil
 }

@@ -12,13 +12,15 @@ const BucketStoreFileName = "bucket.Meta"
 type Ds = uint16
 type BucketId = uint64
 type BucketName = string
+type IDMarkerInBucket map[BucketName]map[Ds]BucketId
+type InfoMapperInBucket map[BucketId]*Bucket
 
 type BucketManager struct {
 	fd *os.File
 	// BucketInfoMapper BucketID => Bucket itself
-	BucketInfoMapper map[BucketId]*Bucket
+	BucketInfoMapper InfoMapperInBucket
 
-	BucketIDMarker map[BucketName]map[Ds]BucketId
+	BucketIDMarker IDMarkerInBucket
 
 	// IDGenerator helps generates an ID for every single bucket
 	Gen *IDGenerator
@@ -110,8 +112,8 @@ func (bm *BucketManager) GetBucket(ds Ds, name BucketName) (b *Bucket, err error
 	}
 }
 
-func (bm *BucketManager) GetBucketById(id uint64) (*Bucket, error) {
-	if bucket, exist := bm.BucketInfoMapper[BucketId(id)]; exist {
+func (bm *BucketManager) GetBucketById(id BucketId) (*Bucket, error) {
+	if bucket, exist := bm.BucketInfoMapper[id]; exist {
 		return bucket, nil
 	} else {
 		return nil, ErrBucketNotExist

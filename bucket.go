@@ -86,7 +86,7 @@ func (b *Bucket) Decode(bytes []byte) error {
 	name := bytes[IdSize+DsSize:]
 	b.Id = id
 	b.Name = string(name)
-	b.Ds = Ds(ds)
+	b.Ds = ds
 	return nil
 }
 
