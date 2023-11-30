@@ -7,22 +7,27 @@ import (
 
 // LRUCache is a least recently used (LRU) cache.
 type LRUCache struct {
-	m   *sync.Map
+	m   map[interface{}]*list.Element
 	l   *list.List
 	cap int
+	mu  *sync.RWMutex
 }
 
 // New creates a new LRUCache with the specified capacity.
 func NewLruCache(cap int) *LRUCache {
 	return &LRUCache{
-		m:   &sync.Map{},
+		m:   make(map[interface{}]*list.Element),
 		l:   list.New(),
 		cap: cap,
+		mu:  &sync.RWMutex{},
 	}
 }
 
 // Add adds a new entry to the cache.
 func (c *LRUCache) Add(key interface{}, value interface{}) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	if c.cap <= 0 {
 		return
 	}
@@ -37,17 +42,18 @@ func (c *LRUCache) Add(key interface{}, value interface{}) {
 	}
 	entry := c.l.PushFront(e)
 
-	c.m.Store(key, entry)
+	c.m[key] = entry
 }
 
 // Get returns the entry associated with the given key, or nil if the key is not in the cache.
 func (c *LRUCache) Get(key interface{}) interface{} {
-	value, ok := c.m.Load(key)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	entry, ok := c.m[key]
 	if !ok {
 		return nil
 	}
-
-	entry := value.(*list.Element)
 
 	c.l.MoveToFront(entry)
 	return entry.Value.(*LruEntry).Value
@@ -55,26 +61,33 @@ func (c *LRUCache) Get(key interface{}) interface{} {
 
 // Remove removes the entry associated with the given key from the cache.
 func (c *LRUCache) Remove(key interface{}) {
-	value, ok := c.m.Load(key)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	entry, ok := c.m[key]
 	if !ok {
 		return
 	}
 
-	entry := value.(*list.Element)
-
 	c.l.Remove(entry)
-	c.m.Delete(key)
+	delete(c.m, key)
 }
 
 // Len returns the number of entries in the cache.
 func (c *LRUCache) Len() int {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
 	return c.l.Len()
 }
 
 // Clear clears the cache.
 func (c *LRUCache) Clear() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	c.l.Init()
-	c.m = &sync.Map{}
+	c.m = make(map[interface{}]*list.Element)
 }
 
 // removeOldest removes the oldest entry from the cache.
@@ -85,7 +98,7 @@ func (c *LRUCache) removeOldest() {
 	}
 
 	key := entry.Value.(*LruEntry).Key
-	c.m.Delete(key)
+	delete(c.m, key)
 
 	c.l.Remove(entry)
 }

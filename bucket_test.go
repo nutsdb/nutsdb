@@ -11,7 +11,7 @@ func TestBucket_DecodeAndDecode(t *testing.T) {
 			Op: BucketInsertOperation,
 		},
 		Id:   1,
-		Ds:   Ds(DataStructureBTree),
+		Ds:   DataStructureBTree,
 		Name: "bucket_1",
 	}
 	bytes := bucket.Encode()

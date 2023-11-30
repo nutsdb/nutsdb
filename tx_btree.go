@@ -35,12 +35,10 @@ func (tx *Tx) Get(bucket string, key []byte) (value []byte, err error) {
 		return nil, err
 	}
 
-	idxMode := tx.db.opt.EntryIdxMode
-	b, err := tx.db.bm.GetBucket(Ds(DataStructureBTree), BucketName(bucket))
+	b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
 	if err != nil {
 		return nil, err
 	}
-	bucketName := b.Name
 	bucketId := b.Id
 
 	if idx, ok := tx.db.Index.bTree.exist(bucketId); ok {
@@ -54,22 +52,61 @@ func (tx *Tx) Get(bucket string, key []byte) (value []byte, err error) {
 			return nil, ErrNotFoundKey
 		}
 
-		if idxMode == HintKeyValAndRAMIdxMode {
-			return record.Value, nil
+		value, err = tx.db.getValueByRecord(record)
+		if err != nil {
+			return nil, err
 		}
+		return value, nil
 
-		if idxMode == HintKeyAndRAMIdxMode {
-			value, err := tx.db.getValueByRecord(record)
-			if err != nil {
-				return nil, err
-			}
-			return value, nil
-		}
 	} else {
 		return nil, ErrNotFoundBucket
 	}
+}
 
-	return nil, ErrBucketAndKey(bucketName, key)
+func (tx *Tx) GetMaxKey(bucket string) ([]byte, error) {
+	return tx.getMaxOrMinKey(bucket, true)
+}
+
+func (tx *Tx) GetMinKey(bucket string) ([]byte, error) {
+	return tx.getMaxOrMinKey(bucket, false)
+}
+
+func (tx *Tx) getMaxOrMinKey(bucket string, isMax bool) ([]byte, error) {
+	if err := tx.checkTxIsClosed(); err != nil {
+		return nil, err
+	}
+
+	b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
+	if err != nil {
+		return nil, err
+	}
+	bucketId := b.Id
+
+	if idx, ok := tx.db.Index.bTree.exist(bucketId); ok {
+		var (
+			item  *Item
+			found bool
+		)
+
+		if isMax {
+			item, found = idx.Max()
+		} else {
+			item, found = idx.Min()
+		}
+
+		if !found {
+			return nil, ErrKeyNotFound
+		}
+
+		if item.record.IsExpired() {
+			tx.putDeleteLog(bucketId, item.key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureBTree)
+			return nil, ErrNotFoundKey
+		}
+
+		return item.key, nil
+	} else {
+		return nil, ErrNotFoundBucket
+	}
 }
 
 // GetAll returns all keys and values of the bucket stored at given bucket.
@@ -78,7 +115,7 @@ func (tx *Tx) GetAll(bucket string) (values [][]byte, err error) {
 		return nil, err
 	}
 
-	b, err := tx.db.bm.GetBucket(Ds(DataStructureBTree), BucketName(bucket))
+	b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +146,7 @@ func (tx *Tx) RangeScan(bucket string, start, end []byte) (values [][]byte, err 
 	if err := tx.checkTxIsClosed(); err != nil {
 		return nil, err
 	}
-	b, err := tx.db.bm.GetBucket(Ds(DataStructureBTree), BucketName(bucket))
+	b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
 	if err != nil {
 		return nil, err
 	}
@@ -140,7 +177,7 @@ func (tx *Tx) PrefixScan(bucket string, prefix []byte, offsetNum int, limitNum i
 	if err := tx.checkTxIsClosed(); err != nil {
 		return nil, err
 	}
-	b, err := tx.db.bm.GetBucket(Ds(DataStructureBTree), BucketName(bucket))
+	b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
 	if err != nil {
 		return nil, err
 	}
@@ -167,7 +204,7 @@ func (tx *Tx) PrefixSearchScan(bucket string, prefix []byte, reg string, offsetN
 	if err := tx.checkTxIsClosed(); err != nil {
 		return nil, err
 	}
-	b, err := tx.db.bm.GetBucket(Ds(DataStructureBTree), BucketName(bucket))
+	b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
 	if err != nil {
 		return nil, err
 	}
@@ -193,7 +230,7 @@ func (tx *Tx) Delete(bucket string, key []byte) error {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return err
 	}
-	b, err := tx.db.bm.GetBucket(Ds(DataStructureBTree), BucketName(bucket))
+	b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
 	if err != nil {
 		return err
 	}
@@ -213,7 +250,7 @@ func (tx *Tx) Delete(bucket string, key []byte) error {
 // getHintIdxDataItemsWrapper returns wrapped entries when prefix scanning or range scanning.
 func (tx *Tx) getHintIdxDataItemsWrapper(records []*Record, limitNum int, bucketId BucketId) (values [][]byte, err error) {
 	for _, record := range records {
-		bucket, err := tx.db.bm.GetBucketById(uint64(bucketId))
+		bucket, err := tx.db.bm.GetBucketById(bucketId)
 		if err != nil {
 			return nil, err
 		}

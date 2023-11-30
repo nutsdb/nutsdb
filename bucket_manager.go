@@ -9,9 +9,9 @@ var ErrBucketNotExist = errors.New("bucket not exist")
 
 const BucketStoreFileName = "bucket.Meta"
 
-type Ds uint16
-type BucketId uint64
-type BucketName string
+type Ds = uint16
+type BucketId = uint64
+type BucketName = string
 
 type BucketManager struct {
 	fd *os.File
@@ -61,15 +61,15 @@ func (bm *BucketManager) SubmitPendingBucketChange(reqs []*bucketSubmitRequest) 
 		}
 		switch req.bucket.Meta.Op {
 		case BucketInsertOperation:
-			bm.BucketInfoMapper[BucketId(req.bucket.Id)] = req.bucket
-			bm.BucketIDMarker[req.name][req.bucket.Ds] = BucketId(req.bucket.Id)
+			bm.BucketInfoMapper[req.bucket.Id] = req.bucket
+			bm.BucketIDMarker[req.name][req.bucket.Ds] = req.bucket.Id
 		case BucketDeleteOperation:
 			if len(bm.BucketIDMarker[req.name]) == 1 {
 				delete(bm.BucketIDMarker, req.name)
 			} else {
 				delete(bm.BucketIDMarker[req.name], req.bucket.Ds)
 			}
-			delete(bm.BucketInfoMapper, BucketId(req.bucket.Id))
+			delete(bm.BucketInfoMapper, req.bucket.Id)
 		}
 	}
 	_, err := bm.fd.Write(bytes)

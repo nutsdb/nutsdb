@@ -957,7 +957,7 @@ func (db *DB) IsClose() bool {
 func (db *DB) buildExpireCallback(bucket string, key []byte) func() {
 	return func() {
 		err := db.Update(func(tx *Tx) error {
-			b, err := tx.db.bm.GetBucket(Ds(DataStructureBTree), BucketName(bucket))
+			b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
 			if err != nil {
 				return err
 			}
