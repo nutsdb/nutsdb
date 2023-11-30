@@ -35,12 +35,10 @@ func (tx *Tx) Get(bucket string, key []byte) (value []byte, err error) {
 		return nil, err
 	}
 
-	idxMode := tx.db.opt.EntryIdxMode
 	b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
 	if err != nil {
 		return nil, err
 	}
-	bucketName := b.Name
 	bucketId := b.Id
 
 	if idx, ok := tx.db.Index.bTree.exist(bucketId); ok {
@@ -54,22 +52,61 @@ func (tx *Tx) Get(bucket string, key []byte) (value []byte, err error) {
 			return nil, ErrNotFoundKey
 		}
 
-		if idxMode == HintKeyValAndRAMIdxMode {
-			return record.Value, nil
+		value, err = tx.db.getValueByRecord(record)
+		if err != nil {
+			return nil, err
 		}
+		return value, nil
 
-		if idxMode == HintKeyAndRAMIdxMode {
-			value, err := tx.db.getValueByRecord(record)
-			if err != nil {
-				return nil, err
-			}
-			return value, nil
-		}
 	} else {
 		return nil, ErrNotFoundBucket
 	}
+}
 
-	return nil, ErrBucketAndKey(bucketName, key)
+func (tx *Tx) GetMaxKey(bucket string) ([]byte, error) {
+	return tx.getMaxOrMinKey(bucket, true)
+}
+
+func (tx *Tx) GetMinKey(bucket string) ([]byte, error) {
+	return tx.getMaxOrMinKey(bucket, false)
+}
+
+func (tx *Tx) getMaxOrMinKey(bucket string, isMax bool) ([]byte, error) {
+	if err := tx.checkTxIsClosed(); err != nil {
+		return nil, err
+	}
+
+	b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
+	if err != nil {
+		return nil, err
+	}
+	bucketId := b.Id
+
+	if idx, ok := tx.db.Index.bTree.exist(bucketId); ok {
+		var (
+			item  *Item
+			found bool
+		)
+
+		if isMax {
+			item, found = idx.Max()
+		} else {
+			item, found = idx.Min()
+		}
+
+		if !found {
+			return nil, ErrKeyNotFound
+		}
+
+		if item.record.IsExpired() {
+			tx.putDeleteLog(bucketId, item.key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureBTree)
+			return nil, ErrNotFoundKey
+		}
+
+		return item.key, nil
+	} else {
+		return nil, ErrNotFoundBucket
+	}
 }
 
 // GetAll returns all keys and values of the bucket stored at given bucket.

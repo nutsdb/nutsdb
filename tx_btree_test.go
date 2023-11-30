@@ -845,3 +845,30 @@ func TestTx_ExpiredDeletion(t *testing.T) {
 		})
 	})
 }
+
+func TestTx_GetMaxOrMinKey(t *testing.T) {
+	bucket := "bucket"
+
+	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+		for i := 0; i < 10; i++ {
+			txPut(t, db, bucket, GetTestBytes(i), GetRandomBytes(24), Persistent, nil, nil)
+		}
+
+		txGetMaxOrMinKey(t, db, bucket, true, GetTestBytes(9), nil)
+		txGetMaxOrMinKey(t, db, bucket, false, GetTestBytes(0), nil)
+
+		txDel(t, db, bucket, GetTestBytes(9), nil)
+		txDel(t, db, bucket, GetTestBytes(0), nil)
+
+		txGetMaxOrMinKey(t, db, bucket, true, GetTestBytes(8), nil)
+		txGetMaxOrMinKey(t, db, bucket, false, GetTestBytes(1), nil)
+
+		txPut(t, db, bucket, GetTestBytes(-1), GetRandomBytes(24), Persistent, nil, nil)
+		txPut(t, db, bucket, GetTestBytes(100), GetRandomBytes(24), Persistent, nil, nil)
+
+		txGetMaxOrMinKey(t, db, bucket, false, GetTestBytes(-1), nil)
+		txGetMaxOrMinKey(t, db, bucket, true, GetTestBytes(100), nil)
+	})
+}

@@ -99,6 +99,20 @@ func txDel(t *testing.T, db *DB, bucket string, key []byte, expectErr error) {
 	require.NoError(t, err)
 }
 
+func txGetMaxOrMinKey(t *testing.T, db *DB, bucket string, isMax bool, expectVal []byte, expectErr error) {
+	err := db.View(func(tx *Tx) error {
+		value, err := tx.getMaxOrMinKey(bucket, isMax)
+		if expectErr != nil {
+			require.Equal(t, expectErr, err)
+		} else {
+			require.NoError(t, err)
+			require.EqualValuesf(t, expectVal, value, "err Tx Get. got %s want %s", string(value), string(expectVal))
+		}
+		return nil
+	})
+	require.NoError(t, err)
+}
+
 func txDeleteBucket(t *testing.T, db *DB, ds uint16, bucket string, expectErr error) {
 	err := db.Update(func(tx *Tx) error {
 		err := tx.DeleteBucket(ds, bucket)
