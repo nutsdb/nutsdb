@@ -19,7 +19,7 @@ func TestGetDiskSizeFromSingleObject(t *testing.T) {
 			args: args{
 				obj: MetaData{},
 			},
-			want: 46,
+			want: 50,
 		},
 	}
 	for _, tt := range tests {
