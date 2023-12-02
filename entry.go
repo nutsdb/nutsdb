@@ -250,11 +250,6 @@ func (e *Entry) IsBelongsToSet() bool {
 	return e.Meta.IsSet()
 }
 
-func (meta *MetaData) WithBucketId(bucketID uint64) *MetaData {
-	meta.BucketId = bucketID
-	return meta
-}
-
 func (e *Entry) IsBelongsToSortSet() bool {
 	return e.Meta.IsSortSet()
 }

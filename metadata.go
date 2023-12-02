@@ -185,6 +185,11 @@ func (meta *MetaData) WithCrc(crc uint32) *MetaData {
 	return meta
 }
 
+func (meta *MetaData) WithBucketId(bucketID uint64) *MetaData {
+	meta.BucketId = bucketID
+	return meta
+}
+
 func (meta *MetaData) IsBPlusTree() bool {
 	return meta.Ds == DataStructureBTree
 }
