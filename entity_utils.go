@@ -10,7 +10,7 @@ func GetDiskSizeFromSingleObject(obj interface{}) int64 {
 	}
 	var size int64 = 0
 	for _, field := range fields {
-		// Currently, we only use the unsigned value type for our metadata. That's reasonable for us.
+		// Currently, we only use the unsigned value type for our metadata.go. That's reasonable for us.
 		// Because it's not possible to use negative value mark the size of data.
 		// But if you want to make it more flexible, please help yourself.
 		switch field.Type.Kind() {

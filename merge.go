@@ -223,22 +223,16 @@ func (db *DB) isPendingMergeEntry(entry *Entry) bool {
 		return false
 	}
 	bucketId := bucket.Id
-	if entry.Meta.Ds == DataStructureBTree {
+	switch {
+	case entry.IsBelongsToBPlusTree():
 		return db.isPendingBtreeEntry(bucketId, entry)
-	}
-
-	if entry.Meta.Ds == DataStructureSet {
+	case entry.IsBelongsToList():
+		return db.isPendingListEntry(bucketId, entry)
+	case entry.IsBelongsToSet():
 		return db.isPendingSetEntry(bucketId, entry)
-	}
-
-	if entry.Meta.Ds == DataStructureSortedSet {
+	case entry.IsBelongsToSortSet():
 		return db.isPendingZSetEntry(bucketId, entry)
 	}
-
-	if entry.Meta.Ds == DataStructureList {
-		return db.isPendingListEntry(bucketId, entry)
-	}
-
 	return false
 }
 
