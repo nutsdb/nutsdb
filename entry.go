@@ -41,42 +41,7 @@ type (
 		Value []byte
 		Meta  *MetaData
 	}
-
-	// MetaData represents the Meta information of the data item.
-	MetaData struct {
-		KeySize   uint32
-		ValueSize uint32
-		Timestamp uint64
-		TTL       uint32
-		Flag      uint16 // delete / set
-		TxID      uint64
-		Status    uint16 // committed / uncommitted
-		Ds        uint16 // data structure
-		Crc       uint32
-		BucketId  uint64
-	}
 )
-
-func (meta *MetaData) Size() int64 {
-	// CRC
-	size := 4
-
-	size += UvarintSize(uint64(meta.KeySize))
-	size += UvarintSize(uint64(meta.ValueSize))
-	size += UvarintSize(meta.Timestamp)
-	size += UvarintSize(uint64(meta.TTL))
-	size += UvarintSize(uint64(meta.Flag))
-	size += UvarintSize(meta.TxID)
-	size += UvarintSize(uint64(meta.Status))
-	size += UvarintSize(uint64(meta.Ds))
-	size += UvarintSize(meta.BucketId)
-
-	return int64(size)
-}
-
-func (meta *MetaData) PayloadSize() int64 {
-	return int64(meta.KeySize) + int64(meta.ValueSize)
-}
 
 // Size returns the size of the entry.
 func (e *Entry) Size() int64 {
@@ -273,58 +238,20 @@ func (e *Entry) GetTxIDBytes() []byte {
 	return []byte(strconv2.Int64ToStr(int64(e.Meta.TxID)))
 }
 
-func NewMetaData() *MetaData {
-	return new(MetaData)
+func (e *Entry) IsBelongsToBPlusTree() bool {
+	return e.Meta.IsBPlusTree()
 }
 
-func (meta *MetaData) WithKeySize(keySize uint32) *MetaData {
-	meta.KeySize = keySize
-	return meta
+func (e *Entry) IsBelongsToList() bool {
+	return e.Meta.IsList()
 }
 
-func (meta *MetaData) WithValueSize(valueSize uint32) *MetaData {
-	meta.ValueSize = valueSize
-	return meta
+func (e *Entry) IsBelongsToSet() bool {
+	return e.Meta.IsSet()
 }
 
-func (meta *MetaData) WithTimeStamp(timestamp uint64) *MetaData {
-	meta.Timestamp = timestamp
-	return meta
-}
-
-func (meta *MetaData) WithTTL(ttl uint32) *MetaData {
-	meta.TTL = ttl
-	return meta
-}
-
-func (meta *MetaData) WithFlag(flag uint16) *MetaData {
-	meta.Flag = flag
-	return meta
-}
-
-func (meta *MetaData) WithTxID(txID uint64) *MetaData {
-	meta.TxID = txID
-	return meta
-}
-
-func (meta *MetaData) WithBucketId(bucketID uint64) *MetaData {
-	meta.BucketId = bucketID
-	return meta
-}
-
-func (meta *MetaData) WithStatus(status uint16) *MetaData {
-	meta.Status = status
-	return meta
-}
-
-func (meta *MetaData) WithDs(ds uint16) *MetaData {
-	meta.Ds = ds
-	return meta
-}
-
-func (meta *MetaData) WithCrc(crc uint32) *MetaData {
-	meta.Crc = crc
-	return meta
+func (e *Entry) IsBelongsToSortSet() bool {
+	return e.Meta.IsSortSet()
 }
 
 // Entries represents entries
