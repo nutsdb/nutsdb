@@ -21,9 +21,6 @@ const (
 
 	// DataStructureList represents the data structure list flag
 	DataStructureList DataStructure = 3
-
-	// DataStructureNone represents not the data structure
-	DataStructureNone DataStructure = 4
 )
 
 const (
