@@ -288,52 +288,10 @@ func (tx *Tx) Commit() (err error) {
 
 func (tx *Tx) getNewAddRecordCount() (int64, error) {
 	var res int64
-	writeLen := len(tx.pendingWrites)
-	for i := 0; i < writeLen; i++ {
-		entry := tx.pendingWrites[i]
-		curRecordCnt, err := tx.getEntryNewAddRecordCount(entry)
-		if err != nil {
-			return res, err
-		}
-		res += curRecordCnt
-	}
-
-	for _, bucketsInDs := range tx.pendingBucketList {
-		for _, bucket := range bucketsInDs {
-			bucketId := bucket.Id
-			if bucket.Meta.Op == BucketDeleteOperation {
-				switch bucket.Ds {
-				case DataStructureBTree:
-					if bTree, ok := tx.db.Index.bTree.idx[bucketId]; ok {
-						res -= int64(bTree.Count())
-					}
-				case DataStructureSet:
-					if set, ok := tx.db.Index.set.idx[bucketId]; ok {
-						for key := range set.M {
-							res -= int64(set.SCard(key))
-						}
-					}
-				case DataStructureSortedSet:
-					if sortedSet, ok := tx.db.Index.sortedSet.idx[bucketId]; ok {
-						for key := range sortedSet.M {
-							curLen, _ := sortedSet.ZCard(key)
-							res -= int64(curLen)
-						}
-					}
-				case DataStructureList:
-					if list, ok := tx.db.Index.list.idx[bucketId]; ok {
-						for key := range list.Items {
-							curLen, _ := list.Size(key)
-							res -= int64(curLen)
-						}
-					}
-				default:
-					panic(fmt.Sprintf("there is an unexpected data structure that is unimplemented in our database.:%d", bucket.Ds))
-				}
-			}
-		}
-	}
-
+	changeCountInEntries := tx.GetChangeCountInEntriesChanges()
+	changeCountInBucket := tx.GetChangeCountInBucketChanges()
+	res += changeCountInEntries
+	res += changeCountInBucket
 	return res, nil
 }
 
@@ -778,4 +736,59 @@ func (tx *Tx) DeleteBucketInIndex() error {
 		}
 	}
 	return nil
+}
+
+func (tx *Tx) GetChangeCountInEntriesChanges() int64 {
+	var res int64
+	var err error
+	writeLen := len(tx.pendingWrites)
+	for i := 0; i < writeLen; i++ {
+		entry := tx.pendingWrites[i]
+		curRecordCnt, _ := tx.getEntryNewAddRecordCount(entry)
+		if err != nil {
+			return res
+		}
+		res += curRecordCnt
+	}
+	return res
+}
+
+func (tx *Tx) GetChangeCountInBucketChanges() int64 {
+	var res int64
+	for _, bucketsInDs := range tx.pendingBucketList {
+		for _, bucket := range bucketsInDs {
+			bucketId := bucket.Id
+			if bucket.Meta.Op == BucketDeleteOperation {
+				switch bucket.Ds {
+				case DataStructureBTree:
+					if bTree, ok := tx.db.Index.bTree.idx[bucketId]; ok {
+						res -= int64(bTree.Count())
+					}
+				case DataStructureSet:
+					if set, ok := tx.db.Index.set.idx[bucketId]; ok {
+						for key := range set.M {
+							res -= int64(set.SCard(key))
+						}
+					}
+				case DataStructureSortedSet:
+					if sortedSet, ok := tx.db.Index.sortedSet.idx[bucketId]; ok {
+						for key := range sortedSet.M {
+							curLen, _ := sortedSet.ZCard(key)
+							res -= int64(curLen)
+						}
+					}
+				case DataStructureList:
+					if list, ok := tx.db.Index.list.idx[bucketId]; ok {
+						for key := range list.Items {
+							curLen, _ := list.Size(key)
+							res -= int64(curLen)
+						}
+					}
+				default:
+					panic(fmt.Sprintf("there is an unexpected data structure that is unimplemented in our database.:%d", bucket.Ds))
+				}
+			}
+		}
+	}
+	return res
 }
