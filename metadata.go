@@ -11,78 +11,75 @@ type DataStatus = uint16
 
 const (
 	// DataStructureSet represents the data structure set flag
-	DataStructureSet DataStructure = iota
+	DataStructureSet DataStructure = 0
 
 	// DataStructureSortedSet represents the data structure sorted set flag
-	DataStructureSortedSet
+	DataStructureSortedSet DataStructure = 1
 
 	// DataStructureBTree represents the data structure b tree flag
-	DataStructureBTree
+	DataStructureBTree DataStructure = 2
 
 	// DataStructureList represents the data structure list flag
-	DataStructureList
-
-	// DataStructureNone represents not the data structure
-	DataStructureNone
+	DataStructureList DataStructure = 3
 )
 
 const (
 	// DataDeleteFlag represents the data delete flag
-	DataDeleteFlag uint16 = iota
+	DataDeleteFlag DataFlag = 0
 
 	// DataSetFlag represents the data set flag
-	DataSetFlag
+	DataSetFlag DataFlag = 1
 
 	// DataLPushFlag represents the data LPush flag
-	DataLPushFlag
+	DataLPushFlag DataFlag = 2
 
 	// DataRPushFlag represents the data RPush flag
-	DataRPushFlag
+	DataRPushFlag DataFlag = 3
 
 	// DataLRemFlag represents the data LRem flag
-	DataLRemFlag
+	DataLRemFlag DataFlag = 4
 
 	// DataLPopFlag represents the data LPop flag
-	DataLPopFlag
+	DataLPopFlag DataFlag = 5
 
 	// DataRPopFlag represents the data RPop flag
-	DataRPopFlag
+	DataRPopFlag DataFlag = 6
 
 	// DataLTrimFlag represents the data LTrim flag
-	DataLTrimFlag
+	DataLTrimFlag DataFlag = 8
 
 	// DataZAddFlag represents the data ZAdd flag
-	DataZAddFlag
+	DataZAddFlag DataFlag = 9
 
 	// DataZRemFlag represents the data ZRem flag
-	DataZRemFlag
+	DataZRemFlag DataFlag = 10
 
 	// DataZRemRangeByRankFlag represents the data ZRemRangeByRank flag
-	DataZRemRangeByRankFlag
+	DataZRemRangeByRankFlag DataFlag = 11
 
 	// DataZPopMaxFlag represents the data ZPopMax flag
-	DataZPopMaxFlag
+	DataZPopMaxFlag DataFlag = 12
 
 	// DataZPopMinFlag represents the data aZPopMin flag
-	DataZPopMinFlag
+	DataZPopMinFlag DataFlag = 13
 
 	// DataSetBucketDeleteFlag represents the delete Set bucket flag
-	DataSetBucketDeleteFlag
+	DataSetBucketDeleteFlag DataFlag = 14
 
 	// DataSortedSetBucketDeleteFlag represents the delete Sorted Set bucket flag
-	DataSortedSetBucketDeleteFlag
+	DataSortedSetBucketDeleteFlag DataFlag = 15
 
 	// DataBTreeBucketDeleteFlag represents the delete BTree bucket flag
-	DataBTreeBucketDeleteFlag
+	DataBTreeBucketDeleteFlag DataFlag = 16
 
 	// DataListBucketDeleteFlag represents the delete List bucket flag
-	DataListBucketDeleteFlag
+	DataListBucketDeleteFlag DataFlag = 17
 
 	// DataLRemByIndex represents the data LRemByIndex flag
-	DataLRemByIndex
+	DataLRemByIndex DataFlag = 18
 
 	// DataExpireListFlag represents that set ttl for the list
-	DataExpireListFlag
+	DataExpireListFlag DataFlag = 19
 )
 
 const (

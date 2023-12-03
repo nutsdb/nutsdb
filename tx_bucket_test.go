@@ -45,8 +45,6 @@ func TestBucket_IterateBuckets(t *testing.T) {
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		setupBucket(t, db)
 
-		txIterateBuckets(t, db, DataStructureNone, "*", nil, nil)
-
 		txIterateBuckets(t, db, DataStructureSet, "*", func(bucket string) bool {
 			return true
 		}, nil, setBucketName)
