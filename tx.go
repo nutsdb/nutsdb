@@ -792,3 +792,24 @@ func (tx *Tx) GetChangeCountInBucketChanges() int64 {
 	}
 	return res
 }
+
+func (tx *Tx) GetBucketStatus(ds Ds, name BucketName) BucketStatus {
+	if len(tx.pendingBucketList) > 0 {
+		if bucketInDs, exist := tx.pendingBucketList[ds]; exist {
+			if bucket, exist := bucketInDs[name]; exist {
+				switch bucket.Meta.Op {
+				case BucketInsertOperation:
+					return BucketStatusNew
+				case BucketDeleteOperation:
+					return BucketStatusDelete
+				case BucketUpdateOperation:
+					return BucketStatusUpdated
+				}
+			}
+		}
+	}
+	if tx.db.bm.ExistBucket(ds, name) {
+		return BucketStatusExistAlready
+	}
+	return BucketStatusUnknown
+}
