@@ -21,6 +21,14 @@ const (
 	BucketDeleteOperation BucketOperation = 3
 )
 
+type BucketStatus = uint8
+
+const BucketStatusExistAlready = 1
+const BucketStatusDelete = 2
+const BucketStatusNew = 3
+const BucketStatusUpdated = 4
+const BucketStatusUnknown = 4
+
 var ErrBucketCrcInvalid = errors.New("bucket crc invalid")
 
 func init() {
