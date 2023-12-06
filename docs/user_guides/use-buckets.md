@@ -3,23 +3,23 @@
 Buckets are collections of key/value pairs within the database. All keys in a bucket must be unique. Bucket can be interpreted as a table or namespace. So you can store the same key in different bucket.
 
 ```go
-	key := []byte("key001")
-	val := []byte("val001")
-	
-	bucket001 := "bucket001"
+key := []byte("key001")
+val := []byte("val001")
 
-    if err := db.Update(func(tx *Tx) error {
-		// you should call Bucket with data structure and the name of bucket first
-        return tx.NewBucket(DataStructureBTree, bucket001)
-    }); err != nil {
-        log.Fatal(err)
-    }
+bucket001 := "bucket001"
 
-    if err := db.Update(func(tx *Tx) error {
-        return tx.Put(bucket001, key, val, 0)
-    }); err != nil {
-        log.Fatal(err)
-    }
+if err := db.Update(func(tx *Tx) error {
+    // you should call Bucket with data structure and the name of bucket first
+    return tx.NewBucket(DataStructureBTree, bucket001)
+}); err != nil {
+    log.Fatal(err)
+}
+
+if err := db.Update(func(tx *Tx) error {
+    return tx.Put(bucket001, key, val, 0)
+}); err != nil {
+    log.Fatal(err)
+}
 ```
 
 Also, this bucket is related to the data structure you use. Different data index structures that use the same bucket are also different. For example, you define a bucket named bucket_foo, so you need to use the list data structure, use tx.RPush to add data, you must query or retrieve from this bucket_foo data structure, use tx.RPop, tx.LRange, etc. You cannot use tx.Get (same index type as tx.GetAll, tx.Put, tx.Delete, tx.RangeScan, etc.) to read the data in this bucket_foo, because the index structure is different. Other data structures such as Set, Sorted Set are the same.
