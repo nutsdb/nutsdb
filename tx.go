@@ -18,10 +18,11 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/bwmarrin/snowflake"
-	"github.com/xujiajun/utils/strconv2"
 	"strings"
 	"sync/atomic"
+
+	"github.com/bwmarrin/snowflake"
+	"github.com/xujiajun/utils/strconv2"
 )
 
 const (
@@ -280,6 +281,12 @@ func (tx *Tx) Commit() (err error) {
 	tx.db.RecordCount += curWriteCount
 
 	if err := tx.DeleteBucketInIndex(); err != nil {
+		return err
+	}
+
+	// This can be combined with DeleteBucketInIndex. For now I'll use seperate
+	// method.
+	if err := tx.buildBucketInIndex(); err != nil {
 		return err
 	}
 
@@ -729,6 +736,31 @@ func (tx *Tx) DeleteBucketInIndex() error {
 					tx.db.Index.set.delete(bucket.Id)
 				case DataStructureSortedSet:
 					tx.db.Index.sortedSet.delete(bucket.Id)
+				default:
+					return ErrDataStructureNotSupported
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// buildBucketInIndex build indexes for newly created buckets
+// This method can be combined with DeleteBucketInIndex. As DeleteBucketInIndex is a public API,
+// I leave it untouched
+func (tx *Tx) buildBucketInIndex() error {
+	for _, mapper := range tx.pendingBucketList {
+		for _, bucket := range mapper {
+			if bucket.Meta.Op == BucketInsertOperation {
+				switch bucket.Ds {
+				case DataStructureBTree:
+					tx.db.Index.bTree.getWithDefault(bucket.Id)
+				case DataStructureList:
+					tx.db.Index.list.getWithDefault(bucket.Id)
+				case DataStructureSet:
+					tx.db.Index.set.getWithDefault(bucket.Id)
+				case DataStructureSortedSet:
+					tx.db.Index.sortedSet.getWithDefault(bucket.Id, tx.db)
 				default:
 					return ErrDataStructureNotSupported
 				}
