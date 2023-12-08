@@ -16,6 +16,7 @@ package nutsdb
 
 import (
 	"fmt"
+	"math"
 	"testing"
 	"time"
 
@@ -870,5 +871,113 @@ func TestTx_GetMaxOrMinKey(t *testing.T) {
 
 		txGetMaxOrMinKey(t, db, bucket, false, GetTestBytes(-1), nil)
 		txGetMaxOrMinKey(t, db, bucket, true, GetTestBytes(100), nil)
+	})
+}
+
+func TestTx_IncrementAndDecrement(t *testing.T) {
+	bucket := "bucket"
+	getIntegerValue := func(value int64) []byte {
+		return []byte(fmt.Sprintf("%d", value))
+	}
+
+	key := GetTestBytes(0)
+
+	t.Run("increments and decrements on a non-exist key", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+			txIncrement(t, db, bucket, key, ErrKeyNotFound, nil)
+			txIncrementBy(t, db, bucket, key, 12, ErrKeyNotFound, nil)
+			txDecrement(t, db, bucket, key, ErrKeyNotFound, nil)
+			txDecrementBy(t, db, bucket, key, 12, ErrKeyNotFound, nil)
+		})
+	})
+
+	t.Run("increments and decrements on a non-integer value", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+			txPut(t, db, bucket, key, []byte("foo"), Persistent, nil, nil)
+
+			txIncrement(t, db, bucket, key, ErrValueNotInteger, nil)
+			txIncrementBy(t, db, bucket, key, 12, ErrValueNotInteger, nil)
+			txDecrement(t, db, bucket, key, ErrValueNotInteger, nil)
+			txDecrementBy(t, db, bucket, key, 12, ErrValueNotInteger, nil)
+		})
+	})
+
+	t.Run("increments and decrements normally", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+			txPut(t, db, bucket, key, getIntegerValue(12), Persistent, nil, nil)
+			txIncrement(t, db, bucket, key, nil, nil)
+			txGet(t, db, bucket, key, getIntegerValue(13), nil)
+
+			txDecrement(t, db, bucket, key, nil, nil)
+			txGet(t, db, bucket, key, getIntegerValue(12), nil)
+
+			txIncrementBy(t, db, bucket, key, 12, nil, nil)
+			txGet(t, db, bucket, key, getIntegerValue(24), nil)
+
+			txDecrementBy(t, db, bucket, key, 25, nil, nil)
+			txGet(t, db, bucket, key, getIntegerValue(-1), nil)
+		})
+	})
+
+	t.Run("increments and decrements over range of int64", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+			txPut(t, db, bucket, key, []byte("9223372036854775818"), Persistent, nil, nil)
+			txIncrement(t, db, bucket, key, nil, nil)
+			txGet(t, db, bucket, key, []byte("9223372036854775819"), nil)
+
+			txIncrementBy(t, db, bucket, key, 200, nil, nil)
+			txGet(t, db, bucket, key, []byte("9223372036854776019"), nil)
+
+			txDecrement(t, db, bucket, key, nil, nil)
+			txGet(t, db, bucket, key, []byte("9223372036854776018"), nil)
+
+			txDecrementBy(t, db, bucket, key, math.MaxInt64, nil, nil)
+			txGet(t, db, bucket, key, []byte("211"), nil)
+
+			txDecrementBy(t, db, bucket, key, math.MaxInt64, nil, nil)
+			txGet(t, db, bucket, key, []byte("-9223372036854775596"), nil)
+		})
+	})
+
+	t.Run("increments and decrements on value which will overflow after operation", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+			txPut(t, db, bucket, key, []byte("9223372036854775800"), Persistent, nil, nil)
+			txIncrementBy(t, db, bucket, key, 100, nil, nil)
+			txGet(t, db, bucket, key, []byte("9223372036854775900"), nil)
+
+			txDecrementBy(t, db, bucket, key, math.MaxInt64, nil, nil)
+			txGet(t, db, bucket, key, []byte("93"), nil)
+
+			txDecrementBy(t, db, bucket, key, math.MaxInt64, nil, nil)
+			txGet(t, db, bucket, key, []byte("-9223372036854775714"), nil)
+
+			txDecrementBy(t, db, bucket, key, math.MaxInt64, nil, nil)
+			txGet(t, db, bucket, key, []byte("-18446744073709551521"), nil)
+		})
+	})
+
+	t.Run("operations on expired key", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+			txPut(t, db, bucket, key, []byte("1"), 1, nil, nil)
+
+			time.Sleep(2 * time.Second)
+
+			txIncrement(t, db, bucket, key, ErrKeyNotFound, nil)
+			txIncrementBy(t, db, bucket, key, 12, ErrKeyNotFound, nil)
+			txDecrement(t, db, bucket, key, ErrKeyNotFound, nil)
+			txDecrementBy(t, db, bucket, key, 12, ErrKeyNotFound, nil)
+		})
 	})
 }

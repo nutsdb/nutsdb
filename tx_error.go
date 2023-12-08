@@ -52,4 +52,6 @@ var (
 	ErrBucketAlreadyExist = errors.New("bucket is already exist")
 
 	ErrorBucketNotExist = errors.New("bucket is not exist yet, please use NewBucket function to create this bucket first")
+
+	ErrValueNotInteger = errors.New("value is not an integer")
 )
