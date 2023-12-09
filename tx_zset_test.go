@@ -15,6 +15,7 @@
 package nutsdb
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -332,6 +333,34 @@ func TestTx_ZRank(t *testing.T) {
 
 		txZRank(t, db, bucket, key, GetTestBytes(4), true, 6, nil)
 		txZRank(t, db, bucket, key, GetTestBytes(4), false, 3, nil)
+	})
+}
+
+func TestTx_ZKeys(t *testing.T) {
+	bucket := "bucket"
+	key := "key_%d"
+	val := GetTestBytes(0)
+
+	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureSortedSet, bucket, nil)
+		num := 3
+		for i := 0; i < num; i++ {
+			txZAdd(t, db, bucket, []byte(fmt.Sprintf(key, i)), val, float64(i), nil, nil)
+		}
+
+		txZKeys(t, db, bucket, "*", func(key string) bool {
+			return true
+		}, num, nil)
+
+		var keys []string
+		txZKeys(t, db, bucket, "*", func(key string) bool {
+			keys = append(keys, key)
+			return len(keys) != num-1
+		}, num-1, nil)
+
+		txZKeys(t, db, bucket, "fake_key*", func(key string) bool {
+			return true
+		}, 0, nil)
 	})
 }
 

@@ -552,6 +552,24 @@ func txZPop(t *testing.T, db *DB, bucket string, key []byte, isMax bool, expectV
 	assert.NoError(t, err)
 }
 
+func txZKeys(t *testing.T, db *DB, bucket, pattern string, f func(key string) bool, expectVal int, expectErr error) {
+	err := db.View(func(tx *Tx) error {
+		num := 0
+		err := tx.ZKeys(bucket, pattern, func(key string) bool {
+			num += 1
+			return f(key)
+		})
+		if expectErr != nil {
+			assert.ErrorIs(t, expectErr, err)
+		} else {
+			assert.NoError(t, err)
+			assert.Equal(t, expectVal, num)
+		}
+		return nil
+	})
+	require.NoError(t, err)
+}
+
 func txPop(t *testing.T, db *DB, bucket string, key, expectVal []byte, expectErr error, isLeft bool) {
 	err := db.Update(func(tx *Tx) error {
 		var item []byte
@@ -919,7 +937,7 @@ func TestDB_HintKeyAndRAMIdxMode_RestartDB(t *testing.T) {
 func TestDB_HintKeyAndRAMIdxMode_LruCache(t *testing.T) {
 	opts := DefaultOptions
 	opts.EntryIdxMode = HintKeyAndRAMIdxMode
-	//opts.HintKeyAndRAMIdxCacheSize = 0
+	// opts.HintKeyAndRAMIdxCacheSize = 0
 	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
 		bucket := "bucket"
 		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
