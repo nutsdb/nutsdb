@@ -277,7 +277,7 @@ func (tx *Tx) getHintIdxDataItemsWrapper(records []*Record, limitNum int, bucket
 	return values, nil
 }
 
-func (tx *Tx) update(bucket string, key []byte, op func([]byte) ([]byte, error)) error {
+func (tx *Tx) update(bucket string, key []byte, getNewValue func([]byte) ([]byte, error)) error {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return err
 	}
@@ -302,11 +302,11 @@ func (tx *Tx) update(bucket string, key []byte, op func([]byte) ([]byte, error))
 		if err != nil {
 			return err
 		}
-		newValue, err := op(value)
+		newValue, err := getNewValue(value)
 		if err != nil {
 			return err
 		}
-		tx.putDeleteLog(bucketId, key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureBTree)
+
 		return tx.put(bucket, key, newValue, record.TTL, DataSetFlag, uint64(time.Now().Unix()), DataStructureBTree)
 	} else {
 		return ErrKeyNotFound
@@ -341,18 +341,18 @@ func (tx *Tx) integerIncr(bucket string, key []byte, increment int64) error {
 	})
 }
 
-func (tx *Tx) Increment(bucket string, key []byte) error {
+func (tx *Tx) Incr(bucket string, key []byte) error {
 	return tx.integerIncr(bucket, key, 1)
 }
 
-func (tx *Tx) Decrement(bucket string, key []byte) error {
+func (tx *Tx) Decr(bucket string, key []byte) error {
 	return tx.integerIncr(bucket, key, -1)
 }
 
-func (tx *Tx) IncrementBy(bucket string, key []byte, increment int64) error {
+func (tx *Tx) IncrBy(bucket string, key []byte, increment int64) error {
 	return tx.integerIncr(bucket, key, increment)
 }
 
-func (tx *Tx) DecrementBy(bucket string, key []byte, decrement int64) error {
+func (tx *Tx) DecrBy(bucket string, key []byte, decrement int64) error {
 	return tx.integerIncr(bucket, key, -1*decrement)
 }
