@@ -1379,3 +1379,39 @@ func TestDB_AllDsWriteRecordLimit(t *testing.T) {
 		})
 	}
 }
+
+func txIncrement(t *testing.T, db *DB, bucket string, key []byte, expectErr error, finalExpectErr error) {
+	err := db.Update(func(tx *Tx) error {
+		err := tx.Incr(bucket, key)
+		assertErr(t, err, expectErr)
+		return nil
+	})
+	assertErr(t, err, finalExpectErr)
+}
+
+func txDecrement(t *testing.T, db *DB, bucket string, key []byte, expectErr error, finalExpectErr error) {
+	err := db.Update(func(tx *Tx) error {
+		err := tx.Decr(bucket, key)
+		assertErr(t, err, expectErr)
+		return nil
+	})
+	assertErr(t, err, finalExpectErr)
+}
+
+func txIncrementBy(t *testing.T, db *DB, bucket string, key []byte, value int64, expectErr error, finalExpectErr error) {
+	err := db.Update(func(tx *Tx) error {
+		err := tx.IncrBy(bucket, key, value)
+		assertErr(t, err, expectErr)
+		return nil
+	})
+	assertErr(t, err, finalExpectErr)
+}
+
+func txDecrementBy(t *testing.T, db *DB, bucket string, key []byte, value int64, expectErr error, finalExpectErr error) {
+	err := db.Update(func(tx *Tx) error {
+		err := tx.DecrBy(bucket, key, value)
+		assertErr(t, err, expectErr)
+		return nil
+	})
+	assertErr(t, err, finalExpectErr)
+}

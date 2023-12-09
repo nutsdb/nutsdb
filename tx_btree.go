@@ -15,7 +15,14 @@
 package nutsdb
 
 import (
+	"errors"
+	"math"
+	"math/big"
+	"strconv"
+	"sync/atomic"
 	"time"
+
+	"github.com/xujiajun/utils/strconv2"
 )
 
 func (tx *Tx) PutWithTimestamp(bucket string, key, value []byte, ttl uint32, timestamp uint64) error {
@@ -268,4 +275,84 @@ func (tx *Tx) getHintIdxDataItemsWrapper(records []*Record, limitNum int, bucket
 	}
 
 	return values, nil
+}
+
+func (tx *Tx) update(bucket string, key []byte, getNewValue func([]byte) ([]byte, error)) error {
+	if err := tx.checkTxIsClosed(); err != nil {
+		return err
+	}
+
+	bucketId, err := tx.db.bm.GetBucketID(DataStructureBTree, bucket)
+	if err != nil {
+		return err
+	}
+
+	if idx, ok := tx.db.Index.bTree.exist(bucketId); ok {
+		record, found := idx.Find(key)
+		if !found {
+			return ErrKeyNotFound
+		}
+
+		if record.IsExpired() {
+			tx.putDeleteLog(bucketId, key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureBTree)
+			return ErrNotFoundKey
+		}
+
+		value, err := tx.db.getValueByRecord(record)
+		if err != nil {
+			return err
+		}
+		newValue, err := getNewValue(value)
+		if err != nil {
+			return err
+		}
+
+		return tx.put(bucket, key, newValue, record.TTL, DataSetFlag, uint64(time.Now().Unix()), DataStructureBTree)
+	} else {
+		return ErrKeyNotFound
+	}
+}
+
+func bigIntIncr(a string, b string) string {
+	bigIntA, _ := new(big.Int).SetString(a, 10)
+	bigIntB, _ := new(big.Int).SetString(b, 10)
+	bigIntA.Add(bigIntA, bigIntB)
+	return bigIntA.String()
+}
+
+func (tx *Tx) integerIncr(bucket string, key []byte, increment int64) error {
+	return tx.update(bucket, key, func(value []byte) ([]byte, error) {
+		intValue, err := strconv2.StrToInt64(string(value))
+
+		if err != nil && errors.Is(err, strconv.ErrRange) {
+			return []byte(bigIntIncr(string(value), strconv2.Int64ToStr(increment))), nil
+		}
+
+		if err != nil {
+			return nil, ErrValueNotInteger
+		}
+
+		if (increment > 0 && math.MaxInt64-increment < intValue) || (increment < 0 && math.MinInt64-increment > intValue) {
+			return []byte(bigIntIncr(string(value), strconv2.Int64ToStr(increment))), nil
+		}
+
+		atomic.AddInt64(&intValue, increment)
+		return []byte(strconv2.Int64ToStr(intValue)), nil
+	})
+}
+
+func (tx *Tx) Incr(bucket string, key []byte) error {
+	return tx.integerIncr(bucket, key, 1)
+}
+
+func (tx *Tx) Decr(bucket string, key []byte) error {
+	return tx.integerIncr(bucket, key, -1)
+}
+
+func (tx *Tx) IncrBy(bucket string, key []byte, increment int64) error {
+	return tx.integerIncr(bucket, key, increment)
+}
+
+func (tx *Tx) DecrBy(bucket string, key []byte, decrement int64) error {
+	return tx.integerIncr(bucket, key, -1*decrement)
 }
