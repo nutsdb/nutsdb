@@ -178,6 +178,37 @@ func TestDB_Basic(t *testing.T) {
 	})
 }
 
+func TestDB_ReopenWithDelete(t *testing.T) {
+	var opts *Options
+	if opts == nil {
+		opts = &DefaultOptions
+	}
+	if opts.Dir == "" {
+		opts.Dir = NutsDBTestDirPath
+	}
+	db, err := Open(*opts)
+	require.NoError(t, err)
+	defer removeDir(opts.Dir)
+
+	bucket := "bucket"
+	txCreateBucket(t, db, DataStructureList, bucket, nil)
+	txPush(t, db, bucket, []byte("try"), []byte("1"), true, nil, nil)
+	txPush(t, db, bucket, []byte("try"), []byte("2"), true, nil, nil)
+	txDeleteBucket(t, db, DataStructureList, bucket, nil)
+
+	if !db.IsClose() {
+		require.NoError(t, db.Close())
+	}
+
+	db, err = Open(*opts)
+	require.NoError(t, err)
+	txCreateBucket(t, db, DataStructureList, bucket, nil)
+	txDeleteBucket(t, db, DataStructureList, bucket, nil)
+	if !db.IsClose() {
+		require.NoError(t, db.Close())
+	}
+}
+
 func TestDB_Flock(t *testing.T) {
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		db2, err := Open(db.opt)
