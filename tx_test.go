@@ -188,3 +188,33 @@ func TestTx_PutWithTimestamp(t *testing.T) {
 		}
 	})
 }
+
+func TestTx_Commit(t *testing.T) {
+	t.Run("build_bucket_indexes_after_commit", func(t *testing.T) {
+		withDefaultDB(t, func(t *testing.T, db *DB) {
+			bucket := "bucket1"
+
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			assert.Equal(t, 1, db.Index.bTree.defaultOp.getIdxLen())
+			txDeleteBucket(t, db, DataStructureBTree, bucket, nil)
+			assert.Equal(t, 0, db.Index.bTree.defaultOp.getIdxLen())
+
+			txCreateBucket(t, db, DataStructureSortedSet, bucket, nil)
+			assert.Equal(t, 1, db.Index.sortedSet.defaultOp.getIdxLen())
+			txDeleteBucket(t, db, DataStructureSortedSet, bucket, nil)
+			assert.Equal(t, 0, db.Index.sortedSet.defaultOp.getIdxLen())
+
+			txCreateBucket(t, db, DataStructureList, bucket, nil)
+			assert.Equal(t, 1, db.Index.list.defaultOp.getIdxLen())
+			txDeleteBucket(t, db, DataStructureList, bucket, nil)
+			assert.Equal(t, 0, db.Index.list.defaultOp.getIdxLen())
+
+			txCreateBucket(t, db, DataStructureSet, bucket, nil)
+			assert.Equal(t, 1, db.Index.set.defaultOp.getIdxLen())
+			txDeleteBucket(t, db, DataStructureSet, bucket, nil)
+			assert.Equal(t, 0, db.Index.set.defaultOp.getIdxLen())
+
+		})
+	})
+
+}
