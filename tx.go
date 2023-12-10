@@ -284,8 +284,6 @@ func (tx *Tx) Commit() (err error) {
 		return err
 	}
 
-	// This can be combined with DeleteBucketInIndex. For now I'll use seperate
-	// method.
 	if err := tx.buildBucketInIndex(); err != nil {
 		return err
 	}
