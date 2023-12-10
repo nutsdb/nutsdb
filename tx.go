@@ -280,10 +280,6 @@ func (tx *Tx) Commit() (err error) {
 	}
 	tx.db.RecordCount += curWriteCount
 
-	if err := tx.DeleteBucketInIndex(); err != nil {
-		return err
-	}
-
 	if err := tx.buildBucketInIndex(); err != nil {
 		return err
 	}
@@ -721,31 +717,7 @@ func (tx *Tx) SubmitBucket() error {
 	return tx.db.bm.SubmitPendingBucketChange(bucketReqs)
 }
 
-func (tx *Tx) DeleteBucketInIndex() error {
-	for _, mapper := range tx.pendingBucketList {
-		for _, bucket := range mapper {
-			if bucket.Meta.Op == BucketDeleteOperation {
-				switch bucket.Ds {
-				case DataStructureBTree:
-					tx.db.Index.bTree.delete(bucket.Id)
-				case DataStructureList:
-					tx.db.Index.list.delete(bucket.Id)
-				case DataStructureSet:
-					tx.db.Index.set.delete(bucket.Id)
-				case DataStructureSortedSet:
-					tx.db.Index.sortedSet.delete(bucket.Id)
-				default:
-					return ErrDataStructureNotSupported
-				}
-			}
-		}
-	}
-	return nil
-}
-
-// buildBucketInIndex build indexes for newly created buckets
-// This method can be combined with DeleteBucketInIndex. As DeleteBucketInIndex is a public API,
-// I leave it untouched
+// buildBucketInIndex build indexes on creation and deletion of buckets
 func (tx *Tx) buildBucketInIndex() error {
 	for _, mapper := range tx.pendingBucketList {
 		for _, bucket := range mapper {
@@ -759,6 +731,19 @@ func (tx *Tx) buildBucketInIndex() error {
 					tx.db.Index.set.getWithDefault(bucket.Id)
 				case DataStructureSortedSet:
 					tx.db.Index.sortedSet.getWithDefault(bucket.Id, tx.db)
+				default:
+					return ErrDataStructureNotSupported
+				}
+			} else if bucket.Meta.Op == BucketDeleteOperation {
+				switch bucket.Ds {
+				case DataStructureBTree:
+					tx.db.Index.bTree.delete(bucket.Id)
+				case DataStructureList:
+					tx.db.Index.list.delete(bucket.Id)
+				case DataStructureSet:
+					tx.db.Index.set.delete(bucket.Id)
+				case DataStructureSortedSet:
+					tx.db.Index.sortedSet.delete(bucket.Id)
 				default:
 					return ErrDataStructureNotSupported
 				}
