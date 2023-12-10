@@ -15,9 +15,10 @@
 package nutsdb
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 var tx *Tx
@@ -153,8 +154,8 @@ func TestTx_ZPop(t *testing.T) {
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		txCreateBucket(t, db, DataStructureSortedSet, bucket, nil)
 
-		txZPop(t, db, bucket, key, true, nil, 0, ErrBucket)
-		txZPop(t, db, bucket, key, false, nil, 0, ErrBucket)
+		txZPop(t, db, bucket, key, true, nil, 0, ErrSortedSetNotFound)
+		txZPop(t, db, bucket, key, false, nil, 0, ErrSortedSetNotFound)
 
 		txZAdd(t, db, bucket, key, GetTestBytes(0), float64(0), nil, nil)
 		txZRem(t, db, bucket, key, GetTestBytes(0), nil)
@@ -241,7 +242,7 @@ func TestTx_ZRemRangeByRank(t *testing.T) {
 
 		err := db.Update(func(tx *Tx) error {
 			err := tx.ZRemRangeByRank(bucket, key, 1, 10)
-			assert.Error(t, err)
+			assert.NoError(t, err)
 			return nil
 		})
 		assert.NoError(t, err)
@@ -312,8 +313,8 @@ func TestTx_ZRank(t *testing.T) {
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		txCreateBucket(t, db, DataStructureSortedSet, bucket, nil)
 
-		txZRank(t, db, bucket, key, GetTestBytes(0), true, 0, ErrBucket)
-		txZRank(t, db, bucket, key, GetTestBytes(0), false, 0, ErrBucket)
+		txZRank(t, db, bucket, key, GetTestBytes(0), true, 0, ErrSortedSetNotFound)
+		txZRank(t, db, bucket, key, GetTestBytes(0), false, 0, ErrSortedSetNotFound)
 
 		for i := 0; i < 10; i++ {
 			txZAdd(t, db, bucket, key, GetTestBytes(i), float64(i), nil, nil)

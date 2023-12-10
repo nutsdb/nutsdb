@@ -702,7 +702,8 @@ func (db *DB) buildSortedSetIdx(record *Record, entry *Entry) error {
 		_, _, err = ss.ZPopMin(string(key))
 	}
 
-	if err != nil {
+	// We don't need to panic if sorted set is not found.
+	if err != nil && !errors.Is(err, ErrSortedSetNotFound) {
 		return fmt.Errorf("when build sortedSetIdx err: %s", err)
 	}
 
