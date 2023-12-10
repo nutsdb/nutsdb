@@ -320,10 +320,10 @@ func TestTx_LSize(t *testing.T) {
 func TestTx_LRemByIndex(t *testing.T) {
 	bucket := "bucket"
 
-	// Calling LRemByIndex on a non-existent list
+	// Calling LRemByIndex on a newly created empty list
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		txCreateBucket(t, db, DataStructureList, bucket, nil)
-		txLRemByIndex(t, db, bucket, GetTestBytes(0), ErrListNotFound)
+		txLRemByIndex(t, db, bucket, GetTestBytes(0), nil)
 	})
 
 	// Calling LRemByIndex with len(indexes) == 0

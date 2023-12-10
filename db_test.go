@@ -237,7 +237,7 @@ func TestDB_DeleteANonExistKey(t *testing.T) {
 		testBucket := "test_bucket"
 		txCreateBucket(t, db, DataStructureBTree, testBucket, nil)
 
-		txDel(t, db, testBucket, GetTestBytes(0), ErrNotFoundBucket)
+		txDel(t, db, testBucket, GetTestBytes(0), ErrKeyNotFound)
 		txPut(t, db, testBucket, GetTestBytes(1), GetRandomBytes(24), Persistent, nil, nil)
 		txDel(t, db, testBucket, GetTestBytes(0), ErrKeyNotFound)
 	})
@@ -707,7 +707,7 @@ func TestDB_GetKeyNotFound(t *testing.T) {
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		bucket := "bucket"
 		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
-		txGet(t, db, bucket, GetTestBytes(0), nil, ErrBucketNotFound)
+		txGet(t, db, bucket, GetTestBytes(0), nil, ErrKeyNotFound)
 		txPut(t, db, bucket, GetTestBytes(1), GetRandomBytes(24), Persistent, nil, nil)
 		txGet(t, db, bucket, GetTestBytes(0), nil, ErrKeyNotFound)
 	})
