@@ -442,7 +442,7 @@ func (db *DB) parseDataFiles(dataFileIds []int) (err error) {
 			// its because it already deleted in the feature WAL log.
 			// so we can just ignore here.
 			bucketId := entry.Meta.BucketId
-			if b, err := db.bm.GetBucketById(bucketId); b == nil && err == nil {
+			if _, err := db.bm.GetBucketById(bucketId); errors.Is(err, ErrBucketNotExist) {
 				continue
 			}
 
