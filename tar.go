@@ -17,96 +17,95 @@ package nutsdb
 import (
 	"archive/tar"
 	"compress/gzip"
+	"github.com/pkg/errors"
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
 func tarGZCompress(dst io.Writer, src string) error {
-	gz := gzip.NewWriter(dst)
-	defer gz.Close()
-	return tarCompress(gz, src)
-}
+	gzipWriter := gzip.NewWriter(dst)
+	defer gzipWriter.Close()
 
-// https://blog.ralch.com/articles/golang-working-with-tar-and-gzip
-func tarCompress(dst io.Writer, src string) error {
-	tarball := tar.NewWriter(dst)
-	defer tarball.Close()
+	tarWriter := tar.NewWriter(gzipWriter)
+	defer tarWriter.Close()
 
-	info, err := os.Stat(src)
-	if err != nil {
-		return nil
-	}
-
-	var baseDir string
-	if info.IsDir() {
-		baseDir = filepath.Base(src)
-	}
-
-	return filepath.Walk(src,
-		func(path string, info os.FileInfo, err error) error {
-			if err != nil {
-				return err
-			}
-
-			header, err := tar.FileInfoHeader(info, info.Name())
-			if err != nil {
-				return err
-			}
-
-			if baseDir != "" {
-				header.Name = filepath.Join(baseDir, strings.TrimPrefix(path, src))
-			}
-
-			if err := tarball.WriteHeader(header); err != nil {
-				return err
-			}
-
-			if info.IsDir() {
-				return nil
-			}
-
-			file, err := os.Open(filepath.Clean(path))
-			if err != nil {
-				return err
-			}
-
-			defer file.Close()
-			_, err = io.Copy(tarball, file)
+	return filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
 			return err
-		})
+		}
+
+		header, err := tar.FileInfoHeader(info, "")
+		if err != nil {
+			return err
+		}
+
+		// Update the header name to use relative paths
+		relPath, err := filepath.Rel(src, path)
+		if err != nil {
+			return err
+		}
+		header.Name = relPath
+
+		if err = tarWriter.WriteHeader(header); err != nil {
+			return err
+		}
+
+		// If the file is a regular file, write its contents to the tarball
+		if info.Mode().IsRegular() {
+			f, err := os.Open(path)
+			if err != nil {
+				return err
+			}
+			defer f.Close()
+
+			if _, err = io.Copy(tarWriter, f); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
 }
 
 func tarDecompress(dst string, src io.Reader) error {
-	tarReader := tar.NewReader(src)
+	gzipReader, err := gzip.NewReader(src)
+	if err != nil {
+		return err
+	}
+	defer gzipReader.Close()
+
+	tarReader := tar.NewReader(gzipReader)
 
 	for {
 		header, err := tarReader.Next()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return err
-		}
 
-		path := filepath.Join(dst, header.Name)
-		info := header.FileInfo()
-		if info.IsDir() {
-			if err = os.MkdirAll(path, info.Mode()); err != nil {
-				return err
+		if err != nil {
+			if err == io.EOF {
+				break // end of archive
 			}
-			continue
+			return err
 		}
 
-		file, err := os.OpenFile(filepath.Clean(path), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, info.Mode())
-		if err != nil {
-			return err
-		}
-		defer file.Close()
-		_, err = io.Copy(file, tarReader)
-		if err != nil {
-			return err
+		targetPath := filepath.Join(dst, filepath.Clean(header.Name))
+
+		switch header.Typeflag {
+		case tar.TypeDir:
+			if oErr := os.MkdirAll(targetPath, os.FileMode(header.Mode)); oErr != nil {
+				return oErr
+			}
+		case tar.TypeReg:
+			f, oErr := os.Create(targetPath)
+			if oErr != nil {
+				return oErr
+			}
+			defer f.Close()
+
+			if _, cErr := io.Copy(f, tarReader); cErr != nil {
+				return cErr
+			}
+		default:
+			return errors.Errorf("unsupported tar entry: %s", header.Name)
 		}
 	}
 
