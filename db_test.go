@@ -192,8 +192,8 @@ func TestDB_ReopenWithDelete(t *testing.T) {
 
 	bucket := "bucket"
 	txCreateBucket(t, db, DataStructureList, bucket, nil)
-	txPush(t, db, bucket, []byte("try"), []byte("1"), true, nil, nil)
-	txPush(t, db, bucket, []byte("try"), []byte("2"), true, nil, nil)
+	txPush(t, db, bucket, GetTestBytes(5), GetTestBytes(0), true, nil, nil)
+	txPush(t, db, bucket, GetTestBytes(5), GetTestBytes(1), true, nil, nil)
 	txDeleteBucket(t, db, DataStructureList, bucket, nil)
 
 	if !db.IsClose() {
