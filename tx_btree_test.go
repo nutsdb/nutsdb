@@ -15,6 +15,7 @@
 package nutsdb
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"testing"
@@ -874,6 +875,24 @@ func TestTx_GetMaxOrMinKey(t *testing.T) {
 	})
 }
 
+func TestTx_updateOrPut(t *testing.T) {
+	bucket := "bucket"
+	t.Run("updateOrPut will return the expected error when it do update", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			txPut(t, db, bucket, []byte("any"), []byte("any"), Persistent, nil, nil)
+
+			tx, err := db.Begin(true)
+			require.NoError(t, err)
+			expectedErr := errors.New("some error")
+			require.Equal(t, expectedErr, tx.updateOrPut("bucket", []byte("any"), []byte("any"), func(bytes []byte) ([]byte, error) {
+				return nil, expectedErr
+			}))
+			require.Equal(t, nil, tx.Commit())
+		})
+	})
+}
+
 func TestTx_IncrementAndDecrement(t *testing.T) {
 	bucket := "bucket"
 	getIntegerValue := func(value int64) []byte {
@@ -1005,7 +1024,78 @@ func TestTx_PutIfNotExistsAndPutIfExists(t *testing.T) {
 		for i := 0; i < 10; i++ {
 			txGet(t, db, bucket, GetTestBytes(i), updated_val, nil)
 		}
+	})
+}
 
+func TestTx_GetAndSetBit(t *testing.T) {
+	bucket := "bucket"
+	key := GetTestBytes(0)
+
+	t.Run("get bit on a non-exist key", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+			txGetBit(t, db, bucket, key, 0, 0, ErrKeyNotFound, nil)
+		})
+	})
+
+	t.Run("set bit on a non-exist key", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+			txSetBit(t, db, bucket, key, 0, 1, nil, nil)
+			txGetBit(t, db, bucket, key, 0, 1, nil, nil)
+			txGet(t, db, bucket, key, []byte("\x01"), nil)
+
+			txDel(t, db, bucket, key, nil)
+			txSetBit(t, db, bucket, key, 2, 1, nil, nil)
+			txGetBit(t, db, bucket, key, 2, 1, nil, nil)
+			txGet(t, db, bucket, key, []byte("\x00\x00\x01"), nil)
+
+			txDel(t, db, bucket, key, nil)
+			txSetBit(t, db, bucket, key, 2, '1', nil, nil)
+			txGetBit(t, db, bucket, key, 2, '1', nil, nil)
+			txGet(t, db, bucket, key, []byte("\x00\x001"), nil)
+		})
+	})
+
+	t.Run("get and set bit on a exist string", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+			txPut(t, db, bucket, key, []byte("foober"), Persistent, nil, nil)
+			txGet(t, db, bucket, key, []byte("foober"), nil)
+			txGetBit(t, db, bucket, key, 0, 'f', nil, nil)
+
+			txSetBit(t, db, bucket, key, 0, 'F', nil, nil)
+			txGetBit(t, db, bucket, key, 0, 'F', nil, nil)
+
+			txSetBit(t, db, bucket, key, 3, 'B', nil, nil)
+			txGetBit(t, db, bucket, key, 3, 'B', nil, nil)
+
+			txSetBit(t, db, bucket, key, 5, 'R', nil, nil)
+			txGetBit(t, db, bucket, key, 5, 'R', nil, nil)
+
+			txSetBit(t, db, bucket, key, 6, 'A', nil, nil)
+			txGetBit(t, db, bucket, key, 6, 'A', nil, nil)
+			txGet(t, db, bucket, key, []byte("FooBeRA"), nil)
+
+			txSetBit(t, db, bucket, key, 12, 'C', nil, nil)
+			txGetBit(t, db, bucket, key, 12, 'C', nil, nil)
+			txGet(t, db, bucket, key, []byte("FooBeRA\x00\x00\x00\x00\x00C"), nil)
+		})
+	})
+
+	t.Run("give a invalid offset", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+			txSetBit(t, db, bucket, key, math.MaxInt64, 0, ErrOffsetInvalid, nil)
+			txGetBit(t, db, bucket, key, math.MaxInt64, 0, ErrOffsetInvalid, nil)
+
+			txSetBit(t, db, bucket, key, 0, 1, nil, nil)
+			txGetBit(t, db, bucket, key, 1, 0, nil, nil)
+		})
 	})
 }
 
