@@ -52,9 +52,13 @@ func (tx *Tx) RPeek(bucket string, key []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	bucketId := b.Id
-	l := tx.db.Index.list.getWithDefault(bucketId)
-	if l == nil {
+	var (
+		bucketId = b.Id
+		l        *List
+		exist    bool
+	)
+
+	if l, exist = tx.db.Index.list.exist(bucketId); !exist {
 		return nil, ErrBucket
 	}
 
@@ -183,9 +187,13 @@ func (tx *Tx) LPeek(bucket string, key []byte) (item []byte, err error) {
 	if err != nil {
 		return nil, err
 	}
-	bucketId := b.Id
-	l := tx.db.Index.list.getWithDefault(bucketId)
-	if l == nil {
+	var (
+		bucketId = b.Id
+		l        *List
+		exist    bool
+	)
+
+	if l, exist = tx.db.Index.list.exist(bucketId); !exist {
 		return nil, ErrBucket
 	}
 	if tx.CheckExpire(bucket, key) {
@@ -214,9 +222,14 @@ func (tx *Tx) LSize(bucket string, key []byte) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	bucketId := b.Id
-	l := tx.db.Index.list.getWithDefault(bucketId)
-	if l == nil {
+
+	var (
+		bucketId = b.Id
+		l        *List
+		exist    bool
+	)
+
+	if l, exist = tx.db.Index.list.exist(bucketId); !exist {
 		return 0, ErrBucket
 	}
 	if tx.CheckExpire(bucket, key) {
@@ -239,9 +252,13 @@ func (tx *Tx) LRange(bucket string, key []byte, start, end int) ([][]byte, error
 	if err != nil {
 		return nil, err
 	}
-	bucketId := b.Id
-	l := tx.db.Index.list.getWithDefault(bucketId)
-	if l == nil {
+	var (
+		bucketId = b.Id
+		l        *List
+		exist    bool
+	)
+
+	if l, exist = tx.db.Index.list.exist(bucketId); !exist {
 		return nil, ErrBucket
 	}
 	if tx.CheckExpire(bucket, key) {
@@ -317,8 +334,17 @@ func (tx *Tx) LTrim(bucket string, key []byte, start, end int) error {
 	if err != nil {
 		return err
 	}
-	bucketId := b.Id
-	l := tx.db.Index.list.getWithDefault(bucketId)
+
+	var (
+		bucketId = b.Id
+		l        *List
+		exist    bool
+	)
+
+	if l, exist = tx.db.Index.list.exist(bucketId); !exist {
+		return ErrBucket
+	}
+
 	if tx.CheckExpire(bucket, key) {
 		return ErrListNotFound
 	}
@@ -384,11 +410,15 @@ func (tx *Tx) LKeys(bucket, pattern string, f func(key string) bool) error {
 	if err != nil {
 		return err
 	}
-	bucketId := b.Id
-	l := tx.db.Index.list.getWithDefault(bucketId)
-	if l == nil {
+	var (
+		bucketId = b.Id
+		l        *List
+		exist    bool
+	)
+	if l, exist = tx.db.Index.list.exist(bucketId); !exist {
 		return ErrBucket
 	}
+
 	for key := range l.Items {
 		if tx.CheckExpire(bucket, []byte(key)) {
 			continue
@@ -408,8 +438,17 @@ func (tx *Tx) ExpireList(bucket string, key []byte, ttl uint32) error {
 	if err != nil {
 		return err
 	}
-	bucketId := b.Id
-	l := tx.db.Index.list.getWithDefault(bucketId)
+
+	var (
+		bucketId = b.Id
+		l        *List
+		exist    bool
+	)
+
+	if l, exist = tx.db.Index.list.exist(bucketId); !exist {
+		return ErrBucket
+	}
+
 	l.TTL[string(key)] = ttl
 	l.TimeStamp[string(key)] = uint64(time.Now().Unix())
 	ttls := strconv2.Int64ToStr(int64(ttl))
@@ -425,8 +464,17 @@ func (tx *Tx) CheckExpire(bucket string, key []byte) bool {
 	if err != nil {
 		return false
 	}
-	bucketId := b.Id
-	l := tx.db.Index.list.getWithDefault(bucketId)
+
+	var (
+		bucketId = b.Id
+		l        *List
+		exist    bool
+	)
+
+	if l, exist = tx.db.Index.list.exist(bucketId); !exist {
+		return false
+	}
+
 	if l.IsExpire(string(key)) {
 		_ = tx.push(bucket, key, DataDeleteFlag)
 		return true
@@ -442,9 +490,13 @@ func (tx *Tx) GetListTTL(bucket string, key []byte) (uint32, error) {
 	if err != nil {
 		return 0, err
 	}
-	bucketId := b.Id
-	l := tx.db.Index.list.getWithDefault(bucketId)
-	if l == nil {
+
+	var (
+		bucketId = b.Id
+		l        *List
+		exist    bool
+	)
+	if l, exist = tx.db.Index.list.exist(bucketId); !exist {
 		return 0, ErrBucket
 	}
 	return l.GetListTTL(string(key))

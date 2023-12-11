@@ -14,39 +14,28 @@
 
 package nutsdb
 
-import "sync"
-
 type IdxType interface {
 	BTree | Set | SortedSet | List
 }
 
 type defaultOp[T IdxType] struct {
 	idx map[BucketId]*T
-	mtx *sync.RWMutex
 }
 
 func (op *defaultOp[T]) computeIfAbsent(id BucketId, f func() *T) *T {
 	if i, isExist := op.idx[id]; isExist {
 		return i
 	}
-
 	i := f()
-	op.mtx.Lock()
-	defer op.mtx.Unlock()
 	op.idx[id] = i
 	return i
 }
 
 func (op *defaultOp[T]) delete(id BucketId) {
-	op.mtx.Lock()
-	defer op.mtx.Unlock()
 	delete(op.idx, id)
 }
 
 func (op *defaultOp[T]) exist(id BucketId) (*T, bool) {
-	op.mtx.RLock()
-	defer op.mtx.RUnlock()
-
 	i, isExist := op.idx[id]
 	return i, isExist
 }
@@ -110,9 +99,9 @@ type index struct {
 
 func newIndex() *index {
 	i := new(index)
-	i.list = ListIdx{&defaultOp[List]{idx: map[BucketId]*List{}, mtx: new(sync.RWMutex)}}
-	i.bTree = BTreeIdx{&defaultOp[BTree]{idx: map[BucketId]*BTree{}, mtx: new(sync.RWMutex)}}
-	i.set = SetIdx{&defaultOp[Set]{idx: map[BucketId]*Set{}, mtx: new(sync.RWMutex)}}
-	i.sortedSet = SortedSetIdx{&defaultOp[SortedSet]{idx: map[BucketId]*SortedSet{}, mtx: new(sync.RWMutex)}}
+	i.list = ListIdx{&defaultOp[List]{idx: map[BucketId]*List{}}}
+	i.bTree = BTreeIdx{&defaultOp[BTree]{idx: map[BucketId]*BTree{}}}
+	i.set = SetIdx{&defaultOp[Set]{idx: map[BucketId]*Set{}}}
+	i.sortedSet = SortedSetIdx{&defaultOp[SortedSet]{idx: map[BucketId]*SortedSet{}}}
 	return i
 }
