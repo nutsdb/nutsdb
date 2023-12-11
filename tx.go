@@ -289,8 +289,8 @@ func (tx *Tx) Commit() (err error) {
 
 func (tx *Tx) getNewAddRecordCount() (int64, error) {
 	var res int64
-	changeCountInEntries := tx.GetChangeCountInEntriesChanges()
-	changeCountInBucket := tx.GetChangeCountInBucketChanges()
+	changeCountInEntries := tx.getChangeCountInEntriesChanges()
+	changeCountInBucket := tx.getChangeCountInBucketChanges()
 	res += changeCountInEntries
 	res += changeCountInBucket
 	return res, nil
@@ -753,7 +753,7 @@ func (tx *Tx) buildBucketInIndex() error {
 	return nil
 }
 
-func (tx *Tx) GetChangeCountInEntriesChanges() int64 {
+func (tx *Tx) getChangeCountInEntriesChanges() int64 {
 	var res int64
 	var err error
 	writeLen := len(tx.pendingWrites)
@@ -768,7 +768,7 @@ func (tx *Tx) GetChangeCountInEntriesChanges() int64 {
 	return res
 }
 
-func (tx *Tx) GetChangeCountInBucketChanges() int64 {
+func (tx *Tx) getChangeCountInBucketChanges() int64 {
 	var res int64
 	for _, bucketsInDs := range tx.pendingBucketList {
 		for _, bucket := range bucketsInDs {
@@ -808,7 +808,7 @@ func (tx *Tx) GetChangeCountInBucketChanges() int64 {
 	return res
 }
 
-func (tx *Tx) GetBucketStatus(ds Ds, name BucketName) BucketStatus {
+func (tx *Tx) getBucketStatus(ds Ds, name BucketName) BucketStatus {
 	if len(tx.pendingBucketList) > 0 {
 		if bucketInDs, exist := tx.pendingBucketList[ds]; exist {
 			if bucket, exist := bucketInDs[name]; exist {
