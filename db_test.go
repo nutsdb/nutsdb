@@ -1446,3 +1446,21 @@ func txDecrementBy(t *testing.T, db *DB, bucket string, key []byte, value int64,
 	})
 	assertErr(t, err, finalExpectErr)
 }
+
+func txPutIfNotExists(t *testing.T, db *DB, bucket string, key, value []byte, expectedErr, finalExpectErr error) {
+	err := db.Update(func(tx *Tx) error {
+		err := tx.PutIfNotExists(bucket, key, value, Persistent)
+		assertErr(t, err, expectedErr)
+		return nil
+	})
+	assertErr(t, err, finalExpectErr)
+}
+
+func txPutIfExists(t *testing.T, db *DB, bucket string, key, value []byte, expectedErr, finalExpectErr error) {
+	err := db.Update(func(tx *Tx) error {
+		err := tx.PutIfExists(bucket, key, value, Persistent)
+		assertErr(t, err, expectedErr)
+		return nil
+	})
+	assertErr(t, err, finalExpectErr)
+}

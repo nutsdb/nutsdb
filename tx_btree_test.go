@@ -981,3 +981,30 @@ func TestTx_IncrementAndDecrement(t *testing.T) {
 		})
 	})
 }
+
+func TestTx_PutIfNotExistsAndPutIfExists(t *testing.T) {
+	bucket := "bucket"
+	val := []byte("value")
+	updated_val := []byte("updated_value")
+
+	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+		for i := 0; i < 10; i++ {
+			txPutIfNotExists(t, db, bucket, GetTestBytes(i), val, nil, nil)
+		}
+
+		for i := 0; i < 10; i++ {
+			txGet(t, db, bucket, GetTestBytes(i), val, nil)
+		}
+
+		for i := 0; i < 10; i++ {
+			txPutIfExists(t, db, bucket, GetTestBytes(i), updated_val, nil, nil)
+		}
+
+		for i := 0; i < 10; i++ {
+			txGet(t, db, bucket, GetTestBytes(i), updated_val, nil)
+		}
+
+	})
+}
