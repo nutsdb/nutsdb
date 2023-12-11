@@ -30,9 +30,9 @@ func (op *defaultOp[T]) computeIfAbsent(id BucketId, f func() *T) *T {
 		return i
 	}
 
+	i := f()
 	op.mtx.Lock()
 	defer op.mtx.Unlock()
-	i := f()
 	op.idx[id] = i
 	return i
 }
