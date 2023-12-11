@@ -35,6 +35,56 @@ func (tx *Tx) Put(bucket string, key, value []byte, ttl uint32) error {
 	return tx.put(bucket, key, value, ttl, DataSetFlag, uint64(time.Now().UnixMilli()), DataStructureBTree)
 }
 
+// PutIfNotExists set the value for a key in the bucket only if the key doesn't exist already.
+func (tx *Tx) PutIfNotExists(bucket string, key, value []byte, ttl uint32) error {
+	if err := tx.checkTxIsClosed(); err != nil {
+		return err
+	}
+
+	b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
+	if err != nil {
+		return err
+	}
+	bucketId := b.Id
+
+	idx, bucketExists := tx.db.Index.bTree.exist(bucketId)
+	if !bucketExists {
+		return ErrNotFoundBucket
+	}
+	record, recordExists := idx.Find(key)
+
+	if recordExists && !record.IsExpired() {
+		return nil
+	}
+
+	return tx.put(bucket, key, value, ttl, DataSetFlag, uint64(time.Now().UnixMilli()), DataStructureBTree)
+}
+
+// PutIfExits set the value for a key in the bucket only if the key already exits.
+func (tx *Tx) PutIfExists(bucket string, key, value []byte, ttl uint32) error {
+	if err := tx.checkTxIsClosed(); err != nil {
+		return err
+	}
+
+	b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
+	if err != nil {
+		return err
+	}
+	bucketId := b.Id
+
+	idx, bucketExists := tx.db.Index.bTree.exist(bucketId)
+	if !bucketExists {
+		return ErrNotFoundBucket
+	}
+
+	record, recordExists := idx.Find(key)
+	if recordExists && !record.IsExpired() {
+		return tx.put(bucket, key, value, ttl, DataSetFlag, uint64(time.Now().UnixMilli()), DataStructureBTree)
+	}
+
+	return nil
+}
+
 // Get retrieves the value for a key in the bucket.
 // The returned value is only valid for the life of the transaction.
 func (tx *Tx) Get(bucket string, key []byte) (value []byte, err error) {
