@@ -37,6 +37,9 @@ func init() {
 }
 
 func main() {
+	// create bucket first
+	createBucket()
+
 	// insert
 	put()
 	// read
@@ -56,6 +59,18 @@ func main() {
 	put2()
 	// read
 	read()
+
+	// get value length
+	valueLen()
+}
+
+func createBucket() {
+	if err := db.Update(
+		func(tx *nutsdb.Tx) error {
+			return tx.NewBucket(nutsdb.DataStructureBTree, bucket)
+		}); err != nil {
+		log.Fatal(err)
+	}
 }
 
 func delete() {
@@ -97,6 +112,22 @@ func read() {
 				return err
 			}
 			fmt.Println("val:", string(value))
+
+			return nil
+		}); err != nil {
+		log.Println(err)
+	}
+}
+
+func valueLen() {
+	if err := db.View(
+		func(tx *nutsdb.Tx) error {
+			key := []byte("name1")
+			value, err := tx.ValueLen(bucket, key)
+			if err != nil {
+				return err
+			}
+			fmt.Println("value length:", value)
 
 			return nil
 		}); err != nil {

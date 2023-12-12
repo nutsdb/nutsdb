@@ -70,3 +70,23 @@ if err := db.Update(
 }
 ```
 
+Use `tx.ValueLen()` to retrieve the length of the value stored by the key
+
+```go
+err := db.View(
+    func(tx *nutsdb.Tx) error {
+        key := []byte("name1")
+        bucket := "bucket1"
+        if length, err := tx.ValueLen(bucket, key); err != nil {
+            return err
+        } else {
+            fmt.Println(length);
+        }
+        return nil
+    },
+);
+if err != nil {
+    log.Fatal(err)
+}
+```
+

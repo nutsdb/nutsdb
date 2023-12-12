@@ -1464,3 +1464,17 @@ func txPutIfExists(t *testing.T, db *DB, bucket string, key, value []byte, expec
 	})
 	assertErr(t, err, finalExpectErr)
 }
+
+func txValueLen(t *testing.T, db *DB, bucket string, key []byte, expectLength int, expectErr error) {
+	err := db.View(func(tx *Tx) error {
+		length, err := tx.ValueLen(bucket, key)
+		if expectErr != nil {
+			require.Equal(t, expectErr, err)
+		} else {
+			require.NoError(t, err)
+		}
+		require.EqualValuesf(t, expectLength, length, "err Tx ValueLen. got %s want %s", length, expectLength)
+		return nil
+	})
+	require.NoError(t, err)
+}

@@ -88,6 +88,10 @@ func (tx *Tx) PutIfExists(bucket string, key, value []byte, ttl uint32) error {
 // Get retrieves the value for a key in the bucket.
 // The returned value is only valid for the life of the transaction.
 func (tx *Tx) Get(bucket string, key []byte) (value []byte, err error) {
+	return tx.get(bucket, key)
+}
+
+func (tx *Tx) get(bucket string, key []byte) (value []byte, err error) {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return nil, err
 	}
@@ -118,6 +122,11 @@ func (tx *Tx) Get(bucket string, key []byte) (value []byte, err error) {
 	} else {
 		return nil, ErrNotFoundBucket
 	}
+}
+
+func (tx *Tx) ValueLen(bucket string, key []byte) (int, error) {
+	value, err := tx.get(bucket, key)
+	return len(value), err
 }
 
 func (tx *Tx) GetMaxKey(bucket string) ([]byte, error) {
