@@ -1473,7 +1473,7 @@ func txValueLen(t *testing.T, db *DB, bucket string, key []byte, expectLength in
 		} else {
 			require.NoError(t, err)
 		}
-		require.EqualValuesf(t, expectLength, length, "err Tx GetLen. got %s want %s", length, expectLength)
+		require.EqualValuesf(t, expectLength, length, "err Tx ValueLen. got %s want %s", length, expectLength)
 		return nil
 	})
 	require.NoError(t, err)

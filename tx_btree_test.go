@@ -1009,7 +1009,7 @@ func TestTx_PutIfNotExistsAndPutIfExists(t *testing.T) {
 	})
 }
 
-func TestTx_GetLen(t *testing.T) {
+func TestTx_ValueLen(t *testing.T) {
 	bucket := "bucket"
 	val := []byte("value")
 
