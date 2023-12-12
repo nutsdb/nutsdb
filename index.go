@@ -14,15 +14,15 @@
 
 package nutsdb
 
-type IdxType interface {
-	BTree | Set | SortedSet | List
+type idxType interface {
+	bTree | set | sortedSet | list
 }
 
-type defaultOp[T IdxType] struct {
-	idx map[BucketId]*T
+type defaultOp[T idxType] struct {
+	idx map[bucketId]*T
 }
 
-func (op *defaultOp[T]) computeIfAbsent(id BucketId, f func() *T) *T {
+func (op *defaultOp[T]) computeIfAbsent(id bucketId, f func() *T) *T {
 	if i, isExist := op.idx[id]; isExist {
 		return i
 	}
@@ -31,11 +31,11 @@ func (op *defaultOp[T]) computeIfAbsent(id BucketId, f func() *T) *T {
 	return i
 }
 
-func (op *defaultOp[T]) delete(id BucketId) {
+func (op *defaultOp[T]) delete(id bucketId) {
 	delete(op.idx, id)
 }
 
-func (op *defaultOp[T]) exist(id BucketId) (*T, bool) {
+func (op *defaultOp[T]) exist(id bucketId) (*T, bool) {
 	i, isExist := op.idx[id]
 	return i, isExist
 }
@@ -50,58 +50,58 @@ func (op *defaultOp[T]) rangeIdx(f func(elem *T)) {
 	}
 }
 
-type ListIdx struct {
-	*defaultOp[List]
+type listIdx struct {
+	*defaultOp[list]
 }
 
-func (idx ListIdx) getWithDefault(id BucketId) *List {
-	return idx.defaultOp.computeIfAbsent(id, func() *List {
-		return NewList()
+func (idx listIdx) getWithDefault(id bucketId) *list {
+	return idx.defaultOp.computeIfAbsent(id, func() *list {
+		return newList()
 	})
 }
 
-type BTreeIdx struct {
-	*defaultOp[BTree]
+type bTreeIdx struct {
+	*defaultOp[bTree]
 }
 
-func (idx BTreeIdx) getWithDefault(id BucketId) *BTree {
-	return idx.defaultOp.computeIfAbsent(id, func() *BTree {
-		return NewBTree()
+func (idx bTreeIdx) getWithDefault(id bucketId) *bTree {
+	return idx.defaultOp.computeIfAbsent(id, func() *bTree {
+		return newBTree()
 	})
 }
 
-type SetIdx struct {
-	*defaultOp[Set]
+type setIdx struct {
+	*defaultOp[set]
 }
 
-func (idx SetIdx) getWithDefault(id BucketId) *Set {
-	return idx.defaultOp.computeIfAbsent(id, func() *Set {
-		return NewSet()
+func (idx setIdx) getWithDefault(id bucketId) *set {
+	return idx.defaultOp.computeIfAbsent(id, func() *set {
+		return newSet()
 	})
 }
 
-type SortedSetIdx struct {
-	*defaultOp[SortedSet]
+type sortedSetIdx struct {
+	*defaultOp[sortedSet]
 }
 
-func (idx SortedSetIdx) getWithDefault(id BucketId, db *DB) *SortedSet {
-	return idx.defaultOp.computeIfAbsent(id, func() *SortedSet {
-		return NewSortedSet(db)
+func (idx sortedSetIdx) getWithDefault(id bucketId, db *DB) *sortedSet {
+	return idx.defaultOp.computeIfAbsent(id, func() *sortedSet {
+		return newSortedSet(db)
 	})
 }
 
 type index struct {
-	list      ListIdx
-	bTree     BTreeIdx
-	set       SetIdx
-	sortedSet SortedSetIdx
+	list      listIdx
+	bTree     bTreeIdx
+	set       setIdx
+	sortedSet sortedSetIdx
 }
 
 func newIndex() *index {
 	i := new(index)
-	i.list = ListIdx{&defaultOp[List]{idx: map[BucketId]*List{}}}
-	i.bTree = BTreeIdx{&defaultOp[BTree]{idx: map[BucketId]*BTree{}}}
-	i.set = SetIdx{&defaultOp[Set]{idx: map[BucketId]*Set{}}}
-	i.sortedSet = SortedSetIdx{&defaultOp[SortedSet]{idx: map[BucketId]*SortedSet{}}}
+	i.list = listIdx{&defaultOp[list]{idx: map[bucketId]*list{}}}
+	i.bTree = bTreeIdx{&defaultOp[bTree]{idx: map[bucketId]*bTree{}}}
+	i.set = setIdx{&defaultOp[set]{idx: map[bucketId]*set{}}}
+	i.sortedSet = sortedSetIdx{&defaultOp[sortedSet]{idx: map[bucketId]*sortedSet{}}}
 	return i
 }

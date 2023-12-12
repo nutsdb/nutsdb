@@ -113,7 +113,7 @@ func (db *DB) merge() error {
 				}
 
 				if entry.isFilter() {
-					off += entry.Size()
+					off += entry.size()
 					if off >= db.opt.SegmentSize {
 						break
 					}
@@ -127,7 +127,7 @@ func (db *DB) merge() error {
 				err := db.Update(func(tx *Tx) error {
 					// check if we have a new entry with same key and bucket
 					if ok := db.isPendingMergeEntry(entry); ok {
-						bucket, err := db.bm.GetBucketById(entry.Meta.BucketId)
+						bucket, err := db.bm.getBucketById(entry.Meta.BucketId)
 						if err != nil {
 							return err
 						}
@@ -158,7 +158,7 @@ func (db *DB) merge() error {
 					return err
 				}
 
-				off += entry.Size()
+				off += entry.size()
 				if off >= db.opt.SegmentSize {
 					break
 				}
@@ -217,8 +217,8 @@ func (db *DB) mergeWorker() {
 	}
 }
 
-func (db *DB) isPendingMergeEntry(entry *Entry) bool {
-	bucket, err := db.bm.GetBucketById(entry.Meta.BucketId)
+func (db *DB) isPendingMergeEntry(entry *entry) bool {
+	bucket, err := db.bm.getBucketById(entry.Meta.BucketId)
 	if err != nil {
 		return false
 	}
@@ -236,7 +236,7 @@ func (db *DB) isPendingMergeEntry(entry *Entry) bool {
 	return false
 }
 
-func (db *DB) isPendingBtreeEntry(bucketId BucketId, entry *Entry) bool {
+func (db *DB) isPendingBtreeEntry(bucketId bucketId, entry *entry) bool {
 	idx, exist := db.Index.bTree.exist(bucketId)
 	if !exist {
 		return false
@@ -260,7 +260,7 @@ func (db *DB) isPendingBtreeEntry(bucketId BucketId, entry *Entry) bool {
 	return true
 }
 
-func (db *DB) isPendingSetEntry(bucketId BucketId, entry *Entry) bool {
+func (db *DB) isPendingSetEntry(bucketId bucketId, entry *entry) bool {
 	setIdx, exist := db.Index.set.exist(bucketId)
 	if !exist {
 		return false
@@ -274,7 +274,7 @@ func (db *DB) isPendingSetEntry(bucketId BucketId, entry *Entry) bool {
 	return true
 }
 
-func (db *DB) isPendingZSetEntry(bucketId BucketId, entry *Entry) bool {
+func (db *DB) isPendingZSetEntry(bucketId bucketId, entry *entry) bool {
 	key, score := splitStringFloat64Str(string(entry.Key), SeparatorForZSetKey)
 	sortedSetIdx, exist := db.Index.sortedSet.exist(bucketId)
 	if !exist {
@@ -288,7 +288,7 @@ func (db *DB) isPendingZSetEntry(bucketId BucketId, entry *Entry) bool {
 	return true
 }
 
-func (db *DB) isPendingListEntry(bucketId BucketId, entry *Entry) bool {
+func (db *DB) isPendingListEntry(bucketId bucketId, entry *entry) bool {
 	var userKeyStr string
 	var curSeq uint64
 	var userKey []byte

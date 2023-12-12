@@ -20,11 +20,11 @@ import (
 
 const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
-func GetTestBytes(i int) []byte {
+func getTestBytes(i int) []byte {
 	return []byte(fmt.Sprintf("nutsdb-%09d", i))
 }
 
-func GetRandomBytes(length int) []byte {
+func getRandomBytes(length int) []byte {
 	b := make([]byte, length)
 	for i := range b {
 		b[i] = charset[rand.Intn(len(charset))]

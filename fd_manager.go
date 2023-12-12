@@ -19,7 +19,7 @@ const (
 // fdManager hold a fd cache in memory, it lru based cache.
 type fdManager struct {
 	lock               sync.Mutex
-	cache              map[string]*FdInfo
+	cache              map[string]*fdInfo
 	fdList             *doubleLinkedList
 	size               int
 	cleanThresholdNums int
@@ -29,7 +29,7 @@ type fdManager struct {
 // newFdm will return a fdManager object
 func newFdm(maxFdNums int, cleanThreshold float64) (fdm *fdManager) {
 	fdm = &fdManager{
-		cache:     map[string]*FdInfo{},
+		cache:     map[string]*fdInfo{},
 		fdList:    initDoubleLinkedList(),
 		size:      0,
 		maxFdNums: DefaultMaxFileNums,
@@ -45,13 +45,13 @@ func newFdm(maxFdNums int, cleanThreshold float64) (fdm *fdManager) {
 	return fdm
 }
 
-// FdInfo holds base fd info
-type FdInfo struct {
+// fdInfo holds base fd info
+type fdInfo struct {
 	fd    *os.File
 	path  string
 	using uint
-	next  *FdInfo
-	prev  *FdInfo
+	next  *fdInfo
+	prev  *fdInfo
 }
 
 // getFd go through this method to get fd.
@@ -100,7 +100,7 @@ func (fdm *fdManager) getFd(path string) (fd *os.File, err error) {
 
 // addToCache add fd to cache
 func (fdm *fdManager) addToCache(fd *os.File, cleanPath string) {
-	fdInfo := &FdInfo{
+	fdInfo := &fdInfo{
 		fd:    fd,
 		using: 1,
 		path:  cleanPath,
@@ -142,15 +142,15 @@ func (fdm *fdManager) close() error {
 }
 
 type doubleLinkedList struct {
-	head *FdInfo
-	tail *FdInfo
+	head *fdInfo
+	tail *fdInfo
 	size int
 }
 
 func initDoubleLinkedList() *doubleLinkedList {
 	list := &doubleLinkedList{
-		head: &FdInfo{},
-		tail: &FdInfo{},
+		head: &fdInfo{},
+		tail: &fdInfo{},
 		size: 0,
 	}
 	list.head.next = list.tail
@@ -158,7 +158,7 @@ func initDoubleLinkedList() *doubleLinkedList {
 	return list
 }
 
-func (list *doubleLinkedList) addNode(node *FdInfo) {
+func (list *doubleLinkedList) addNode(node *fdInfo) {
 	list.head.next.prev = node
 	node.next = list.head.next
 	list.head.next = node
@@ -166,14 +166,14 @@ func (list *doubleLinkedList) addNode(node *FdInfo) {
 	list.size++
 }
 
-func (list *doubleLinkedList) removeNode(node *FdInfo) {
+func (list *doubleLinkedList) removeNode(node *fdInfo) {
 	node.prev.next = node.next
 	node.next.prev = node.prev
 	node.prev = nil
 	node.next = nil
 }
 
-func (list *doubleLinkedList) moveNodeToFront(node *FdInfo) {
+func (list *doubleLinkedList) moveNodeToFront(node *fdInfo) {
 	list.removeNode(node)
 	list.addNode(node)
 }

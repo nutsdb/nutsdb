@@ -30,10 +30,10 @@ func newFileRecovery(path string, bufSize int) (fr *fileRecovery, err error) {
 	}, nil
 }
 
-// readEntry will read an Entry from disk.
-func (fr *fileRecovery) readEntry(off int64) (e *Entry, err error) {
-	var size int64 = MaxEntryHeaderSize
-	// Since MaxEntryHeaderSize may be larger than the actual Header, it needs to be calculated
+// readEntry will read an entry from disk.
+func (fr *fileRecovery) readEntry(off int64) (e *entry, err error) {
+	var size int64 = maxEntryHeaderSize
+	// Since maxEntryHeaderSize may be larger than the actual Header, it needs to be calculated
 	if off+size > fr.size {
 		size = fr.size - off
 	}
@@ -49,13 +49,13 @@ func (fr *fileRecovery) readEntry(off int64) (e *Entry, err error) {
 		return nil, err
 	}
 
-	e = new(Entry)
-	headerSize, err := e.ParseMeta(buf)
+	e = new(entry)
+	headerSize, err := e.parseMeta(buf)
 	if err != nil {
 		return nil, err
 	}
 
-	if e.IsZero() {
+	if e.isZero() {
 		return nil, nil
 	}
 
@@ -76,12 +76,12 @@ func (fr *fileRecovery) readEntry(off int64) (e *Entry, err error) {
 		}
 	}
 
-	err = e.ParsePayload(dataBuf)
+	err = e.parsePayload(dataBuf)
 	if err != nil {
 		return nil, err
 	}
 
-	crc := e.GetCrc(headerBuf)
+	crc := e.getCrc(headerBuf)
 	if crc != e.Meta.Crc {
 		return nil, ErrCrc
 	}
@@ -89,15 +89,15 @@ func (fr *fileRecovery) readEntry(off int64) (e *Entry, err error) {
 	return e, nil
 }
 
-func (fr *fileRecovery) readBucket() (b *Bucket, err error) {
-	buf := make([]byte, BucketMetaSize)
+func (fr *fileRecovery) readBucket() (b *bucket, err error) {
+	buf := make([]byte, bucketMetaSize)
 	_, err = io.ReadFull(fr.reader, buf)
 	if err != nil {
 		return nil, err
 	}
-	meta := new(BucketMeta)
+	meta := new(bucketMeta)
 	meta.decode(buf)
-	bucket := new(Bucket)
+	bucket := new(bucket)
 	bucket.Meta = meta
 	dataBuf := make([]byte, meta.Size)
 	_, err = io.ReadFull(fr.reader, dataBuf)

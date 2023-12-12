@@ -23,12 +23,12 @@ import (
 
 var (
 	filePath string
-	entry    Entry
+	entryObj entry
 )
 
 func init() {
 	filePath = "/tmp/foo"
-	entry = Entry{
+	entryObj = entry{
 		Key:   []byte("key_0001"),
 		Value: []byte("val_0001"),
 		Meta: newMetaData().withKeySize(uint32(len("key_0001"))).
@@ -57,12 +57,12 @@ func TestDataFile1(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	n, err := df.WriteAt(entry.Encode(), 0)
+	n, err := df.WriteAt(entryObj.encode(), 0)
 	if err != nil {
 		t.Error("err TestDataFile_All WriteAt")
 	}
 
-	payloadSize := entry.Meta.payloadSize()
+	payloadSize := entryObj.Meta.payloadSize()
 	e, err := df.ReadEntry(n, payloadSize)
 	assert.Nil(t, e)
 	assert.Error(t, err, ErrEntryZero)
@@ -85,14 +85,14 @@ func TestDataFile2(t *testing.T) {
 	df, err := fm.getDataFile(filePath2, 64)
 	assert.Nil(t, err)
 	defer os.Remove(filePath2)
-	headerSize := entry.Meta.size()
-	content := entry.Encode()[0 : headerSize-1]
+	headerSize := entryObj.Meta.size()
+	content := entryObj.encode()[0 : headerSize-1]
 	_, err = df.WriteAt(content, 0)
 	if err != nil {
 		t.Error("err TestDataFile_All WriteAt")
 	}
 
-	payloadSize := entry.Meta.payloadSize()
+	payloadSize := entryObj.Meta.payloadSize()
 	e, err := df.ReadEntry(0, payloadSize)
 	if err == nil || e != nil {
 		t.Error("err TestDataFile_All ReadAt")
@@ -104,8 +104,8 @@ func TestDataFile2(t *testing.T) {
 	defer os.Remove(filePath3)
 	assert.Nil(t, err)
 
-	headerSize = entry.Meta.size()
-	content = entry.Encode()[0 : headerSize+1]
+	headerSize = entryObj.Meta.size()
+	content = entryObj.encode()[0 : headerSize+1]
 	_, err = df2.WriteAt(content, 0)
 	assert.Nil(t, err)
 
@@ -137,7 +137,7 @@ func TestDataFile_ReadRecord(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	payloadSize := entry.Meta.payloadSize()
+	payloadSize := entryObj.Meta.payloadSize()
 	e, err := df.ReadEntry(0, payloadSize)
 	if err != nil && e != nil {
 		t.Error("err ReadAt")
@@ -153,7 +153,7 @@ func TestDataFile_Err_Path(t *testing.T) {
 	fm := newFileManager(FileIO, 1024, 0.5, 256*MB)
 	defer fm.close()
 	filePath5 := ":/tmp/foo5"
-	df, err := fm.getDataFile(filePath5, entry.Size())
+	df, err := fm.getDataFile(filePath5, entryObj.size())
 	if err == nil && df != nil {
 		t.Error("err TestDataFile_All open")
 	}
@@ -163,7 +163,7 @@ func TestDataFile_Crc_Err(t *testing.T) {
 	fm := newFileManager(FileIO, 1024, 0.5, 256*MB)
 	filePath4 := "/tmp/foo6"
 
-	df, err := fm.getDataFile(filePath4, entry.Size())
+	df, err := fm.getDataFile(filePath4, entryObj.size())
 	assert.Nil(t, err)
 	assert.NotNil(t, df)
 	defer func() {
@@ -176,13 +176,13 @@ func TestDataFile_Crc_Err(t *testing.T) {
 	}()
 
 	var errContent []byte
-	errContent = append(errContent, entry.Encode()[0:4]...)
-	errContent = append(errContent, entry.Encode()[4:entry.Size()-1]...)
+	errContent = append(errContent, entryObj.encode()[0:4]...)
+	errContent = append(errContent, entryObj.encode()[4:entryObj.size()-1]...)
 	errContent = append(errContent, 0)
 	_, err = df.WriteAt(errContent, 0)
 	assert.Nil(t, err)
 
-	payloadSize := entry.Meta.payloadSize()
+	payloadSize := entryObj.Meta.payloadSize()
 	e, err := df.ReadEntry(0, payloadSize)
 	if err == nil || e != nil {
 		t.Error("err TestDataFile_All ReadAt")
@@ -192,7 +192,7 @@ func TestDataFile_Crc_Err(t *testing.T) {
 func TestFileManager1(t *testing.T) {
 	fm := newFileManager(FileIO, 1024, 0.5, 256*MB)
 	filePath4 := "/tmp/foo6"
-	df, err := fm.getDataFile(filePath4, entry.Size())
+	df, err := fm.getDataFile(filePath4, entryObj.size())
 	assert.Nil(t, err)
 	defer func() {
 		err = df.Release()

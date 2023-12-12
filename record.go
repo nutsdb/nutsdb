@@ -18,8 +18,8 @@ import (
 	"time"
 )
 
-// Record means item of indexes in memory
-type Record struct {
+// record means item of indexes in memory
+type record struct {
 	Key       []byte
 	Value     []byte
 	FileID    int64
@@ -31,7 +31,7 @@ type Record struct {
 }
 
 // isExpired returns the record if expired or not.
-func (r *Record) isExpired() bool {
+func (r *record) isExpired() bool {
 	return isExpired(r.TTL, r.Timestamp)
 }
 
@@ -49,49 +49,49 @@ func isExpired(ttl uint32, timestamp uint64) bool {
 }
 
 // newRecord generate a record Obj
-func newRecord() *Record {
-	return new(Record)
+func newRecord() *record {
+	return new(record)
 }
 
-func (r *Record) withKey(k []byte) *Record {
+func (r *record) withKey(k []byte) *record {
 	r.Key = k
 	return r
 }
 
-// withValue set the Value to Record
-func (r *Record) withValue(v []byte) *Record {
+// withValue set the Value to record
+func (r *record) withValue(v []byte) *record {
 	r.Value = v
 	return r
 }
 
-// withFileId set FileID to Record
-func (r *Record) withFileId(fid int64) *Record {
+// withFileId set FileID to record
+func (r *record) withFileId(fid int64) *record {
 	r.FileID = fid
 	return r
 }
 
-// withDataPos set DataPos to Record
-func (r *Record) withDataPos(pos uint64) *Record {
+// withDataPos set DataPos to record
+func (r *record) withDataPos(pos uint64) *record {
 	r.DataPos = pos
 	return r
 }
 
-func (r *Record) withValueSize(valueSize uint32) *Record {
+func (r *record) withValueSize(valueSize uint32) *record {
 	r.ValueSize = valueSize
 	return r
 }
 
-func (r *Record) withTimestamp(timestamp uint64) *Record {
+func (r *record) withTimestamp(timestamp uint64) *record {
 	r.Timestamp = timestamp
 	return r
 }
 
-func (r *Record) withTTL(ttl uint32) *Record {
+func (r *record) withTTL(ttl uint32) *record {
 	r.TTL = ttl
 	return r
 }
 
-func (r *Record) withTxID(txID uint64) *Record {
+func (r *record) withTxID(txID uint64) *record {
 	r.TxID = txID
 	return r
 }

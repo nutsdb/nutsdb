@@ -34,17 +34,17 @@ import (
 	"github.com/xujiajun/utils/strconv2"
 )
 
-// ScanNoLimit represents the data scan no limit flag
-const ScanNoLimit int = -1
-const KvWriteChCapacity = 1000
-const FLockName = "nutsdb-flock"
+// scanNoLimit represents the data scan no limit flag
+const scanNoLimit int = -1
+const kvWriteChCapacity = 1000
+const flockName = "nutsdb-flock"
 
 type (
 	// DB represents a collection of buckets that persist on disk.
 	DB struct {
 		opt                     Options // the database options
 		Index                   *index
-		ActiveFile              *DataFile
+		ActiveFile              *dataFile
 		MaxFileID               int64
 		mu                      sync.RWMutex
 		KeyCount                int // total key number ,include expired, deleted, repeated.
@@ -59,8 +59,8 @@ type (
 		writeCh                 chan *request
 		tm                      *ttlManager
 		RecordCount             int64 // current valid record count, exclude deleted, repeated
-		bm                      *BucketManager
-		hintKeyAndRAMIdxModeLru *LRUCache // lru cache for HintKeyAndRAMIdxMode
+		bm                      *bucketManager
+		hintKeyAndRAMIdxModeLru *lRUCache // lru cache for HintKeyAndRAMIdxMode
 	}
 )
 
@@ -76,9 +76,9 @@ func open(opt Options) (*DB, error) {
 		mergeStartCh:            make(chan struct{}),
 		mergeEndCh:              make(chan error),
 		mergeWorkCloseCh:        make(chan struct{}),
-		writeCh:                 make(chan *request, KvWriteChCapacity),
+		writeCh:                 make(chan *request, kvWriteChCapacity),
 		tm:                      newTTLManager(opt.ExpiredDeleteType),
-		hintKeyAndRAMIdxModeLru: NewLruCache(opt.HintKeyAndRAMIdxCacheSize),
+		hintKeyAndRAMIdxModeLru: newLruCache(opt.HintKeyAndRAMIdxCacheSize),
 	}
 
 	db.commitBuffer = createNewBufferWithSize(int(db.opt.CommitBufferSize))
@@ -89,7 +89,7 @@ func open(opt Options) (*DB, error) {
 		}
 	}
 
-	fileLock := flock.New(filepath.Join(opt.Dir, FLockName))
+	fileLock := flock.New(filepath.Join(opt.Dir, flockName))
 	if ok, err := fileLock.TryLock(); err != nil {
 		return nil, err
 	} else if !ok {
@@ -98,7 +98,7 @@ func open(opt Options) (*DB, error) {
 
 	db.flock = fileLock
 
-	if bm, err := NewBucketManager(opt.Dir); err == nil {
+	if bm, err := newBucketManager(opt.Dir); err == nil {
 		db.bm = bm
 	} else {
 		return nil, err
@@ -220,7 +220,7 @@ func (db *DB) release() error {
 	return nil
 }
 
-func (db *DB) getValueByRecord(record *Record) ([]byte, error) {
+func (db *DB) getValueByRecord(record *record) ([]byte, error) {
 	if record == nil {
 		return nil, ErrRecordIsNil
 	}
@@ -349,7 +349,7 @@ func (db *DB) doWrites() {
 		for {
 			reqs = append(reqs, r)
 
-			if len(reqs) >= 3*KvWriteChCapacity {
+			if len(reqs) >= 3*kvWriteChCapacity {
 				pendingCh <- struct{}{} // blocking.
 				goto writeCase
 			}
@@ -385,7 +385,7 @@ func (db *DB) doWrites() {
 	}
 }
 
-// setActiveFile sets the ActiveFile (DataFile object).
+// setActiveFile sets the ActiveFile (dataFile object).
 func (db *DB) setActiveFile() (err error) {
 	activeFilePath := getDataPath(db.MaxFileID, db.opt.Dir)
 	db.ActiveFile, err = db.fm.getDataFile(activeFilePath, db.opt.SegmentSize)
@@ -442,13 +442,13 @@ func (db *DB) parseDataFiles(dataFileIds []int) (err error) {
 			// its because it already deleted in the feature WAL log.
 			// so we can just ignore here.
 			bucketId := entry.Meta.BucketId
-			if _, err := db.bm.GetBucketById(bucketId); errors.Is(err, ErrBucketNotExist) {
+			if _, err := db.bm.getBucketById(bucketId); errors.Is(err, ErrBucketNotExist) {
 				continue
 			}
 
-			record := db.createRecordByModeWithFidAndOff(entry.fid, uint64(entry.off), &entry.Entry)
+			record := db.createRecordByModeWithFidAndOff(entry.fid, uint64(entry.off), &entry.entry)
 
-			if err = db.buildIdxes(record, &entry.Entry); err != nil {
+			if err = db.buildIdxes(record, &entry.entry); err != nil {
 				return err
 			}
 
@@ -478,8 +478,8 @@ func (db *DB) parseDataFiles(dataFileIds []int) (err error) {
 				break
 			}
 
-			entryWhenRecovery := &EntryWhenRecovery{
-				Entry: *entry,
+			entryWhenRecovery := &entryWhenRecovery{
+				entry: *entry,
 				fid:   fID,
 				off:   off,
 			}
@@ -505,7 +505,7 @@ func (db *DB) parseDataFiles(dataFileIds []int) (err error) {
 				dataInTx.startOff = off
 			}
 
-			off += entry.Size()
+			off += entry.size()
 		}
 
 		if fID == db.MaxFileID {
@@ -538,12 +538,12 @@ func (db *DB) parseDataFiles(dataFileIds []int) (err error) {
 func (db *DB) getRecordCount() (int64, error) {
 	var res int64
 
-	// Iterate through the BTree indices
+	// Iterate through the bTree indices
 	for _, btree := range db.Index.bTree.idx {
 		res += int64(btree.count())
 	}
 
-	// Iterate through the List indices
+	// Iterate through the list indices
 	for _, listItem := range db.Index.list.idx {
 		for key := range listItem.Items {
 			curLen, err := listItem.size(key)
@@ -554,14 +554,14 @@ func (db *DB) getRecordCount() (int64, error) {
 		}
 	}
 
-	// Iterate through the Set indices
+	// Iterate through the set indices
 	for _, setItem := range db.Index.set.idx {
 		for key := range setItem.M {
 			res += int64(setItem.sCard(key))
 		}
 	}
 
-	// Iterate through the SortedSet indices
+	// Iterate through the sortedSet indices
 	for _, zsetItem := range db.Index.sortedSet.idx {
 		for key := range zsetItem.M {
 			curLen, err := zsetItem.zCard(key)
@@ -575,10 +575,10 @@ func (db *DB) getRecordCount() (int64, error) {
 	return res, nil
 }
 
-func (db *DB) buildBTreeIdx(record *Record, entry *Entry) error {
+func (db *DB) buildBTreeIdx(record *record, entry *entry) error {
 	key, meta := entry.Key, entry.Meta
 
-	bucket, err := db.bm.GetBucketById(meta.BucketId)
+	bucket, err := db.bm.getBucketById(meta.BucketId)
 	if err != nil {
 		return err
 	}
@@ -607,7 +607,7 @@ func (db *DB) expireTime(timestamp uint64, ttl uint32) time.Duration {
 	return expireTime.Sub(now)
 }
 
-func (db *DB) buildIdxes(record *Record, entry *Entry) error {
+func (db *DB) buildIdxes(record *record, entry *entry) error {
 	meta := entry.Meta
 	switch meta.Ds {
 	case DataStructureBTree:
@@ -630,7 +630,7 @@ func (db *DB) buildIdxes(record *Record, entry *Entry) error {
 	return nil
 }
 
-func (db *DB) deleteBucket(ds uint16, bucket BucketId) {
+func (db *DB) deleteBucket(ds uint16, bucket bucketId) {
 	if ds == DataStructureSet {
 		db.Index.set.delete(bucket)
 	}
@@ -646,10 +646,10 @@ func (db *DB) deleteBucket(ds uint16, bucket BucketId) {
 }
 
 // buildSetIdx builds set index when opening the DB.
-func (db *DB) buildSetIdx(record *Record, entry *Entry) error {
+func (db *DB) buildSetIdx(rec *record, entry *entry) error {
 	key, val, meta := entry.Key, entry.Value, entry.Meta
 
-	bucket, err := db.bm.GetBucketById(entry.Meta.BucketId)
+	bucket, err := db.bm.getBucketById(entry.Meta.BucketId)
 	if err != nil {
 		return err
 	}
@@ -659,12 +659,12 @@ func (db *DB) buildSetIdx(record *Record, entry *Entry) error {
 
 	switch meta.Flag {
 	case DataSetFlag:
-		if err := s.sAdd(string(key), [][]byte{val}, []*Record{record}); err != nil {
-			return fmt.Errorf("when build SetIdx sAdd index err: %s", err)
+		if err := s.sAdd(string(key), [][]byte{val}, []*record{rec}); err != nil {
+			return fmt.Errorf("when build setIdx sAdd index err: %s", err)
 		}
 	case DataDeleteFlag:
 		if err := s.sRem(string(key), val); err != nil {
-			return fmt.Errorf("when build SetIdx sRem index err: %s", err)
+			return fmt.Errorf("when build setIdx sRem index err: %s", err)
 		}
 	}
 
@@ -672,10 +672,10 @@ func (db *DB) buildSetIdx(record *Record, entry *Entry) error {
 }
 
 // buildSortedSetIdx builds sorted set index when opening the DB.
-func (db *DB) buildSortedSetIdx(record *Record, entry *Entry) error {
+func (db *DB) buildSortedSetIdx(rec *record, entry *entry) error {
 	key, val, meta := entry.Key, entry.Value, entry.Meta
 
-	bucket, err := db.bm.GetBucketById(entry.Meta.BucketId)
+	bucket, err := db.bm.getBucketById(entry.Meta.BucketId)
 	if err != nil {
 		return err
 	}
@@ -689,7 +689,7 @@ func (db *DB) buildSortedSetIdx(record *Record, entry *Entry) error {
 		if len(keyAndScore) == 2 {
 			key := keyAndScore[0]
 			score, _ := strconv2.StrToFloat64(keyAndScore[1])
-			err = ss.zAdd(key, SCORE(score), val, record)
+			err = ss.zAdd(key, SCORE(score), val, rec)
 		}
 	case DataZRemFlag:
 		_, err = ss.zRem(string(key), val)
@@ -710,11 +710,11 @@ func (db *DB) buildSortedSetIdx(record *Record, entry *Entry) error {
 	return nil
 }
 
-// buildListIdx builds List index when opening the DB.
-func (db *DB) buildListIdx(record *Record, entry *Entry) error {
+// buildListIdx builds list index when opening the DB.
+func (db *DB) buildListIdx(rec *record, entry *entry) error {
 	key, val, meta := entry.Key, entry.Value, entry.Meta
 
-	bucket, err := db.bm.GetBucketById(entry.Meta.BucketId)
+	bucket, err := db.bm.getBucketById(entry.Meta.BucketId)
 	if err != nil {
 		return err
 	}
@@ -733,9 +733,9 @@ func (db *DB) buildListIdx(record *Record, entry *Entry) error {
 		l.TTL[string(key)] = ttl
 		l.TimeStamp[string(key)] = meta.Timestamp
 	case DataLPushFlag:
-		err = l.lPush(string(key), record)
+		err = l.lPush(string(key), rec)
 	case DataRPushFlag:
-		err = l.rPush(string(key), record)
+		err = l.rPush(string(key), rec)
 	case DataLRemFlag:
 		err = db.buildListLRemIdx(val, l, key)
 	case DataLPopFlag:
@@ -758,10 +758,10 @@ func (db *DB) buildListIdx(record *Record, entry *Entry) error {
 	return nil
 }
 
-func (db *DB) buildListLRemIdx(value []byte, l *List, key []byte) error {
+func (db *DB) buildListLRemIdx(value []byte, l *list, key []byte) error {
 	count, newValue := splitIntStringStr(string(value), SeparatorForListKey)
 
-	return l.lRem(string(key), count, func(r *Record) (bool, error) {
+	return l.lRem(string(key), count, func(r *record) (bool, error) {
 		v, err := db.getValueByRecord(r)
 		if err != nil {
 			return false, err
@@ -795,7 +795,7 @@ func (db *DB) buildIndexes() (err error) {
 	return db.parseDataFiles(dataFileIds)
 }
 
-func (db *DB) createRecordByModeWithFidAndOff(fid int64, off uint64, entry *Entry) *Record {
+func (db *DB) createRecordByModeWithFidAndOff(fid int64, off uint64, entry *entry) *record {
 	record := newRecord()
 
 	record.withKey(entry.Key).
@@ -856,7 +856,7 @@ func (db *DB) sendToWriteCh(tx *Tx) (*request, error) {
 }
 
 func (db *DB) checkListExpired() {
-	db.Index.list.rangeIdx(func(l *List) {
+	db.Index.list.rangeIdx(func(l *list) {
 		for key := range l.TTL {
 			l.isExpire(key)
 		}
@@ -871,7 +871,7 @@ func (db *DB) IsClose() bool {
 func (db *DB) buildExpireCallback(bucket string, key []byte) func() {
 	return func() {
 		err := db.Update(func(tx *Tx) error {
-			b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
+			b, err := tx.db.bm.getBucket(DataStructureBTree, bucket)
 			if err != nil {
 				return err
 			}
@@ -888,7 +888,7 @@ func (db *DB) buildExpireCallback(bucket string, key []byte) func() {
 }
 
 func (db *DB) rebuildBucketManager() error {
-	bucketFilePath := db.opt.Dir + "/" + BucketStoreFileName
+	bucketFilePath := db.opt.Dir + "/" + bucketStoreFileName
 	f, err := newFileRecovery(bucketFilePath, db.opt.BufferSizeOfRecovery)
 	if err != nil {
 		return nil
@@ -908,13 +908,13 @@ func (db *DB) rebuildBucketManager() error {
 		}
 		bucketRequest = append(bucketRequest, &bucketSubmitRequest{
 			ds:     bucket.Ds,
-			name:   BucketName(bucket.Name),
+			name:   bucketName(bucket.Name),
 			bucket: bucket,
 		})
 	}
 
 	if len(bucketRequest) > 0 {
-		err = db.bm.SubmitPendingBucketChange(bucketRequest)
+		err = db.bm.submitPendingBucketChange(bucketRequest)
 		if err != nil {
 			return err
 		}

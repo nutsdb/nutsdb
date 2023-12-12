@@ -33,8 +33,8 @@ const (
 	DataSuffix = ".dat"
 )
 
-// DataFile records about data file information.
-type DataFile struct {
+// dataFile records about data file information.
+type dataFile struct {
 	path       string
 	fileID     int64
 	writeOff   int64
@@ -42,9 +42,9 @@ type DataFile struct {
 	rwManager  RWManager
 }
 
-// NewDataFile will return a new DataFile Object.
-func NewDataFile(path string, rwManager RWManager) *DataFile {
-	dataFile := &DataFile{
+// newDataFile will return a new dataFile Object.
+func newDataFile(path string, rwManager RWManager) *dataFile {
+	dataFile := &dataFile{
 		path:      path,
 		rwManager: rwManager,
 	}
@@ -53,9 +53,9 @@ func NewDataFile(path string, rwManager RWManager) *DataFile {
 
 // ReadEntry returns entry at the given off(offset).
 // payloadSize = bucketSize + keySize + valueSize
-func (df *DataFile) ReadEntry(off int, payloadSize int64) (e *Entry, err error) {
-	size := MaxEntryHeaderSize + payloadSize
-	// Since MaxEntryHeaderSize + payloadSize may be larger than the actual entry size, it needs to be calculated
+func (df *dataFile) ReadEntry(off int, payloadSize int64) (e *entry, err error) {
+	size := maxEntryHeaderSize + payloadSize
+	// Since maxEntryHeaderSize + payloadSize may be larger than the actual entry size, it needs to be calculated
 	if int64(off)+size > df.rwManager.Size() {
 		size = df.rwManager.Size() - int64(off)
 	}
@@ -65,8 +65,8 @@ func (df *DataFile) ReadEntry(off int, payloadSize int64) (e *Entry, err error) 
 		return nil, err
 	}
 
-	e = new(Entry)
-	headerSize, err := e.ParseMeta(buf)
+	e = new(entry)
+	headerSize, err := e.parseMeta(buf)
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +74,7 @@ func (df *DataFile) ReadEntry(off int, payloadSize int64) (e *Entry, err error) 
 	// Remove the content after the Header
 	buf = buf[:int(headerSize+payloadSize)]
 
-	if e.IsZero() {
+	if e.isZero() {
 		return nil, ErrEntryZero
 	}
 
@@ -82,12 +82,12 @@ func (df *DataFile) ReadEntry(off int, payloadSize int64) (e *Entry, err error) 
 		return nil, err
 	}
 
-	err = e.ParsePayload(buf[headerSize:])
+	err = e.parsePayload(buf[headerSize:])
 	if err != nil {
 		return nil, err
 	}
 
-	crc := e.GetCrc(buf[:headerSize])
+	crc := e.getCrc(buf[:headerSize])
 	if crc != e.Meta.Crc {
 		return nil, ErrCrc
 	}
@@ -97,14 +97,14 @@ func (df *DataFile) ReadEntry(off int, payloadSize int64) (e *Entry, err error) 
 
 // WriteAt copies data to mapped region from the b slice starting at
 // given off and returns number of bytes copied to the mapped region.
-func (df *DataFile) WriteAt(b []byte, off int64) (n int, err error) {
+func (df *dataFile) WriteAt(b []byte, off int64) (n int, err error) {
 	return df.rwManager.WriteAt(b, off)
 }
 
 // Sync commits the current contents of the file to stable storage.
 // Typically, this means flushing the file system's in-memory copy
 // of recently written data to disk.
-func (df *DataFile) Sync() (err error) {
+func (df *dataFile) Sync() (err error) {
 	return df.rwManager.Sync()
 }
 
@@ -113,10 +113,10 @@ func (df *DataFile) Sync() (err error) {
 // rendering it unusable for I/O.
 // If RWManager is a MMapRWManager represents Unmap deletes the memory mapped region,
 // flushes any remaining changes.
-func (df *DataFile) Close() (err error) {
+func (df *dataFile) Close() (err error) {
 	return df.rwManager.Close()
 }
 
-func (df *DataFile) Release() (err error) {
+func (df *dataFile) Release() (err error) {
 	return df.rwManager.Release()
 }

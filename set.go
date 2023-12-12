@@ -32,21 +32,21 @@ var (
 
 var fnvHash = fnv.New32a()
 
-type Set struct {
-	M map[string]map[uint32]*Record
+type set struct {
+	M map[string]map[uint32]*record
 }
 
-func NewSet() *Set {
-	return &Set{
-		M: map[string]map[uint32]*Record{},
+func newSet() *set {
+	return &set{
+		M: map[string]map[uint32]*record{},
 	}
 }
 
 // sAdd adds the specified members to the set stored at key.
-func (s *Set) sAdd(key string, values [][]byte, records []*Record) error {
+func (s *set) sAdd(key string, values [][]byte, records []*record) error {
 	set, ok := s.M[key]
 	if !ok {
-		s.M[key] = map[uint32]*Record{}
+		s.M[key] = map[uint32]*record{}
 		set = s.M[key]
 	}
 
@@ -62,7 +62,7 @@ func (s *Set) sAdd(key string, values [][]byte, records []*Record) error {
 }
 
 // sRem removes the specified members from the set stored at key.
-func (s *Set) sRem(key string, values ...[]byte) error {
+func (s *set) sRem(key string, values ...[]byte) error {
 	set, ok := s.M[key]
 	if !ok {
 		return ErrSetNotExist
@@ -84,7 +84,7 @@ func (s *Set) sRem(key string, values ...[]byte) error {
 }
 
 // sHasKey returns whether it has the set at given key.
-func (s *Set) sHasKey(key string) bool {
+func (s *set) sHasKey(key string) bool {
 	if _, ok := s.M[key]; ok {
 		return true
 	}
@@ -92,7 +92,7 @@ func (s *Set) sHasKey(key string) bool {
 }
 
 // sPop removes and returns one or more random elements from the set value store at key.
-func (s *Set) sPop(key string) *Record {
+func (s *set) sPop(key string) *record {
 	if !s.sHasKey(key) {
 		return nil
 	}
@@ -106,7 +106,7 @@ func (s *Set) sPop(key string) *Record {
 }
 
 // sCard Returns the set cardinality (number of elements) of the set stored at key.
-func (s *Set) sCard(key string) int {
+func (s *set) sCard(key string) int {
 	if !s.sHasKey(key) {
 		return 0
 	}
@@ -115,12 +115,12 @@ func (s *Set) sCard(key string) int {
 }
 
 // sDiff Returns the members of the set resulting from the difference between the first set and all the successive sets.
-func (s *Set) sDiff(key1, key2 string) ([]*Record, error) {
+func (s *set) sDiff(key1, key2 string) ([]*record, error) {
 	if !s.sHasKey(key1) || !s.sHasKey(key2) {
 		return nil, ErrSetNotExist
 	}
 
-	records := make([]*Record, 0)
+	records := make([]*record, 0)
 
 	for hash, record := range s.M[key1] {
 		if _, ok := s.M[key2][hash]; !ok {
@@ -131,12 +131,12 @@ func (s *Set) sDiff(key1, key2 string) ([]*Record, error) {
 }
 
 // sInter Returns the members of the set resulting from the intersection of all the given sets.
-func (s *Set) sInter(key1, key2 string) ([]*Record, error) {
+func (s *set) sInter(key1, key2 string) ([]*record, error) {
 	if !s.sHasKey(key1) || !s.sHasKey(key2) {
 		return nil, ErrSetNotExist
 	}
 
-	records := make([]*Record, 0)
+	records := make([]*record, 0)
 
 	for hash, record := range s.M[key1] {
 		if _, ok := s.M[key2][hash]; ok {
@@ -147,7 +147,7 @@ func (s *Set) sInter(key1, key2 string) ([]*Record, error) {
 }
 
 // SIsMember Returns if member is a member of the set stored at key.
-func (s *Set) sIsMember(key string, value []byte) (bool, error) {
+func (s *set) sIsMember(key string, value []byte) (bool, error) {
 	if _, ok := s.M[key]; !ok {
 		return false, ErrSetNotExist
 	}
@@ -166,7 +166,7 @@ func (s *Set) sIsMember(key string, value []byte) (bool, error) {
 
 // SAreMembers Returns if members are members of the set stored at key.
 // For multiple items it returns true only if all the items exist.
-func (s *Set) sAreMembers(key string, values ...[]byte) (bool, error) {
+func (s *set) sAreMembers(key string, values ...[]byte) (bool, error) {
 	if _, ok := s.M[key]; !ok {
 		return false, ErrSetNotExist
 	}
@@ -187,12 +187,12 @@ func (s *Set) sAreMembers(key string, values ...[]byte) (bool, error) {
 }
 
 // SMembers returns all the members of the set value stored at key.
-func (s *Set) sMembers(key string) ([]*Record, error) {
+func (s *set) sMembers(key string) ([]*record, error) {
 	if _, ok := s.M[key]; !ok {
 		return nil, ErrSetNotExist
 	}
 
-	records := make([]*Record, 0)
+	records := make([]*record, 0)
 
 	for _, record := range s.M[key] {
 		records = append(records, record)
@@ -202,7 +202,7 @@ func (s *Set) sMembers(key string) ([]*Record, error) {
 }
 
 // SMove moves member from the set at source to the set at destination.
-func (s *Set) sMove(key1, key2 string, value []byte) (bool, error) {
+func (s *set) sMove(key1, key2 string, value []byte) (bool, error) {
 	if !s.sHasKey(key1) || !s.sHasKey(key2) {
 		return false, ErrSetNotExist
 	}
@@ -215,7 +215,7 @@ func (s *Set) sMove(key1, key2 string, value []byte) (bool, error) {
 	}
 
 	var (
-		member *Record
+		member *record
 		ok     bool
 	)
 
@@ -224,7 +224,7 @@ func (s *Set) sMove(key1, key2 string, value []byte) (bool, error) {
 	}
 
 	if _, ok = set2[hash]; !ok {
-		err = s.sAdd(key2, [][]byte{value}, []*Record{member})
+		err = s.sAdd(key2, [][]byte{value}, []*record{member})
 		if err != nil {
 			return false, err
 		}
@@ -239,7 +239,7 @@ func (s *Set) sMove(key1, key2 string, value []byte) (bool, error) {
 }
 
 // SUnion returns the members of the set resulting from the union of all the given sets.
-func (s *Set) sUnion(key1, key2 string) ([]*Record, error) {
+func (s *set) sUnion(key1, key2 string) ([]*record, error) {
 	if !s.sHasKey(key1) || !s.sHasKey(key2) {
 		return nil, ErrSetNotExist
 	}

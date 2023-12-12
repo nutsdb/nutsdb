@@ -41,7 +41,7 @@ func (tx *Tx) PutIfNotExists(bucket string, key, value []byte, ttl uint32) error
 		return err
 	}
 
-	b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
+	b, err := tx.db.bm.getBucket(DataStructureBTree, bucket)
 	if err != nil {
 		return err
 	}
@@ -66,7 +66,7 @@ func (tx *Tx) PutIfExists(bucket string, key, value []byte, ttl uint32) error {
 		return err
 	}
 
-	b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
+	b, err := tx.db.bm.getBucket(DataStructureBTree, bucket)
 	if err != nil {
 		return err
 	}
@@ -92,7 +92,7 @@ func (tx *Tx) Get(bucket string, key []byte) (value []byte, err error) {
 		return nil, err
 	}
 
-	b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
+	b, err := tx.db.bm.getBucket(DataStructureBTree, bucket)
 	if err != nil {
 		return nil, err
 	}
@@ -133,7 +133,7 @@ func (tx *Tx) getMaxOrMinKey(bucket string, isMax bool) ([]byte, error) {
 		return nil, err
 	}
 
-	b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
+	b, err := tx.db.bm.getBucket(DataStructureBTree, bucket)
 	if err != nil {
 		return nil, err
 	}
@@ -141,7 +141,7 @@ func (tx *Tx) getMaxOrMinKey(bucket string, isMax bool) ([]byte, error) {
 
 	if idx, ok := tx.db.Index.bTree.exist(bucketId); ok {
 		var (
-			item  *Item
+			item  *item
 			found bool
 		)
 
@@ -172,7 +172,7 @@ func (tx *Tx) GetAll(bucket string) (values [][]byte, err error) {
 		return nil, err
 	}
 
-	b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
+	b, err := tx.db.bm.getBucket(DataStructureBTree, bucket)
 	if err != nil {
 		return nil, err
 	}
@@ -185,7 +185,7 @@ func (tx *Tx) GetAll(bucket string) (values [][]byte, err error) {
 			return nil, ErrBucketEmpty
 		}
 
-		values, err = tx.getHintIdxDataItemsWrapper(records, ScanNoLimit, bucketId)
+		values, err = tx.getHintIdxDataItemsWrapper(records, scanNoLimit, bucketId)
 		if err != nil {
 			return nil, ErrBucketEmpty
 		}
@@ -203,7 +203,7 @@ func (tx *Tx) RangeScan(bucket string, start, end []byte) (values [][]byte, err 
 	if err := tx.checkTxIsClosed(); err != nil {
 		return nil, err
 	}
-	b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
+	b, err := tx.db.bm.getBucket(DataStructureBTree, bucket)
 	if err != nil {
 		return nil, err
 	}
@@ -215,7 +215,7 @@ func (tx *Tx) RangeScan(bucket string, start, end []byte) (values [][]byte, err 
 			return nil, ErrRangeScan
 		}
 
-		values, err = tx.getHintIdxDataItemsWrapper(records, ScanNoLimit, bucketId)
+		values, err = tx.getHintIdxDataItemsWrapper(records, scanNoLimit, bucketId)
 		if err != nil {
 			return nil, ErrRangeScan
 		}
@@ -234,7 +234,7 @@ func (tx *Tx) PrefixScan(bucket string, prefix []byte, offsetNum int, limitNum i
 	if err := tx.checkTxIsClosed(); err != nil {
 		return nil, err
 	}
-	b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
+	b, err := tx.db.bm.getBucket(DataStructureBTree, bucket)
 	if err != nil {
 		return nil, err
 	}
@@ -261,7 +261,7 @@ func (tx *Tx) PrefixSearchScan(bucket string, prefix []byte, reg string, offsetN
 	if err := tx.checkTxIsClosed(); err != nil {
 		return nil, err
 	}
-	b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
+	b, err := tx.db.bm.getBucket(DataStructureBTree, bucket)
 	if err != nil {
 		return nil, err
 	}
@@ -287,7 +287,7 @@ func (tx *Tx) Delete(bucket string, key []byte) error {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return err
 	}
-	b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
+	b, err := tx.db.bm.getBucket(DataStructureBTree, bucket)
 	if err != nil {
 		return err
 	}
@@ -305,9 +305,9 @@ func (tx *Tx) Delete(bucket string, key []byte) error {
 }
 
 // getHintIdxDataItemsWrapper returns wrapped entries when prefix scanning or range scanning.
-func (tx *Tx) getHintIdxDataItemsWrapper(records []*Record, limitNum int, bucketId BucketId) (values [][]byte, err error) {
+func (tx *Tx) getHintIdxDataItemsWrapper(records []*record, limitNum int, bucketId bucketId) (values [][]byte, err error) {
 	for _, record := range records {
-		bucket, err := tx.db.bm.GetBucketById(bucketId)
+		bucket, err := tx.db.bm.getBucketById(bucketId)
 		if err != nil {
 			return nil, err
 		}
@@ -315,7 +315,7 @@ func (tx *Tx) getHintIdxDataItemsWrapper(records []*Record, limitNum int, bucket
 			tx.putDeleteLog(bucket.Id, record.Key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureBTree)
 			continue
 		}
-		if limitNum > 0 && len(values) < limitNum || limitNum == ScanNoLimit {
+		if limitNum > 0 && len(values) < limitNum || limitNum == scanNoLimit {
 			value, err := tx.db.getValueByRecord(record)
 			if err != nil {
 				return nil, err
@@ -332,7 +332,7 @@ func (tx *Tx) update(bucket string, key []byte, getNewValue func([]byte) ([]byte
 		return err
 	}
 
-	bucketId, err := tx.db.bm.GetBucketID(DataStructureBTree, bucket)
+	bucketId, err := tx.db.bm.getBucketID(DataStructureBTree, bucket)
 	if err != nil {
 		return err
 	}

@@ -27,7 +27,7 @@ import (
 var bucketKeySeqMap map[string]*HeadTailSeq
 
 // ErrSeparatorForListKey returns when list key contains the SeparatorForListKey.
-var ErrSeparatorForListKey = errors.Errorf("contain separator (%s) for List key", SeparatorForListKey)
+var ErrSeparatorForListKey = errors.Errorf("contain separator (%s) for list key", SeparatorForListKey)
 
 // SeparatorForListKey represents separator for listKey
 const SeparatorForListKey = "|"
@@ -48,13 +48,13 @@ func (tx *Tx) RPeek(bucket string, key []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	b, err := tx.db.bm.GetBucket(DataStructureList, bucket)
+	b, err := tx.db.bm.getBucket(DataStructureList, bucket)
 	if err != nil {
 		return nil, err
 	}
 	var (
 		bucketId = b.Id
-		l        *List
+		l        *list
 		exist    bool
 	)
 
@@ -96,7 +96,7 @@ func (tx *Tx) getListNewKey(bucket string, key []byte, isLeft bool) []byte {
 		bucketKeySeqMap = make(map[string]*HeadTailSeq)
 	}
 
-	b, err := tx.db.bm.GetBucket(DataStructureList, bucket)
+	b, err := tx.db.bm.getBucket(DataStructureList, bucket)
 	if err != nil {
 		return nil
 	}
@@ -183,13 +183,13 @@ func (tx *Tx) LPeek(bucket string, key []byte) (item []byte, err error) {
 		return nil, err
 	}
 
-	b, err := tx.db.bm.GetBucket(DataStructureList, bucket)
+	b, err := tx.db.bm.getBucket(DataStructureList, bucket)
 	if err != nil {
 		return nil, err
 	}
 	var (
 		bucketId = b.Id
-		l        *List
+		l        *list
 		exist    bool
 	)
 
@@ -218,14 +218,14 @@ func (tx *Tx) LSize(bucket string, key []byte) (int, error) {
 		return 0, err
 	}
 
-	b, err := tx.db.bm.GetBucket(DataStructureList, bucket)
+	b, err := tx.db.bm.getBucket(DataStructureList, bucket)
 	if err != nil {
 		return 0, err
 	}
 
 	var (
 		bucketId = b.Id
-		l        *List
+		l        *list
 		exist    bool
 	)
 
@@ -248,13 +248,13 @@ func (tx *Tx) LRange(bucket string, key []byte, start, end int) ([][]byte, error
 		return nil, err
 	}
 
-	b, err := tx.db.bm.GetBucket(DataStructureList, bucket)
+	b, err := tx.db.bm.getBucket(DataStructureList, bucket)
 	if err != nil {
 		return nil, err
 	}
 	var (
 		bucketId = b.Id
-		l        *List
+		l        *list
 		exist    bool
 	)
 
@@ -330,14 +330,14 @@ func (tx *Tx) LTrim(bucket string, key []byte, start, end int) error {
 		return err
 	}
 
-	b, err := tx.db.bm.GetBucket(DataStructureList, bucket)
+	b, err := tx.db.bm.getBucket(DataStructureList, bucket)
 	if err != nil {
 		return err
 	}
 
 	var (
 		bucketId = b.Id
-		l        *List
+		l        *list
 		exist    bool
 	)
 
@@ -370,7 +370,7 @@ func (tx *Tx) LRemByIndex(bucket string, key []byte, indexes ...int) error {
 		return err
 	}
 
-	b, err := tx.db.bm.GetBucket(DataStructureList, bucket)
+	b, err := tx.db.bm.getBucket(DataStructureList, bucket)
 	if err != nil {
 		return err
 	}
@@ -406,13 +406,13 @@ func (tx *Tx) LKeys(bucket, pattern string, f func(key string) bool) error {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return err
 	}
-	b, err := tx.db.bm.GetBucket(DataStructureList, bucket)
+	b, err := tx.db.bm.getBucket(DataStructureList, bucket)
 	if err != nil {
 		return err
 	}
 	var (
 		bucketId = b.Id
-		l        *List
+		l        *list
 		exist    bool
 	)
 	if l, exist = tx.db.Index.list.exist(bucketId); !exist {
@@ -434,14 +434,14 @@ func (tx *Tx) ExpireList(bucket string, key []byte, ttl uint32) error {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return err
 	}
-	b, err := tx.db.bm.GetBucket(DataStructureList, bucket)
+	b, err := tx.db.bm.getBucket(DataStructureList, bucket)
 	if err != nil {
 		return err
 	}
 
 	var (
 		bucketId = b.Id
-		l        *List
+		l        *list
 		exist    bool
 	)
 
@@ -460,14 +460,14 @@ func (tx *Tx) ExpireList(bucket string, key []byte, ttl uint32) error {
 }
 
 func (tx *Tx) CheckExpire(bucket string, key []byte) bool {
-	b, err := tx.db.bm.GetBucket(DataStructureList, bucket)
+	b, err := tx.db.bm.getBucket(DataStructureList, bucket)
 	if err != nil {
 		return false
 	}
 
 	var (
 		bucketId = b.Id
-		l        *List
+		l        *list
 		exist    bool
 	)
 
@@ -486,14 +486,14 @@ func (tx *Tx) GetListTTL(bucket string, key []byte) (uint32, error) {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return 0, err
 	}
-	b, err := tx.db.bm.GetBucket(DataStructureList, bucket)
+	b, err := tx.db.bm.getBucket(DataStructureList, bucket)
 	if err != nil {
 		return 0, err
 	}
 
 	var (
 		bucketId = b.Id
-		l        *List
+		l        *list
 		exist    bool
 	)
 	if l, exist = tx.db.Index.list.exist(bucketId); !exist {

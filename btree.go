@@ -25,50 +25,50 @@ import (
 // ErrKeyNotFound is returned when the key is not in the b tree.
 var ErrKeyNotFound = errors.New("key not found")
 
-type Item struct {
+type item struct {
 	key    []byte
-	record *Record
+	record *record
 }
 
-type BTree struct {
-	btree *btree.BTreeG[*Item]
+type bTree struct {
+	btree *btree.BTreeG[*item]
 }
 
-func NewBTree() *BTree {
-	return &BTree{
-		btree: btree.NewBTreeG[*Item](func(a, b *Item) bool {
+func newBTree() *bTree {
+	return &bTree{
+		btree: btree.NewBTreeG[*item](func(a, b *item) bool {
 			return bytes.Compare(a.key, b.key) == -1
 		}),
 	}
 }
 
-func (bt *BTree) find(key []byte) (*Record, bool) {
-	item, ok := bt.btree.Get(&Item{key: key})
+func (bt *bTree) find(key []byte) (*record, bool) {
+	item, ok := bt.btree.Get(&item{key: key})
 	if ok {
 		return item.record, ok
 	}
 	return nil, ok
 }
 
-func (bt *BTree) insert(record *Record) bool {
-	_, replaced := bt.btree.Set(&Item{key: record.Key, record: record})
+func (bt *bTree) insert(record *record) bool {
+	_, replaced := bt.btree.Set(&item{key: record.Key, record: record})
 	return replaced
 }
 
-func (bt *BTree) insertRecord(key []byte, record *Record) bool {
-	_, replaced := bt.btree.Set(&Item{key: key, record: record})
+func (bt *bTree) insertRecord(key []byte, record *record) bool {
+	_, replaced := bt.btree.Set(&item{key: key, record: record})
 	return replaced
 }
 
-func (bt *BTree) delete(key []byte) bool {
-	_, deleted := bt.btree.Delete(&Item{key: key})
+func (bt *bTree) delete(key []byte) bool {
+	_, deleted := bt.btree.Delete(&item{key: key})
 	return deleted
 }
 
-func (bt *BTree) all() []*Record {
+func (bt *bTree) all() []*record {
 	items := bt.btree.Items()
 
-	records := make([]*Record, len(items))
+	records := make([]*record, len(items))
 	for i, item := range items {
 		records[i] = item.record
 	}
@@ -76,15 +76,15 @@ func (bt *BTree) all() []*Record {
 	return records
 }
 
-func (bt *BTree) allItems() []*Item {
+func (bt *bTree) allItems() []*item {
 	items := bt.btree.Items()
 	return items
 }
 
-func (bt *BTree) Range(start, end []byte) []*Record {
-	records := make([]*Record, 0)
+func (bt *bTree) Range(start, end []byte) []*record {
+	records := make([]*record, 0)
 
-	bt.btree.Ascend(&Item{key: start}, func(item *Item) bool {
+	bt.btree.Ascend(&item{key: start}, func(item *item) bool {
 		if bytes.Compare(item.key, end) > 0 {
 			return false
 		}
@@ -95,10 +95,10 @@ func (bt *BTree) Range(start, end []byte) []*Record {
 	return records
 }
 
-func (bt *BTree) prefixScan(prefix []byte, offset, limitNum int) []*Record {
-	records := make([]*Record, 0)
+func (bt *bTree) prefixScan(prefix []byte, offset, limitNum int) []*record {
+	records := make([]*record, 0)
 
-	bt.btree.Ascend(&Item{key: prefix}, func(item *Item) bool {
+	bt.btree.Ascend(&item{key: prefix}, func(item *item) bool {
 		if !bytes.HasPrefix(item.key, prefix) {
 			return false
 		}
@@ -117,12 +117,12 @@ func (bt *BTree) prefixScan(prefix []byte, offset, limitNum int) []*Record {
 	return records
 }
 
-func (bt *BTree) prefixSearchScan(prefix []byte, reg string, offset, limitNum int) []*Record {
-	records := make([]*Record, 0)
+func (bt *bTree) prefixSearchScan(prefix []byte, reg string, offset, limitNum int) []*record {
+	records := make([]*record, 0)
 
 	rgx := regexp.MustCompile(reg)
 
-	bt.btree.Ascend(&Item{key: prefix}, func(item *Item) bool {
+	bt.btree.Ascend(&item{key: prefix}, func(item *item) bool {
 		if !bytes.HasPrefix(item.key, prefix) {
 			return false
 		}
@@ -145,22 +145,22 @@ func (bt *BTree) prefixSearchScan(prefix []byte, reg string, offset, limitNum in
 	return records
 }
 
-func (bt *BTree) count() int {
+func (bt *bTree) count() int {
 	return bt.btree.Len()
 }
 
-func (bt *BTree) popMin() (*Item, bool) {
+func (bt *bTree) popMin() (*item, bool) {
 	return bt.btree.PopMin()
 }
 
-func (bt *BTree) popMax() (*Item, bool) {
+func (bt *bTree) popMax() (*item, bool) {
 	return bt.btree.PopMax()
 }
 
-func (bt *BTree) min() (*Item, bool) {
+func (bt *bTree) min() (*item, bool) {
 	return bt.btree.Min()
 }
 
-func (bt *BTree) max() (*Item, bool) {
+func (bt *bTree) max() (*item, bool) {
 	return bt.btree.Max()
 }

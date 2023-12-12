@@ -11,7 +11,7 @@ import (
 	"github.com/xujiajun/utils/time2"
 )
 
-var bucket string
+var testBucketName string
 
 const (
 	fileDir  = "/tmp/nutsdb/"
@@ -28,7 +28,7 @@ const (
 )
 
 func init() {
-	bucket = "bucketForBatchWrite"
+	testBucketName = "bucketForBatchWrite"
 	files, err := ioutil.ReadDir(fileDir)
 	if err != nil {
 		return
@@ -70,7 +70,7 @@ func TestBatchWrite(t *testing.T) {
 	}
 
 	testWrite := func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+		txCreateBucket(t, db, DataStructureBTree, testBucketName, nil)
 		key := func(i int) []byte {
 			return []byte(fmt.Sprintf("%10d", i))
 		}
@@ -81,7 +81,7 @@ func TestBatchWrite(t *testing.T) {
 		require.NoError(t, err)
 		time2.Start()
 		for i := 0; i < N; i++ {
-			require.NoError(t, wb.Put(bucket, key(i), val(i), 0))
+			require.NoError(t, wb.Put(testBucketName, key(i), val(i), 0))
 		}
 		require.NoError(t, wb.Flush())
 		// fmt.Printf("Time taken via batch write %v keys: %v\n", N, time2.End())
@@ -91,7 +91,7 @@ func TestBatchWrite(t *testing.T) {
 			func(tx *Tx) error {
 				for i := 0; i < N; i++ {
 					key := key(i)
-					value, err := tx.Get(bucket, key)
+					value, err := tx.Get(testBucketName, key)
 					if err != nil {
 						return err
 					}
@@ -108,7 +108,7 @@ func TestBatchWrite(t *testing.T) {
 		require.NoError(t, err)
 		time2.Start()
 		for i := 0; i < N; i++ {
-			require.NoError(t, wb.Delete(bucket, key(i)))
+			require.NoError(t, wb.Delete(testBucketName, key(i)))
 		}
 		require.NoError(t, wb.Flush())
 		// fmt.Printf("Time taken via batch delete %v keys: %v\n", N, time2.End())
@@ -117,7 +117,7 @@ func TestBatchWrite(t *testing.T) {
 			func(tx *Tx) error {
 				for i := 0; i < N; i++ {
 					key := key(i)
-					_, err := tx.Get(bucket, key)
+					_, err := tx.Get(testBucketName, key)
 					require.Error(t, ErrNotFoundKey, err)
 				}
 				return nil

@@ -159,14 +159,14 @@ func TestDB_Basic(t *testing.T) {
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		bucket := "bucket"
 		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
-		key0 := GetTestBytes(0)
-		val0 := GetRandomBytes(24)
+		key0 := getTestBytes(0)
+		val0 := getRandomBytes(24)
 
 		// put
 		txPut(t, db, bucket, key0, val0, Persistent, nil, nil)
 		txGet(t, db, bucket, key0, val0, nil)
 
-		val1 := GetRandomBytes(24)
+		val1 := getRandomBytes(24)
 
 		// update
 		txPut(t, db, bucket, key0, val1, Persistent, nil, nil)
@@ -192,8 +192,8 @@ func TestDB_ReopenWithDelete(t *testing.T) {
 
 	bucket := "bucket"
 	txCreateBucket(t, db, DataStructureList, bucket, nil)
-	txPush(t, db, bucket, GetTestBytes(5), GetTestBytes(0), true, nil, nil)
-	txPush(t, db, bucket, GetTestBytes(5), GetTestBytes(1), true, nil, nil)
+	txPush(t, db, bucket, getTestBytes(5), getTestBytes(0), true, nil, nil)
+	txPush(t, db, bucket, getTestBytes(5), getTestBytes(1), true, nil, nil)
 	txDeleteBucket(t, db, DataStructureList, bucket, nil)
 
 	if !db.IsClose() {
@@ -237,9 +237,9 @@ func TestDB_DeleteANonExistKey(t *testing.T) {
 		testBucket := "test_bucket"
 		txCreateBucket(t, db, DataStructureBTree, testBucket, nil)
 
-		txDel(t, db, testBucket, GetTestBytes(0), ErrKeyNotFound)
-		txPut(t, db, testBucket, GetTestBytes(1), GetRandomBytes(24), Persistent, nil, nil)
-		txDel(t, db, testBucket, GetTestBytes(0), ErrKeyNotFound)
+		txDel(t, db, testBucket, getTestBytes(0), ErrKeyNotFound)
+		txPut(t, db, testBucket, getTestBytes(1), getRandomBytes(24), Persistent, nil, nil)
+		txDel(t, db, testBucket, getTestBytes(0), ErrKeyNotFound)
 	})
 }
 
@@ -248,17 +248,17 @@ func TestDB_CheckListExpired(t *testing.T) {
 		testBucket := "test_bucket"
 		txCreateBucket(t, db, DataStructureBTree, testBucket, nil)
 
-		txPut(t, db, testBucket, GetTestBytes(0), GetTestBytes(1), Persistent, nil, nil)
-		txPut(t, db, testBucket, GetTestBytes(1), GetRandomBytes(24), 1, nil, nil)
+		txPut(t, db, testBucket, getTestBytes(0), getTestBytes(1), Persistent, nil, nil)
+		txPut(t, db, testBucket, getTestBytes(1), getRandomBytes(24), 1, nil, nil)
 
 		time.Sleep(1100 * time.Millisecond)
 
 		db.checkListExpired()
 
 		// this entry still alive
-		txGet(t, db, testBucket, GetTestBytes(0), GetTestBytes(1), nil)
+		txGet(t, db, testBucket, getTestBytes(0), getTestBytes(1), nil)
 		// this entry will be deleted
-		txGet(t, db, testBucket, GetTestBytes(1), nil, ErrKeyNotFound)
+		txGet(t, db, testBucket, getTestBytes(1), nil, ErrKeyNotFound)
 	})
 }
 
@@ -707,9 +707,9 @@ func TestDB_GetKeyNotFound(t *testing.T) {
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		bucket := "bucket"
 		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
-		txGet(t, db, bucket, GetTestBytes(0), nil, ErrKeyNotFound)
-		txPut(t, db, bucket, GetTestBytes(1), GetRandomBytes(24), Persistent, nil, nil)
-		txGet(t, db, bucket, GetTestBytes(0), nil, ErrKeyNotFound)
+		txGet(t, db, bucket, getTestBytes(0), nil, ErrKeyNotFound)
+		txPut(t, db, bucket, getTestBytes(1), getRandomBytes(24), Persistent, nil, nil)
+		txGet(t, db, bucket, getTestBytes(0), nil, ErrKeyNotFound)
 	})
 }
 
@@ -804,7 +804,7 @@ func TestDB_CommitBuffer(t *testing.T) {
 		require.Equal(t, 0, db.commitBuffer.Len())
 		require.Equal(t, db.opt.CommitBufferSize, int64(db.commitBuffer.Cap()))
 		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
-		txPut(t, db, bucket, GetTestBytes(0), GetRandomBytes(24), Persistent, nil, nil)
+		txPut(t, db, bucket, getTestBytes(0), getRandomBytes(24), Persistent, nil, nil)
 
 		// When tx is committed, content of commit buffer should be empty, but do not release memory
 		require.Equal(t, 0, db.commitBuffer.Len())
@@ -820,7 +820,7 @@ func TestDB_CommitBuffer(t *testing.T) {
 		err := db.Update(func(tx *Tx) error {
 			// making this tx big enough, it should not use the commit buffer
 			for i := 0; i < 1000; i++ {
-				err := tx.Put(bucket, GetTestBytes(i), GetRandomBytes(1024), Persistent)
+				err := tx.Put(bucket, getTestBytes(i), getRandomBytes(1024), Persistent)
 				require.NoError(t, err)
 			}
 			return nil
@@ -836,8 +836,8 @@ func TestDB_DeleteBucket(t *testing.T) {
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		bucket := "bucket"
 		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
-		key := GetTestBytes(0)
-		val := GetTestBytes(0)
+		key := getTestBytes(0)
+		val := getTestBytes(0)
 		txPut(t, db, bucket, key, val, Persistent, nil, nil)
 		txGet(t, db, bucket, key, val, nil)
 
@@ -882,8 +882,8 @@ func TestDB_HintKeyValAndRAMIdxMode_RestartDB(t *testing.T) {
 		bucket := "bucket"
 		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
-		key := GetTestBytes(0)
-		val := GetTestBytes(0)
+		key := getTestBytes(0)
+		val := getTestBytes(0)
 
 		txPut(t, db, bucket, key, val, Persistent, nil, nil)
 		txGet(t, db, bucket, key, val, nil)
@@ -902,8 +902,8 @@ func TestDB_HintKeyAndRAMIdxMode_RestartDB(t *testing.T) {
 	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
 		bucket := "bucket"
 		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
-		key := GetTestBytes(0)
-		val := GetTestBytes(0)
+		key := getTestBytes(0)
+		val := getTestBytes(0)
 
 		txPut(t, db, bucket, key, val, Persistent, nil, nil)
 		txGet(t, db, bucket, key, val, nil)
@@ -948,43 +948,43 @@ func TestDB_ChangeMode_RestartDB(t *testing.T) {
 
 			// k-v
 			for i := 0; i < 10; i++ {
-				txPut(t, db, bucket, GetTestBytes(i), GetTestBytes(i), Persistent, nil, nil)
+				txPut(t, db, bucket, getTestBytes(i), getTestBytes(i), Persistent, nil, nil)
 			}
 
 			// list
 			for i := 0; i < 10; i++ {
-				txPush(t, db, bucket, GetTestBytes(0), GetTestBytes(i), true, nil, nil)
+				txPush(t, db, bucket, getTestBytes(0), getTestBytes(i), true, nil, nil)
 			}
 
 			err = db.Update(func(tx *Tx) error {
-				return tx.LRem(bucket, GetTestBytes(0), 1, GetTestBytes(5))
+				return tx.LRem(bucket, getTestBytes(0), 1, getTestBytes(5))
 			})
 			require.NoError(t, err)
 
 			for i := 0; i < 2; i++ {
-				txPop(t, db, bucket, GetTestBytes(0), GetTestBytes(9-i), nil, true)
+				txPop(t, db, bucket, getTestBytes(0), getTestBytes(9-i), nil, true)
 			}
 
 			for i := 0; i < 2; i++ {
-				txPop(t, db, bucket, GetTestBytes(0), GetTestBytes(i), nil, false)
+				txPop(t, db, bucket, getTestBytes(0), getTestBytes(i), nil, false)
 			}
 
 			// set
 			for i := 0; i < 10; i++ {
-				txSAdd(t, db, bucket, GetTestBytes(0), GetTestBytes(i), nil, nil)
+				txSAdd(t, db, bucket, getTestBytes(0), getTestBytes(i), nil, nil)
 			}
 
 			for i := 0; i < 3; i++ {
-				txSRem(t, db, bucket, GetTestBytes(0), GetTestBytes(i), nil)
+				txSRem(t, db, bucket, getTestBytes(0), getTestBytes(i), nil)
 			}
 
 			// zset
 			for i := 0; i < 10; i++ {
-				txZAdd(t, db, bucket, GetTestBytes(0), GetTestBytes(i), float64(i), nil, nil)
+				txZAdd(t, db, bucket, getTestBytes(0), getTestBytes(i), float64(i), nil, nil)
 			}
 
 			for i := 0; i < 3; i++ {
-				txZRem(t, db, bucket, GetTestBytes(0), GetTestBytes(i), nil)
+				txZRem(t, db, bucket, getTestBytes(0), getTestBytes(i), nil)
 			}
 
 			require.NoError(t, db.Close())
@@ -995,17 +995,17 @@ func TestDB_ChangeMode_RestartDB(t *testing.T) {
 
 			// k-v
 			for i := 0; i < 10; i++ {
-				txGet(t, db, bucket, GetTestBytes(i), GetTestBytes(i), nil)
+				txGet(t, db, bucket, getTestBytes(i), getTestBytes(i), nil)
 			}
 
 			// list
-			txPop(t, db, bucket, GetTestBytes(0), GetTestBytes(7), nil, true)
-			txPop(t, db, bucket, GetTestBytes(0), GetTestBytes(6), nil, true)
-			txPop(t, db, bucket, GetTestBytes(0), GetTestBytes(4), nil, true)
-			txPop(t, db, bucket, GetTestBytes(0), GetTestBytes(2), nil, false)
+			txPop(t, db, bucket, getTestBytes(0), getTestBytes(7), nil, true)
+			txPop(t, db, bucket, getTestBytes(0), getTestBytes(6), nil, true)
+			txPop(t, db, bucket, getTestBytes(0), getTestBytes(4), nil, true)
+			txPop(t, db, bucket, getTestBytes(0), getTestBytes(2), nil, false)
 
 			err = db.View(func(tx *Tx) error {
-				size, err := tx.LSize(bucket, GetTestBytes(0))
+				size, err := tx.LSize(bucket, getTestBytes(0))
 				require.NoError(t, err)
 				require.Equal(t, 1, size)
 				return nil
@@ -1014,20 +1014,20 @@ func TestDB_ChangeMode_RestartDB(t *testing.T) {
 
 			// set
 			for i := 0; i < 3; i++ {
-				txSIsMember(t, db, bucket, GetTestBytes(0), GetTestBytes(i), false)
+				txSIsMember(t, db, bucket, getTestBytes(0), getTestBytes(i), false)
 			}
 
 			for i := 3; i < 10; i++ {
-				txSIsMember(t, db, bucket, GetTestBytes(0), GetTestBytes(i), true)
+				txSIsMember(t, db, bucket, getTestBytes(0), getTestBytes(i), true)
 			}
 
 			// zset
 			for i := 0; i < 3; i++ {
-				txZScore(t, db, bucket, GetTestBytes(0), GetTestBytes(i), float64(i), ErrSortedSetMemberNotExist)
+				txZScore(t, db, bucket, getTestBytes(0), getTestBytes(i), float64(i), ErrSortedSetMemberNotExist)
 			}
 
 			for i := 3; i < 10; i++ {
-				txZScore(t, db, bucket, GetTestBytes(0), GetTestBytes(i), float64(i), nil)
+				txZScore(t, db, bucket, getTestBytes(0), getTestBytes(i), float64(i), nil)
 			}
 		})
 	}
@@ -1048,7 +1048,7 @@ func TestTx_SmallFile(t *testing.T) {
 
 		err := db.Update(func(tx *Tx) error {
 			for i := 0; i < 100; i++ {
-				err := tx.Put(bucket, GetTestBytes(i), GetTestBytes(i), Persistent)
+				err := tx.Put(bucket, getTestBytes(i), getTestBytes(i), Persistent)
 				if err != nil {
 					return err
 				}
@@ -1059,7 +1059,7 @@ func TestTx_SmallFile(t *testing.T) {
 		require.NoError(t, db.Close())
 		db, _ = Open(opts)
 
-		txGet(t, db, bucket, GetTestBytes(10), GetTestBytes(10), nil)
+		txGet(t, db, bucket, getTestBytes(10), getTestBytes(10), nil)
 	})
 }
 

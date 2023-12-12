@@ -30,6 +30,6 @@ var (
 	// ErrNotSupportMergeWhenUsingList is returned calling 'Merge' when using list
 	ErrNotSupportMergeWhenUsingList = errors.New("not support merge when using list for now")
 
-	// ErrRecordIsNil is returned when Record is nil
+	// ErrRecordIsNil is returned when record is nil
 	ErrRecordIsNil = errors.New("the record is nil")
 )

@@ -1,85 +1,85 @@
 package nutsdb
 
-// DataStructure represents the data structure we have already supported
-type DataStructure = uint16
+// dataStructure represents the data structure we have already supported
+type dataStructure = uint16
 
-// DataFlag means the data operations have done by users.
-type DataFlag = uint16
+// dataFlag means the data operations have done by users.
+type dataFlag = uint16
 
-// DataStatus means the status of data
-type DataStatus = uint16
+// dataStatus means the status of data
+type dataStatus = uint16
 
 const (
 	// DataStructureSet represents the data structure set flag
-	DataStructureSet DataStructure = 0
+	DataStructureSet dataStructure = 0
 
 	// DataStructureSortedSet represents the data structure sorted set flag
-	DataStructureSortedSet DataStructure = 1
+	DataStructureSortedSet dataStructure = 1
 
 	// DataStructureBTree represents the data structure b tree flag
-	DataStructureBTree DataStructure = 2
+	DataStructureBTree dataStructure = 2
 
 	// DataStructureList represents the data structure list flag
-	DataStructureList DataStructure = 3
+	DataStructureList dataStructure = 3
 )
 
 const (
 	// DataDeleteFlag represents the data delete flag
-	DataDeleteFlag DataFlag = 0
+	DataDeleteFlag dataFlag = 0
 
 	// DataSetFlag represents the data set flag
-	DataSetFlag DataFlag = 1
+	DataSetFlag dataFlag = 1
 
 	// DataLPushFlag represents the data LPush flag
-	DataLPushFlag DataFlag = 2
+	DataLPushFlag dataFlag = 2
 
 	// DataRPushFlag represents the data RPush flag
-	DataRPushFlag DataFlag = 3
+	DataRPushFlag dataFlag = 3
 
 	// DataLRemFlag represents the data LRem flag
-	DataLRemFlag DataFlag = 4
+	DataLRemFlag dataFlag = 4
 
 	// DataLPopFlag represents the data LPop flag
-	DataLPopFlag DataFlag = 5
+	DataLPopFlag dataFlag = 5
 
 	// DataRPopFlag represents the data RPop flag
-	DataRPopFlag DataFlag = 6
+	DataRPopFlag dataFlag = 6
 
 	// DataLTrimFlag represents the data LTrim flag
-	DataLTrimFlag DataFlag = 8
+	DataLTrimFlag dataFlag = 8
 
 	// DataZAddFlag represents the data ZAdd flag
-	DataZAddFlag DataFlag = 9
+	DataZAddFlag dataFlag = 9
 
 	// DataZRemFlag represents the data ZRem flag
-	DataZRemFlag DataFlag = 10
+	DataZRemFlag dataFlag = 10
 
 	// DataZRemRangeByRankFlag represents the data ZRemRangeByRank flag
-	DataZRemRangeByRankFlag DataFlag = 11
+	DataZRemRangeByRankFlag dataFlag = 11
 
 	// DataZPopMaxFlag represents the data ZPopMax flag
-	DataZPopMaxFlag DataFlag = 12
+	DataZPopMaxFlag dataFlag = 12
 
 	// DataZPopMinFlag represents the data aZPopMin flag
-	DataZPopMinFlag DataFlag = 13
+	DataZPopMinFlag dataFlag = 13
 
 	// DataSetBucketDeleteFlag represents the delete Set bucket flag
-	DataSetBucketDeleteFlag DataFlag = 14
+	DataSetBucketDeleteFlag dataFlag = 14
 
 	// DataSortedSetBucketDeleteFlag represents the delete Sorted Set bucket flag
-	DataSortedSetBucketDeleteFlag DataFlag = 15
+	DataSortedSetBucketDeleteFlag dataFlag = 15
 
-	// DataBTreeBucketDeleteFlag represents the delete BTree bucket flag
-	DataBTreeBucketDeleteFlag DataFlag = 16
+	// DataBTreeBucketDeleteFlag represents the delete bTree bucket flag
+	DataBTreeBucketDeleteFlag dataFlag = 16
 
-	// DataListBucketDeleteFlag represents the delete List bucket flag
-	DataListBucketDeleteFlag DataFlag = 17
+	// DataListBucketDeleteFlag represents the delete list bucket flag
+	DataListBucketDeleteFlag dataFlag = 17
 
 	// DataLRemByIndex represents the data LRemByIndex flag
-	DataLRemByIndex DataFlag = 18
+	DataLRemByIndex dataFlag = 18
 
 	// DataExpireListFlag represents that set ttl for the list
-	DataExpireListFlag DataFlag = 19
+	DataExpireListFlag dataFlag = 19
 )
 
 const (
@@ -93,21 +93,21 @@ const (
 // Persistent represents the data persistent flag
 const Persistent uint32 = 0
 
-type MetaData struct {
+type metaData struct {
 	KeySize    uint32
 	ValueSize  uint32
 	Timestamp  uint64
 	TTL        uint32
-	Flag       DataFlag // delete / set
+	Flag       dataFlag // delete / set
 	BucketSize uint32
 	TxID       uint64
-	Status     DataStatus    // committed / uncommitted
-	Ds         DataStructure // data structure
+	Status     dataStatus    // committed / uncommitted
+	Ds         dataStructure // data structure
 	Crc        uint32
-	BucketId   BucketId
+	BucketId   bucketId
 }
 
-func (meta *MetaData) size() int64 {
+func (meta *metaData) size() int64 {
 	// CRC
 	size := 4
 
@@ -124,81 +124,81 @@ func (meta *MetaData) size() int64 {
 	return int64(size)
 }
 
-func (meta *MetaData) payloadSize() int64 {
+func (meta *metaData) payloadSize() int64 {
 	return int64(meta.BucketSize) + int64(meta.KeySize) + int64(meta.ValueSize)
 }
 
-func newMetaData() *MetaData {
-	return new(MetaData)
+func newMetaData() *metaData {
+	return new(metaData)
 }
 
-func (meta *MetaData) withKeySize(keySize uint32) *MetaData {
+func (meta *metaData) withKeySize(keySize uint32) *metaData {
 	meta.KeySize = keySize
 	return meta
 }
 
-func (meta *MetaData) withValueSize(valueSize uint32) *MetaData {
+func (meta *metaData) withValueSize(valueSize uint32) *metaData {
 	meta.ValueSize = valueSize
 	return meta
 }
 
-func (meta *MetaData) withTimeStamp(timestamp uint64) *MetaData {
+func (meta *metaData) withTimeStamp(timestamp uint64) *metaData {
 	meta.Timestamp = timestamp
 	return meta
 }
 
-func (meta *MetaData) withTTL(ttl uint32) *MetaData {
+func (meta *metaData) withTTL(ttl uint32) *metaData {
 	meta.TTL = ttl
 	return meta
 }
 
-func (meta *MetaData) withFlag(flag uint16) *MetaData {
+func (meta *metaData) withFlag(flag uint16) *metaData {
 	meta.Flag = flag
 	return meta
 }
 
-func (meta *MetaData) withBucketSize(bucketSize uint32) *MetaData {
+func (meta *metaData) withBucketSize(bucketSize uint32) *metaData {
 	meta.BucketSize = bucketSize
 	return meta
 }
 
-func (meta *MetaData) withTxID(txID uint64) *MetaData {
+func (meta *metaData) withTxID(txID uint64) *metaData {
 	meta.TxID = txID
 	return meta
 }
 
-func (meta *MetaData) withStatus(status uint16) *MetaData {
+func (meta *metaData) withStatus(status uint16) *metaData {
 	meta.Status = status
 	return meta
 }
 
-func (meta *MetaData) withDs(ds uint16) *MetaData {
+func (meta *metaData) withDs(ds uint16) *metaData {
 	meta.Ds = ds
 	return meta
 }
 
-func (meta *MetaData) withCrc(crc uint32) *MetaData {
+func (meta *metaData) withCrc(crc uint32) *metaData {
 	meta.Crc = crc
 	return meta
 }
 
-func (meta *MetaData) withBucketId(bucketID uint64) *MetaData {
+func (meta *metaData) withBucketId(bucketID uint64) *metaData {
 	meta.BucketId = bucketID
 	return meta
 }
 
-func (meta *MetaData) isBPlusTree() bool {
+func (meta *metaData) isBPlusTree() bool {
 	return meta.Ds == DataStructureBTree
 }
 
-func (meta *MetaData) isSet() bool {
+func (meta *metaData) isSet() bool {
 	return meta.Ds == DataStructureSet
 }
 
-func (meta *MetaData) isSortSet() bool {
+func (meta *metaData) isSortSet() bool {
 	return meta.Ds == DataStructureSortedSet
 }
 
-func (meta *MetaData) isList() bool {
+func (meta *metaData) isList() bool {
 	return meta.Ds == DataStructureList
 }

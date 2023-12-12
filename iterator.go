@@ -21,7 +21,7 @@ import (
 type Iterator struct {
 	tx      *Tx
 	options IteratorOptions
-	iter    btree.IterG[*Item]
+	iter    btree.IterG[*item]
 }
 
 type IteratorOptions struct {
@@ -29,7 +29,7 @@ type IteratorOptions struct {
 }
 
 func NewIterator(tx *Tx, bucket string, options IteratorOptions) *Iterator {
-	b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
+	b, err := tx.db.bm.getBucket(DataStructureBTree, bucket)
 	if err != nil {
 		return nil
 	}
@@ -57,7 +57,7 @@ func (it *Iterator) Rewind() bool {
 }
 
 func (it *Iterator) Seek(key []byte) bool {
-	return it.iter.Seek(&Item{key: key})
+	return it.iter.Seek(&item{key: key})
 }
 
 func (it *Iterator) Next() bool {

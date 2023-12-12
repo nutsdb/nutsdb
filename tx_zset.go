@@ -55,14 +55,14 @@ func (tx *Tx) ZMembers(bucket string, key []byte) (map[*SortedSetMember]struct{}
 		return nil, err
 	}
 
-	b, err := tx.db.bm.GetBucket(DataStructureSortedSet, bucket)
+	b, err := tx.db.bm.getBucket(DataStructureSortedSet, bucket)
 	if err != nil {
 		return nil, err
 	}
 
 	var (
 		bucketId  = b.Id
-		sortedSet *SortedSet
+		sortedSet *sortedSet
 		exist     bool
 	)
 
@@ -96,14 +96,14 @@ func (tx *Tx) ZCard(bucket string, key []byte) (int, error) {
 		return 0, err
 	}
 
-	b, err := tx.db.bm.GetBucket(DataStructureSortedSet, bucket)
+	b, err := tx.db.bm.getBucket(DataStructureSortedSet, bucket)
 	if err != nil {
 		return 0, err
 	}
 
 	var (
 		bucketId  = b.Id
-		sortedSet *SortedSet
+		sortedSet *sortedSet
 		exist     bool
 	)
 
@@ -124,14 +124,14 @@ func (tx *Tx) ZCount(bucket string, key []byte, start, end float64, opts *GetByS
 		return 0, err
 	}
 
-	b, err := tx.db.bm.GetBucket(DataStructureSortedSet, bucket)
+	b, err := tx.db.bm.getBucket(DataStructureSortedSet, bucket)
 	if err != nil {
 		return 0, err
 	}
 
 	var (
 		bucketId  = b.Id
-		sortedSet *SortedSet
+		sortedSet *sortedSet
 		exist     bool
 	)
 
@@ -148,14 +148,14 @@ func (tx *Tx) ZPopMax(bucket string, key []byte) (*SortedSetMember, error) {
 		return nil, err
 	}
 
-	b, err := tx.db.bm.GetBucket(DataStructureSortedSet, bucket)
+	b, err := tx.db.bm.getBucket(DataStructureSortedSet, bucket)
 	if err != nil {
 		return nil, err
 	}
 
 	var (
 		bucketId  = b.Id
-		sortedSet *SortedSet
+		sortedSet *sortedSet
 		exist     bool
 	)
 
@@ -182,14 +182,14 @@ func (tx *Tx) ZPopMin(bucket string, key []byte) (*SortedSetMember, error) {
 		return nil, err
 	}
 
-	b, err := tx.db.bm.GetBucket(DataStructureSortedSet, bucket)
+	b, err := tx.db.bm.getBucket(DataStructureSortedSet, bucket)
 	if err != nil {
 		return nil, err
 	}
 
 	var (
 		bucketId  = b.Id
-		sortedSet *SortedSet
+		sortedSet *sortedSet
 		exist     bool
 	)
 
@@ -216,14 +216,14 @@ func (tx *Tx) ZPeekMax(bucket string, key []byte) (*SortedSetMember, error) {
 		return nil, err
 	}
 
-	b, err := tx.db.bm.GetBucket(DataStructureSortedSet, bucket)
+	b, err := tx.db.bm.getBucket(DataStructureSortedSet, bucket)
 	if err != nil {
 		return nil, err
 	}
 
 	var (
 		bucketId  = b.Id
-		sortedSet *SortedSet
+		sortedSet *sortedSet
 		exist     bool
 	)
 
@@ -250,14 +250,14 @@ func (tx *Tx) ZPeekMin(bucket string, key []byte) (*SortedSetMember, error) {
 		return nil, err
 	}
 
-	b, err := tx.db.bm.GetBucket(DataStructureSortedSet, bucket)
+	b, err := tx.db.bm.getBucket(DataStructureSortedSet, bucket)
 	if err != nil {
 		return nil, err
 	}
 
 	var (
 		bucketId  = b.Id
-		sortedSet *SortedSet
+		sortedSet *sortedSet
 		exist     bool
 	)
 
@@ -285,14 +285,14 @@ func (tx *Tx) ZRangeByScore(bucket string, key []byte, start, end float64, opts 
 		return nil, err
 	}
 
-	b, err := tx.db.bm.GetBucket(DataStructureSortedSet, bucket)
+	b, err := tx.db.bm.getBucket(DataStructureSortedSet, bucket)
 	if err != nil {
 		return nil, err
 	}
 
 	var (
 		bucketId  = b.Id
-		sortedSet *SortedSet
+		sortedSet *sortedSet
 		exist     bool
 	)
 
@@ -324,14 +324,14 @@ func (tx *Tx) ZRangeByRank(bucket string, key []byte, start, end int) ([]*Sorted
 		return nil, err
 	}
 
-	b, err := tx.db.bm.GetBucket(DataStructureSortedSet, bucket)
+	b, err := tx.db.bm.getBucket(DataStructureSortedSet, bucket)
 	if err != nil {
 		return nil, err
 	}
 
 	var (
 		bucketId  = b.Id
-		sortedSet *SortedSet
+		sortedSet *sortedSet
 		exist     bool
 	)
 
@@ -362,14 +362,14 @@ func (tx *Tx) ZRem(bucket string, key []byte, value []byte) error {
 		return err
 	}
 
-	b, err := tx.db.bm.GetBucket(DataStructureSortedSet, bucket)
+	b, err := tx.db.bm.getBucket(DataStructureSortedSet, bucket)
 	if err != nil {
 		return err
 	}
 
 	var (
 		bucketId  = b.Id
-		sortedSet *SortedSet
+		sortedSet *sortedSet
 		exist     bool
 	)
 
@@ -407,14 +407,14 @@ func (tx *Tx) ZRank(bucket string, key, value []byte) (int, error) {
 		return 0, err
 	}
 
-	b, err := tx.db.bm.GetBucket(DataStructureSortedSet, bucket)
+	b, err := tx.db.bm.getBucket(DataStructureSortedSet, bucket)
 	if err != nil {
 		return 0, err
 	}
 
 	var (
 		bucketId  = b.Id
-		sortedSet *SortedSet
+		sortedSet *sortedSet
 		exist     bool
 	)
 
@@ -431,14 +431,14 @@ func (tx *Tx) ZRevRank(bucket string, key, value []byte) (int, error) {
 		return 0, err
 	}
 
-	b, err := tx.db.bm.GetBucket(DataStructureSortedSet, bucket)
+	b, err := tx.db.bm.getBucket(DataStructureSortedSet, bucket)
 	if err != nil {
 		return 0, err
 	}
 
 	var (
 		bucketId  = b.Id
-		sortedSet *SortedSet
+		sortedSet *sortedSet
 		exist     bool
 	)
 
@@ -455,14 +455,14 @@ func (tx *Tx) ZScore(bucket string, key, value []byte) (float64, error) {
 		return 0, err
 	}
 
-	b, err := tx.db.bm.GetBucket(DataStructureSortedSet, bucket)
+	b, err := tx.db.bm.getBucket(DataStructureSortedSet, bucket)
 	if err != nil {
 		return 0.0, err
 	}
 
 	var (
 		bucketId  = b.Id
-		sortedSet *SortedSet
+		sortedSet *sortedSet
 		exist     bool
 	)
 
@@ -479,14 +479,14 @@ func (tx *Tx) ZKeys(bucket, pattern string, f func(key string) bool) error {
 		return err
 	}
 
-	b, err := tx.db.bm.GetBucket(DataStructureSortedSet, bucket)
+	b, err := tx.db.bm.getBucket(DataStructureSortedSet, bucket)
 	if err != nil {
 		return err
 	}
 
 	var (
 		bucketId  = b.Id
-		sortedSet *SortedSet
+		sortedSet *sortedSet
 		exist     bool
 	)
 
@@ -507,7 +507,7 @@ func (tx *Tx) ZCheck(bucket string) error {
 		return err
 	}
 
-	b, err := tx.db.bm.GetBucket(DataStructureSortedSet, bucket)
+	b, err := tx.db.bm.getBucket(DataStructureSortedSet, bucket)
 	if err != nil {
 		return err
 	}
@@ -520,5 +520,5 @@ func (tx *Tx) ZCheck(bucket string) error {
 
 // ErrSeparatorForZSetKey returns when zSet key contains the SeparatorForZSetKey flag.
 func ErrSeparatorForZSetKey() error {
-	return errors.New("contain separator (" + SeparatorForZSetKey + ") for SortedSetIdx key")
+	return errors.New("contain separator (" + SeparatorForZSetKey + ") for sortedSetIdx key")
 }

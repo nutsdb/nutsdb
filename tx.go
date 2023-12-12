@@ -40,9 +40,9 @@ type Tx struct {
 	db                *DB
 	writable          bool
 	status            atomic.Value
-	pendingWrites     []*Entry
+	pendingWrites     []*entry
 	size              int64
-	pendingBucketList map[Ds]map[BucketName]*Bucket
+	pendingBucketList map[ds]map[bucketName]*bucket
 }
 
 type txnCb struct {
@@ -97,8 +97,8 @@ func newTx(db *DB, writable bool) (tx *Tx, err error) {
 	tx = &Tx{
 		db:                db,
 		writable:          writable,
-		pendingWrites:     []*Entry{},
-		pendingBucketList: make(map[Ds]map[BucketName]*Bucket),
+		pendingWrites:     []*entry{},
+		pendingBucketList: make(map[ds]map[bucketName]*bucket),
 	}
 
 	txID, err = tx.getTxID()
@@ -225,11 +225,11 @@ func (tx *Tx) Commit() (err error) {
 	buff := tx.allocCommitBuffer()
 	defer tx.db.commitBuffer.Reset()
 
-	var records []*Record
+	var records []*record
 
 	for i := 0; i < writesLen; i++ {
 		entry := tx.pendingWrites[i]
-		entrySize := entry.Size()
+		entrySize := entry.size()
 		if entrySize > tx.db.opt.SegmentSize {
 			return ErrDataSizeExceed
 		}
@@ -251,7 +251,7 @@ func (tx *Tx) Commit() (err error) {
 			entry.Meta.Status = Committed
 		}
 
-		if _, err := buff.Write(entry.Encode()); err != nil {
+		if _, err := buff.Write(entry.encode()); err != nil {
 			return err
 		}
 
@@ -296,7 +296,7 @@ func (tx *Tx) getNewAddRecordCount() (int64, error) {
 	return res, nil
 }
 
-func (tx *Tx) getListHeadTailSeq(bucketId BucketId, key string) *HeadTailSeq {
+func (tx *Tx) getListHeadTailSeq(bucketId bucketId, key string) *HeadTailSeq {
 	res := HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
 	if _, ok := tx.db.Index.list.idx[bucketId]; ok {
 		if _, ok := tx.db.Index.list.idx[bucketId].Seq[key]; ok {
@@ -307,7 +307,7 @@ func (tx *Tx) getListHeadTailSeq(bucketId BucketId, key string) *HeadTailSeq {
 	return &res
 }
 
-func (tx *Tx) getListEntryNewAddRecordCount(bucketId BucketId, entry *Entry) (int64, error) {
+func (tx *Tx) getListEntryNewAddRecordCount(bucketId bucketId, entry *entry) (int64, error) {
 	if entry.Meta.Flag == DataExpireListFlag {
 		return 0, nil
 	}
@@ -327,7 +327,7 @@ func (tx *Tx) getListEntryNewAddRecordCount(bucketId BucketId, entry *Entry) (in
 		res -= int64(len(l.getValidIndexes(key, indexes)))
 	case DataLRemFlag:
 		count, newValue := splitIntStringStr(value, SeparatorForListKey)
-		removeIndices, err := l.getRemoveIndexes(key, count, func(r *Record) (bool, error) {
+		removeIndices, err := l.getRemoveIndexes(key, count, func(r *record) (bool, error) {
 			v, err := tx.db.getValueByRecord(r)
 			if err != nil {
 				return false, err
@@ -362,7 +362,7 @@ func (tx *Tx) getListEntryNewAddRecordCount(bucketId BucketId, entry *Entry) (in
 	return res, nil
 }
 
-func (tx *Tx) getKvEntryNewAddRecordCount(bucketId BucketId, entry *Entry) (int64, error) {
+func (tx *Tx) getKvEntryNewAddRecordCount(bucketId bucketId, entry *entry) (int64, error) {
 	var res int64
 
 	switch entry.Meta.Flag {
@@ -382,7 +382,7 @@ func (tx *Tx) getKvEntryNewAddRecordCount(bucketId BucketId, entry *Entry) (int6
 	return res, nil
 }
 
-func (tx *Tx) getSetEntryNewAddRecordCount(bucketId BucketId, entry *Entry) (int64, error) {
+func (tx *Tx) getSetEntryNewAddRecordCount(bucketId bucketId, entry *entry) (int64, error) {
 	var res int64
 
 	if entry.Meta.Flag == DataDeleteFlag {
@@ -396,7 +396,7 @@ func (tx *Tx) getSetEntryNewAddRecordCount(bucketId BucketId, entry *Entry) (int
 	return res, nil
 }
 
-func (tx *Tx) getSortedSetEntryNewAddRecordCount(bucketId BucketId, entry *Entry) (int64, error) {
+func (tx *Tx) getSortedSetEntryNewAddRecordCount(bucketId bucketId, entry *entry) (int64, error) {
 	var res int64
 	key := string(entry.Key)
 	value := string(entry.Value)
@@ -422,7 +422,7 @@ func (tx *Tx) getSortedSetEntryNewAddRecordCount(bucketId BucketId, entry *Entry
 	return res, nil
 }
 
-func (tx *Tx) keyExistsInSortedSet(bucketId BucketId, key, value string) bool {
+func (tx *Tx) keyExistsInSortedSet(bucketId bucketId, key, value string) bool {
 	if _, exist := tx.db.Index.sortedSet.exist(bucketId); !exist {
 		return false
 	}
@@ -434,11 +434,11 @@ func (tx *Tx) keyExistsInSortedSet(bucketId BucketId, key, value string) bool {
 	return exists
 }
 
-func (tx *Tx) getEntryNewAddRecordCount(entry *Entry) (int64, error) {
+func (tx *Tx) getEntryNewAddRecordCount(entry *entry) (int64, error) {
 	var res int64
 	var err error
 
-	bucket, err := tx.db.bm.GetBucketById(entry.Meta.BucketId)
+	bucket, err := tx.db.bm.getBucketById(entry.Meta.BucketId)
 	if err != nil {
 		return 0, err
 	}
@@ -592,7 +592,7 @@ func (tx *Tx) put(bucket string, key, value []byte, ttl uint32, flag uint16, tim
 		return err
 	}
 
-	if !tx.db.bm.ExistBucket(ds, bucket) {
+	if !tx.db.bm.existBucket(ds, bucket) {
 		return ErrorBucketNotExist
 	}
 
@@ -600,7 +600,7 @@ func (tx *Tx) put(bucket string, key, value []byte, ttl uint32, flag uint16, tim
 		return ErrTxNotWritable
 	}
 
-	bucketId, err := tx.db.bm.GetBucketID(ds, bucket)
+	bucketId, err := tx.db.bm.getBucketID(ds, bucket)
 	if err != nil {
 		return err
 	}
@@ -615,13 +615,13 @@ func (tx *Tx) put(bucket string, key, value []byte, ttl uint32, flag uint16, tim
 		return err
 	}
 	tx.pendingWrites = append(tx.pendingWrites, e)
-	tx.size += e.Size()
+	tx.size += e.size()
 
 	return nil
 }
 
-func (tx *Tx) putDeleteLog(bucketId BucketId, key, value []byte, ttl uint32, flag uint16, timestamp uint64, ds uint16) {
-	bucket, err := tx.db.bm.GetBucketById(bucketId)
+func (tx *Tx) putDeleteLog(bucketId bucketId, key, value []byte, ttl uint32, flag uint16, timestamp uint64, ds uint16) {
+	bucket, err := tx.db.bm.getBucketById(bucketId)
 	if err != nil {
 		return
 	}
@@ -630,7 +630,7 @@ func (tx *Tx) putDeleteLog(bucketId BucketId, key, value []byte, ttl uint32, fla
 
 	e := newEntry().withKey(key).withMeta(meta).withValue(value)
 	tx.pendingWrites = append(tx.pendingWrites, e)
-	tx.size += e.Size()
+	tx.size += e.size()
 }
 
 // setStatusCommitting will change the tx status to txStatusCommitting
@@ -669,7 +669,7 @@ func (tx *Tx) isClosed() bool {
 	return status == txStatusClosed
 }
 
-func (tx *Tx) buildIdxes(records []*Record, entries []*Entry) error {
+func (tx *Tx) buildIdxes(records []*record, entries []*entry) error {
 	for i, entry := range entries {
 		meta := entry.Meta
 		var err error
@@ -693,9 +693,9 @@ func (tx *Tx) buildIdxes(records []*Record, entries []*Entry) error {
 	return nil
 }
 
-func (tx *Tx) putBucket(b *Bucket) error {
+func (tx *Tx) putBucket(b *bucket) error {
 	if _, exist := tx.pendingBucketList[b.Ds]; !exist {
-		tx.pendingBucketList[b.Ds] = map[BucketName]*Bucket{}
+		tx.pendingBucketList[b.Ds] = map[bucketName]*bucket{}
 	}
 	bucketInDs := tx.pendingBucketList[b.Ds]
 	bucketInDs[b.Name] = b
@@ -714,14 +714,14 @@ func (tx *Tx) submitBucket() error {
 			bucketReqs = append(bucketReqs, req)
 		}
 	}
-	return tx.db.bm.SubmitPendingBucketChange(bucketReqs)
+	return tx.db.bm.submitPendingBucketChange(bucketReqs)
 }
 
 // buildBucketInIndex build indexes on creation and deletion of buckets
 func (tx *Tx) buildBucketInIndex() error {
 	for _, mapper := range tx.pendingBucketList {
 		for _, bucket := range mapper {
-			if bucket.Meta.Op == BucketInsertOperation {
+			if bucket.Meta.Op == bucketInsertOperation {
 				switch bucket.Ds {
 				case DataStructureBTree:
 					tx.db.Index.bTree.getWithDefault(bucket.Id)
@@ -734,7 +734,7 @@ func (tx *Tx) buildBucketInIndex() error {
 				default:
 					return ErrDataStructureNotSupported
 				}
-			} else if bucket.Meta.Op == BucketDeleteOperation {
+			} else if bucket.Meta.Op == bucketDeleteOperation {
 				switch bucket.Ds {
 				case DataStructureBTree:
 					tx.db.Index.bTree.delete(bucket.Id)
@@ -773,7 +773,7 @@ func (tx *Tx) getChangeCountInBucketChanges() int64 {
 	for _, bucketsInDs := range tx.pendingBucketList {
 		for _, bucket := range bucketsInDs {
 			bucketId := bucket.Id
-			if bucket.Meta.Op == BucketDeleteOperation {
+			if bucket.Meta.Op == bucketDeleteOperation {
 				switch bucket.Ds {
 				case DataStructureBTree:
 					if bTree, ok := tx.db.Index.bTree.idx[bucketId]; ok {
@@ -808,23 +808,23 @@ func (tx *Tx) getChangeCountInBucketChanges() int64 {
 	return res
 }
 
-func (tx *Tx) getBucketStatus(ds Ds, name BucketName) BucketStatus {
+func (tx *Tx) getBucketStatus(ds ds, name bucketName) bucketStatus {
 	if len(tx.pendingBucketList) > 0 {
 		if bucketInDs, exist := tx.pendingBucketList[ds]; exist {
 			if bucket, exist := bucketInDs[name]; exist {
 				switch bucket.Meta.Op {
-				case BucketInsertOperation:
-					return BucketStatusNew
-				case BucketDeleteOperation:
-					return BucketStatusDelete
-				case BucketUpdateOperation:
-					return BucketStatusUpdated
+				case bucketInsertOperation:
+					return bucketStatusNew
+				case bucketDeleteOperation:
+					return bucketStatusDelete
+				case bucketUpdateOperation:
+					return bucketStatusUpdated
 				}
 			}
 		}
 	}
-	if tx.db.bm.ExistBucket(ds, name) {
-		return BucketStatusExistAlready
+	if tx.db.bm.existBucket(ds, name) {
+		return bucketStatusExistAlready
 	}
-	return BucketStatusUnknown
+	return bucketStatusUnknown
 }

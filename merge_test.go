@@ -41,12 +41,12 @@ func TestDB_MergeForString(t *testing.T) {
 		// Add some data
 		n := 1000
 		for i := 0; i < n; i++ {
-			txPut(t, db, bucket, GetTestBytes(i), GetTestBytes(i), Persistent, nil, nil)
+			txPut(t, db, bucket, getTestBytes(i), getTestBytes(i), Persistent, nil, nil)
 		}
 
 		// Delete some data
 		for i := 0; i < n/2; i++ {
-			txDel(t, db, bucket, GetTestBytes(i), nil)
+			txDel(t, db, bucket, getTestBytes(i), nil)
 		}
 
 		// Merge and check the result
@@ -58,12 +58,12 @@ func TestDB_MergeForString(t *testing.T) {
 
 		// Check the deleted data is deleted
 		for i := 0; i < n/2; i++ {
-			txGet(t, db, bucket, GetTestBytes(i), GetTestBytes(i), ErrKeyNotFound)
+			txGet(t, db, bucket, getTestBytes(i), getTestBytes(i), ErrKeyNotFound)
 		}
 
 		// Check the added data is added
 		for i := n / 2; i < n; i++ {
-			txGet(t, db, bucket, GetTestBytes(i), GetTestBytes(i), nil)
+			txGet(t, db, bucket, getTestBytes(i), getTestBytes(i), nil)
 		}
 
 		// Close and reopen the db
@@ -78,12 +78,12 @@ func TestDB_MergeForString(t *testing.T) {
 
 		// Check the deleted data is deleted
 		for i := 0; i < n/2; i++ {
-			txGet(t, db, bucket, GetTestBytes(i), GetTestBytes(i), ErrKeyNotFound)
+			txGet(t, db, bucket, getTestBytes(i), getTestBytes(i), ErrKeyNotFound)
 		}
 
 		// Check the added data is added
 		for i := n / 2; i < n; i++ {
-			txGet(t, db, bucket, GetTestBytes(i), GetTestBytes(i), nil)
+			txGet(t, db, bucket, getTestBytes(i), getTestBytes(i), nil)
 		}
 
 		require.NoError(t, db.Close())
@@ -100,7 +100,7 @@ func TestDB_MergeForSet(t *testing.T) {
 	for _, idxMode := range []EntryIdxMode{HintKeyValAndRAMIdxMode, HintKeyAndRAMIdxMode} {
 		opts.EntryIdxMode = idxMode
 		db, err := Open(opts)
-		if exist := db.bm.ExistBucket(DataStructureSet, bucket); !exist {
+		if exist := db.bm.existBucket(DataStructureSet, bucket); !exist {
 			txCreateBucket(t, db, DataStructureSet, bucket, nil)
 		}
 
@@ -112,14 +112,14 @@ func TestDB_MergeForSet(t *testing.T) {
 
 		// Add some data
 		n := 1000
-		key := GetTestBytes(0)
+		key := getTestBytes(0)
 		for i := 0; i < n; i++ {
-			txSAdd(t, db, bucket, key, GetTestBytes(i), nil, nil)
+			txSAdd(t, db, bucket, key, getTestBytes(i), nil, nil)
 		}
 
 		// Delete some data
 		for i := 0; i < n/2; i++ {
-			txSRem(t, db, bucket, key, GetTestBytes(i), nil)
+			txSRem(t, db, bucket, key, getTestBytes(i), nil)
 		}
 
 		// Pop a random value
@@ -150,7 +150,7 @@ func TestDB_MergeForSet(t *testing.T) {
 		// Check the random value is popped
 		txSIsMember(t, db, bucket, key, spopValue, false)
 		for i := n / 2; i < n; i++ {
-			v := GetTestBytes(i)
+			v := getTestBytes(i)
 			if bytes.Equal(v, spopValue) {
 				continue
 			}
@@ -171,7 +171,7 @@ func TestDB_MergeForSet(t *testing.T) {
 		// Check the random value is popped
 		txSIsMember(t, db, bucket, key, spopValue, false)
 		for i := n / 2; i < n; i++ {
-			v := GetTestBytes(i)
+			v := getTestBytes(i)
 			if bytes.Equal(v, spopValue) {
 				continue
 			}
@@ -188,7 +188,7 @@ func TestDB_MergeForSet(t *testing.T) {
 // It then closes the DB, reopens it, and checks that the items that were removed are now not present
 func TestDB_MergeForZSet(t *testing.T) {
 	bucket := "bucket"
-	key := GetTestBytes(0)
+	key := getTestBytes(0)
 	n := 1000
 	opts := DefaultOptions
 	opts.SegmentSize = KB
@@ -199,7 +199,7 @@ func TestDB_MergeForZSet(t *testing.T) {
 
 		opts.EntryIdxMode = idxMode
 		db, err := Open(opts)
-		if exist := db.bm.ExistBucket(DataStructureSortedSet, bucket); !exist {
+		if exist := db.bm.existBucket(DataStructureSortedSet, bucket); !exist {
 			txCreateBucket(t, db, DataStructureSortedSet, bucket, nil)
 		}
 		require.NoError(t, err)
@@ -210,29 +210,29 @@ func TestDB_MergeForZSet(t *testing.T) {
 
 		for i := 0; i < n; i++ {
 			score, _ := strconv2.IntToFloat64(i)
-			txZAdd(t, db, bucket, key, GetTestBytes(i), score, nil, nil)
+			txZAdd(t, db, bucket, key, getTestBytes(i), score, nil, nil)
 		}
 
 		for i := 0; i < n; i++ {
 			score, _ := strconv2.IntToFloat64(i)
-			txZScore(t, db, bucket, key, GetTestBytes(i), score, nil)
+			txZScore(t, db, bucket, key, getTestBytes(i), score, nil)
 		}
 
 		// remove half of the items
 		for i := 0; i < n/2; i++ {
-			txZRem(t, db, bucket, key, GetTestBytes(i), nil)
+			txZRem(t, db, bucket, key, getTestBytes(i), nil)
 		}
 
 		// check that the items that are left are the same as the ones that were removed
 		for i := 0; i < n/2; i++ {
 			score, _ := strconv2.IntToFloat64(i)
-			txZScore(t, db, bucket, key, GetTestBytes(i), score, ErrSortedSetMemberNotExist)
+			txZScore(t, db, bucket, key, getTestBytes(i), score, ErrSortedSetMemberNotExist)
 		}
 
 		// check that the items that are left are the same as the ones that were removed
 		for i := n / 2; i < n; i++ {
 			score, _ := strconv2.IntToFloat64(i)
-			txZScore(t, db, bucket, key, GetTestBytes(i), score, nil)
+			txZScore(t, db, bucket, key, getTestBytes(i), score, nil)
 		}
 
 		// check that the number of items in the DB is correct
@@ -251,13 +251,13 @@ func TestDB_MergeForZSet(t *testing.T) {
 		// check that the items that were removed are now not present
 		for i := 0; i < n/2; i++ {
 			score, _ := strconv2.IntToFloat64(i)
-			txZScore(t, db, bucket, key, GetTestBytes(i), score, ErrSortedSetMemberNotExist)
+			txZScore(t, db, bucket, key, getTestBytes(i), score, ErrSortedSetMemberNotExist)
 		}
 
 		// check that the items that are left are the same as the ones that were removed
 		for i := n / 2; i < n; i++ {
 			score, _ := strconv2.IntToFloat64(i)
-			txZScore(t, db, bucket, key, GetTestBytes(i), score, nil)
+			txZScore(t, db, bucket, key, getTestBytes(i), score, nil)
 		}
 
 		// close db
@@ -273,13 +273,13 @@ func TestDB_MergeForZSet(t *testing.T) {
 		// check that the items that were removed are now not present
 		for i := 0; i < n/2; i++ {
 			score, _ := strconv2.IntToFloat64(i)
-			txZScore(t, db, bucket, key, GetTestBytes(i), score, ErrSortedSetMemberNotExist)
+			txZScore(t, db, bucket, key, getTestBytes(i), score, ErrSortedSetMemberNotExist)
 		}
 
 		// check that the items that are left are the same as the ones that were removed
 		for i := n / 2; i < n; i++ {
 			score, _ := strconv2.IntToFloat64(i)
-			txZScore(t, db, bucket, key, GetTestBytes(i), score, nil)
+			txZScore(t, db, bucket, key, getTestBytes(i), score, nil)
 		}
 
 		require.NoError(t, db.Close())
@@ -292,7 +292,7 @@ func TestDB_MergeForZSet(t *testing.T) {
 // It then reopens the DB and checks that the data is still there.
 func TestDB_MergeForList(t *testing.T) {
 	bucket := "bucket"
-	key := GetTestBytes(0)
+	key := getTestBytes(0)
 	opts := DefaultOptions
 	opts.SegmentSize = KB
 	opts.Dir = "/tmp/test-list-merge/"
@@ -301,7 +301,7 @@ func TestDB_MergeForList(t *testing.T) {
 	for _, idxMode := range []EntryIdxMode{HintKeyValAndRAMIdxMode, HintKeyAndRAMIdxMode} {
 		opts.EntryIdxMode = idxMode
 		db, err := Open(opts)
-		if exist := db.bm.ExistBucket(DataStructureList, bucket); !exist {
+		if exist := db.bm.existBucket(DataStructureList, bucket); !exist {
 			txCreateBucket(t, db, DataStructureList, bucket, nil)
 		}
 
@@ -314,25 +314,25 @@ func TestDB_MergeForList(t *testing.T) {
 		// push data
 		n := 1000
 		for i := 0; i < n; i++ {
-			txPush(t, db, bucket, key, GetTestBytes(i), true, nil, nil)
+			txPush(t, db, bucket, key, getTestBytes(i), true, nil, nil)
 		}
 
 		for i := n; i < 2*n; i++ {
-			txPush(t, db, bucket, key, GetTestBytes(i), false, nil, nil)
+			txPush(t, db, bucket, key, getTestBytes(i), false, nil, nil)
 		}
 
 		// pop data
 		for i := n - 1; i >= n/2; i-- {
-			txPop(t, db, bucket, key, GetTestBytes(i), nil, true)
+			txPop(t, db, bucket, key, getTestBytes(i), nil, true)
 		}
 
 		for i := 2*n - 1; i >= 3*n/2; i-- {
-			txPop(t, db, bucket, key, GetTestBytes(i), nil, false)
+			txPop(t, db, bucket, key, getTestBytes(i), nil, false)
 		}
 
 		// trim and remove data
 		txLTrim(t, db, bucket, key, 0, 9, nil)
-		txLRem(t, db, bucket, key, 0, GetTestBytes(100), nil)
+		txLRem(t, db, bucket, key, 0, getTestBytes(100), nil)
 		txLRemByIndex(t, db, bucket, key, nil, []int{7, 8, 9}...)
 
 		dbCnt, err := db.getRecordCount()
@@ -358,7 +358,7 @@ func TestDB_MergeForList(t *testing.T) {
 
 		// pop data
 		for i := n/2 - 1; i < n/2-8; i-- {
-			txPop(t, db, bucket, key, GetTestBytes(i), nil, true)
+			txPop(t, db, bucket, key, getTestBytes(i), nil, true)
 		}
 
 		require.NoError(t, db.Close())

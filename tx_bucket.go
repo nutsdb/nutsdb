@@ -29,7 +29,7 @@ func (tx *Tx) IterateBuckets(ds uint16, pattern string, f func(bucket string) bo
 	var err error
 	if ds == DataStructureSet {
 		for bucketId := range tx.db.Index.set.idx {
-			bucket, err := tx.db.bm.GetBucketById(uint64(bucketId))
+			bucket, err := tx.db.bm.getBucketById(uint64(bucketId))
 			if err != nil {
 				return err
 			}
@@ -38,7 +38,7 @@ func (tx *Tx) IterateBuckets(ds uint16, pattern string, f func(bucket string) bo
 	}
 	if ds == DataStructureSortedSet {
 		for bucketId := range tx.db.Index.sortedSet.idx {
-			bucket, err := tx.db.bm.GetBucketById(uint64(bucketId))
+			bucket, err := tx.db.bm.getBucketById(uint64(bucketId))
 			if err != nil {
 				return err
 			}
@@ -47,7 +47,7 @@ func (tx *Tx) IterateBuckets(ds uint16, pattern string, f func(bucket string) bo
 	}
 	if ds == DataStructureList {
 		for bucketId := range tx.db.Index.list.idx {
-			bucket, err := tx.db.bm.GetBucketById(uint64(bucketId))
+			bucket, err := tx.db.bm.getBucketById(uint64(bucketId))
 			if err != nil {
 				return err
 			}
@@ -56,7 +56,7 @@ func (tx *Tx) IterateBuckets(ds uint16, pattern string, f func(bucket string) bo
 	}
 	if ds == DataStructureBTree {
 		for bucketId := range tx.db.Index.bTree.idx {
-			bucket, err := tx.db.bm.GetBucketById(uint64(bucketId))
+			bucket, err := tx.db.bm.getBucketById(uint64(bucketId))
 			if err != nil {
 				return err
 			}
@@ -86,44 +86,44 @@ func (tx *Tx) NewBucket(ds uint16, name string) (err error) {
 	if tx.ExistBucket(ds, name) {
 		return ErrBucketAlreadyExist
 	}
-	bucket := &Bucket{
-		Meta: &BucketMeta{
-			Op: BucketInsertOperation,
+	b := &bucket{
+		Meta: &bucketMeta{
+			Op: bucketInsertOperation,
 		},
-		Id:   tx.db.bm.Gen.GenId(),
+		Id:   tx.db.bm.Gen.genId(),
 		Ds:   ds,
 		Name: name,
 	}
 	if _, exist := tx.pendingBucketList[ds]; !exist {
-		tx.pendingBucketList[ds] = map[BucketName]*Bucket{}
+		tx.pendingBucketList[ds] = map[bucketName]*bucket{}
 	}
-	tx.pendingBucketList[ds][name] = bucket
+	tx.pendingBucketList[ds][name] = b
 	return nil
 }
 
 // DeleteBucket delete bucket depends on ds (represents the data structure)
-func (tx *Tx) DeleteBucket(ds uint16, bucket string) error {
+func (tx *Tx) DeleteBucket(ds uint16, bucketName string) error {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return err
 	}
 
-	b, err := tx.db.bm.GetBucket(ds, bucket)
+	b, err := tx.db.bm.getBucket(ds, bucketName)
 	if err != nil {
 		return ErrBucketNotFound
 	}
 
-	deleteBucket := &Bucket{
-		Meta: &BucketMeta{
-			Op: BucketDeleteOperation,
+	deleteBucket := &bucket{
+		Meta: &bucketMeta{
+			Op: bucketDeleteOperation,
 		},
 		Id:   b.Id,
 		Ds:   ds,
-		Name: bucket,
+		Name: bucketName,
 	}
 
 	return tx.putBucket(deleteBucket)
 }
 
 func (tx *Tx) ExistBucket(ds uint16, bucket string) bool {
-	return tx.db.bm.ExistBucket(ds, bucket)
+	return tx.db.bm.existBucket(ds, bucket)
 }

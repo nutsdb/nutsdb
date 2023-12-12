@@ -22,7 +22,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func ListPush(t *testing.T, list *List, key string, r *Record, isLeft bool, expectError error) {
+func ListPush(t *testing.T, list *list, key string, r *record, isLeft bool, expectError error) {
 	var e error
 	if isLeft {
 		e = list.lPush(key, r)
@@ -32,10 +32,10 @@ func ListPush(t *testing.T, list *List, key string, r *Record, isLeft bool, expe
 	assertErr(t, e, expectError)
 }
 
-func ListPop(t *testing.T, list *List, key string, isLeft bool, expectVal *Record, expectError error) {
+func ListPop(t *testing.T, list *list, key string, isLeft bool, expectVal *record, expectError error) {
 	var (
 		e error
-		r *Record
+		r *record
 	)
 
 	if isLeft {
@@ -51,7 +51,7 @@ func ListPop(t *testing.T, list *List, key string, isLeft bool, expectVal *Recor
 	}
 }
 
-func ListCmp(t *testing.T, list *List, key string, expectRecords []*Record, isReverse bool) {
+func ListCmp(t *testing.T, list *list, key string, expectRecords []*record, isReverse bool) {
 	records, err := list.lRange(key, 0, -1)
 	require.NoError(t, err)
 
@@ -67,9 +67,9 @@ func ListCmp(t *testing.T, list *List, key string, expectRecords []*Record, isRe
 }
 
 func TestList_LPush(t *testing.T) {
-	list := NewList()
+	list := newList()
 	// 测试 lPush
-	key := string(GetTestBytes(0))
+	key := string(getTestBytes(0))
 	expectRecords := generateRecords(5)
 	seqInfo := HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
 
@@ -84,9 +84,9 @@ func TestList_LPush(t *testing.T) {
 }
 
 func TestList_RPush(t *testing.T) {
-	list := NewList()
+	list := newList()
 	expectRecords := generateRecords(5)
-	key := string(GetTestBytes(0))
+	key := string(getTestBytes(0))
 	seqInfo := HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
 
 	for i := 0; i < len(expectRecords); i++ {
@@ -100,9 +100,9 @@ func TestList_RPush(t *testing.T) {
 }
 
 func TestList_Pop(t *testing.T) {
-	list := NewList()
+	list := newList()
 	expectRecords := generateRecords(5)
-	key := string(GetTestBytes(0))
+	key := string(getTestBytes(0))
 
 	ListPop(t, list, key, true, nil, ErrListNotFound)
 	seqInfo := HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
@@ -124,9 +124,9 @@ func TestList_Pop(t *testing.T) {
 }
 
 func TestList_LRem(t *testing.T) {
-	list := NewList()
+	list := newList()
 	records := generateRecords(2)
-	key := string(GetTestBytes(0))
+	key := string(getTestBytes(0))
 	seqInfo := HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
 
 	for i := 0; i < 3; i++ {
@@ -152,9 +152,9 @@ func TestList_LRem(t *testing.T) {
 	ListPush(t, list, string(newKey), records[1], false, nil)
 
 	// r1 r1 r1 r2 r1 r2
-	expectRecords := []*Record{records[0], records[0], records[0], records[1], records[0], records[1]}
+	expectRecords := []*record{records[0], records[0], records[0], records[1], records[0], records[1]}
 
-	cmp := func(r *Record) (bool, error) {
+	cmp := func(r *record) (bool, error) {
 		return bytes.Equal(r.Value, records[0].Value), nil
 	}
 
@@ -170,7 +170,7 @@ func TestList_LRem(t *testing.T) {
 	expectRecords = expectRecords[2:]
 	ListCmp(t, list, key, expectRecords, false)
 
-	cmp = func(r *Record) (bool, error) {
+	cmp = func(r *record) (bool, error) {
 		return bytes.Equal(r.Value, records[1].Value), nil
 	}
 
@@ -182,9 +182,9 @@ func TestList_LRem(t *testing.T) {
 }
 
 func TestList_LTrim(t *testing.T) {
-	list := NewList()
+	list := newList()
 	expectRecords := generateRecords(5)
-	key := string(GetTestBytes(0))
+	key := string(getTestBytes(0))
 	seqInfo := HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
 
 	for i := 0; i < len(expectRecords); i++ {
@@ -201,9 +201,9 @@ func TestList_LTrim(t *testing.T) {
 }
 
 func TestList_LRemByIndex(t *testing.T) {
-	list := NewList()
+	list := newList()
 	expectRecords := generateRecords(8)
-	key := string(GetTestBytes(0))
+	key := string(getTestBytes(0))
 	seqInfo := HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
 
 	// r1 r2 r3 r4 r5 r6 r7 r8
@@ -233,14 +233,14 @@ func TestList_LRemByIndex(t *testing.T) {
 	ListCmp(t, list, key, expectRecords, false)
 }
 
-func generateRecords(count int) []*Record {
+func generateRecords(count int) []*record {
 	rand.Seed(time.Now().UnixNano())
-	records := make([]*Record, count)
+	records := make([]*record, count)
 	for i := 0; i < count; i++ {
-		key := GetTestBytes(i)
-		val := GetRandomBytes(24)
+		key := getTestBytes(i)
+		val := getRandomBytes(24)
 
-		record := &Record{
+		record := &record{
 			Key:       key,
 			Value:     val,
 			FileID:    int64(i),

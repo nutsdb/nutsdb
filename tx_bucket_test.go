@@ -28,8 +28,8 @@ var (
 )
 
 func setupBucket(t *testing.T, db *DB) {
-	key := GetTestBytes(0)
-	val := GetTestBytes(1)
+	key := getTestBytes(0)
+	val := getTestBytes(1)
 	txCreateBucket(t, db, DataStructureBTree, stringBucketName, nil)
 	txCreateBucket(t, db, DataStructureSet, setBucketName, nil)
 	txCreateBucket(t, db, DataStructureSortedSet, zSetBucketName, nil)

@@ -25,12 +25,12 @@ import (
 
 type EntryTestSuite struct {
 	suite.Suite
-	entry          Entry
+	entry          entry
 	expectedEncode []byte
 }
 
 func (suite *EntryTestSuite) SetupSuite() {
-	suite.entry = Entry{
+	suite.entry = entry{
 		Key:   []byte("key_0001"),
 		Value: []byte("val_0001"),
 		Meta: newMetaData().withKeySize(uint32(len("key_0001"))).
@@ -40,14 +40,14 @@ func (suite *EntryTestSuite) SetupSuite() {
 }
 
 func (suite *EntryTestSuite) TestEncode() {
-	ok := reflect.DeepEqual(suite.entry.Encode(), suite.expectedEncode)
+	ok := reflect.DeepEqual(suite.entry.encode(), suite.expectedEncode)
 	assert.True(suite.T(), ok, "entry's encode test fail")
 }
 
 func (suite *EntryTestSuite) TestIsZero() {
 
-	if ok := suite.entry.IsZero(); ok {
-		assert.Fail(suite.T(), "entry's IsZero test fail")
+	if ok := suite.entry.isZero(); ok {
+		assert.Fail(suite.T(), "entry's isZero test fail")
 	}
 
 }
@@ -55,11 +55,11 @@ func (suite *EntryTestSuite) TestIsZero() {
 func (suite *EntryTestSuite) TestGetCrc() {
 
 	headerSize := suite.entry.Meta.size()
-	crc1 := suite.entry.GetCrc(suite.expectedEncode[:headerSize])
+	crc1 := suite.entry.getCrc(suite.expectedEncode[:headerSize])
 	crc2 := binary.LittleEndian.Uint32(suite.expectedEncode[:4])
 
 	if crc1 != crc2 {
-		assert.Fail(suite.T(), "entry's GetCrc test fail")
+		assert.Fail(suite.T(), "entry's getCrc test fail")
 	}
 }
 
@@ -70,12 +70,12 @@ func TestEntrySuit(t *testing.T) {
 func TestEntries_processEntriesScanOnDisk(t *testing.T) {
 	tests := []struct {
 		name       string
-		e          Entries
-		wantResult []*Entry
+		e          entries
+		wantResult []*entry
 	}{
 		{
 			"sort",
-			Entries{
+			entries{
 				{
 					Key:  []byte("abc"),
 					Meta: newMetaData().withTTL(0).withFlag(DataSetFlag),
@@ -89,7 +89,7 @@ func TestEntries_processEntriesScanOnDisk(t *testing.T) {
 					Meta: newMetaData().withTTL(0).withFlag(DataSetFlag),
 				},
 			},
-			[]*Entry{
+			[]*entry{
 				{
 					Key:  []byte("abc"),
 					Meta: newMetaData().withTTL(0).withFlag(DataSetFlag),
@@ -106,7 +106,7 @@ func TestEntries_processEntriesScanOnDisk(t *testing.T) {
 		},
 		{
 			"expired",
-			Entries{
+			entries{
 				{
 					Key:  []byte("abc"),
 					Meta: newMetaData().withTTL(1),
@@ -124,7 +124,7 @@ func TestEntries_processEntriesScanOnDisk(t *testing.T) {
 			assert.Equalf(t, tt.wantResult, tt.e.processEntriesScanOnDisk(), "processEntriesScanOnDisk()")
 		})
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equalf(t, tt.wantResult, tt.e.toCEntries(nil).processEntriesScanOnDisk(), "CEntries.processEntriesScanOnDisk()")
+			assert.Equalf(t, tt.wantResult, tt.e.toCEntries(nil).processEntriesScanOnDisk(), "cEntries.processEntriesScanOnDisk()")
 		})
 	}
 }

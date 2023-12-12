@@ -5,9 +5,9 @@ And it also supports data structure such as list、set、sorted set etc.
 
 NutsDB currently works on Mac OS, Linux and Windows.
 
-Usage
+# Usage
 
-NutsDB has the following main types: DB, BPTree, Entry, DataFile And Tx. and NutsDB supports bucket, A bucket is
+NutsDB has the following main types: DB, BPTree, entry, dataFile And Tx. and NutsDB supports bucket, A bucket is
 a collection of unique keys that are associated with values.
 
 All operations happen inside a Tx. Tx represents a transaction, which can

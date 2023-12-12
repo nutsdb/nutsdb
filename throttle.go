@@ -4,10 +4,10 @@ import (
 	"sync"
 )
 
-// Throttle allows a limited number of workers to run at a time. It also
+// throttle allows a limited number of workers to run at a time. It also
 // provides a mechanism to check for errors encountered by workers and wait for
 // them to finish.
-type Throttle struct {
+type throttle struct {
 	once      sync.Once
 	wg        sync.WaitGroup
 	ch        chan struct{}
@@ -15,9 +15,9 @@ type Throttle struct {
 	finishErr error
 }
 
-// NewThrottle creates a new throttle with a max number of workers.
-func NewThrottle(max int) *Throttle {
-	return &Throttle{
+// newThrottle creates a new throttle with a max number of workers.
+func newThrottle(max int) *throttle {
+	return &throttle{
 		ch:    make(chan struct{}, max),
 		errCh: make(chan error, max),
 	}
@@ -26,7 +26,7 @@ func NewThrottle(max int) *Throttle {
 // do should be called by workers before they start working. It blocks if there
 // are already maximum number of workers working. If it detects an error from
 // previously done workers, it would return it.
-func (t *Throttle) do() error {
+func (t *throttle) do() error {
 	for {
 		select {
 		case t.ch <- struct{}{}:
@@ -42,14 +42,14 @@ func (t *Throttle) do() error {
 
 // done should be called by workers when they finish working. They can also
 // pass the error status of work done.
-func (t *Throttle) done(err error) {
+func (t *throttle) done(err error) {
 	if err != nil {
 		t.errCh <- err
 	}
 	select {
 	case <-t.ch:
 	default:
-		panic("Throttle do done mismatch")
+		panic("throttle do done mismatch")
 	}
 	t.wg.Done()
 }
@@ -57,7 +57,7 @@ func (t *Throttle) done(err error) {
 // finish waits until all workers have finished working. It would return any error passed by done.
 // If finish is called multiple time, it will wait for workers to finish only once(first time).
 // From next calls, it will return same error as found on first call.
-func (t *Throttle) finish() error {
+func (t *throttle) finish() error {
 	t.once.Do(func() {
 		t.wg.Wait()
 		close(t.ch)

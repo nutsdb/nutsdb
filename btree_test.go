@@ -26,8 +26,8 @@ var (
 	valFormat = "val_%03d"
 )
 
-func runBTreeTest(t *testing.T, test func(t *testing.T, btree *BTree)) {
-	btree := NewBTree()
+func runBTreeTest(t *testing.T, test func(t *testing.T, btree *bTree)) {
+	btree := newBTree()
 
 	for i := 0; i < 100; i++ {
 		key := []byte(fmt.Sprintf(keyFormat, i))
@@ -40,7 +40,7 @@ func runBTreeTest(t *testing.T, test func(t *testing.T, btree *BTree)) {
 }
 
 func TestBTree_Find(t *testing.T) {
-	runBTreeTest(t, func(t *testing.T, btree *BTree) {
+	runBTreeTest(t, func(t *testing.T, btree *bTree) {
 		r, ok := btree.find([]byte(fmt.Sprintf(keyFormat, 0)))
 		require.Equal(t, []byte(fmt.Sprintf(keyFormat, 0)), r.Key)
 		require.True(t, ok)
@@ -48,7 +48,7 @@ func TestBTree_Find(t *testing.T) {
 }
 
 func TestBTree_Delete(t *testing.T) {
-	runBTreeTest(t, func(t *testing.T, btree *BTree) {
+	runBTreeTest(t, func(t *testing.T, btree *bTree) {
 		require.True(t, btree.delete([]byte(fmt.Sprintf(keyFormat, 0))))
 		require.False(t, btree.delete([]byte(fmt.Sprintf(keyFormat, 100))))
 
@@ -59,7 +59,7 @@ func TestBTree_Delete(t *testing.T) {
 
 func TestBTree_PrefixScan(t *testing.T) {
 	t.Run("prefix scan from beginning", func(t *testing.T) {
-		runBTreeTest(t, func(t *testing.T, btree *BTree) {
+		runBTreeTest(t, func(t *testing.T, btree *bTree) {
 			limit := 10
 
 			records := btree.prefixScan([]byte("key_"), 0, limit)
@@ -75,7 +75,7 @@ func TestBTree_PrefixScan(t *testing.T) {
 	})
 
 	t.Run("prefix scan for not exists pre key", func(t *testing.T) {
-		runBTreeTest(t, func(t *testing.T, btree *BTree) {
+		runBTreeTest(t, func(t *testing.T, btree *bTree) {
 			records := btree.prefixScan([]byte("key_xx"), 0, 10)
 			assert.Len(t, records, 0)
 		})
@@ -84,10 +84,10 @@ func TestBTree_PrefixScan(t *testing.T) {
 
 func TestBTree_PrefixSearchScan(t *testing.T) {
 	t.Run("prefix search scan right email", func(t *testing.T) {
-		runBTreeTest(t, func(t *testing.T, btree *BTree) {
+		runBTreeTest(t, func(t *testing.T, btree *bTree) {
 
 			key := []byte("nutsdb-123456789@outlook.com")
-			val := GetRandomBytes(24)
+			val := getRandomBytes(24)
 
 			_ = btree.insert(newRecord().withKey(key).withValue(val))
 
@@ -102,10 +102,10 @@ func TestBTree_PrefixSearchScan(t *testing.T) {
 	})
 
 	t.Run("prefix search scan wrong email", func(t *testing.T) {
-		runBTreeTest(t, func(t *testing.T, btree *BTree) {
+		runBTreeTest(t, func(t *testing.T, btree *bTree) {
 
 			key := []byte("nutsdb-123456789@outlook")
-			val := GetRandomBytes(24)
+			val := getRandomBytes(24)
 
 			_ = btree.insert(newRecord().withKey(key).withValue(val))
 
@@ -121,8 +121,8 @@ func TestBTree_PrefixSearchScan(t *testing.T) {
 }
 
 func TestBTree_All(t *testing.T) {
-	runBTreeTest(t, func(t *testing.T, btree *BTree) {
-		expectRecords := make([]*Record, 100)
+	runBTreeTest(t, func(t *testing.T, btree *bTree) {
+		expectRecords := make([]*record, 100)
 
 		for i := 0; i < 100; i++ {
 			key := []byte(fmt.Sprintf(keyFormat, i))
@@ -137,8 +137,8 @@ func TestBTree_All(t *testing.T) {
 
 func TestBTree_Range(t *testing.T) {
 	t.Run("btree range at begin", func(t *testing.T) {
-		runBTreeTest(t, func(t *testing.T, btree *BTree) {
-			expectRecords := make([]*Record, 10)
+		runBTreeTest(t, func(t *testing.T, btree *bTree) {
+			expectRecords := make([]*record, 10)
 
 			for i := 0; i < 10; i++ {
 				key := []byte(fmt.Sprintf(keyFormat, i))
@@ -154,8 +154,8 @@ func TestBTree_Range(t *testing.T) {
 	})
 
 	t.Run("btree range at middle", func(t *testing.T) {
-		runBTreeTest(t, func(t *testing.T, btree *BTree) {
-			expectRecords := make([]*Record, 10)
+		runBTreeTest(t, func(t *testing.T, btree *bTree) {
+			expectRecords := make([]*record, 10)
 
 			for i := 40; i < 50; i++ {
 				key := []byte(fmt.Sprintf(keyFormat, i))
@@ -171,8 +171,8 @@ func TestBTree_Range(t *testing.T) {
 	})
 
 	t.Run("btree range at end", func(t *testing.T) {
-		runBTreeTest(t, func(t *testing.T, btree *BTree) {
-			expectRecords := make([]*Record, 10)
+		runBTreeTest(t, func(t *testing.T, btree *bTree) {
+			expectRecords := make([]*record, 10)
 
 			for i := 90; i < 100; i++ {
 				key := []byte(fmt.Sprintf(keyFormat, i))
@@ -189,7 +189,7 @@ func TestBTree_Range(t *testing.T) {
 }
 
 func TestBTree_Update(t *testing.T) {
-	runBTreeTest(t, func(t *testing.T, btree *BTree) {
+	runBTreeTest(t, func(t *testing.T, btree *bTree) {
 		for i := 40; i < 50; i++ {
 			key := []byte(fmt.Sprintf(keyFormat, i))
 			val := []byte(fmt.Sprintf("val_%03d_modify", i))

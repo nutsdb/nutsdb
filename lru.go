@@ -1,30 +1,30 @@
 package nutsdb
 
 import (
-	"container/list"
+	stdList "container/list"
 	"sync"
 )
 
-// LRUCache is a least recently used (LRU) cache.
-type LRUCache struct {
-	m   map[interface{}]*list.Element
-	l   *list.List
+// lRUCache is a least recently used (LRU) cache.
+type lRUCache struct {
+	m   map[interface{}]*stdList.Element
+	l   *stdList.List
 	cap int
 	mu  *sync.RWMutex
 }
 
-// New creates a new LRUCache with the specified capacity.
-func NewLruCache(cap int) *LRUCache {
-	return &LRUCache{
-		m:   make(map[interface{}]*list.Element),
-		l:   list.New(),
+// newLruCache creates a new lRUCache with the specified capacity.
+func newLruCache(cap int) *lRUCache {
+	return &lRUCache{
+		m:   make(map[interface{}]*stdList.Element),
+		l:   stdList.New(),
 		cap: cap,
 		mu:  &sync.RWMutex{},
 	}
 }
 
 // add adds a new entry to the cache.
-func (c *LRUCache) add(key interface{}, value interface{}) {
+func (c *lRUCache) add(key interface{}, value interface{}) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -46,7 +46,7 @@ func (c *LRUCache) add(key interface{}, value interface{}) {
 }
 
 // get returns the entry associated with the given key, or nil if the key is not in the cache.
-func (c *LRUCache) get(key interface{}) interface{} {
+func (c *lRUCache) get(key interface{}) interface{} {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -60,7 +60,7 @@ func (c *LRUCache) get(key interface{}) interface{} {
 }
 
 // remove removes the entry associated with the given key from the cache.
-func (c *LRUCache) remove(key interface{}) {
+func (c *lRUCache) remove(key interface{}) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -74,7 +74,7 @@ func (c *LRUCache) remove(key interface{}) {
 }
 
 // len returns the number of entries in the cache.
-func (c *LRUCache) len() int {
+func (c *lRUCache) len() int {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
@@ -82,16 +82,16 @@ func (c *LRUCache) len() int {
 }
 
 // clear clears the cache.
-func (c *LRUCache) clear() {
+func (c *lRUCache) clear() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	c.l.Init()
-	c.m = make(map[interface{}]*list.Element)
+	c.m = make(map[interface{}]*stdList.Element)
 }
 
 // removeOldest removes the oldest entry from the cache.
-func (c *LRUCache) removeOldest() {
+func (c *lRUCache) removeOldest() {
 	entry := c.l.Back()
 	if entry == nil {
 		return

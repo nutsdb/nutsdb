@@ -120,10 +120,10 @@ func TestFdManager_All(t *testing.T) {
 
 func TestDoubleLinkedList_All(t *testing.T) {
 	list := initDoubleLinkedList()
-	nodeMap := make(map[int]*FdInfo)
+	nodeMap := make(map[int]*fdInfo)
 	t.Run("test add node", func(t *testing.T) {
 		for i := 1; i <= 10; i++ {
-			fd := &FdInfo{
+			fd := &fdInfo{
 				path: fmt.Sprint(i),
 			}
 			list.addNode(fd)

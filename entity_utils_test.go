@@ -17,7 +17,7 @@ func TestGetDiskSizeFromSingleObject(t *testing.T) {
 		{
 			name: "happy path for getting entry header size",
 			args: args{
-				obj: MetaData{},
+				obj: metaData{},
 			},
 			want: 50,
 		},

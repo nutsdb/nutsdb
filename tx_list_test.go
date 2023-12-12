@@ -23,13 +23,13 @@ import (
 
 func pushDataByStartEnd(t *testing.T, db *DB, bucket string, key int, start, end int, isLeft bool) {
 	for i := start; i <= end; i++ {
-		txPush(t, db, bucket, GetTestBytes(key), GetTestBytes(i), isLeft, nil, nil)
+		txPush(t, db, bucket, getTestBytes(key), getTestBytes(i), isLeft, nil, nil)
 	}
 }
 
 func pushDataByValues(t *testing.T, db *DB, bucket string, key int, isLeft bool, values ...int) {
 	for _, v := range values {
-		txPush(t, db, bucket, GetTestBytes(key), GetTestBytes(v), isLeft, nil, nil)
+		txPush(t, db, bucket, getTestBytes(key), getTestBytes(v), isLeft, nil, nil)
 	}
 }
 
@@ -45,13 +45,13 @@ func TestTx_RPush(t *testing.T) {
 		pushDataByStartEnd(t, db, bucket, 2, 20, 29, false)
 
 		for i := 0; i < 10; i++ {
-			txPop(t, db, bucket, GetTestBytes(0), GetTestBytes(9-i), nil, false)
+			txPop(t, db, bucket, getTestBytes(0), getTestBytes(9-i), nil, false)
 		}
 		for i := 10; i < 20; i++ {
-			txPop(t, db, bucket, GetTestBytes(1), GetTestBytes(29-i), nil, false)
+			txPop(t, db, bucket, getTestBytes(1), getTestBytes(29-i), nil, false)
 		}
 		for i := 20; i < 30; i++ {
-			txPop(t, db, bucket, GetTestBytes(2), GetTestBytes(49-i), nil, false)
+			txPop(t, db, bucket, getTestBytes(2), getTestBytes(49-i), nil, false)
 		}
 	})
 }
@@ -68,16 +68,16 @@ func TestTx_LPush(t *testing.T) {
 		pushDataByStartEnd(t, db, bucket, 1, 10, 19, true)
 		pushDataByStartEnd(t, db, bucket, 2, 20, 29, true)
 
-		txPush(t, db, bucket, []byte("012|sas"), GetTestBytes(0), true, ErrSeparatorForListKey, nil)
+		txPush(t, db, bucket, []byte("012|sas"), getTestBytes(0), true, ErrSeparatorForListKey, nil)
 
 		for i := 0; i < 10; i++ {
-			txPop(t, db, bucket, GetTestBytes(0), GetTestBytes(9-i), nil, true)
+			txPop(t, db, bucket, getTestBytes(0), getTestBytes(9-i), nil, true)
 		}
 		for i := 10; i < 20; i++ {
-			txPop(t, db, bucket, GetTestBytes(1), GetTestBytes(29-i), nil, true)
+			txPop(t, db, bucket, getTestBytes(1), getTestBytes(29-i), nil, true)
 		}
 		for i := 20; i < 30; i++ {
-			txPop(t, db, bucket, GetTestBytes(2), GetTestBytes(49-i), nil, true)
+			txPop(t, db, bucket, getTestBytes(2), getTestBytes(49-i), nil, true)
 		}
 	})
 }
@@ -91,11 +91,11 @@ func TestTx_LPushRaw(t *testing.T) {
 		for i := 0; i <= 100; i++ {
 			key := encodeListKey([]byte("0"), seq)
 			seq--
-			txPushRaw(t, db, bucket, key, GetTestBytes(i), true, nil, nil)
+			txPushRaw(t, db, bucket, key, getTestBytes(i), true, nil, nil)
 		}
 
 		for i := 0; i <= 100; i++ {
-			v := GetTestBytes(100 - i)
+			v := getTestBytes(100 - i)
 			txPop(t, db, bucket, []byte("0"), v, nil, true)
 		}
 	})
@@ -109,13 +109,13 @@ func TestTx_RPushRaw(t *testing.T) {
 		for i := 0; i <= 100; i++ {
 			key := encodeListKey([]byte("0"), seq)
 			seq++
-			txPushRaw(t, db, bucket, key, GetTestBytes(i), false, nil, nil)
+			txPushRaw(t, db, bucket, key, getTestBytes(i), false, nil, nil)
 		}
 
-		txPush(t, db, bucket, []byte("012|sas"), GetTestBytes(0), false, ErrSeparatorForListKey, nil)
+		txPush(t, db, bucket, []byte("012|sas"), getTestBytes(0), false, ErrSeparatorForListKey, nil)
 
 		for i := 0; i <= 100; i++ {
-			v := GetTestBytes(100 - i)
+			v := getTestBytes(100 - i)
 			txPop(t, db, bucket, []byte("0"), v, nil, false)
 		}
 	})
@@ -127,7 +127,7 @@ func TestTx_LPop(t *testing.T) {
 	// Calling LPop on a non-existent list
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		txCreateBucket(t, db, DataStructureList, bucket, nil)
-		txPop(t, db, bucket, GetTestBytes(0), nil, ErrListNotFound, true)
+		txPop(t, db, bucket, getTestBytes(0), nil, ErrListNotFound, true)
 	})
 
 	// Insert some values for a key and validate them by using LPop
@@ -135,7 +135,7 @@ func TestTx_LPop(t *testing.T) {
 		txCreateBucket(t, db, DataStructureList, bucket, nil)
 		pushDataByStartEnd(t, db, bucket, 0, 0, 2, true)
 		for i := 0; i < 3; i++ {
-			txPop(t, db, bucket, GetTestBytes(0), GetTestBytes(2-i), nil, true)
+			txPop(t, db, bucket, getTestBytes(0), getTestBytes(2-i), nil, true)
 		}
 	})
 }
@@ -146,7 +146,7 @@ func TestTx_RPop(t *testing.T) {
 	// Calling RPop on a non-existent list
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		txCreateBucket(t, db, DataStructureList, bucket, nil)
-		txPop(t, db, bucket, GetTestBytes(0), nil, ErrListNotFound, false)
+		txPop(t, db, bucket, getTestBytes(0), nil, ErrListNotFound, false)
 	})
 
 	// Calling RPop on a list with added data
@@ -154,13 +154,13 @@ func TestTx_RPop(t *testing.T) {
 		txCreateBucket(t, db, DataStructureList, bucket, nil)
 		pushDataByStartEnd(t, db, bucket, 0, 0, 2, false)
 
-		txPop(t, db, "fake_bucket", GetTestBytes(0), nil, ErrBucketNotExist, false)
+		txPop(t, db, "fake_bucket", getTestBytes(0), nil, ErrBucketNotExist, false)
 
 		for i := 0; i < 3; i++ {
-			txPop(t, db, bucket, GetTestBytes(0), GetTestBytes(2-i), nil, false)
+			txPop(t, db, bucket, getTestBytes(0), getTestBytes(2-i), nil, false)
 		}
 
-		txPop(t, db, bucket, GetTestBytes(0), nil, ErrEmptyList, false)
+		txPop(t, db, bucket, getTestBytes(0), nil, ErrEmptyList, false)
 	})
 }
 
@@ -171,7 +171,7 @@ func TestTx_LRange(t *testing.T) {
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		txCreateBucket(t, db, DataStructureList, bucket, nil)
 
-		txLRange(t, db, bucket, GetTestBytes(0), 0, -1, 0, nil, ErrListNotFound)
+		txLRange(t, db, bucket, getTestBytes(0), 0, -1, 0, nil, ErrListNotFound)
 	})
 
 	// Calling LRange on a list with added data
@@ -180,15 +180,15 @@ func TestTx_LRange(t *testing.T) {
 
 		pushDataByStartEnd(t, db, bucket, 0, 0, 2, true)
 
-		txLRange(t, db, bucket, GetTestBytes(0), 0, -1, 3, [][]byte{
-			GetTestBytes(2), GetTestBytes(1), GetTestBytes(0),
+		txLRange(t, db, bucket, getTestBytes(0), 0, -1, 3, [][]byte{
+			getTestBytes(2), getTestBytes(1), getTestBytes(0),
 		}, nil)
 
 		for i := 0; i < 3; i++ {
-			txPop(t, db, bucket, GetTestBytes(0), GetTestBytes(2-i), nil, true)
+			txPop(t, db, bucket, getTestBytes(0), getTestBytes(2-i), nil, true)
 		}
 
-		txLRange(t, db, bucket, GetTestBytes(0), 0, -1, 0, nil, nil)
+		txLRange(t, db, bucket, getTestBytes(0), 0, -1, 0, nil, nil)
 	})
 }
 
@@ -198,7 +198,7 @@ func TestTx_LRem(t *testing.T) {
 	// Calling LRem on a non-existent list
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		txCreateBucket(t, db, DataStructureList, bucket, nil)
-		txLRem(t, db, bucket, GetTestBytes(0), 1, GetTestBytes(0), ErrListNotFound)
+		txLRem(t, db, bucket, getTestBytes(0), 1, getTestBytes(0), ErrListNotFound)
 	})
 
 	// A basic calling for LRem
@@ -207,12 +207,12 @@ func TestTx_LRem(t *testing.T) {
 
 		pushDataByStartEnd(t, db, bucket, 0, 0, 3, true)
 
-		txLRem(t, db, bucket, GetTestBytes(0), 1, GetTestBytes(0), nil)
-		txLRange(t, db, bucket, GetTestBytes(0), 0, -1, 3, [][]byte{
-			GetTestBytes(3), GetTestBytes(2), GetTestBytes(1),
+		txLRem(t, db, bucket, getTestBytes(0), 1, getTestBytes(0), nil)
+		txLRange(t, db, bucket, getTestBytes(0), 0, -1, 3, [][]byte{
+			getTestBytes(3), getTestBytes(2), getTestBytes(1),
 		}, nil)
-		txLRem(t, db, bucket, GetTestBytes(0), 4, GetTestBytes(0), ErrCount)
-		txLRem(t, db, bucket, GetTestBytes(0), 1, GetTestBytes(1), nil)
+		txLRem(t, db, bucket, getTestBytes(0), 4, getTestBytes(0), ErrCount)
+		txLRem(t, db, bucket, getTestBytes(0), 1, getTestBytes(1), nil)
 	})
 
 	// Calling LRem with count > 0
@@ -223,13 +223,13 @@ func TestTx_LRem(t *testing.T) {
 
 		pushDataByValues(t, db, bucket, 1, true, 0, 1, 0, 1, 0, 1, 0, 1)
 
-		txLRange(t, db, bucket, GetTestBytes(1), 0, -1, 8, [][]byte{
-			GetTestBytes(1), GetTestBytes(0), GetTestBytes(1), GetTestBytes(0),
-			GetTestBytes(1), GetTestBytes(0), GetTestBytes(1), GetTestBytes(0),
+		txLRange(t, db, bucket, getTestBytes(1), 0, -1, 8, [][]byte{
+			getTestBytes(1), getTestBytes(0), getTestBytes(1), getTestBytes(0),
+			getTestBytes(1), getTestBytes(0), getTestBytes(1), getTestBytes(0),
 		}, nil)
-		txLRem(t, db, bucket, GetTestBytes(1), count, GetTestBytes(0), nil)
-		txLRange(t, db, bucket, GetTestBytes(1), 0, -1, 5, [][]byte{
-			GetTestBytes(1), GetTestBytes(1), GetTestBytes(1), GetTestBytes(1), GetTestBytes(0),
+		txLRem(t, db, bucket, getTestBytes(1), count, getTestBytes(0), nil)
+		txLRange(t, db, bucket, getTestBytes(1), 0, -1, 5, [][]byte{
+			getTestBytes(1), getTestBytes(1), getTestBytes(1), getTestBytes(1), getTestBytes(0),
 		}, nil)
 	})
 
@@ -240,13 +240,13 @@ func TestTx_LRem(t *testing.T) {
 
 		pushDataByValues(t, db, bucket, 1, true, 0, 1, 0, 1, 0, 1, 0, 1)
 
-		txLRange(t, db, bucket, GetTestBytes(1), 0, -1, 8, [][]byte{
-			GetTestBytes(1), GetTestBytes(0), GetTestBytes(1), GetTestBytes(0),
-			GetTestBytes(1), GetTestBytes(0), GetTestBytes(1), GetTestBytes(0),
+		txLRange(t, db, bucket, getTestBytes(1), 0, -1, 8, [][]byte{
+			getTestBytes(1), getTestBytes(0), getTestBytes(1), getTestBytes(0),
+			getTestBytes(1), getTestBytes(0), getTestBytes(1), getTestBytes(0),
 		}, nil)
-		txLRem(t, db, bucket, GetTestBytes(1), count, GetTestBytes(0), nil)
-		txLRange(t, db, bucket, GetTestBytes(1), 0, -1, 4, [][]byte{
-			GetTestBytes(1), GetTestBytes(1), GetTestBytes(1), GetTestBytes(1),
+		txLRem(t, db, bucket, getTestBytes(1), count, getTestBytes(0), nil)
+		txLRange(t, db, bucket, getTestBytes(1), 0, -1, 4, [][]byte{
+			getTestBytes(1), getTestBytes(1), getTestBytes(1), getTestBytes(1),
 		}, nil)
 	})
 
@@ -258,13 +258,13 @@ func TestTx_LRem(t *testing.T) {
 
 		pushDataByValues(t, db, bucket, 1, true, 0, 1, 0, 1, 0, 1, 0, 1)
 
-		txLRange(t, db, bucket, GetTestBytes(1), 0, -1, 8, [][]byte{
-			GetTestBytes(1), GetTestBytes(0), GetTestBytes(1), GetTestBytes(0),
-			GetTestBytes(1), GetTestBytes(0), GetTestBytes(1), GetTestBytes(0),
+		txLRange(t, db, bucket, getTestBytes(1), 0, -1, 8, [][]byte{
+			getTestBytes(1), getTestBytes(0), getTestBytes(1), getTestBytes(0),
+			getTestBytes(1), getTestBytes(0), getTestBytes(1), getTestBytes(0),
 		}, nil)
-		txLRem(t, db, bucket, GetTestBytes(1), count, GetTestBytes(0), nil)
-		txLRange(t, db, bucket, GetTestBytes(1), 0, -1, 5, [][]byte{
-			GetTestBytes(1), GetTestBytes(0), GetTestBytes(1), GetTestBytes(1), GetTestBytes(1),
+		txLRem(t, db, bucket, getTestBytes(1), count, getTestBytes(0), nil)
+		txLRange(t, db, bucket, getTestBytes(1), 0, -1, 5, [][]byte{
+			getTestBytes(1), getTestBytes(0), getTestBytes(1), getTestBytes(1), getTestBytes(1),
 		}, nil)
 	})
 }
@@ -275,17 +275,17 @@ func TestTx_LTrim(t *testing.T) {
 	// Calling LTrim on a non-existent list
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		txCreateBucket(t, db, DataStructureList, bucket, nil)
-		txLTrim(t, db, bucket, GetTestBytes(0), 0, 1, ErrListNotFound)
+		txLTrim(t, db, bucket, getTestBytes(0), 0, 1, ErrListNotFound)
 	})
 
 	// Calling LTrim on a list with added data and use LRange to validate it
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		txCreateBucket(t, db, DataStructureList, bucket, nil)
 		pushDataByStartEnd(t, db, bucket, 0, 0, 2, true)
-		txLTrim(t, db, bucket, GetTestBytes(0), 0, 1, nil)
+		txLTrim(t, db, bucket, getTestBytes(0), 0, 1, nil)
 
-		txLRange(t, db, bucket, GetTestBytes(0), 0, -1, 2, [][]byte{
-			GetTestBytes(2), GetTestBytes(1),
+		txLRange(t, db, bucket, getTestBytes(0), 0, -1, 2, [][]byte{
+			getTestBytes(2), getTestBytes(1),
 		}, nil)
 	})
 
@@ -294,9 +294,9 @@ func TestTx_LTrim(t *testing.T) {
 		txCreateBucket(t, db, DataStructureList, bucket, nil)
 
 		for i := 0; i < 3; i++ {
-			txPush(t, db, bucket, GetTestBytes(2), GetTestBytes(i), true, nil, nil)
+			txPush(t, db, bucket, getTestBytes(2), getTestBytes(i), true, nil, nil)
 		}
-		txLTrim(t, db, bucket, GetTestBytes(2), 0, -10, ErrStartOrEnd)
+		txLTrim(t, db, bucket, getTestBytes(2), 0, -10, ErrStartOrEnd)
 	})
 }
 
@@ -306,14 +306,14 @@ func TestTx_LSize(t *testing.T) {
 	// Calling LSize on a non-existent list
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		txCreateBucket(t, db, DataStructureList, bucket, nil)
-		txLSize(t, db, bucket, GetTestBytes(0), 0, ErrListNotFound)
+		txLSize(t, db, bucket, getTestBytes(0), 0, ErrListNotFound)
 	})
 
 	// Calling LSize after adding some values
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		txCreateBucket(t, db, DataStructureList, bucket, nil)
 		pushDataByStartEnd(t, db, bucket, 0, 0, 2, false)
-		txLSize(t, db, bucket, GetTestBytes(0), 3, nil)
+		txLSize(t, db, bucket, getTestBytes(0), 3, nil)
 	})
 }
 
@@ -323,32 +323,32 @@ func TestTx_LRemByIndex(t *testing.T) {
 	// Calling LRemByIndex on a newly created empty list
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		txCreateBucket(t, db, DataStructureList, bucket, nil)
-		txLRemByIndex(t, db, bucket, GetTestBytes(0), nil)
+		txLRemByIndex(t, db, bucket, getTestBytes(0), nil)
 	})
 
 	// Calling LRemByIndex with len(indexes) == 0
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		txCreateBucket(t, db, DataStructureList, bucket, nil)
 		pushDataByValues(t, db, bucket, 0, true, 0)
-		txLRemByIndex(t, db, bucket, GetTestBytes(0), nil)
+		txLRemByIndex(t, db, bucket, getTestBytes(0), nil)
 	})
 
 	// Calling LRemByIndex with a expired bucket name
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		txCreateBucket(t, db, DataStructureList, bucket, nil)
 		pushDataByValues(t, db, bucket, 0, true, 0)
-		txExpireList(t, db, bucket, GetTestBytes(0), 1, nil)
+		txExpireList(t, db, bucket, getTestBytes(0), 1, nil)
 		time.Sleep(3 * time.Second)
-		txLRemByIndex(t, db, bucket, GetTestBytes(0), ErrListNotFound)
+		txLRemByIndex(t, db, bucket, getTestBytes(0), ErrListNotFound)
 	})
 
 	// Calling LRemByIndex on a list with added data and use LRange to validate it
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		txCreateBucket(t, db, DataStructureList, bucket, nil)
 		pushDataByStartEnd(t, db, bucket, 0, 0, 2, false)
-		txLRemByIndex(t, db, bucket, GetTestBytes(0), nil, 1, 0, 8, -8, 88, -88)
-		txLRange(t, db, bucket, GetTestBytes(0), 0, -1, 1, [][]byte{
-			GetTestBytes(2),
+		txLRemByIndex(t, db, bucket, getTestBytes(0), nil, 1, 0, 8, -8, 88, -88)
+		txLRange(t, db, bucket, getTestBytes(0), 0, -1, 1, [][]byte{
+			getTestBytes(2),
 		}, nil)
 	})
 }
@@ -360,23 +360,23 @@ func TestTx_ExpireList(t *testing.T) {
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		txCreateBucket(t, db, DataStructureList, bucket, nil)
 		pushDataByStartEnd(t, db, bucket, 0, 0, 3, false)
-		txLRange(t, db, bucket, GetTestBytes(0), 0, -1, 4, [][]byte{
-			GetTestBytes(0), GetTestBytes(1), GetTestBytes(2), GetTestBytes(3),
+		txLRange(t, db, bucket, getTestBytes(0), 0, -1, 4, [][]byte{
+			getTestBytes(0), getTestBytes(1), getTestBytes(2), getTestBytes(3),
 		}, nil)
 
-		txExpireList(t, db, bucket, GetTestBytes(0), 1, nil)
+		txExpireList(t, db, bucket, getTestBytes(0), 1, nil)
 		time.Sleep(time.Second)
-		txLRange(t, db, bucket, GetTestBytes(0), 0, -1, 0, nil, ErrListNotFound)
+		txLRange(t, db, bucket, getTestBytes(0), 0, -1, 0, nil, ErrListNotFound)
 	})
 
 	// Verify that the list with persistent time
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		txCreateBucket(t, db, DataStructureList, bucket, nil)
 		pushDataByStartEnd(t, db, bucket, 0, 0, 3, false)
-		txExpireList(t, db, bucket, GetTestBytes(0), Persistent, nil)
+		txExpireList(t, db, bucket, getTestBytes(0), Persistent, nil)
 		time.Sleep(time.Second)
-		txLRange(t, db, bucket, GetTestBytes(0), 0, -1, 4, [][]byte{
-			GetTestBytes(0), GetTestBytes(1), GetTestBytes(2), GetTestBytes(3),
+		txLRange(t, db, bucket, getTestBytes(0), 0, -1, 4, [][]byte{
+			getTestBytes(0), getTestBytes(1), getTestBytes(2), getTestBytes(3),
 		}, nil)
 	})
 }
@@ -414,18 +414,18 @@ func TestTx_GetListTTL(t *testing.T) {
 		txCreateBucket(t, db, DataStructureList, bucket, nil)
 		pushDataByStartEnd(t, db, bucket, 0, 0, 3, false)
 
-		txGetListTTL(t, db, bucket, GetTestBytes(0), uint32(0), nil)
-		txExpireList(t, db, bucket, GetTestBytes(0), uint32(1), nil)
-		txGetListTTL(t, db, bucket, GetTestBytes(0), uint32(1), nil)
+		txGetListTTL(t, db, bucket, getTestBytes(0), uint32(0), nil)
+		txExpireList(t, db, bucket, getTestBytes(0), uint32(1), nil)
+		txGetListTTL(t, db, bucket, getTestBytes(0), uint32(1), nil)
 
 		time.Sleep(3 * time.Second)
-		txGetListTTL(t, db, bucket, GetTestBytes(0), uint32(0), ErrListNotFound)
+		txGetListTTL(t, db, bucket, getTestBytes(0), uint32(0), ErrListNotFound)
 	})
 }
 
 func TestTx_ListEntryIdxMode_HintKeyValAndRAMIdxMode(t *testing.T) {
 	bucket := "bucket"
-	key := GetTestBytes(0)
+	key := getTestBytes(0)
 
 	opts := DefaultOptions
 	opts.EntryIdxMode = HintKeyValAndRAMIdxMode
@@ -452,7 +452,7 @@ func TestTx_ListEntryIdxMode_HintKeyValAndRAMIdxMode(t *testing.T) {
 
 func TestTx_ListEntryIdxMode_HintKeyAndRAMIdxMode(t *testing.T) {
 	bucket := "bucket"
-	key := GetTestBytes(0)
+	key := getTestBytes(0)
 
 	opts := &DefaultOptions
 	opts.EntryIdxMode = HintKeyAndRAMIdxMode

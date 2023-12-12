@@ -10,19 +10,19 @@ func TestBucketManager_NewBucketAndDeleteBucket(t *testing.T) {
 	bucket2 := "bucket_2"
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		txNewBucket(t, db, bucket1, DataStructureBTree, nil, nil)
-		exist := db.bm.ExistBucket(DataStructureBTree, bucket1)
+		exist := db.bm.existBucket(DataStructureBTree, bucket1)
 		assert.Equal(t, true, exist)
 		txNewBucket(t, db, bucket2, DataStructureBTree, nil, nil)
-		exist = db.bm.ExistBucket(DataStructureBTree, bucket2)
+		exist = db.bm.existBucket(DataStructureBTree, bucket2)
 		assert.Equal(t, true, exist)
 	})
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		txNewBucket(t, db, bucket1, DataStructureBTree, nil, nil)
-		exist := db.bm.ExistBucket(DataStructureBTree, bucket1)
+		exist := db.bm.existBucket(DataStructureBTree, bucket1)
 		assert.Equal(t, true, exist)
 		txDeleteBucketFunc(t, db, bucket1, DataStructureBTree, nil, nil)
-		exist = db.bm.ExistBucket(DataStructureBTree, bucket1)
+		exist = db.bm.existBucket(DataStructureBTree, bucket1)
 		assert.Equal(t, false, exist)
 	})
 }
@@ -30,11 +30,11 @@ func TestBucketManager_NewBucketAndDeleteBucket(t *testing.T) {
 func TestBucketManager_ExistBucket(t *testing.T) {
 	bucket1 := "bucket_1"
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		exist := db.bm.ExistBucket(DataStructureBTree, bucket1)
+		exist := db.bm.existBucket(DataStructureBTree, bucket1)
 		assert.Equal(t, false, exist)
 
 		txNewBucket(t, db, bucket1, DataStructureBTree, nil, nil)
-		exist = db.bm.ExistBucket(DataStructureBTree, bucket1)
+		exist = db.bm.existBucket(DataStructureBTree, bucket1)
 		assert.Equal(t, true, exist)
 	})
 }
@@ -71,9 +71,9 @@ func TestBucketManager_DataStructureIsolation(t *testing.T) {
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		txCreateBucket(t, db, DataStructureBTree, bucket1, nil)
 
-		assert.Equal(t, false, db.bm.ExistBucket(DataStructureList, bucket1))
-		assert.Equal(t, false, db.bm.ExistBucket(DataStructureSortedSet, bucket1))
-		assert.Equal(t, false, db.bm.ExistBucket(DataStructureSet, bucket1))
+		assert.Equal(t, false, db.bm.existBucket(DataStructureList, bucket1))
+		assert.Equal(t, false, db.bm.existBucket(DataStructureSortedSet, bucket1))
+		assert.Equal(t, false, db.bm.existBucket(DataStructureSet, bucket1))
 	})
 }
 

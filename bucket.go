@@ -6,79 +6,79 @@ import (
 	"hash/crc32"
 )
 
-var BucketMetaSize int64
+var bucketMetaSize int64
 
 const (
-	IdSize = 8
-	DsSize = 2
+	idSize = 8
+	dsSize = 2
 )
 
-type BucketOperation uint16
+type bucketOperation uint16
 
 const (
-	BucketInsertOperation BucketOperation = 1
-	BucketUpdateOperation BucketOperation = 2
-	BucketDeleteOperation BucketOperation = 3
+	bucketInsertOperation bucketOperation = 1
+	bucketUpdateOperation bucketOperation = 2
+	bucketDeleteOperation bucketOperation = 3
 )
 
-type BucketStatus = uint8
+type bucketStatus = uint8
 
-const BucketStatusExistAlready = 1
-const BucketStatusDelete = 2
-const BucketStatusNew = 3
-const BucketStatusUpdated = 4
-const BucketStatusUnknown = 4
+const bucketStatusExistAlready = 1
+const bucketStatusDelete = 2
+const bucketStatusNew = 3
+const bucketStatusUpdated = 4
+const bucketStatusUnknown = 4
 
 var ErrBucketCrcInvalid = errors.New("bucket crc invalid")
 
 func init() {
-	BucketMetaSize = getDiskSizeFromSingleObject(BucketMeta{})
+	bucketMetaSize = getDiskSizeFromSingleObject(bucketMeta{})
 }
 
-// BucketMeta stores the Meta info of a Bucket. E.g. the size of bucket it store in disk.
-type BucketMeta struct {
+// bucketMeta stores the Meta info of a bucket. E.g. the size of bucket it store in disk.
+type bucketMeta struct {
 	Crc uint32
 	// Op: Mark the latest operation (e.g. delete, insert, update) for this bucket.
-	Op BucketOperation
+	Op bucketOperation
 	// Size: the size of payload.
 	Size uint32
 }
 
-// Bucket is the disk structure of bucket
-type Bucket struct {
+// bucket is the disk structure of bucket
+type bucket struct {
 	// Meta: the metadata for this bucket
-	Meta *BucketMeta
+	Meta *bucketMeta
 	// Id: is the marker for this bucket, every bucket creation activity will generate a new Id for it.
 	// for example. If you have a bucket called "bucket_1", and you just delete bucket and create it again.
 	// the last bucket will have a different Id from the previous one.
-	Id BucketId
-	// Ds: the data structure for this bucket. (List, Set, SortSet, String)
-	Ds Ds
+	Id bucketId
+	// Ds: the data structure for this bucket. (list, set, SortSet, String)
+	Ds ds
 	// Name: the name of this bucket.
 	Name string
 }
 
 // decode : CRC | op | size
-func (meta *BucketMeta) decode(bytes []byte) {
-	_ = bytes[BucketMetaSize-1]
+func (meta *bucketMeta) decode(bytes []byte) {
+	_ = bytes[bucketMetaSize-1]
 	crc := binary.LittleEndian.Uint32(bytes[:4])
 	op := binary.LittleEndian.Uint16(bytes[4:6])
 	size := binary.LittleEndian.Uint32(bytes[6:10])
 	meta.Crc = crc
 	meta.Size = size
-	meta.Op = BucketOperation(op)
+	meta.Op = bucketOperation(op)
 }
 
-// encode : Meta | BucketId | Ds | BucketName
-func (b *Bucket) encode() []byte {
+// encode : Meta | bucketId | ds | bucketName
+func (b *bucket) encode() []byte {
 	entrySize := b.getEntrySize()
 	buf := make([]byte, entrySize)
 	b.Meta.Size = uint32(b.getPayloadSize())
 	binary.LittleEndian.PutUint16(buf[4:6], uint16(b.Meta.Op))
 	binary.LittleEndian.PutUint32(buf[6:10], b.Meta.Size)
-	binary.LittleEndian.PutUint64(buf[BucketMetaSize:BucketMetaSize+IdSize], uint64(b.Id))
-	binary.LittleEndian.PutUint16(buf[BucketMetaSize+IdSize:BucketMetaSize+IdSize+DsSize], uint16(b.Ds))
-	copy(buf[BucketMetaSize+IdSize+DsSize:], b.Name)
+	binary.LittleEndian.PutUint64(buf[bucketMetaSize:bucketMetaSize+idSize], uint64(b.Id))
+	binary.LittleEndian.PutUint16(buf[bucketMetaSize+idSize:bucketMetaSize+idSize+dsSize], uint16(b.Ds))
+	copy(buf[bucketMetaSize+idSize+dsSize:], b.Name)
 	c32 := crc32.ChecksumIEEE(buf[4:])
 	b.Meta.Crc = c32
 	binary.LittleEndian.PutUint32(buf[0:4], c32)
@@ -86,28 +86,28 @@ func (b *Bucket) encode() []byte {
 	return buf
 }
 
-// decode : Meta | BucketId | Ds | BucketName
-func (b *Bucket) decode(bytes []byte) error {
+// decode : Meta | bucketId | ds | bucketName
+func (b *bucket) decode(bytes []byte) error {
 	// parse the payload
-	id := binary.LittleEndian.Uint64(bytes[:IdSize])
-	ds := binary.LittleEndian.Uint16(bytes[IdSize : IdSize+DsSize])
-	name := bytes[IdSize+DsSize:]
+	id := binary.LittleEndian.Uint64(bytes[:idSize])
+	ds := binary.LittleEndian.Uint16(bytes[idSize : idSize+dsSize])
+	name := bytes[idSize+dsSize:]
 	b.Id = id
 	b.Name = string(name)
 	b.Ds = ds
 	return nil
 }
 
-func (b *Bucket) getEntrySize() int {
-	return int(BucketMetaSize) + b.getPayloadSize()
+func (b *bucket) getEntrySize() int {
+	return int(bucketMetaSize) + b.getPayloadSize()
 }
 
-func (b *Bucket) getCRC(headerBuf []byte, dataBuf []byte) uint32 {
+func (b *bucket) getCRC(headerBuf []byte, dataBuf []byte) uint32 {
 	crc := crc32.ChecksumIEEE(headerBuf[4:])
 	crc = crc32.Update(crc, crc32.IEEETable, dataBuf)
 	return crc
 }
 
-func (b *Bucket) getPayloadSize() int {
-	return IdSize + DsSize + len(b.Name)
+func (b *bucket) getPayloadSize() int {
+	return idSize + dsSize + len(b.Name)
 }

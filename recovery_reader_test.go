@@ -18,7 +18,7 @@ func Test_readEntry(t *testing.T) {
 
 	expect := newEntry().withKey([]byte("key")).withMeta(meta).withValue([]byte("val"))
 
-	_, err = fd.Write(expect.Encode())
+	_, err = fd.Write(expect.encode())
 	require.NoError(t, err)
 
 	f, err := newFileRecovery(path, 4096)
@@ -27,7 +27,7 @@ func Test_readEntry(t *testing.T) {
 	entry, err := f.readEntry(0)
 	require.NoError(t, err)
 
-	assert.Equal(t, expect.Encode(), entry.Encode())
+	assert.Equal(t, expect.encode(), entry.encode())
 
 	err = fd.Close()
 	require.NoError(t, err)
@@ -36,9 +36,9 @@ func Test_readEntry(t *testing.T) {
 
 func Test_fileRecovery_readBucket(t *testing.T) {
 	filePath := "bucket_test_data"
-	bucket := &Bucket{
-		Meta: &BucketMeta{
-			Op: BucketInsertOperation,
+	bucket := &bucket{
+		Meta: &bucketMeta{
+			Op: bucketInsertOperation,
 		},
 		Id:   1,
 		Ds:   DataStructureBTree,
@@ -61,8 +61,8 @@ func Test_fileRecovery_readBucket(t *testing.T) {
 	assert.Nil(t, err)
 	readBucket, err := fr.readBucket()
 	assert.Nil(t, err)
-	assert.Equal(t, readBucket.Meta.Op, BucketInsertOperation)
+	assert.Equal(t, readBucket.Meta.Op, bucketInsertOperation)
 	assert.Equal(t, int64(8+2+8), int64(readBucket.Meta.Size))
-	assert.Equal(t, BucketId(1), readBucket.Id)
+	assert.Equal(t, bucketId(1), readBucket.Id)
 	assert.Equal(t, readBucket.Name, "bucket_1")
 }

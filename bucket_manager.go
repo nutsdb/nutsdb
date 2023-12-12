@@ -7,31 +7,31 @@ import (
 
 var ErrBucketNotExist = errors.New("bucket not exist")
 
-const BucketStoreFileName = "bucket.Meta"
+const bucketStoreFileName = "bucket.Meta"
 
-type Ds = uint16
-type BucketId = uint64
-type BucketName = string
-type IDMarkerInBucket map[BucketName]map[Ds]BucketId
-type InfoMapperInBucket map[BucketId]*Bucket
+type ds = uint16
+type bucketId = uint64
+type bucketName = string
+type idMarkerInBucket map[bucketName]map[ds]bucketId
+type infoMapperInBucket map[bucketId]*bucket
 
-type BucketManager struct {
+type bucketManager struct {
 	fd *os.File
 	// BucketInfoMapper BucketID => Bucket itself
-	BucketInfoMapper InfoMapperInBucket
+	BucketInfoMapper infoMapperInBucket
 
-	BucketIDMarker IDMarkerInBucket
+	BucketIDMarker idMarkerInBucket
 
 	// IDGenerator helps generates an ID for every single bucket
 	Gen *IDGenerator
 }
 
-func NewBucketManager(dir string) (*BucketManager, error) {
-	bm := &BucketManager{
-		BucketInfoMapper: map[BucketId]*Bucket{},
-		BucketIDMarker:   map[BucketName]map[Ds]BucketId{},
+func newBucketManager(dir string) (*bucketManager, error) {
+	bm := &bucketManager{
+		BucketInfoMapper: map[bucketId]*bucket{},
+		BucketIDMarker:   map[bucketName]map[ds]bucketId{},
 	}
-	bucketFilePath := dir + "/" + BucketStoreFileName
+	bucketFilePath := dir + "/" + bucketStoreFileName
 	_, err := os.Stat(bucketFilePath)
 	mode := os.O_RDWR
 	if err != nil {
@@ -47,25 +47,25 @@ func NewBucketManager(dir string) (*BucketManager, error) {
 }
 
 type bucketSubmitRequest struct {
-	ds     Ds
-	name   BucketName
-	bucket *Bucket
+	ds     ds
+	name   bucketName
+	bucket *bucket
 }
 
-func (bm *BucketManager) SubmitPendingBucketChange(reqs []*bucketSubmitRequest) error {
+func (bm *bucketManager) submitPendingBucketChange(reqs []*bucketSubmitRequest) error {
 	bytes := make([]byte, 0)
 	for _, req := range reqs {
 		bs := req.bucket.encode()
 		bytes = append(bytes, bs...)
 		// update the marker info
 		if _, exist := bm.BucketIDMarker[req.name]; !exist {
-			bm.BucketIDMarker[req.name] = map[Ds]BucketId{}
+			bm.BucketIDMarker[req.name] = map[ds]bucketId{}
 		}
 		switch req.bucket.Meta.Op {
-		case BucketInsertOperation:
+		case bucketInsertOperation:
 			bm.BucketInfoMapper[req.bucket.Id] = req.bucket
 			bm.BucketIDMarker[req.name][req.bucket.Ds] = req.bucket.Id
-		case BucketDeleteOperation:
+		case bucketDeleteOperation:
 			if len(bm.BucketIDMarker[req.name]) == 1 {
 				delete(bm.BucketIDMarker, req.name)
 			} else {
@@ -82,20 +82,20 @@ type IDGenerator struct {
 	currentMaxId uint64
 }
 
-func (g *IDGenerator) GenId() uint64 {
+func (g *IDGenerator) genId() uint64 {
 	g.currentMaxId++
 	return g.currentMaxId
 }
 
-func (bm *BucketManager) ExistBucket(ds Ds, name BucketName) bool {
-	bucket, err := bm.GetBucket(ds, name)
+func (bm *bucketManager) existBucket(ds ds, name bucketName) bool {
+	bucket, err := bm.getBucket(ds, name)
 	if bucket != nil && err == nil {
 		return true
 	}
 	return false
 }
 
-func (bm *BucketManager) GetBucket(ds Ds, name BucketName) (b *Bucket, err error) {
+func (bm *bucketManager) getBucket(ds ds, name bucketName) (b *bucket, err error) {
 	ds2IdMapper := bm.BucketIDMarker[name]
 	if ds2IdMapper == nil {
 		return nil, ErrBucketNotExist
@@ -112,7 +112,7 @@ func (bm *BucketManager) GetBucket(ds Ds, name BucketName) (b *Bucket, err error
 	}
 }
 
-func (bm *BucketManager) GetBucketById(id BucketId) (*Bucket, error) {
+func (bm *bucketManager) getBucketById(id bucketId) (*bucket, error) {
 	if bucket, exist := bm.BucketInfoMapper[id]; exist {
 		return bucket, nil
 	} else {
@@ -120,8 +120,8 @@ func (bm *BucketManager) GetBucketById(id BucketId) (*Bucket, error) {
 	}
 }
 
-func (bm *BucketManager) GetBucketID(ds Ds, name BucketName) (BucketId, error) {
-	if bucket, err := bm.GetBucket(ds, name); err != nil {
+func (bm *bucketManager) getBucketID(ds ds, name bucketName) (bucketId, error) {
+	if bucket, err := bm.getBucket(ds, name); err != nil {
 		return 0, err
 	} else {
 		return bucket.Id, nil

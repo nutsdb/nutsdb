@@ -19,7 +19,7 @@ type WriteBatch struct {
 	sync.Mutex
 	tx       *Tx
 	db       *DB
-	throttle *Throttle
+	throttle *throttle
 	err      atomic.Value
 	finished bool
 }
@@ -27,7 +27,7 @@ type WriteBatch struct {
 func (db *DB) NewWriteBatch() (*WriteBatch, error) {
 	wb := &WriteBatch{
 		db:       db,
-		throttle: NewThrottle(DefaultThrottleSize),
+		throttle: newThrottle(DefaultThrottleSize),
 	}
 
 	var err error
@@ -39,7 +39,7 @@ func (db *DB) NewWriteBatch() (*WriteBatch, error) {
 // This function should be called before using WriteBatch. Default value of MaxPendingTxns is
 // 16 to minimise memory usage.
 func (wb *WriteBatch) SetMaxPendingTxns(max int) {
-	wb.throttle = NewThrottle(max)
+	wb.throttle = newThrottle(max)
 }
 
 func (wb *WriteBatch) Cancel() error {
@@ -172,7 +172,7 @@ func (wb *WriteBatch) Reset() error {
 	if err != nil {
 		return err
 	}
-	wb.throttle = NewThrottle(DefaultThrottleSize)
+	wb.throttle = newThrottle(DefaultThrottleSize)
 	return err
 }
 

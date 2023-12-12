@@ -39,7 +39,7 @@ func TestRWManager_MMap_Release(t *testing.T) {
 	}
 
 	if !rwmanager.IsActive() {
-		t.Error("err TestRWManager_MMap_Release FdInfo:using not correct")
+		t.Error("err TestRWManager_MMap_Release fdInfo:using not correct")
 	}
 
 	err = rwmanager.Release()

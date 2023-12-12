@@ -5,7 +5,7 @@ import (
 )
 
 func TestLRUCache(t *testing.T) {
-	cache := NewLruCache(3)
+	cache := newLruCache(3)
 
 	// Add some entries to the cache
 	cache.add(1, "one")
@@ -44,7 +44,7 @@ func TestLRUCache(t *testing.T) {
 }
 
 func TestLRUCache_RemoveOldest(t *testing.T) {
-	cache := NewLruCache(2)
+	cache := newLruCache(2)
 
 	// Add two entries to the cache
 	cache.add(1, "one")

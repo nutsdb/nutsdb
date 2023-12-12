@@ -21,8 +21,8 @@ func newFileManager(rwMode RWMode, maxFdNums int, cleanThreshold float64, segmen
 	return fm
 }
 
-// getDataFile will return a DataFile Object
-func (fm *fileManager) getDataFile(path string, capacity int64) (datafile *DataFile, err error) {
+// getDataFile will return a dataFile Object
+func (fm *fileManager) getDataFile(path string, capacity int64) (datafile *dataFile, err error) {
 	if capacity <= 0 {
 		return nil, ErrCapacity
 	}
@@ -43,7 +43,7 @@ func (fm *fileManager) getDataFile(path string, capacity int64) (datafile *DataF
 		}
 	}
 
-	return NewDataFile(path, rwManager), nil
+	return newDataFile(path, rwManager), nil
 }
 
 // getFileRWManager will return a FileIORWManager Object

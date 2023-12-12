@@ -30,25 +30,25 @@ var (
 )
 
 const (
-	MaxEntryHeaderSize = 4 + binary.MaxVarintLen32*3 + binary.MaxVarintLen64*3 + binary.MaxVarintLen16*3
-	MinEntryHeaderSize = 4 + 9
+	maxEntryHeaderSize = 4 + binary.MaxVarintLen32*3 + binary.MaxVarintLen64*3 + binary.MaxVarintLen16*3
+	minEntryHeaderSize = 4 + 9
 )
 
 type (
-	// Entry represents the data item.
-	Entry struct {
+	// entry represents the data item.
+	entry struct {
 		Key   []byte
 		Value []byte
-		Meta  *MetaData
+		Meta  *metaData
 	}
 )
 
-// Size returns the size of the entry.
-func (e *Entry) Size() int64 {
+// size returns the size of the entry.
+func (e *entry) size() int64 {
 	return e.Meta.size() + int64(e.Meta.KeySize+e.Meta.ValueSize)
 }
 
-// Encode returns the slice after the entry be encoded.
+// encode returns the slice after the entry be encoded.
 //
 //	the entry stored format:
 //	|----------------------------------------------------------------------------------------------------------|
@@ -56,11 +56,11 @@ func (e *Entry) Size() int64 {
 //	|----------------------------------------------------------------------------------------------------------|
 //	| uint32| uint64  |uint32 |  uint32 | uint16  | uint32| uint16 | uint16 |uint64 | uint64 | []byte | []byte |
 //	|----------------------------------------------------------------------------------------------------------|
-func (e *Entry) Encode() []byte {
+func (e *entry) encode() []byte {
 	keySize := e.Meta.KeySize
 	valueSize := e.Meta.ValueSize
 
-	buf := make([]byte, MaxEntryHeaderSize+keySize+valueSize)
+	buf := make([]byte, maxEntryHeaderSize+keySize+valueSize)
 
 	index := e.setEntryHeaderBuf(buf)
 	copy(buf[index:], e.Key)
@@ -77,7 +77,7 @@ func (e *Entry) Encode() []byte {
 }
 
 // setEntryHeaderBuf sets the entry header buff.
-func (e *Entry) setEntryHeaderBuf(buf []byte) int {
+func (e *entry) setEntryHeaderBuf(buf []byte) int {
 	index := 4
 
 	index += binary.PutUvarint(buf[index:], e.Meta.Timestamp)
@@ -93,16 +93,16 @@ func (e *Entry) setEntryHeaderBuf(buf []byte) int {
 	return index
 }
 
-// IsZero checks if the entry is zero or not.
-func (e *Entry) IsZero() bool {
+// isZero checks if the entry is zero or not.
+func (e *entry) isZero() bool {
 	if e.Meta.Crc == 0 && e.Meta.KeySize == 0 && e.Meta.ValueSize == 0 && e.Meta.Timestamp == 0 {
 		return true
 	}
 	return false
 }
 
-// GetCrc returns the crc at given buf slice.
-func (e *Entry) GetCrc(buf []byte) uint32 {
+// getCrc returns the crc at given buf slice.
+func (e *entry) getCrc(buf []byte) uint32 {
 	crc := crc32.ChecksumIEEE(buf[4:])
 	crc = crc32.Update(crc, crc32.IEEETable, e.Key)
 	crc = crc32.Update(crc, crc32.IEEETable, e.Value)
@@ -110,8 +110,8 @@ func (e *Entry) GetCrc(buf []byte) uint32 {
 	return crc
 }
 
-// ParsePayload means this function will parse a byte array to bucket, key, size of an entry
-func (e *Entry) ParsePayload(data []byte) error {
+// parsePayload means this function will parse a byte array to bucket, key, size of an entry
+func (e *entry) parsePayload(data []byte) error {
 	meta := e.Meta
 	keyLowBound := 0
 	keyHighBound := meta.KeySize
@@ -126,19 +126,19 @@ func (e *Entry) ParsePayload(data []byte) error {
 }
 
 // checkPayloadSize checks the payload size
-func (e *Entry) checkPayloadSize(size int64) error {
+func (e *entry) checkPayloadSize(size int64) error {
 	if e.Meta.payloadSize() != size {
 		return ErrPayLoadSizeMismatch
 	}
 	return nil
 }
 
-// ParseMeta parse Meta object to entry
-func (e *Entry) ParseMeta(buf []byte) (int64, error) {
-	// If the length of the header is less than MinEntryHeaderSize,
+// parseMeta parse Meta object to entry
+func (e *entry) parseMeta(buf []byte) (int64, error) {
+	// If the length of the header is less than minEntryHeaderSize,
 	// it means that the final remaining capacity of the file is not enough to write a record,
 	// and an error needs to be returned.
-	if len(buf) < MinEntryHeaderSize {
+	if len(buf) < minEntryHeaderSize {
 		return 0, ErrHeaderSizeOutOfBounds
 	}
 
@@ -182,7 +182,7 @@ func (e *Entry) ParseMeta(buf []byte) (int64, error) {
 }
 
 // isFilter to confirm if this entry is can be filtered
-func (e *Entry) isFilter() bool {
+func (e *entry) isFilter() bool {
 	meta := e.Meta
 	var filterDataSet = []uint16{
 		DataDeleteFlag,
@@ -200,7 +200,7 @@ func (e *Entry) isFilter() bool {
 }
 
 // valid check the entry fields valid or not
-func (e *Entry) valid() error {
+func (e *entry) valid() error {
 	if len(e.Key) == 0 {
 		return ErrKeyEmpty
 	}
@@ -210,65 +210,65 @@ func (e *Entry) valid() error {
 	return nil
 }
 
-// newEntry new Entry Object
-func newEntry() *Entry {
-	return new(Entry)
+// newEntry new entry Object
+func newEntry() *entry {
+	return new(entry)
 }
 
-// withKey set key to Entry
-func (e *Entry) withKey(key []byte) *Entry {
+// withKey set key to entry
+func (e *entry) withKey(key []byte) *entry {
 	e.Key = key
 	return e
 }
 
-// withValue set value to Entry
-func (e *Entry) withValue(value []byte) *Entry {
+// withValue set value to entry
+func (e *entry) withValue(value []byte) *entry {
 	e.Value = value
 	return e
 }
 
-// withMeta set Meta to Entry
-func (e *Entry) withMeta(meta *MetaData) *Entry {
+// withMeta set Meta to entry
+func (e *entry) withMeta(meta *metaData) *entry {
 	e.Meta = meta
 	return e
 }
 
 // getTxIDBytes return the bytes of TxID
-func (e *Entry) getTxIDBytes() []byte {
+func (e *entry) getTxIDBytes() []byte {
 	return []byte(strconv2.Int64ToStr(int64(e.Meta.TxID)))
 }
 
-func (e *Entry) isBelongsToBPlusTree() bool {
+func (e *entry) isBelongsToBPlusTree() bool {
 	return e.Meta.isBPlusTree()
 }
 
-func (e *Entry) isBelongsToList() bool {
+func (e *entry) isBelongsToList() bool {
 	return e.Meta.isList()
 }
 
-func (e *Entry) isBelongsToSet() bool {
+func (e *entry) isBelongsToSet() bool {
 	return e.Meta.isSet()
 }
 
-func (e *Entry) isBelongsToSortSet() bool {
+func (e *entry) isBelongsToSortSet() bool {
 	return e.Meta.isSortSet()
 }
 
-// Entries represents entries
-type Entries []*Entry
+// entries represents entries
+type entries []*entry
 
-func (e Entries) Len() int { return len(e) }
+func (e entries) Len() int { return len(e) }
 
-func (e Entries) Less(i, j int) bool {
+func (e entries) Less(i, j int) bool {
 	l := string(e[i].Key)
 	r := string(e[j].Key)
 
 	return strings.Compare(l, r) == -1
 }
 
-func (e Entries) Swap(i, j int) { e[i], e[j] = e[j], e[i] }
+func (e entries) Swap(i, j int) { e[i], e[j] = e[j], e[i] }
 
-func (e Entries) processEntriesScanOnDisk() (result []*Entry) {
+func (e entries) processEntriesScanOnDisk() (result []*entry) {
 	sort.Sort(e)
 	for _, ele := range e {
 		curE := ele
@@ -280,35 +280,35 @@ func (e Entries) processEntriesScanOnDisk() (result []*Entry) {
 	return result
 }
 
-func (e Entries) toCEntries(lFunc func(l, r string) bool) CEntries {
-	return CEntries{
-		Entries:  e,
+func (e entries) toCEntries(lFunc func(l, r string) bool) cEntries {
+	return cEntries{
+		entries:  e,
 		LessFunc: lFunc,
 	}
 }
 
-type CEntries struct {
-	Entries
+type cEntries struct {
+	entries
 	LessFunc func(l, r string) bool
 }
 
-func (c CEntries) Len() int { return len(c.Entries) }
+func (c cEntries) Len() int { return len(c.entries) }
 
-func (c CEntries) Less(i, j int) bool {
-	l := string(c.Entries[i].Key)
-	r := string(c.Entries[j].Key)
+func (c cEntries) Less(i, j int) bool {
+	l := string(c.entries[i].Key)
+	r := string(c.entries[j].Key)
 	if c.LessFunc != nil {
 		return c.LessFunc(l, r)
 	}
 
-	return c.Entries.Less(i, j)
+	return c.entries.Less(i, j)
 }
 
-func (c CEntries) Swap(i, j int) { c.Entries[i], c.Entries[j] = c.Entries[j], c.Entries[i] }
+func (c cEntries) Swap(i, j int) { c.entries[i], c.entries[j] = c.entries[j], c.entries[i] }
 
-func (c CEntries) processEntriesScanOnDisk() (result []*Entry) {
+func (c cEntries) processEntriesScanOnDisk() (result []*entry) {
 	sort.Sort(c)
-	for _, ele := range c.Entries {
+	for _, ele := range c.entries {
 		curE := ele
 		if !isExpired(curE.Meta.TTL, curE.Meta.Timestamp) && curE.Meta.Flag != DataDeleteFlag {
 			result = append(result, curE)
@@ -318,27 +318,27 @@ func (c CEntries) processEntriesScanOnDisk() (result []*Entry) {
 	return result
 }
 
-type EntryWhenRecovery struct {
-	Entry
+type entryWhenRecovery struct {
+	entry
 	fid int64
 	off int64
 }
 
 type dataInTx struct {
-	es       []*EntryWhenRecovery
+	es       []*entryWhenRecovery
 	txId     uint64
 	startOff int64
 }
 
-func (dt *dataInTx) isSameTx(e *EntryWhenRecovery) bool {
+func (dt *dataInTx) isSameTx(e *entryWhenRecovery) bool {
 	return dt.txId == e.Meta.TxID
 }
 
-func (dt *dataInTx) appendEntry(e *EntryWhenRecovery) {
+func (dt *dataInTx) appendEntry(e *entryWhenRecovery) {
 	dt.es = append(dt.es, e)
 }
 
 func (dt *dataInTx) reset() {
-	dt.es = make([]*EntryWhenRecovery, 0)
+	dt.es = make([]*entryWhenRecovery, 0)
 	dt.txId = 0
 }
