@@ -29,9 +29,9 @@ func TestSet_SAdd(t *testing.T) {
 		values[i] = expectRecords[i].Value
 	}
 
-	require.NoError(t, set.SAdd(key, values, expectRecords))
+	require.NoError(t, set.sAdd(key, values, expectRecords))
 
-	ok, err := set.SAreMembers(key, values...)
+	ok, err := set.sAreMembers(key, values...)
 	require.True(t, ok)
 	require.NoError(t, err)
 }
@@ -45,16 +45,16 @@ func TestSet_SRem(t *testing.T) {
 		values[i] = expectRecords[i].Value
 	}
 
-	require.NoError(t, set.SAdd(key, values, expectRecords))
+	require.NoError(t, set.sAdd(key, values, expectRecords))
 
-	require.NoError(t, set.SRem(key, values[0]))
-	require.NoError(t, set.SRem(key, values[1:]...))
+	require.NoError(t, set.sRem(key, values[0]))
+	require.NoError(t, set.sRem(key, values[1:]...))
 
-	require.NoError(t, set.SAdd(key, values, expectRecords))
-	require.NoError(t, set.SRem(key, values...))
+	require.NoError(t, set.sAdd(key, values, expectRecords))
+	require.NoError(t, set.sRem(key, values...))
 
-	require.Error(t, set.SRem("fake key", values...))
-	require.Error(t, set.SRem(key, nil))
+	require.Error(t, set.sRem("fake key", values...))
+	require.Error(t, set.sRem(key, nil))
 }
 
 func TestSet_SDiff(t *testing.T) {
@@ -72,10 +72,10 @@ func TestSet_SDiff(t *testing.T) {
 		values[i] = expectRecords[i].Value
 	}
 
-	require.NoError(t, set.SAdd(key1, values[:5], expectRecords[:5]))
-	require.NoError(t, set.SAdd(key2, values[2:6], expectRecords[2:6]))
-	require.NoError(t, set.SAdd(key3, values[2:7], expectRecords[2:7]))
-	require.NoError(t, set.SAdd(key4, values[7:], expectRecords[7:]))
+	require.NoError(t, set.sAdd(key1, values[:5], expectRecords[:5]))
+	require.NoError(t, set.sAdd(key2, values[2:6], expectRecords[2:6]))
+	require.NoError(t, set.sAdd(key3, values[2:7], expectRecords[2:7]))
+	require.NoError(t, set.sAdd(key4, values[7:], expectRecords[7:]))
 
 	type args struct {
 		key1 string
@@ -99,7 +99,7 @@ func TestSet_SDiff(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.set.SDiff(tt.args.key1, tt.args.key2)
+			got, err := tt.set.sDiff(tt.args.key1, tt.args.key2)
 			if (err != nil) != tt.wantErr {
 				require.Errorf(t, err, "Get() error = %v, wantErr %v", tt.wantErr)
 			}
@@ -123,10 +123,10 @@ func TestSet_SCard(t *testing.T) {
 		values[i] = expectRecords[i].Value
 	}
 
-	require.NoError(t, set.SAdd(key1, values[:5], expectRecords[:5]))
-	require.NoError(t, set.SAdd(key2, values[2:6], expectRecords[2:6]))
-	require.NoError(t, set.SAdd(key3, values[2:7], expectRecords[2:7]))
-	require.NoError(t, set.SAdd(key4, values[7:], expectRecords[7:]))
+	require.NoError(t, set.sAdd(key1, values[:5], expectRecords[:5]))
+	require.NoError(t, set.sAdd(key2, values[2:6], expectRecords[2:6]))
+	require.NoError(t, set.sAdd(key3, values[2:7], expectRecords[2:7]))
+	require.NoError(t, set.sAdd(key4, values[7:], expectRecords[7:]))
 
 	tests := []struct {
 		name string
@@ -142,7 +142,7 @@ func TestSet_SCard(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := tt.set.SCard(tt.key)
+			got := tt.set.sCard(tt.key)
 			require.Equalf(t, tt.want, got, "TestSet_SCard err")
 		})
 	}
@@ -163,10 +163,10 @@ func TestSet_SInter(t *testing.T) {
 		values[i] = expectRecords[i].Value
 	}
 
-	require.NoError(t, set.SAdd(key1, values[:5], expectRecords[:5]))
-	require.NoError(t, set.SAdd(key2, values[2:6], expectRecords[2:6]))
-	require.NoError(t, set.SAdd(key3, values[2:7], expectRecords[2:7]))
-	require.NoError(t, set.SAdd(key4, values[7:], expectRecords[7:]))
+	require.NoError(t, set.sAdd(key1, values[:5], expectRecords[:5]))
+	require.NoError(t, set.sAdd(key2, values[2:6], expectRecords[2:6]))
+	require.NoError(t, set.sAdd(key3, values[2:7], expectRecords[2:7]))
+	require.NoError(t, set.sAdd(key4, values[7:], expectRecords[7:]))
 
 	type args struct {
 		key1 string
@@ -190,7 +190,7 @@ func TestSet_SInter(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.set.SInter(tt.args.key1, tt.args.key2)
+			got, err := tt.set.sInter(tt.args.key1, tt.args.key2)
 			if (err != nil) != tt.wantErr {
 				require.Errorf(t, err, "Get() error = %v, wantErr %v", tt.wantErr)
 			}
@@ -211,7 +211,7 @@ func TestSet_SMembers(t *testing.T) {
 		values[i] = expectRecords[i].Value
 	}
 
-	require.NoError(t, set.SAdd(key, values, expectRecords))
+	require.NoError(t, set.sAdd(key, values, expectRecords))
 
 	tests := []struct {
 		name    string
@@ -228,11 +228,11 @@ func TestSet_SMembers(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.set.SMembers(tt.key)
+			got, err := tt.set.sMembers(tt.key)
 			if (err != nil) != tt.wantErr {
 				require.Errorf(t, err, "Get() error = %v, wantErr %v", tt.wantErr)
 			}
-			require.Subsetf(t, got, tt.want, "SInter() got = %v, want = %v", got, tt.want)
+			require.Subsetf(t, got, tt.want, "sInter() got = %v, want = %v", got, tt.want)
 		})
 	}
 }
@@ -249,8 +249,8 @@ func TestSet_SMove(t *testing.T) {
 		values[i] = expectRecords[i].Value
 	}
 
-	require.NoError(t, set.SAdd(key1, values[:2], expectRecords[:2]))
-	require.NoError(t, set.SAdd(key2, values[2:], expectRecords[2:]))
+	require.NoError(t, set.sAdd(key1, values[:2], expectRecords[:2]))
+	require.NoError(t, set.sAdd(key2, values[2:], expectRecords[2:]))
 
 	type args struct {
 		key1 string
@@ -266,21 +266,21 @@ func TestSet_SMove(t *testing.T) {
 		want2     []*Record
 		expectErr error
 	}{
-		{"normal SMove", args{key1, key2, values[1]}, set, expectRecords[0:1], expectRecords[1:], nil},
-		{"not exist member SMove", args{key1, key2, values[2]}, set, nil, nil, ErrSetMemberNotExist},
-		{"fake key SMove1", args{"fake key", key2, values[2]}, set, nil, nil, ErrSetNotExist},
-		{"fake key SMove", args{key1, "fake key", values[2]}, set, nil, nil, ErrSetNotExist},
+		{"normal sMove", args{key1, key2, values[1]}, set, expectRecords[0:1], expectRecords[1:], nil},
+		{"not exist member sMove", args{key1, key2, values[2]}, set, nil, nil, ErrSetMemberNotExist},
+		{"fake key sMove1", args{"fake key", key2, values[2]}, set, nil, nil, ErrSetNotExist},
+		{"fake key sMove", args{key1, "fake key", values[2]}, set, nil, nil, ErrSetNotExist},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := tt.set.SMove(tt.args.key1, tt.args.key2, tt.args.item)
+			_, err := tt.set.sMove(tt.args.key1, tt.args.key2, tt.args.item)
 			if tt.expectErr != nil {
 				require.Error(t, err)
 				require.Equal(t, tt.expectErr, err)
 			} else {
-				got1, _ := tt.set.SMembers(tt.args.key1)
-				got2, _ := tt.set.SMembers(tt.args.key2)
+				got1, _ := tt.set.sMembers(tt.args.key1)
+				got2, _ := tt.set.sMembers(tt.args.key2)
 				require.ElementsMatchf(t, got1, tt.want1, "SMove() got = %v, want = %v", got1, tt.want1)
 				require.ElementsMatchf(t, got2, tt.want2, "SMove() got = %v, want = %v", got2, tt.want2)
 			}
@@ -303,7 +303,7 @@ func TestSet_SPop(t *testing.T) {
 		m[expectRecord] = struct{}{}
 	}
 
-	require.NoError(t, set.SAdd(key, values, expectRecords))
+	require.NoError(t, set.sAdd(key, values, expectRecords))
 
 	tests := []struct {
 		name string
@@ -311,14 +311,14 @@ func TestSet_SPop(t *testing.T) {
 		set  *Set
 		ok   bool
 	}{
-		{"normal set SPop", key, set, true},
-		{"normal set SPop", key, set, true},
-		{"normal set SPop", key, set, false},
+		{"normal set sPop", key, set, true},
+		{"normal set sPop", key, set, true},
+		{"normal set sPop", key, set, false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			record := tt.set.SPop(tt.key)
+			record := tt.set.sPop(tt.key)
 			_, ok := m[record]
 			require.Equal(t, tt.ok, ok)
 		})
@@ -333,7 +333,7 @@ func TestSet_SIsMember(t *testing.T) {
 	expectRecords := generateRecords(1)
 	values := [][]byte{expectRecords[0].Value}
 
-	require.NoError(t, set.SAdd(key, values, expectRecords))
+	require.NoError(t, set.sAdd(key, values, expectRecords))
 	tests := []struct {
 		key       string
 		val       []byte
@@ -345,7 +345,7 @@ func TestSet_SIsMember(t *testing.T) {
 		{"fake key", GetRandomBytes(24), false, ErrSetNotExist},
 	}
 	for _, tt := range tests {
-		ok, err := set.SIsMember(tt.key, tt.val)
+		ok, err := set.sIsMember(tt.key, tt.val)
 		if tt.expectErr != nil {
 			require.Equal(t, tt.expectErr, err)
 		} else {
@@ -365,7 +365,7 @@ func TestSet_SAreMembers(t *testing.T) {
 		values[i] = expectRecords[i].Value
 	}
 
-	require.NoError(t, set.SAdd(key, values, expectRecords))
+	require.NoError(t, set.sAdd(key, values, expectRecords))
 	tests := []struct {
 		key       string
 		val       [][]byte
@@ -379,7 +379,7 @@ func TestSet_SAreMembers(t *testing.T) {
 		{"fake key", values, true, ErrSetNotExist},
 	}
 	for _, tt := range tests {
-		ok, err := set.SAreMembers(tt.key, tt.val...)
+		ok, err := set.sAreMembers(tt.key, tt.val...)
 		if tt.expectErr != nil {
 			require.Equal(t, tt.expectErr, err)
 		} else {
@@ -403,10 +403,10 @@ func TestSet_SUnion(t *testing.T) {
 		values[i] = expectRecords[i].Value
 	}
 
-	require.NoError(t, set.SAdd(key1, values[:5], expectRecords[:5]))
-	require.NoError(t, set.SAdd(key2, values[2:6], expectRecords[2:6]))
-	require.NoError(t, set.SAdd(key3, values[2:7], expectRecords[2:7]))
-	require.NoError(t, set.SAdd(key4, values[7:], expectRecords[7:]))
+	require.NoError(t, set.sAdd(key1, values[:5], expectRecords[:5]))
+	require.NoError(t, set.sAdd(key2, values[2:6], expectRecords[2:6]))
+	require.NoError(t, set.sAdd(key3, values[2:7], expectRecords[2:7]))
+	require.NoError(t, set.sAdd(key4, values[7:], expectRecords[7:]))
 
 	type args struct {
 		key1 string
@@ -435,7 +435,7 @@ func TestSet_SUnion(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.set.SUnion(tt.args.key1, tt.args.key2)
+			got, err := tt.set.sUnion(tt.args.key1, tt.args.key2)
 			if (err != nil) != tt.wantErr {
 				require.Errorf(t, err, "Get() error = %v, wantErr %v", tt.wantErr)
 			}

@@ -442,7 +442,7 @@ func TestTx_ListEntryIdxMode_HintKeyValAndRAMIdxMode(t *testing.T) {
 		require.NoError(t, err)
 
 		listIdx := db.Index.list.getWithDefault(1)
-		item, ok := listIdx.Items[string(key)].PopMin()
+		item, ok := listIdx.Items[string(key)].popMin()
 		r := item.record
 		require.True(t, ok)
 		require.NotNil(t, r.Value)
@@ -469,7 +469,7 @@ func TestTx_ListEntryIdxMode_HintKeyAndRAMIdxMode(t *testing.T) {
 		require.NoError(t, err)
 
 		listIdx := db.Index.list.getWithDefault(1)
-		item, ok := listIdx.Items[string(key)].PopMin()
+		item, ok := listIdx.Items[string(key)].popMin()
 		r := item.record
 		require.True(t, ok)
 		require.Nil(t, r.Value)

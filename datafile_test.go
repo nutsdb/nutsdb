@@ -31,9 +31,9 @@ func init() {
 	entry = Entry{
 		Key:   []byte("key_0001"),
 		Value: []byte("val_0001"),
-		Meta: NewMetaData().WithKeySize(uint32(len("key_0001"))).
-			WithValueSize(uint32(len("val_0001"))).WithTimeStamp(1547707905).
-			WithTTL(Persistent).WithFlag(DataSetFlag).WithBucketId(1),
+		Meta: newMetaData().withKeySize(uint32(len("key_0001"))).
+			withValueSize(uint32(len("val_0001"))).withTimeStamp(1547707905).
+			withTTL(Persistent).withFlag(DataSetFlag).withBucketId(1),
 	}
 }
 
@@ -62,7 +62,7 @@ func TestDataFile1(t *testing.T) {
 		t.Error("err TestDataFile_All WriteAt")
 	}
 
-	payloadSize := entry.Meta.PayloadSize()
+	payloadSize := entry.Meta.payloadSize()
 	e, err := df.ReadEntry(n, payloadSize)
 	assert.Nil(t, e)
 	assert.Error(t, err, ErrEntryZero)
@@ -85,14 +85,14 @@ func TestDataFile2(t *testing.T) {
 	df, err := fm.getDataFile(filePath2, 64)
 	assert.Nil(t, err)
 	defer os.Remove(filePath2)
-	headerSize := entry.Meta.Size()
+	headerSize := entry.Meta.size()
 	content := entry.Encode()[0 : headerSize-1]
 	_, err = df.WriteAt(content, 0)
 	if err != nil {
 		t.Error("err TestDataFile_All WriteAt")
 	}
 
-	payloadSize := entry.Meta.PayloadSize()
+	payloadSize := entry.Meta.payloadSize()
 	e, err := df.ReadEntry(0, payloadSize)
 	if err == nil || e != nil {
 		t.Error("err TestDataFile_All ReadAt")
@@ -104,7 +104,7 @@ func TestDataFile2(t *testing.T) {
 	defer os.Remove(filePath3)
 	assert.Nil(t, err)
 
-	headerSize = entry.Meta.Size()
+	headerSize = entry.Meta.size()
 	content = entry.Encode()[0 : headerSize+1]
 	_, err = df2.WriteAt(content, 0)
 	assert.Nil(t, err)
@@ -137,7 +137,7 @@ func TestDataFile_ReadRecord(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	payloadSize := entry.Meta.PayloadSize()
+	payloadSize := entry.Meta.payloadSize()
 	e, err := df.ReadEntry(0, payloadSize)
 	if err != nil && e != nil {
 		t.Error("err ReadAt")
@@ -182,7 +182,7 @@ func TestDataFile_Crc_Err(t *testing.T) {
 	_, err = df.WriteAt(errContent, 0)
 	assert.Nil(t, err)
 
-	payloadSize := entry.Meta.PayloadSize()
+	payloadSize := entry.Meta.payloadSize()
 	e, err := df.ReadEntry(0, payloadSize)
 	if err == nil || e != nil {
 		t.Error("err TestDataFile_All ReadAt")

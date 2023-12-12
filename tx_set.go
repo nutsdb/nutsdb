@@ -90,7 +90,7 @@ func (tx *Tx) SRem(bucket string, key []byte, items ...[]byte) error {
 	}
 	bucketId := b.Id
 	if set, ok := tx.db.Index.set.exist(bucketId); ok {
-		ok, err := set.SAreMembers(string(key), items...)
+		ok, err := set.sAreMembers(string(key), items...)
 		if err != nil {
 			return err
 		}
@@ -113,7 +113,7 @@ func (tx *Tx) SAreMembers(bucket string, key []byte, items ...[]byte) (bool, err
 	}
 	bucketId := b.Id
 	if set, ok := tx.db.Index.set.exist(bucketId); ok {
-		return set.SAreMembers(string(key), items...)
+		return set.sAreMembers(string(key), items...)
 	}
 
 	return false, ErrBucketNotFound
@@ -130,7 +130,7 @@ func (tx *Tx) SIsMember(bucket string, key, item []byte) (bool, error) {
 	}
 	bucketId := b.Id
 	if set, ok := tx.db.Index.set.exist(bucketId); ok {
-		isMember, err := set.SIsMember(string(key), item)
+		isMember, err := set.sIsMember(string(key), item)
 		if err != nil {
 			return false, err
 		}
@@ -151,7 +151,7 @@ func (tx *Tx) SMembers(bucket string, key []byte) ([][]byte, error) {
 	}
 	bucketId := b.Id
 	if set, ok := tx.db.Index.set.exist(bucketId); ok {
-		items, err := set.SMembers(string(key))
+		items, err := set.sMembers(string(key))
 		if err != nil {
 			return nil, err
 		}
@@ -182,7 +182,7 @@ func (tx *Tx) SHasKey(bucket string, key []byte) (bool, error) {
 	}
 	bucketId := b.Id
 	if set, ok := tx.db.Index.set.exist(bucketId); ok {
-		return set.SHasKey(string(key)), nil
+		return set.sHasKey(string(key)), nil
 	}
 
 	return false, ErrBucketNotFound
@@ -228,7 +228,7 @@ func (tx *Tx) SCard(bucket string, key []byte) (int, error) {
 	}
 	bucketId := b.Id
 	if set, ok := tx.db.Index.set.exist(bucketId); ok {
-		return set.SCard(string(key)), nil
+		return set.sCard(string(key)), nil
 	}
 
 	return 0, ErrBucketNotFound
@@ -246,7 +246,7 @@ func (tx *Tx) SDiffByOneBucket(bucket string, key1, key2 []byte) ([][]byte, erro
 	}
 	bucketId := b.Id
 	if set, ok := tx.db.Index.set.exist(bucketId); ok {
-		items, err := set.SDiff(string(key1), string(key2))
+		items, err := set.sDiff(string(key1), string(key2))
 		if err != nil {
 			return nil, err
 		}
@@ -323,7 +323,7 @@ func (tx *Tx) SMoveByOneBucket(bucket string, key1, key2, item []byte) (bool, er
 	}
 	bucketId := b.Id
 	if set, ok := tx.db.Index.set.exist(bucketId); ok {
-		return set.SMove(string(key1), string(key2), item)
+		return set.sMove(string(key1), string(key2), item)
 	}
 
 	return false, ErrBucket
@@ -360,11 +360,11 @@ func (tx *Tx) SMoveByTwoBuckets(bucket1 string, key1 []byte, bucket2 string, key
 		return false, ErrBucketAndKey(bucket2, key1)
 	}
 
-	if !set1.SHasKey(string(key1)) {
+	if !set1.sHasKey(string(key1)) {
 		return false, ErrNotFoundKeyInBucket(bucket1, key1)
 	}
 
-	if !set2.SHasKey(string(key2)) {
+	if !set2.sHasKey(string(key2)) {
 		return false, ErrNotFoundKeyInBucket(bucket2, key2)
 	}
 
@@ -374,13 +374,13 @@ func (tx *Tx) SMoveByTwoBuckets(bucket1 string, key1 []byte, bucket2 string, key
 	}
 
 	if r, ok := set2.M[string(key2)][hash]; !ok {
-		err := set2.SAdd(string(key2), [][]byte{item}, []*Record{r})
+		err := set2.sAdd(string(key2), [][]byte{item}, []*Record{r})
 		if err != nil {
 			return false, err
 		}
 	}
 
-	err = set1.SRem(string(key1), item)
+	err = set1.sRem(string(key1), item)
 	if err != nil {
 		return false, err
 	}
@@ -400,7 +400,7 @@ func (tx *Tx) SUnionByOneBucket(bucket string, key1, key2 []byte) ([][]byte, err
 	bucketId := b1.Id
 
 	if set, ok := tx.db.Index.set.exist(bucketId); ok {
-		items, err := set.SUnion(string(key1), string(key2))
+		items, err := set.sUnion(string(key1), string(key2))
 		if err != nil {
 			return nil, err
 		}
@@ -450,11 +450,11 @@ func (tx *Tx) SUnionByTwoBuckets(bucket1 string, key1 []byte, bucket2 string, ke
 		return nil, ErrBucketAndKey(bucket2, key2)
 	}
 
-	if !set1.SHasKey(string(key1)) {
+	if !set1.sHasKey(string(key1)) {
 		return nil, ErrNotFoundKeyInBucket(bucket1, key1)
 	}
 
-	if !set2.SHasKey(string(key2)) {
+	if !set2.sHasKey(string(key2)) {
 		return nil, ErrNotFoundKeyInBucket(bucket2, key2)
 	}
 
@@ -495,7 +495,7 @@ func (tx *Tx) SKeys(bucket, pattern string, f func(key string) bool) error {
 		return ErrBucket
 	} else {
 		for key := range set.M {
-			if end, err := MatchForRange(pattern, key, f); end || err != nil {
+			if end, err := matchForRange(pattern, key, f); end || err != nil {
 				return err
 			}
 		}

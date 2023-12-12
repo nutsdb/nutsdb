@@ -230,8 +230,8 @@ func (db *DB) getValueByRecord(record *Record) ([]byte, error) {
 	}
 
 	// firstly we find data in cache
-	if db.hintKeyAndRAMIdxModeLru.Get(record) != nil {
-		return db.hintKeyAndRAMIdxModeLru.Get(record).([]byte), nil
+	if db.hintKeyAndRAMIdxModeLru.get(record) != nil {
+		return db.hintKeyAndRAMIdxModeLru.get(record).([]byte), nil
 	}
 
 	dirPath := getDataPath(record.FileID, db.opt.Dir)
@@ -253,7 +253,7 @@ func (db *DB) getValueByRecord(record *Record) ([]byte, error) {
 	}
 
 	// saved in cache
-	db.hintKeyAndRAMIdxModeLru.Add(string(item.Value), item)
+	db.hintKeyAndRAMIdxModeLru.add(string(item.Value), item)
 	return item.Value, nil
 }
 
@@ -540,13 +540,13 @@ func (db *DB) getRecordCount() (int64, error) {
 
 	// Iterate through the BTree indices
 	for _, btree := range db.Index.bTree.idx {
-		res += int64(btree.Count())
+		res += int64(btree.count())
 	}
 
 	// Iterate through the List indices
 	for _, listItem := range db.Index.list.idx {
 		for key := range listItem.Items {
-			curLen, err := listItem.Size(key)
+			curLen, err := listItem.size(key)
 			if err != nil {
 				return res, err
 			}
@@ -557,14 +557,14 @@ func (db *DB) getRecordCount() (int64, error) {
 	// Iterate through the Set indices
 	for _, setItem := range db.Index.set.idx {
 		for key := range setItem.M {
-			res += int64(setItem.SCard(key))
+			res += int64(setItem.sCard(key))
 		}
 	}
 
 	// Iterate through the SortedSet indices
 	for _, zsetItem := range db.Index.sortedSet.idx {
 		for key := range zsetItem.M {
-			curLen, err := zsetItem.ZCard(key)
+			curLen, err := zsetItem.zCard(key)
 			if err != nil {
 				return res, err
 			}
@@ -586,16 +586,16 @@ func (db *DB) buildBTreeIdx(record *Record, entry *Entry) error {
 
 	bTree := db.Index.bTree.getWithDefault(bucketId)
 
-	if record.IsExpired() || meta.Flag == DataDeleteFlag {
+	if record.isExpired() || meta.Flag == DataDeleteFlag {
 		db.tm.del(bucketId, string(key))
-		bTree.Delete(key)
+		bTree.delete(key)
 	} else {
 		if meta.TTL != Persistent {
 			db.tm.add(bucketId, string(key), db.expireTime(meta.Timestamp, meta.TTL), db.buildExpireCallback(bucket.Name, key))
 		} else {
 			db.tm.del(bucketId, string(key))
 		}
-		bTree.Insert(record)
+		bTree.insert(record)
 	}
 	return nil
 }
@@ -659,12 +659,12 @@ func (db *DB) buildSetIdx(record *Record, entry *Entry) error {
 
 	switch meta.Flag {
 	case DataSetFlag:
-		if err := s.SAdd(string(key), [][]byte{val}, []*Record{record}); err != nil {
-			return fmt.Errorf("when build SetIdx SAdd index err: %s", err)
+		if err := s.sAdd(string(key), [][]byte{val}, []*Record{record}); err != nil {
+			return fmt.Errorf("when build SetIdx sAdd index err: %s", err)
 		}
 	case DataDeleteFlag:
-		if err := s.SRem(string(key), val); err != nil {
-			return fmt.Errorf("when build SetIdx SRem index err: %s", err)
+		if err := s.sRem(string(key), val); err != nil {
+			return fmt.Errorf("when build SetIdx sRem index err: %s", err)
 		}
 	}
 
@@ -689,17 +689,17 @@ func (db *DB) buildSortedSetIdx(record *Record, entry *Entry) error {
 		if len(keyAndScore) == 2 {
 			key := keyAndScore[0]
 			score, _ := strconv2.StrToFloat64(keyAndScore[1])
-			err = ss.ZAdd(key, SCORE(score), val, record)
+			err = ss.zAdd(key, SCORE(score), val, record)
 		}
 	case DataZRemFlag:
-		_, err = ss.ZRem(string(key), val)
+		_, err = ss.zRem(string(key), val)
 	case DataZRemRangeByRankFlag:
 		start, end := splitIntIntStr(string(val), SeparatorForZSetKey)
-		err = ss.ZRemRangeByRank(string(key), start, end)
+		err = ss.zRemRangeByRank(string(key), start, end)
 	case DataZPopMaxFlag:
-		_, _, err = ss.ZPopMax(string(key))
+		_, _, err = ss.zPopMax(string(key))
 	case DataZPopMinFlag:
-		_, _, err = ss.ZPopMin(string(key))
+		_, _, err = ss.zPopMin(string(key))
 	}
 
 	// We don't need to panic if sorted set is not found.
@@ -722,7 +722,7 @@ func (db *DB) buildListIdx(record *Record, entry *Entry) error {
 
 	l := db.Index.list.getWithDefault(bucketId)
 
-	if IsExpired(meta.TTL, meta.Timestamp) {
+	if isExpired(meta.TTL, meta.Timestamp) {
 		return nil
 	}
 
@@ -733,22 +733,22 @@ func (db *DB) buildListIdx(record *Record, entry *Entry) error {
 		l.TTL[string(key)] = ttl
 		l.TimeStamp[string(key)] = meta.Timestamp
 	case DataLPushFlag:
-		err = l.LPush(string(key), record)
+		err = l.lPush(string(key), record)
 	case DataRPushFlag:
-		err = l.RPush(string(key), record)
+		err = l.rPush(string(key), record)
 	case DataLRemFlag:
 		err = db.buildListLRemIdx(val, l, key)
 	case DataLPopFlag:
-		_, err = l.LPop(string(key))
+		_, err = l.lPop(string(key))
 	case DataRPopFlag:
-		_, err = l.RPop(string(key))
+		_, err = l.rPop(string(key))
 	case DataLTrimFlag:
 		newKey, start := splitStringIntStr(string(key), SeparatorForListKey)
 		end, _ := strconv2.StrToInt(string(val))
-		err = l.LTrim(newKey, start, end)
+		err = l.lTrim(newKey, start, end)
 	case DataLRemByIndex:
-		indexes, _ := UnmarshalInts(val)
-		err = l.LRemByIndex(string(key), indexes)
+		indexes, _ := unmarshalInts(val)
+		err = l.lRemByIndex(string(key), indexes)
 	}
 
 	if err != nil {
@@ -761,7 +761,7 @@ func (db *DB) buildListIdx(record *Record, entry *Entry) error {
 func (db *DB) buildListLRemIdx(value []byte, l *List, key []byte) error {
 	count, newValue := splitIntStringStr(string(value), SeparatorForListKey)
 
-	return l.LRem(string(key), count, func(r *Record) (bool, error) {
+	return l.lRem(string(key), count, func(r *Record) (bool, error) {
 		v, err := db.getValueByRecord(r)
 		if err != nil {
 			return false, err
@@ -796,21 +796,21 @@ func (db *DB) buildIndexes() (err error) {
 }
 
 func (db *DB) createRecordByModeWithFidAndOff(fid int64, off uint64, entry *Entry) *Record {
-	record := NewRecord()
+	record := newRecord()
 
-	record.WithKey(entry.Key).
-		WithTimestamp(entry.Meta.Timestamp).
-		WithTTL(entry.Meta.TTL).
-		WithTxID(entry.Meta.TxID)
+	record.withKey(entry.Key).
+		withTimestamp(entry.Meta.Timestamp).
+		withTTL(entry.Meta.TTL).
+		withTxID(entry.Meta.TxID)
 
 	if db.opt.EntryIdxMode == HintKeyValAndRAMIdxMode {
-		record.WithValue(entry.Value)
+		record.withValue(entry.Value)
 	}
 
 	if db.opt.EntryIdxMode == HintKeyAndRAMIdxMode {
-		record.WithFileId(fid).
-			WithDataPos(off).
-			WithValueSize(uint32(len(entry.Value)))
+		record.withFileId(fid).
+			withDataPos(off).
+			withValueSize(uint32(len(entry.Value)))
 	}
 
 	return record
@@ -850,7 +850,7 @@ func (db *DB) sendToWriteCh(tx *Tx) (*request, error) {
 	req.reset()
 	req.Wg.Add(1)
 	req.tx = tx
-	req.IncrRef()     // for db write
+	req.incrRef()     // for db write
 	db.writeCh <- req // Handled in doWrites.
 	return req, nil
 }
@@ -858,7 +858,7 @@ func (db *DB) sendToWriteCh(tx *Tx) (*request, error) {
 func (db *DB) checkListExpired() {
 	db.Index.list.rangeIdx(func(l *List) {
 		for key := range l.TTL {
-			l.IsExpire(key)
+			l.isExpire(key)
 		}
 	})
 }

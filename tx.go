@@ -139,7 +139,7 @@ func (tx *Tx) commitAndSend() (func() error, error) {
 		return nil, err
 	}
 	ret := func() error {
-		err := req.Wait()
+		err := req.wait()
 		return err
 	}
 
@@ -265,13 +265,13 @@ func (tx *Tx) Commit() (err error) {
 
 		// add to cache
 		if tx.db.opt.EntryIdxMode == HintKeyAndRAMIdxMode {
-			tx.db.hintKeyAndRAMIdxModeLru.Add(string(entry.Value), entry)
+			tx.db.hintKeyAndRAMIdxModeLru.add(string(entry.Value), entry)
 		}
 
 		records = append(records, record)
 	}
 
-	if err := tx.SubmitBucket(); err != nil {
+	if err := tx.submitBucket(); err != nil {
 		return err
 	}
 
@@ -323,7 +323,7 @@ func (tx *Tx) getListEntryNewAddRecordCount(bucketId BucketId, entry *Entry) (in
 	case DataLPopFlag, DataRPopFlag:
 		res--
 	case DataLRemByIndex:
-		indexes, _ := UnmarshalInts([]byte(value))
+		indexes, _ := unmarshalInts([]byte(value))
 		res -= int64(len(l.getValidIndexes(key, indexes)))
 	case DataLRemFlag:
 		count, newValue := splitIntStringStr(value, SeparatorForListKey)
@@ -342,7 +342,7 @@ func (tx *Tx) getListEntryNewAddRecordCount(bucketId BucketId, entry *Entry) (in
 		newKey, start := splitStringIntStr(key, SeparatorForListKey)
 		end, _ := strconv2.StrToInt(value)
 
-		if l.IsExpire(newKey) {
+		if l.isExpire(newKey) {
 			return 0, nil
 		}
 
@@ -350,13 +350,13 @@ func (tx *Tx) getListEntryNewAddRecordCount(bucketId BucketId, entry *Entry) (in
 			return 0, nil
 		}
 
-		items, err := l.LRange(newKey, start, end)
+		items, err := l.lRange(newKey, start, end)
 		if err != nil {
 			return res, err
 		}
 
 		list := l.Items[newKey]
-		res -= int64(list.Count() - len(items))
+		res -= int64(list.count() - len(items))
 	}
 
 	return res, nil
@@ -370,7 +370,7 @@ func (tx *Tx) getKvEntryNewAddRecordCount(bucketId BucketId, entry *Entry) (int6
 		res--
 	case DataSetFlag:
 		if idx, ok := tx.db.Index.bTree.exist(bucketId); ok {
-			_, found := idx.Find(entry.Key)
+			_, found := idx.find(entry.Key)
 			if !found {
 				res++
 			}
@@ -430,7 +430,7 @@ func (tx *Tx) keyExistsInSortedSet(bucketId BucketId, key, value string) bool {
 	if strings.Contains(key, SeparatorForZSetKey) {
 		newKey, _ = splitStringFloat64Str(key, SeparatorForZSetKey)
 	}
-	exists, _ := tx.db.Index.sortedSet.idx[bucketId].ZExist(newKey, []byte(value))
+	exists, _ := tx.db.Index.sortedSet.idx[bucketId].zExist(newKey, []byte(value))
 	return exists
 }
 
@@ -605,10 +605,10 @@ func (tx *Tx) put(bucket string, key, value []byte, ttl uint32, flag uint16, tim
 		return err
 	}
 
-	meta := NewMetaData().WithTimeStamp(timestamp).WithKeySize(uint32(len(key))).WithValueSize(uint32(len(value))).WithFlag(flag).
-		WithTTL(ttl).WithStatus(UnCommitted).WithDs(ds).WithTxID(tx.id).WithBucketId(bucketId)
+	meta := newMetaData().withTimeStamp(timestamp).withKeySize(uint32(len(key))).withValueSize(uint32(len(value))).withFlag(flag).
+		withTTL(ttl).withStatus(UnCommitted).withDs(ds).withTxID(tx.id).withBucketId(bucketId)
 
-	e := NewEntry().WithKey(key).WithMeta(meta).WithValue(value)
+	e := newEntry().withKey(key).withMeta(meta).withValue(value)
 
 	err = e.valid()
 	if err != nil {
@@ -625,10 +625,10 @@ func (tx *Tx) putDeleteLog(bucketId BucketId, key, value []byte, ttl uint32, fla
 	if err != nil {
 		return
 	}
-	meta := NewMetaData().WithTimeStamp(timestamp).WithKeySize(uint32(len(key))).WithValueSize(uint32(len(value))).WithFlag(flag).
-		WithTTL(ttl).WithStatus(UnCommitted).WithDs(ds).WithTxID(tx.id).WithBucketId(bucket.Id)
+	meta := newMetaData().withTimeStamp(timestamp).withKeySize(uint32(len(key))).withValueSize(uint32(len(value))).withFlag(flag).
+		withTTL(ttl).withStatus(UnCommitted).withDs(ds).withTxID(tx.id).withBucketId(bucket.Id)
 
-	e := NewEntry().WithKey(key).WithMeta(meta).WithValue(value)
+	e := newEntry().withKey(key).withMeta(meta).withValue(value)
 	tx.pendingWrites = append(tx.pendingWrites, e)
 	tx.size += e.Size()
 }
@@ -702,7 +702,7 @@ func (tx *Tx) putBucket(b *Bucket) error {
 	return nil
 }
 
-func (tx *Tx) SubmitBucket() error {
+func (tx *Tx) submitBucket() error {
 	bucketReqs := make([]*bucketSubmitRequest, 0)
 	for ds, mapper := range tx.pendingBucketList {
 		for name, bucket := range mapper {
@@ -777,25 +777,25 @@ func (tx *Tx) getChangeCountInBucketChanges() int64 {
 				switch bucket.Ds {
 				case DataStructureBTree:
 					if bTree, ok := tx.db.Index.bTree.idx[bucketId]; ok {
-						res -= int64(bTree.Count())
+						res -= int64(bTree.count())
 					}
 				case DataStructureSet:
 					if set, ok := tx.db.Index.set.idx[bucketId]; ok {
 						for key := range set.M {
-							res -= int64(set.SCard(key))
+							res -= int64(set.sCard(key))
 						}
 					}
 				case DataStructureSortedSet:
 					if sortedSet, ok := tx.db.Index.sortedSet.idx[bucketId]; ok {
 						for key := range sortedSet.M {
-							curLen, _ := sortedSet.ZCard(key)
+							curLen, _ := sortedSet.zCard(key)
 							res -= int64(curLen)
 						}
 					}
 				case DataStructureList:
 					if list, ok := tx.db.Index.list.idx[bucketId]; ok {
 						for key := range list.Items {
-							curLen, _ := list.Size(key)
+							curLen, _ := list.size(key)
 							res -= int64(curLen)
 						}
 					}

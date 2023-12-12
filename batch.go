@@ -48,7 +48,7 @@ func (wb *WriteBatch) Cancel() error {
 	wb.tx.setStatusClosed()
 	wb.Unlock()
 
-	if err := wb.throttle.Finish(); err != nil {
+	if err := wb.throttle.finish(); err != nil {
 		return fmt.Errorf("WatchBatch.Cancel error while finishing: %v", err)
 	}
 
@@ -113,7 +113,7 @@ func (wb *WriteBatch) commit() error {
 		return ErrCommitAfterFinish
 	}
 
-	if err := wb.throttle.Do(); err != nil {
+	if err := wb.throttle.do(); err != nil {
 		wb.err.Store(err)
 		return err
 	}
@@ -132,7 +132,7 @@ func (wb *WriteBatch) commit() error {
 
 func (wb *WriteBatch) callback(err error) {
 	// sync.WaitGroup is thread-safe, so it doesn't need to be run inside wb.Lock.
-	defer wb.throttle.Done(err)
+	defer wb.throttle.done(err)
 	if err == nil {
 		return
 	}
@@ -153,7 +153,7 @@ func (wb *WriteBatch) Flush() error {
 	wb.finished = true
 	wb.tx.setStatusClosed()
 	wb.Unlock()
-	if err := wb.throttle.Finish(); err != nil {
+	if err := wb.throttle.finish(); err != nil {
 		if wb.Error() != nil {
 			return fmt.Errorf("wb.err: %s err: %s", wb.Error(), err)
 		}

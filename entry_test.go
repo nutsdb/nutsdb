@@ -33,8 +33,8 @@ func (suite *EntryTestSuite) SetupSuite() {
 	suite.entry = Entry{
 		Key:   []byte("key_0001"),
 		Value: []byte("val_0001"),
-		Meta: NewMetaData().WithKeySize(uint32(len("key_0001"))).
-			WithValueSize(uint32(len("val_0001"))).WithTimeStamp(1547707905).WithTTL(Persistent).WithFlag(DataSetFlag).WithBucketId(1),
+		Meta: newMetaData().withKeySize(uint32(len("key_0001"))).
+			withValueSize(uint32(len("val_0001"))).withTimeStamp(1547707905).withTTL(Persistent).withFlag(DataSetFlag).withBucketId(1),
 	}
 	suite.expectedEncode = []byte{168, 1, 59, 122, 129, 204, 128, 226, 5, 8, 8, 1, 0, 0, 0, 0, 1, 107, 101, 121, 95, 48, 48, 48, 49, 118, 97, 108, 95, 48, 48, 48, 49}
 }
@@ -54,7 +54,7 @@ func (suite *EntryTestSuite) TestIsZero() {
 
 func (suite *EntryTestSuite) TestGetCrc() {
 
-	headerSize := suite.entry.Meta.Size()
+	headerSize := suite.entry.Meta.size()
 	crc1 := suite.entry.GetCrc(suite.expectedEncode[:headerSize])
 	crc2 := binary.LittleEndian.Uint32(suite.expectedEncode[:4])
 
@@ -78,29 +78,29 @@ func TestEntries_processEntriesScanOnDisk(t *testing.T) {
 			Entries{
 				{
 					Key:  []byte("abc"),
-					Meta: NewMetaData().WithTTL(0).WithFlag(DataSetFlag),
+					Meta: newMetaData().withTTL(0).withFlag(DataSetFlag),
 				},
 				{
 					Key:  []byte("z"),
-					Meta: NewMetaData().WithTTL(0).WithFlag(DataSetFlag),
+					Meta: newMetaData().withTTL(0).withFlag(DataSetFlag),
 				},
 				{
 					Key:  []byte("abcd"),
-					Meta: NewMetaData().WithTTL(0).WithFlag(DataSetFlag),
+					Meta: newMetaData().withTTL(0).withFlag(DataSetFlag),
 				},
 			},
 			[]*Entry{
 				{
 					Key:  []byte("abc"),
-					Meta: NewMetaData().WithTTL(0).WithFlag(DataSetFlag),
+					Meta: newMetaData().withTTL(0).withFlag(DataSetFlag),
 				},
 				{
 					Key:  []byte("abcd"),
-					Meta: NewMetaData().WithTTL(0).WithFlag(DataSetFlag),
+					Meta: newMetaData().withTTL(0).withFlag(DataSetFlag),
 				},
 				{
 					Key:  []byte("z"),
-					Meta: NewMetaData().WithTTL(0).WithFlag(DataSetFlag),
+					Meta: newMetaData().withTTL(0).withFlag(DataSetFlag),
 				},
 			},
 		},
@@ -109,11 +109,11 @@ func TestEntries_processEntriesScanOnDisk(t *testing.T) {
 			Entries{
 				{
 					Key:  []byte("abc"),
-					Meta: NewMetaData().WithTTL(1),
+					Meta: newMetaData().withTTL(1),
 				},
 				{
 					Key:  []byte("abc"),
-					Meta: NewMetaData().WithTTL(0).WithFlag(DataDeleteFlag),
+					Meta: newMetaData().withTTL(0).withFlag(DataDeleteFlag),
 				},
 			},
 			nil,
@@ -124,7 +124,7 @@ func TestEntries_processEntriesScanOnDisk(t *testing.T) {
 			assert.Equalf(t, tt.wantResult, tt.e.processEntriesScanOnDisk(), "processEntriesScanOnDisk()")
 		})
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equalf(t, tt.wantResult, tt.e.ToCEntries(nil).processEntriesScanOnDisk(), "CEntries.processEntriesScanOnDisk()")
+			assert.Equalf(t, tt.wantResult, tt.e.toCEntries(nil).processEntriesScanOnDisk(), "CEntries.processEntriesScanOnDisk()")
 		})
 	}
 }

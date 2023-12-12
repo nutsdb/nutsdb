@@ -30,13 +30,13 @@ type Record struct {
 	TxID      uint64
 }
 
-// IsExpired returns the record if expired or not.
-func (r *Record) IsExpired() bool {
-	return IsExpired(r.TTL, r.Timestamp)
+// isExpired returns the record if expired or not.
+func (r *Record) isExpired() bool {
+	return isExpired(r.TTL, r.Timestamp)
 }
 
-// IsExpired checks the ttl if expired or not.
-func IsExpired(ttl uint32, timestamp uint64) bool {
+// isExpired checks the ttl if expired or not.
+func isExpired(ttl uint32, timestamp uint64) bool {
 	if ttl == Persistent {
 		return false
 	}
@@ -48,50 +48,50 @@ func IsExpired(ttl uint32, timestamp uint64) bool {
 	return expireTime.Before(now)
 }
 
-// NewRecord generate a record Obj
-func NewRecord() *Record {
+// newRecord generate a record Obj
+func newRecord() *Record {
 	return new(Record)
 }
 
-func (r *Record) WithKey(k []byte) *Record {
+func (r *Record) withKey(k []byte) *Record {
 	r.Key = k
 	return r
 }
 
-// WithValue set the Value to Record
-func (r *Record) WithValue(v []byte) *Record {
+// withValue set the Value to Record
+func (r *Record) withValue(v []byte) *Record {
 	r.Value = v
 	return r
 }
 
-// WithFileId set FileID to Record
-func (r *Record) WithFileId(fid int64) *Record {
+// withFileId set FileID to Record
+func (r *Record) withFileId(fid int64) *Record {
 	r.FileID = fid
 	return r
 }
 
-// WithDataPos set DataPos to Record
-func (r *Record) WithDataPos(pos uint64) *Record {
+// withDataPos set DataPos to Record
+func (r *Record) withDataPos(pos uint64) *Record {
 	r.DataPos = pos
 	return r
 }
 
-func (r *Record) WithValueSize(valueSize uint32) *Record {
+func (r *Record) withValueSize(valueSize uint32) *Record {
 	r.ValueSize = valueSize
 	return r
 }
 
-func (r *Record) WithTimestamp(timestamp uint64) *Record {
+func (r *Record) withTimestamp(timestamp uint64) *Record {
 	r.Timestamp = timestamp
 	return r
 }
 
-func (r *Record) WithTTL(ttl uint32) *Record {
+func (r *Record) withTTL(ttl uint32) *Record {
 	r.TTL = ttl
 	return r
 }
 
-func (r *Record) WithTxID(txID uint64) *Record {
+func (r *Record) withTxID(txID uint64) *Record {
 	r.TxID = txID
 	return r
 }

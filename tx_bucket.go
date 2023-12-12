@@ -21,7 +21,7 @@ func (tx *Tx) IterateBuckets(ds uint16, pattern string, f func(bucket string) bo
 	}
 
 	handle := func(bucket string) error {
-		if end, err := MatchForRange(pattern, bucket, f); end || err != nil {
+		if end, err := matchForRange(pattern, bucket, f); end || err != nil {
 			return err
 		}
 		return nil

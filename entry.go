@@ -45,7 +45,7 @@ type (
 
 // Size returns the size of the entry.
 func (e *Entry) Size() int64 {
-	return e.Meta.Size() + int64(e.Meta.KeySize+e.Meta.ValueSize)
+	return e.Meta.size() + int64(e.Meta.KeySize+e.Meta.ValueSize)
 }
 
 // Encode returns the slice after the entry be encoded.
@@ -127,7 +127,7 @@ func (e *Entry) ParsePayload(data []byte) error {
 
 // checkPayloadSize checks the payload size
 func (e *Entry) checkPayloadSize(size int64) error {
-	if e.Meta.PayloadSize() != size {
+	if e.Meta.payloadSize() != size {
 		return ErrPayLoadSizeMismatch
 	}
 	return nil
@@ -142,9 +142,9 @@ func (e *Entry) ParseMeta(buf []byte) (int64, error) {
 		return 0, ErrHeaderSizeOutOfBounds
 	}
 
-	e.Meta = NewMetaData()
+	e.Meta = newMetaData()
 
-	e.Meta.WithCrc(binary.LittleEndian.Uint32(buf[0:4]))
+	e.Meta.withCrc(binary.LittleEndian.Uint32(buf[0:4]))
 
 	index := 4
 
@@ -168,15 +168,15 @@ func (e *Entry) ParseMeta(buf []byte) (int64, error) {
 	index += n
 
 	e.Meta.
-		WithTimeStamp(timestamp).
-		WithKeySize(uint32(keySize)).
-		WithValueSize(uint32(valueSize)).
-		WithFlag(uint16(flag)).
-		WithTTL(uint32(ttl)).
-		WithStatus(uint16(status)).
-		WithDs(uint16(ds)).
-		WithTxID(txId).
-		WithBucketId(bucketId)
+		withTimeStamp(timestamp).
+		withKeySize(uint32(keySize)).
+		withValueSize(uint32(valueSize)).
+		withFlag(uint16(flag)).
+		withTTL(uint32(ttl)).
+		withStatus(uint16(status)).
+		withDs(uint16(ds)).
+		withTxID(txId).
+		withBucketId(bucketId)
 
 	return int64(index), nil
 }
@@ -196,7 +196,7 @@ func (e *Entry) isFilter() bool {
 		DataZPopMinFlag,
 		DataLRemByIndex,
 	}
-	return OneOfUint16Array(meta.Flag, filterDataSet)
+	return oneOfUint16Array(meta.Flag, filterDataSet)
 }
 
 // valid check the entry fields valid or not
@@ -210,48 +210,48 @@ func (e *Entry) valid() error {
 	return nil
 }
 
-// NewEntry new Entry Object
-func NewEntry() *Entry {
+// newEntry new Entry Object
+func newEntry() *Entry {
 	return new(Entry)
 }
 
-// WithKey set key to Entry
-func (e *Entry) WithKey(key []byte) *Entry {
+// withKey set key to Entry
+func (e *Entry) withKey(key []byte) *Entry {
 	e.Key = key
 	return e
 }
 
-// WithValue set value to Entry
-func (e *Entry) WithValue(value []byte) *Entry {
+// withValue set value to Entry
+func (e *Entry) withValue(value []byte) *Entry {
 	e.Value = value
 	return e
 }
 
-// WithMeta set Meta to Entry
-func (e *Entry) WithMeta(meta *MetaData) *Entry {
+// withMeta set Meta to Entry
+func (e *Entry) withMeta(meta *MetaData) *Entry {
 	e.Meta = meta
 	return e
 }
 
-// GetTxIDBytes return the bytes of TxID
-func (e *Entry) GetTxIDBytes() []byte {
+// getTxIDBytes return the bytes of TxID
+func (e *Entry) getTxIDBytes() []byte {
 	return []byte(strconv2.Int64ToStr(int64(e.Meta.TxID)))
 }
 
-func (e *Entry) IsBelongsToBPlusTree() bool {
-	return e.Meta.IsBPlusTree()
+func (e *Entry) isBelongsToBPlusTree() bool {
+	return e.Meta.isBPlusTree()
 }
 
-func (e *Entry) IsBelongsToList() bool {
-	return e.Meta.IsList()
+func (e *Entry) isBelongsToList() bool {
+	return e.Meta.isList()
 }
 
-func (e *Entry) IsBelongsToSet() bool {
-	return e.Meta.IsSet()
+func (e *Entry) isBelongsToSet() bool {
+	return e.Meta.isSet()
 }
 
-func (e *Entry) IsBelongsToSortSet() bool {
-	return e.Meta.IsSortSet()
+func (e *Entry) isBelongsToSortSet() bool {
+	return e.Meta.isSortSet()
 }
 
 // Entries represents entries
@@ -272,7 +272,7 @@ func (e Entries) processEntriesScanOnDisk() (result []*Entry) {
 	sort.Sort(e)
 	for _, ele := range e {
 		curE := ele
-		if !IsExpired(curE.Meta.TTL, curE.Meta.Timestamp) && curE.Meta.Flag != DataDeleteFlag {
+		if !isExpired(curE.Meta.TTL, curE.Meta.Timestamp) && curE.Meta.Flag != DataDeleteFlag {
 			result = append(result, curE)
 		}
 	}
@@ -280,7 +280,7 @@ func (e Entries) processEntriesScanOnDisk() (result []*Entry) {
 	return result
 }
 
-func (e Entries) ToCEntries(lFunc func(l, r string) bool) CEntries {
+func (e Entries) toCEntries(lFunc func(l, r string) bool) CEntries {
 	return CEntries{
 		Entries:  e,
 		LessFunc: lFunc,
@@ -310,7 +310,7 @@ func (c CEntries) processEntriesScanOnDisk() (result []*Entry) {
 	sort.Sort(c)
 	for _, ele := range c.Entries {
 		curE := ele
-		if !IsExpired(curE.Meta.TTL, curE.Meta.Timestamp) && curE.Meta.Flag != DataDeleteFlag {
+		if !isExpired(curE.Meta.TTL, curE.Meta.Timestamp) && curE.Meta.Flag != DataDeleteFlag {
 			result = append(result, curE)
 		}
 	}

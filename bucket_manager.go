@@ -55,7 +55,7 @@ type bucketSubmitRequest struct {
 func (bm *BucketManager) SubmitPendingBucketChange(reqs []*bucketSubmitRequest) error {
 	bytes := make([]byte, 0)
 	for _, req := range reqs {
-		bs := req.bucket.Encode()
+		bs := req.bucket.encode()
 		bytes = append(bytes, bs...)
 		// update the marker info
 		if _, exist := bm.BucketIDMarker[req.name]; !exist {

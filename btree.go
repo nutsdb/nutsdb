@@ -42,7 +42,7 @@ func NewBTree() *BTree {
 	}
 }
 
-func (bt *BTree) Find(key []byte) (*Record, bool) {
+func (bt *BTree) find(key []byte) (*Record, bool) {
 	item, ok := bt.btree.Get(&Item{key: key})
 	if ok {
 		return item.record, ok
@@ -50,22 +50,22 @@ func (bt *BTree) Find(key []byte) (*Record, bool) {
 	return nil, ok
 }
 
-func (bt *BTree) Insert(record *Record) bool {
+func (bt *BTree) insert(record *Record) bool {
 	_, replaced := bt.btree.Set(&Item{key: record.Key, record: record})
 	return replaced
 }
 
-func (bt *BTree) InsertRecord(key []byte, record *Record) bool {
+func (bt *BTree) insertRecord(key []byte, record *Record) bool {
 	_, replaced := bt.btree.Set(&Item{key: key, record: record})
 	return replaced
 }
 
-func (bt *BTree) Delete(key []byte) bool {
+func (bt *BTree) delete(key []byte) bool {
 	_, deleted := bt.btree.Delete(&Item{key: key})
 	return deleted
 }
 
-func (bt *BTree) All() []*Record {
+func (bt *BTree) all() []*Record {
 	items := bt.btree.Items()
 
 	records := make([]*Record, len(items))
@@ -76,7 +76,7 @@ func (bt *BTree) All() []*Record {
 	return records
 }
 
-func (bt *BTree) AllItems() []*Item {
+func (bt *BTree) allItems() []*Item {
 	items := bt.btree.Items()
 	return items
 }
@@ -95,7 +95,7 @@ func (bt *BTree) Range(start, end []byte) []*Record {
 	return records
 }
 
-func (bt *BTree) PrefixScan(prefix []byte, offset, limitNum int) []*Record {
+func (bt *BTree) prefixScan(prefix []byte, offset, limitNum int) []*Record {
 	records := make([]*Record, 0)
 
 	bt.btree.Ascend(&Item{key: prefix}, func(item *Item) bool {
@@ -117,7 +117,7 @@ func (bt *BTree) PrefixScan(prefix []byte, offset, limitNum int) []*Record {
 	return records
 }
 
-func (bt *BTree) PrefixSearchScan(prefix []byte, reg string, offset, limitNum int) []*Record {
+func (bt *BTree) prefixSearchScan(prefix []byte, reg string, offset, limitNum int) []*Record {
 	records := make([]*Record, 0)
 
 	rgx := regexp.MustCompile(reg)
@@ -145,22 +145,22 @@ func (bt *BTree) PrefixSearchScan(prefix []byte, reg string, offset, limitNum in
 	return records
 }
 
-func (bt *BTree) Count() int {
+func (bt *BTree) count() int {
 	return bt.btree.Len()
 }
 
-func (bt *BTree) PopMin() (*Item, bool) {
+func (bt *BTree) popMin() (*Item, bool) {
 	return bt.btree.PopMin()
 }
 
-func (bt *BTree) PopMax() (*Item, bool) {
+func (bt *BTree) popMax() (*Item, bool) {
 	return bt.btree.PopMax()
 }
 
-func (bt *BTree) Min() (*Item, bool) {
+func (bt *BTree) min() (*Item, bool) {
 	return bt.btree.Min()
 }
 
-func (bt *BTree) Max() (*Item, bool) {
+func (bt *BTree) max() (*Item, bool) {
 	return bt.btree.Max()
 }

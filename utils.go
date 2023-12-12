@@ -26,8 +26,8 @@ import (
 	"github.com/xujiajun/utils/strconv2"
 )
 
-// Truncate changes the size of the file.
-func Truncate(path string, capacity int64, f *os.File) error {
+// truncate changes the size of the file.
+func truncate(path string, capacity int64, f *os.File) error {
 	fileInfo, _ := os.Stat(path)
 	if fileInfo.Size() < capacity {
 		if err := f.Truncate(capacity); err != nil {
@@ -37,17 +37,17 @@ func Truncate(path string, capacity int64, f *os.File) error {
 	return nil
 }
 
-func ConvertBigEndianBytesToUint64(data []byte) uint64 {
+func convertBigEndianBytesToUint64(data []byte) uint64 {
 	return binary.BigEndian.Uint64(data)
 }
 
-func ConvertUint64ToBigEndianBytes(value uint64) []byte {
+func convertUint64ToBigEndianBytes(value uint64) []byte {
 	b := make([]byte, 8)
 	binary.BigEndian.PutUint64(b, value)
 	return b
 }
 
-func MarshalInts(ints []int) ([]byte, error) {
+func marshalInts(ints []int) ([]byte, error) {
 	buffer := bytes.NewBuffer([]byte{})
 	for _, x := range ints {
 		if err := binary.Write(buffer, binary.LittleEndian, int64(x)); err != nil {
@@ -57,7 +57,7 @@ func MarshalInts(ints []int) ([]byte, error) {
 	return buffer.Bytes(), nil
 }
 
-func UnmarshalInts(data []byte) ([]int, error) {
+func unmarshalInts(data []byte) ([]int, error) {
 	var ints []int
 	buffer := bytes.NewBuffer(data)
 	for {
@@ -73,7 +73,7 @@ func UnmarshalInts(data []byte) ([]int, error) {
 	return ints, nil
 }
 
-func MatchForRange(pattern, bucket string, f func(bucket string) bool) (end bool, err error) {
+func matchForRange(pattern, bucket string, f func(bucket string) bool) (end bool, err error) {
 	match, err := filepath.Match(pattern, bucket)
 	if err != nil {
 		return true, err
@@ -90,7 +90,7 @@ func getDataPath(fID int64, dir string) string {
 	return dir + separator + strconv2.Int64ToStr(fID) + DataSuffix
 }
 
-func OneOfUint16Array(value uint16, array []uint16) bool {
+func oneOfUint16Array(value uint16, array []uint16) bool {
 	for _, v := range array {
 		if v == value {
 			return true
@@ -170,7 +170,7 @@ func createNewBufferWithSize(size int) *bytes.Buffer {
 	return buf
 }
 
-func UvarintSize(x uint64) int {
+func uVarIntSize(x uint64) int {
 	i := 0
 	for x >= 0x80 {
 		x >>= 7

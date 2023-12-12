@@ -24,7 +24,7 @@ func TestGetDiskSizeFromSingleObject(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equalf(t, tt.want, GetDiskSizeFromSingleObject(tt.args.obj), "GetDiskSizeFromSingleObject(%v)", tt.args.obj)
+			assert.Equalf(t, tt.want, getDiskSizeFromSingleObject(tt.args.obj), "getDiskSizeFromSingleObject(%v)", tt.args.obj)
 		})
 	}
 }

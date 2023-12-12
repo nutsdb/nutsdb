@@ -70,7 +70,7 @@ func (tx *Tx) ZMembers(bucket string, key []byte) (map[*SortedSetMember]struct{}
 		return nil, ErrBucket
 	}
 
-	members, err := sortedSet.ZMembers(string(key))
+	members, err := sortedSet.zMembers(string(key))
 	if err != nil {
 		return nil, err
 	}
@@ -111,7 +111,7 @@ func (tx *Tx) ZCard(bucket string, key []byte) (int, error) {
 		return 0, ErrBucket
 	}
 
-	return sortedSet.ZCard(string(key))
+	return sortedSet.zCard(string(key))
 }
 
 // ZCount Returns the number of elements in the sorted set specified by key in a bucket with a score between min and max and opts.
@@ -139,7 +139,7 @@ func (tx *Tx) ZCount(bucket string, key []byte, start, end float64, opts *GetByS
 		return 0, ErrBucket
 	}
 
-	return sortedSet.ZCount(string(key), SCORE(start), SCORE(end), opts)
+	return sortedSet.zCount(string(key), SCORE(start), SCORE(end), opts)
 }
 
 // ZPopMax Removes and returns the member with the highest score in the sorted set specified by key in a bucket.
@@ -163,7 +163,7 @@ func (tx *Tx) ZPopMax(bucket string, key []byte) (*SortedSetMember, error) {
 		return nil, ErrBucket
 	}
 
-	record, score, err := sortedSet.ZPeekMax(string(key))
+	record, score, err := sortedSet.zPeekMax(string(key))
 	if err != nil {
 		return nil, err
 	}
@@ -197,7 +197,7 @@ func (tx *Tx) ZPopMin(bucket string, key []byte) (*SortedSetMember, error) {
 		return nil, ErrBucket
 	}
 
-	record, score, err := sortedSet.ZPeekMin(string(key))
+	record, score, err := sortedSet.zPeekMin(string(key))
 	if err != nil {
 		return nil, err
 	}
@@ -231,7 +231,7 @@ func (tx *Tx) ZPeekMax(bucket string, key []byte) (*SortedSetMember, error) {
 		return nil, ErrBucket
 	}
 
-	record, score, err := sortedSet.ZPeekMax(string(key))
+	record, score, err := sortedSet.zPeekMax(string(key))
 	if err != nil {
 		return nil, err
 	}
@@ -265,7 +265,7 @@ func (tx *Tx) ZPeekMin(bucket string, key []byte) (*SortedSetMember, error) {
 		return nil, ErrBucket
 	}
 
-	record, score, err := sortedSet.ZPeekMin(string(key))
+	record, score, err := sortedSet.zPeekMin(string(key))
 	if err != nil {
 		return nil, err
 	}
@@ -300,7 +300,7 @@ func (tx *Tx) ZRangeByScore(bucket string, key []byte, start, end float64, opts 
 		return nil, ErrBucket
 	}
 
-	records, scores, err := sortedSet.ZRangeByScore(string(key), SCORE(start), SCORE(end), opts)
+	records, scores, err := sortedSet.zRangeByScore(string(key), SCORE(start), SCORE(end), opts)
 	if err != nil {
 		return nil, err
 	}
@@ -339,7 +339,7 @@ func (tx *Tx) ZRangeByRank(bucket string, key []byte, start, end int) ([]*Sorted
 		return nil, ErrBucket
 	}
 
-	records, scores, err := sortedSet.ZRangeByRank(string(key), start, end)
+	records, scores, err := sortedSet.zRangeByRank(string(key), start, end)
 	if err != nil {
 		return nil, err
 	}
@@ -377,7 +377,7 @@ func (tx *Tx) ZRem(bucket string, key []byte, value []byte) error {
 		return ErrBucket
 	}
 
-	exist, err = sortedSet.ZExist(string(key), value)
+	exist, err = sortedSet.zExist(string(key), value)
 	if err != nil {
 		return err
 	}
@@ -422,7 +422,7 @@ func (tx *Tx) ZRank(bucket string, key, value []byte) (int, error) {
 		return 0, ErrBucket
 	}
 
-	return sortedSet.ZRank(string(key), value)
+	return sortedSet.zRank(string(key), value)
 }
 
 // ZRevRank Returns the rank of member in the sorted set specified by key in a bucket, with the scores ordered from high to low.
@@ -446,7 +446,7 @@ func (tx *Tx) ZRevRank(bucket string, key, value []byte) (int, error) {
 		return 0, ErrBucket
 	}
 
-	return sortedSet.ZRevRank(string(key), value)
+	return sortedSet.zRevRank(string(key), value)
 }
 
 // ZScore Returns the score of members in a sorted set specified by key in a bucket.
@@ -470,7 +470,7 @@ func (tx *Tx) ZScore(bucket string, key, value []byte) (float64, error) {
 		return 0, ErrBucket
 	}
 
-	return sortedSet.ZScore(string(key), value)
+	return sortedSet.zScore(string(key), value)
 }
 
 // ZKeys find all keys matching a given pattern in a bucket
@@ -495,7 +495,7 @@ func (tx *Tx) ZKeys(bucket, pattern string, f func(key string) bool) error {
 	}
 
 	for key := range sortedSet.M {
-		if end, err := MatchForRange(pattern, key, f); end || err != nil {
+		if end, err := matchForRange(pattern, key, f); end || err != nil {
 			return err
 		}
 	}

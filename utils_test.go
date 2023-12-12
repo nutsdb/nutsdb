@@ -22,17 +22,17 @@ import (
 
 func TestMarshalInts(t *testing.T) {
 	assertions := assert.New(t)
-	data, err := MarshalInts([]int{})
+	data, err := marshalInts([]int{})
 	assertions.NoError(err, "TestMarshalInts")
 
-	ints, err := UnmarshalInts(data)
+	ints, err := unmarshalInts(data)
 	assertions.NoError(err, "TestMarshalInts")
 	assertions.Equal(0, len(ints), "TestMarshalInts")
 
-	data, err = MarshalInts([]int{1, 3})
+	data, err = marshalInts([]int{1, 3})
 	assertions.NoError(err, "TestMarshalInts")
 
-	ints, err = UnmarshalInts(data)
+	ints, err = unmarshalInts(data)
 	assertions.NoError(err, "TestMarshalInts")
 	assertions.Equal(2, len(ints), "TestMarshalInts")
 	assertions.Equal(1, ints[0], "TestMarshalInts")
@@ -42,18 +42,18 @@ func TestMarshalInts(t *testing.T) {
 func TestMatchForRange(t *testing.T) {
 	assertions := assert.New(t)
 
-	end, err := MatchForRange("*", "hello", func(key string) bool {
+	end, err := matchForRange("*", "hello", func(key string) bool {
 		return true
 	})
 	assertions.NoError(err, "TestMatchForRange")
 	assertions.False(end, "TestMatchForRange")
 
-	_, err = MatchForRange("[", "hello", func(key string) bool {
+	_, err = matchForRange("[", "hello", func(key string) bool {
 		return true
 	})
 	assertions.Error(err, "TestMatchForRange")
 
-	end, err = MatchForRange("*", "hello", func(key string) bool {
+	end, err = matchForRange("*", "hello", func(key string) bool {
 		return false
 	})
 	assertions.NoError(err, "TestMatchForRange")

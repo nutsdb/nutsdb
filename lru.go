@@ -23,8 +23,8 @@ func NewLruCache(cap int) *LRUCache {
 	}
 }
 
-// Add adds a new entry to the cache.
-func (c *LRUCache) Add(key interface{}, value interface{}) {
+// add adds a new entry to the cache.
+func (c *LRUCache) add(key interface{}, value interface{}) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -45,8 +45,8 @@ func (c *LRUCache) Add(key interface{}, value interface{}) {
 	c.m[key] = entry
 }
 
-// Get returns the entry associated with the given key, or nil if the key is not in the cache.
-func (c *LRUCache) Get(key interface{}) interface{} {
+// get returns the entry associated with the given key, or nil if the key is not in the cache.
+func (c *LRUCache) get(key interface{}) interface{} {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -59,8 +59,8 @@ func (c *LRUCache) Get(key interface{}) interface{} {
 	return entry.Value.(*LruEntry).Value
 }
 
-// Remove removes the entry associated with the given key from the cache.
-func (c *LRUCache) Remove(key interface{}) {
+// remove removes the entry associated with the given key from the cache.
+func (c *LRUCache) remove(key interface{}) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -73,16 +73,16 @@ func (c *LRUCache) Remove(key interface{}) {
 	delete(c.m, key)
 }
 
-// Len returns the number of entries in the cache.
-func (c *LRUCache) Len() int {
+// len returns the number of entries in the cache.
+func (c *LRUCache) len() int {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
 	return c.l.Len()
 }
 
-// Clear clears the cache.
-func (c *LRUCache) Clear() {
+// clear clears the cache.
+func (c *LRUCache) clear() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 

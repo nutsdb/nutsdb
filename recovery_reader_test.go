@@ -12,11 +12,11 @@ func Test_readEntry(t *testing.T) {
 
 	fd, err := os.OpenFile(path, os.O_TRUNC|os.O_CREATE|os.O_RDWR, os.ModePerm)
 	require.NoError(t, err)
-	meta := NewMetaData().WithKeySize(uint32(len("key"))).
-		WithValueSize(uint32(len("val"))).WithTimeStamp(1547707905).
-		WithTTL(Persistent).WithFlag(DataSetFlag).WithBucketId(1)
+	meta := newMetaData().withKeySize(uint32(len("key"))).
+		withValueSize(uint32(len("val"))).withTimeStamp(1547707905).
+		withTTL(Persistent).withFlag(DataSetFlag).withBucketId(1)
 
-	expect := NewEntry().WithKey([]byte("key")).WithMeta(meta).WithValue([]byte("val"))
+	expect := newEntry().withKey([]byte("key")).withMeta(meta).withValue([]byte("val"))
 
 	_, err = fd.Write(expect.Encode())
 	require.NoError(t, err)
@@ -44,7 +44,7 @@ func Test_fileRecovery_readBucket(t *testing.T) {
 		Ds:   DataStructureBTree,
 		Name: "bucket_1",
 	}
-	bytes := bucket.Encode()
+	bytes := bucket.encode()
 
 	fd, err := os.OpenFile(filePath, os.O_RDWR|os.O_CREATE, os.ModePerm)
 	defer func() {

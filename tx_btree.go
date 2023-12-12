@@ -51,9 +51,9 @@ func (tx *Tx) PutIfNotExists(bucket string, key, value []byte, ttl uint32) error
 	if !bucketExists {
 		return ErrNotFoundBucket
 	}
-	record, recordExists := idx.Find(key)
+	record, recordExists := idx.find(key)
 
-	if recordExists && !record.IsExpired() {
+	if recordExists && !record.isExpired() {
 		return nil
 	}
 
@@ -77,8 +77,8 @@ func (tx *Tx) PutIfExists(bucket string, key, value []byte, ttl uint32) error {
 		return ErrNotFoundBucket
 	}
 
-	record, recordExists := idx.Find(key)
-	if recordExists && !record.IsExpired() {
+	record, recordExists := idx.find(key)
+	if recordExists && !record.isExpired() {
 		return tx.put(bucket, key, value, ttl, DataSetFlag, uint64(time.Now().UnixMilli()), DataStructureBTree)
 	}
 
@@ -99,12 +99,12 @@ func (tx *Tx) Get(bucket string, key []byte) (value []byte, err error) {
 	bucketId := b.Id
 
 	if idx, ok := tx.db.Index.bTree.exist(bucketId); ok {
-		record, found := idx.Find(key)
+		record, found := idx.find(key)
 		if !found {
 			return nil, ErrKeyNotFound
 		}
 
-		if record.IsExpired() {
+		if record.isExpired() {
 			tx.putDeleteLog(bucketId, key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureBTree)
 			return nil, ErrNotFoundKey
 		}
@@ -146,16 +146,16 @@ func (tx *Tx) getMaxOrMinKey(bucket string, isMax bool) ([]byte, error) {
 		)
 
 		if isMax {
-			item, found = idx.Max()
+			item, found = idx.max()
 		} else {
-			item, found = idx.Min()
+			item, found = idx.min()
 		}
 
 		if !found {
 			return nil, ErrKeyNotFound
 		}
 
-		if item.record.IsExpired() {
+		if item.record.isExpired() {
 			tx.putDeleteLog(bucketId, item.key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureBTree)
 			return nil, ErrNotFoundKey
 		}
@@ -179,7 +179,7 @@ func (tx *Tx) GetAll(bucket string) (values [][]byte, err error) {
 	bucketId := b.Id
 
 	if index, ok := tx.db.Index.bTree.exist(bucketId); ok {
-		records := index.All()
+		records := index.all()
 
 		if len(records) == 0 {
 			return nil, ErrBucketEmpty
@@ -241,7 +241,7 @@ func (tx *Tx) PrefixScan(bucket string, prefix []byte, offsetNum int, limitNum i
 	bucketId := b.Id
 
 	if idx, ok := tx.db.Index.bTree.exist(bucketId); ok {
-		records := idx.PrefixScan(prefix, offsetNum, limitNum)
+		records := idx.prefixScan(prefix, offsetNum, limitNum)
 		values, err = tx.getHintIdxDataItemsWrapper(records, limitNum, bucketId)
 		if err != nil {
 			return nil, ErrPrefixScan
@@ -268,7 +268,7 @@ func (tx *Tx) PrefixSearchScan(bucket string, prefix []byte, reg string, offsetN
 	bucketId := b.Id
 
 	if idx, ok := tx.db.Index.bTree.exist(bucketId); ok {
-		records := idx.PrefixSearchScan(prefix, reg, offsetNum, limitNum)
+		records := idx.prefixSearchScan(prefix, reg, offsetNum, limitNum)
 		values, err = tx.getHintIdxDataItemsWrapper(records, limitNum, bucketId)
 		if err != nil {
 			return nil, ErrPrefixSearchScan
@@ -294,7 +294,7 @@ func (tx *Tx) Delete(bucket string, key []byte) error {
 	bucketId := b.Id
 
 	if idx, ok := tx.db.Index.bTree.exist(bucketId); ok {
-		if _, found := idx.Find(key); !found {
+		if _, found := idx.find(key); !found {
 			return ErrKeyNotFound
 		}
 	} else {
@@ -311,7 +311,7 @@ func (tx *Tx) getHintIdxDataItemsWrapper(records []*Record, limitNum int, bucket
 		if err != nil {
 			return nil, err
 		}
-		if record.IsExpired() {
+		if record.isExpired() {
 			tx.putDeleteLog(bucket.Id, record.Key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureBTree)
 			continue
 		}
@@ -338,12 +338,12 @@ func (tx *Tx) update(bucket string, key []byte, getNewValue func([]byte) ([]byte
 	}
 
 	if idx, ok := tx.db.Index.bTree.exist(bucketId); ok {
-		record, found := idx.Find(key)
+		record, found := idx.find(key)
 		if !found {
 			return ErrKeyNotFound
 		}
 
-		if record.IsExpired() {
+		if record.isExpired() {
 			tx.putDeleteLog(bucketId, key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureBTree)
 			return ErrNotFoundKey
 		}

@@ -63,11 +63,11 @@ func NewList() *List {
 	}
 }
 
-func (l *List) LPush(key string, r *Record) error {
+func (l *List) lPush(key string, r *Record) error {
 	return l.push(key, r, true)
 }
 
-func (l *List) RPush(key string, r *Record) error {
+func (l *List) rPush(key string, r *Record) error {
 	return l.push(key, r, false)
 }
 
@@ -75,7 +75,7 @@ func (l *List) push(key string, r *Record, isLeft bool) error {
 	// key is seq + user_key
 	userKey, curSeq := decodeListKey([]byte(key))
 	userKeyStr := string(userKey)
-	if l.IsExpire(userKeyStr) {
+	if l.isExpire(userKeyStr) {
 		return ErrListNotFound
 	}
 
@@ -91,7 +91,7 @@ func (l *List) push(key string, r *Record, isLeft bool) error {
 		seq = l.Seq[userKeyStr]
 	}
 
-	list.InsertRecord(ConvertUint64ToBigEndianBytes(curSeq), r)
+	list.insertRecord(convertUint64ToBigEndianBytes(curSeq), r)
 	if isLeft {
 		if seq.Head > curSeq-1 {
 			seq.Head = curSeq - 1
@@ -105,39 +105,39 @@ func (l *List) push(key string, r *Record, isLeft bool) error {
 	return nil
 }
 
-func (l *List) LPop(key string) (*Record, error) {
-	item, err := l.LPeek(key)
+func (l *List) lPop(key string) (*Record, error) {
+	item, err := l.lPeek(key)
 	if err != nil {
 		return nil, err
 	}
 
-	l.Items[key].Delete(item.key)
-	l.Seq[key].Head = ConvertBigEndianBytesToUint64(item.key)
+	l.Items[key].delete(item.key)
+	l.Seq[key].Head = convertBigEndianBytesToUint64(item.key)
 	return item.record, nil
 }
 
-// RPop removes and returns the last element of the list stored at key.
-func (l *List) RPop(key string) (*Record, error) {
-	item, err := l.RPeek(key)
+// rPop removes and returns the last element of the list stored at key.
+func (l *List) rPop(key string) (*Record, error) {
+	item, err := l.rPeek(key)
 	if err != nil {
 		return nil, err
 	}
 
-	l.Items[key].Delete(item.key)
-	l.Seq[key].Tail = ConvertBigEndianBytesToUint64(item.key)
+	l.Items[key].delete(item.key)
+	l.Seq[key].Tail = convertBigEndianBytesToUint64(item.key)
 	return item.record, nil
 }
 
-func (l *List) LPeek(key string) (*Item, error) {
+func (l *List) lPeek(key string) (*Item, error) {
 	return l.peek(key, true)
 }
 
-func (l *List) RPeek(key string) (*Item, error) {
+func (l *List) rPeek(key string) (*Item, error) {
 	return l.peek(key, false)
 }
 
 func (l *List) peek(key string, isLeft bool) (*Item, error) {
-	if l.IsExpire(key) {
+	if l.isExpire(key) {
 		return nil, ErrListNotFound
 	}
 	list, ok := l.Items[key]
@@ -146,12 +146,12 @@ func (l *List) peek(key string, isLeft bool) (*Item, error) {
 	}
 
 	if isLeft {
-		item, ok := list.Min()
+		item, ok := list.min()
 		if ok {
 			return item, nil
 		}
 	} else {
-		item, ok := list.Max()
+		item, ok := list.max()
 		if ok {
 			return item, nil
 		}
@@ -160,9 +160,9 @@ func (l *List) peek(key string, isLeft bool) (*Item, error) {
 	return nil, ErrEmptyList
 }
 
-// LRange returns the specified elements of the list stored at key [start,end]
-func (l *List) LRange(key string, start, end int) ([]*Record, error) {
-	size, err := l.Size(key)
+// lRange returns the specified elements of the list stored at key [start,end]
+func (l *List) lRange(key string, start, end int) ([]*Record, error) {
+	size, err := l.size(key)
 	if err != nil || size == 0 {
 		return nil, err
 	}
@@ -173,7 +173,7 @@ func (l *List) LRange(key string, start, end int) ([]*Record, error) {
 	}
 
 	var res []*Record
-	allRecords := l.Items[key].All()
+	allRecords := l.Items[key].all()
 	for i, item := range allRecords {
 		if i >= start && i <= end {
 			res = append(res, item)
@@ -185,7 +185,7 @@ func (l *List) LRange(key string, start, end int) ([]*Record, error) {
 
 // getRemoveIndexes returns a slice of indices to be removed from the list based on the count
 func (l *List) getRemoveIndexes(key string, count int, cmp func(r *Record) (bool, error)) ([][]byte, error) {
-	if l.IsExpire(key) {
+	if l.isExpire(key) {
 		return nil, ErrListNotFound
 	}
 
@@ -198,10 +198,10 @@ func (l *List) getRemoveIndexes(key string, count int, cmp func(r *Record) (bool
 	var res [][]byte
 	var allItems []*Item
 	if 0 == count {
-		count = list.Count()
+		count = list.count()
 	}
 
-	allItems = l.Items[key].AllItems()
+	allItems = l.Items[key].allItems()
 	if count > 0 {
 		for _, item := range allItems {
 			if count <= 0 {
@@ -237,12 +237,12 @@ func (l *List) getRemoveIndexes(key string, count int, cmp func(r *Record) (bool
 	return res, nil
 }
 
-// LRem removes the first count occurrences of elements equal to value from the list stored at key.
+// lRem removes the first count occurrences of elements equal to value from the list stored at key.
 // The count argument influences the operation in the following ways:
 // count > 0: Remove elements equal to value moving from head to tail.
 // count < 0: Remove elements equal to value moving from tail to head.
 // count = 0: Remove all elements equal to value.
-func (l *List) LRem(key string, count int, cmp func(r *Record) (bool, error)) error {
+func (l *List) lRem(key string, count int, cmp func(r *Record) (bool, error)) error {
 	removeIndexes, err := l.getRemoveIndexes(key, count, cmp)
 	if err != nil {
 		return err
@@ -250,15 +250,15 @@ func (l *List) LRem(key string, count int, cmp func(r *Record) (bool, error)) er
 
 	list := l.Items[key]
 	for _, idx := range removeIndexes {
-		list.Delete(idx)
+		list.delete(idx)
 	}
 
 	return nil
 }
 
-// LTrim trim an existing list so that it will contain only the specified range of elements specified.
-func (l *List) LTrim(key string, start, end int) error {
-	if l.IsExpire(key) {
+// lTrim trim an existing list so that it will contain only the specified range of elements specified.
+func (l *List) lTrim(key string, start, end int) error {
+	if l.isExpire(key) {
 		return ErrListNotFound
 	}
 	if _, ok := l.Items[key]; !ok {
@@ -266,19 +266,19 @@ func (l *List) LTrim(key string, start, end int) error {
 	}
 
 	list := l.Items[key]
-	allItems := list.AllItems()
+	allItems := list.allItems()
 	for i, item := range allItems {
 		if i < start || i > end {
-			list.Delete(item.key)
+			list.delete(item.key)
 		}
 	}
 
 	return nil
 }
 
-// LRemByIndex remove the list element at specified index
-func (l *List) LRemByIndex(key string, indexes []int) error {
-	if l.IsExpire(key) {
+// lRemByIndex remove the list element at specified index
+func (l *List) lRemByIndex(key string, indexes []int) error {
+	if l.isExpire(key) {
 		return ErrListNotFound
 	}
 
@@ -288,10 +288,10 @@ func (l *List) LRemByIndex(key string, indexes []int) error {
 	}
 
 	list := l.Items[key]
-	allItems := list.AllItems()
+	allItems := list.allItems()
 	for i, item := range allItems {
 		if _, ok := idxes[i]; ok {
-			list.Delete(item.key)
+			list.delete(item.key)
 		}
 	}
 
@@ -300,7 +300,7 @@ func (l *List) LRemByIndex(key string, indexes []int) error {
 
 func (l *List) getValidIndexes(key string, indexes []int) map[int]struct{} {
 	idxes := make(map[int]struct{})
-	listLen, err := l.Size(key)
+	listLen, err := l.size(key)
 	if err != nil || 0 == listLen {
 		return idxes
 	}
@@ -315,7 +315,7 @@ func (l *List) getValidIndexes(key string, indexes []int) map[int]struct{} {
 	return idxes
 }
 
-func (l *List) IsExpire(key string) bool {
+func (l *List) isExpire(key string) bool {
 	if l == nil {
 		return false
 	}
@@ -339,27 +339,27 @@ func (l *List) IsExpire(key string) bool {
 	return true
 }
 
-func (l *List) Size(key string) (int, error) {
-	if l.IsExpire(key) {
+func (l *List) size(key string) (int, error) {
+	if l.isExpire(key) {
 		return 0, ErrListNotFound
 	}
 	if _, ok := l.Items[key]; !ok {
 		return 0, ErrListNotFound
 	}
 
-	return l.Items[key].Count(), nil
+	return l.Items[key].count(), nil
 }
 
-func (l *List) IsEmpty(key string) (bool, error) {
-	size, err := l.Size(key)
+func (l *List) isEmpty(key string) (bool, error) {
+	size, err := l.size(key)
 	if err != nil || size > 0 {
 		return false, err
 	}
 	return true, nil
 }
 
-func (l *List) GetListTTL(key string) (uint32, error) {
-	if l.IsExpire(key) {
+func (l *List) getListTTL(key string) (uint32, error) {
+	if l.isExpire(key) {
 		return 0, ErrListNotFound
 	}
 

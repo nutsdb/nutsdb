@@ -32,7 +32,7 @@ const BucketStatusUnknown = 4
 var ErrBucketCrcInvalid = errors.New("bucket crc invalid")
 
 func init() {
-	BucketMetaSize = GetDiskSizeFromSingleObject(BucketMeta{})
+	BucketMetaSize = getDiskSizeFromSingleObject(BucketMeta{})
 }
 
 // BucketMeta stores the Meta info of a Bucket. E.g. the size of bucket it store in disk.
@@ -58,8 +58,8 @@ type Bucket struct {
 	Name string
 }
 
-// Decode : CRC | op | size
-func (meta *BucketMeta) Decode(bytes []byte) {
+// decode : CRC | op | size
+func (meta *BucketMeta) decode(bytes []byte) {
 	_ = bytes[BucketMetaSize-1]
 	crc := binary.LittleEndian.Uint32(bytes[:4])
 	op := binary.LittleEndian.Uint16(bytes[4:6])
@@ -69,11 +69,11 @@ func (meta *BucketMeta) Decode(bytes []byte) {
 	meta.Op = BucketOperation(op)
 }
 
-// Encode : Meta | BucketId | Ds | BucketName
-func (b *Bucket) Encode() []byte {
-	entrySize := b.GetEntrySize()
+// encode : Meta | BucketId | Ds | BucketName
+func (b *Bucket) encode() []byte {
+	entrySize := b.getEntrySize()
 	buf := make([]byte, entrySize)
-	b.Meta.Size = uint32(b.GetPayloadSize())
+	b.Meta.Size = uint32(b.getPayloadSize())
 	binary.LittleEndian.PutUint16(buf[4:6], uint16(b.Meta.Op))
 	binary.LittleEndian.PutUint32(buf[6:10], b.Meta.Size)
 	binary.LittleEndian.PutUint64(buf[BucketMetaSize:BucketMetaSize+IdSize], uint64(b.Id))
@@ -86,8 +86,8 @@ func (b *Bucket) Encode() []byte {
 	return buf
 }
 
-// Decode : Meta | BucketId | Ds | BucketName
-func (b *Bucket) Decode(bytes []byte) error {
+// decode : Meta | BucketId | Ds | BucketName
+func (b *Bucket) decode(bytes []byte) error {
 	// parse the payload
 	id := binary.LittleEndian.Uint64(bytes[:IdSize])
 	ds := binary.LittleEndian.Uint16(bytes[IdSize : IdSize+DsSize])
@@ -98,16 +98,16 @@ func (b *Bucket) Decode(bytes []byte) error {
 	return nil
 }
 
-func (b *Bucket) GetEntrySize() int {
-	return int(BucketMetaSize) + b.GetPayloadSize()
+func (b *Bucket) getEntrySize() int {
+	return int(BucketMetaSize) + b.getPayloadSize()
 }
 
-func (b *Bucket) GetCRC(headerBuf []byte, dataBuf []byte) uint32 {
+func (b *Bucket) getCRC(headerBuf []byte, dataBuf []byte) uint32 {
 	crc := crc32.ChecksumIEEE(headerBuf[4:])
 	crc = crc32.Update(crc, crc32.IEEETable, dataBuf)
 	return crc
 }
 
-func (b *Bucket) GetPayloadSize() int {
+func (b *Bucket) getPayloadSize() int {
 	return IdSize + DsSize + len(b.Name)
 }

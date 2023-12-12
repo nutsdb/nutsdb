@@ -14,19 +14,19 @@ func TestBucket_DecodeAndDecode(t *testing.T) {
 		Ds:   DataStructureBTree,
 		Name: "bucket_1",
 	}
-	bytes := bucket.Encode()
+	bytes := bucket.encode()
 
 	bucketMeta := &BucketMeta{}
-	bucketMeta.Decode(bytes[:BucketMetaSize])
+	bucketMeta.decode(bytes[:BucketMetaSize])
 	assert.Equal(t, bucketMeta.Op, BucketInsertOperation)
 	assert.Equal(t, int64(8+2+8), int64(bucketMeta.Size))
 	decodeBucket := &Bucket{Meta: bucketMeta}
 
-	err := decodeBucket.Decode(bytes[BucketMetaSize:])
+	err := decodeBucket.decode(bytes[BucketMetaSize:])
 	assert.Nil(t, err)
 	assert.Equal(t, BucketId(1), decodeBucket.Id)
 	assert.Equal(t, decodeBucket.Name, "bucket_1")
 
-	crc := decodeBucket.GetCRC(bytes[:BucketMetaSize], bytes[BucketMetaSize:])
+	crc := decodeBucket.getCRC(bytes[:BucketMetaSize], bytes[BucketMetaSize:])
 	assert.Equal(t, decodeBucket.Meta.Crc, crc)
 }

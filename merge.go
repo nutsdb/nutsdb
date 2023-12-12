@@ -224,13 +224,13 @@ func (db *DB) isPendingMergeEntry(entry *Entry) bool {
 	}
 	bucketId := bucket.Id
 	switch {
-	case entry.IsBelongsToBPlusTree():
+	case entry.isBelongsToBPlusTree():
 		return db.isPendingBtreeEntry(bucketId, entry)
-	case entry.IsBelongsToList():
+	case entry.isBelongsToList():
 		return db.isPendingListEntry(bucketId, entry)
-	case entry.IsBelongsToSet():
+	case entry.isBelongsToSet():
 		return db.isPendingSetEntry(bucketId, entry)
-	case entry.IsBelongsToSortSet():
+	case entry.isBelongsToSortSet():
 		return db.isPendingZSetEntry(bucketId, entry)
 	}
 	return false
@@ -242,14 +242,14 @@ func (db *DB) isPendingBtreeEntry(bucketId BucketId, entry *Entry) bool {
 		return false
 	}
 
-	r, ok := idx.Find(entry.Key)
+	r, ok := idx.find(entry.Key)
 	if !ok {
 		return false
 	}
 
-	if r.IsExpired() {
+	if r.isExpired() {
 		db.tm.del(bucketId, string(entry.Key))
-		idx.Delete(entry.Key)
+		idx.delete(entry.Key)
 		return false
 	}
 
@@ -266,7 +266,7 @@ func (db *DB) isPendingSetEntry(bucketId BucketId, entry *Entry) bool {
 		return false
 	}
 
-	isMember, err := setIdx.SIsMember(string(entry.Key), entry.Value)
+	isMember, err := setIdx.sIsMember(string(entry.Key), entry.Value)
 	if err != nil || !isMember {
 		return false
 	}
@@ -280,7 +280,7 @@ func (db *DB) isPendingZSetEntry(bucketId BucketId, entry *Entry) bool {
 	if !exist {
 		return false
 	}
-	s, err := sortedSetIdx.ZScore(key, entry.Value)
+	s, err := sortedSetIdx.zScore(key, entry.Value)
 	if err != nil || s != score {
 		return false
 	}
@@ -330,7 +330,7 @@ func (db *DB) isPendingListEntry(bucketId BucketId, entry *Entry) bool {
 			return false
 		}
 
-		r, ok := list.Items[userKeyStr].Find(ConvertUint64ToBigEndianBytes(curSeq))
+		r, ok := list.Items[userKeyStr].find(convertUint64ToBigEndianBytes(curSeq))
 		if !ok {
 			return false
 		}

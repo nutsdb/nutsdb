@@ -66,7 +66,7 @@ func (tx *Tx) RPeek(bucket string, key []byte) ([]byte, error) {
 		return nil, ErrListNotFound
 	}
 
-	item, err := l.RPeek(string(key))
+	item, err := l.rPeek(string(key))
 	if err != nil {
 		return nil, err
 	}
@@ -199,7 +199,7 @@ func (tx *Tx) LPeek(bucket string, key []byte) (item []byte, err error) {
 	if tx.CheckExpire(bucket, key) {
 		return nil, ErrListNotFound
 	}
-	r, err := l.LPeek(string(key))
+	r, err := l.lPeek(string(key))
 	if err != nil {
 		return nil, err
 	}
@@ -235,7 +235,7 @@ func (tx *Tx) LSize(bucket string, key []byte) (int, error) {
 	if tx.CheckExpire(bucket, key) {
 		return 0, ErrListNotFound
 	}
-	return l.Size(string(key))
+	return l.size(string(key))
 }
 
 // LRange returns the specified elements of the list stored in the bucket at given bucket,key, start and end.
@@ -265,7 +265,7 @@ func (tx *Tx) LRange(bucket string, key []byte, start, end int) ([][]byte, error
 		return nil, ErrListNotFound
 	}
 
-	records, err := l.LRange(string(key), start, end)
+	records, err := l.lRange(string(key), start, end)
 	if err != nil {
 		return nil, err
 	}
@@ -388,7 +388,7 @@ func (tx *Tx) LRemByIndex(bucket string, key []byte, indexes ...int) error {
 	}
 
 	sort.Ints(indexes)
-	data, err := MarshalInts(indexes)
+	data, err := marshalInts(indexes)
 	if err != nil {
 		return err
 	}
@@ -423,7 +423,7 @@ func (tx *Tx) LKeys(bucket, pattern string, f func(key string) bool) error {
 		if tx.CheckExpire(bucket, []byte(key)) {
 			continue
 		}
-		if end, err := MatchForRange(pattern, key, f); end || err != nil {
+		if end, err := matchForRange(pattern, key, f); end || err != nil {
 			return err
 		}
 	}
@@ -475,7 +475,7 @@ func (tx *Tx) CheckExpire(bucket string, key []byte) bool {
 		return false
 	}
 
-	if l.IsExpire(string(key)) {
+	if l.isExpire(string(key)) {
 		_ = tx.push(bucket, key, DataDeleteFlag)
 		return true
 	}
@@ -499,5 +499,5 @@ func (tx *Tx) GetListTTL(bucket string, key []byte) (uint32, error) {
 	if l, exist = tx.db.Index.list.exist(bucketId); !exist {
 		return 0, ErrBucket
 	}
-	return l.GetListTTL(string(key))
+	return l.getListTTL(string(key))
 }

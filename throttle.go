@@ -23,10 +23,10 @@ func NewThrottle(max int) *Throttle {
 	}
 }
 
-// Do should be called by workers before they start working. It blocks if there
+// do should be called by workers before they start working. It blocks if there
 // are already maximum number of workers working. If it detects an error from
-// previously Done workers, it would return it.
-func (t *Throttle) Do() error {
+// previously done workers, it would return it.
+func (t *Throttle) do() error {
 	for {
 		select {
 		case t.ch <- struct{}{}:
@@ -40,24 +40,24 @@ func (t *Throttle) Do() error {
 	}
 }
 
-// Done should be called by workers when they finish working. They can also
+// done should be called by workers when they finish working. They can also
 // pass the error status of work done.
-func (t *Throttle) Done(err error) {
+func (t *Throttle) done(err error) {
 	if err != nil {
 		t.errCh <- err
 	}
 	select {
 	case <-t.ch:
 	default:
-		panic("Throttle Do Done mismatch")
+		panic("Throttle do done mismatch")
 	}
 	t.wg.Done()
 }
 
-// Finish waits until all workers have finished working. It would return any error passed by Done.
-// If Finish is called multiple time, it will wait for workers to finish only once(first time).
+// finish waits until all workers have finished working. It would return any error passed by done.
+// If finish is called multiple time, it will wait for workers to finish only once(first time).
 // From next calls, it will return same error as found on first call.
-func (t *Throttle) Finish() error {
+func (t *Throttle) finish() error {
 	t.once.Do(func() {
 		t.wg.Wait()
 		close(t.ch)

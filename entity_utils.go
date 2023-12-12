@@ -2,7 +2,7 @@ package nutsdb
 
 import "reflect"
 
-func GetDiskSizeFromSingleObject(obj interface{}) int64 {
+func getDiskSizeFromSingleObject(obj interface{}) int64 {
 	typ := reflect.TypeOf(obj)
 	fields := reflect.VisibleFields(typ)
 	if len(fields) == 0 {

@@ -26,11 +26,11 @@ func (req *request) reset() {
 	atomic.StoreInt32(&req.ref, 0)
 }
 
-func (req *request) IncrRef() {
+func (req *request) incrRef() {
 	atomic.AddInt32(&req.ref, 1)
 }
 
-func (req *request) DecrRef() {
+func (req *request) decrRef() {
 	nRef := atomic.AddInt32(&req.ref, -1)
 	if nRef > 0 {
 		return
@@ -39,9 +39,9 @@ func (req *request) DecrRef() {
 	requestPool.Put(req)
 }
 
-func (req *request) Wait() error {
+func (req *request) wait() error {
 	req.Wg.Wait()
 	err := req.Err
-	req.DecrRef() // DecrRef after writing to DB.
+	req.decrRef() // decrRef after writing to DB.
 	return err
 }

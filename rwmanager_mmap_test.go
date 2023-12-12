@@ -68,7 +68,7 @@ func TestRWManager_MMap_WriteAt(t *testing.T) {
 	}
 	defer os.Remove(fd.Name())
 
-	err = Truncate(filePath, 1024, fd)
+	err = truncate(filePath, 1024, fd)
 	if err != nil {
 		require.NoError(t, err)
 
@@ -101,7 +101,7 @@ func TestRWManager_MMap_Sync(t *testing.T) {
 	}
 	defer os.Remove(fd.Name())
 
-	err = Truncate(filePath, 1024, fd)
+	err = truncate(filePath, 1024, fd)
 	if err != nil {
 		require.NoError(t, err)
 
@@ -132,7 +132,7 @@ func TestRWManager_MMap_Close(t *testing.T) {
 	}
 	defer os.Remove(fd.Name())
 
-	err = Truncate(filePath, 1024, fd)
+	err = truncate(filePath, 1024, fd)
 	if err != nil {
 		require.NoError(t, err)
 

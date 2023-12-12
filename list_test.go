@@ -25,9 +25,9 @@ import (
 func ListPush(t *testing.T, list *List, key string, r *Record, isLeft bool, expectError error) {
 	var e error
 	if isLeft {
-		e = list.LPush(key, r)
+		e = list.lPush(key, r)
 	} else {
-		e = list.RPush(key, r)
+		e = list.rPush(key, r)
 	}
 	assertErr(t, e, expectError)
 }
@@ -39,9 +39,9 @@ func ListPop(t *testing.T, list *List, key string, isLeft bool, expectVal *Recor
 	)
 
 	if isLeft {
-		r, e = list.LPop(key)
+		r, e = list.lPop(key)
 	} else {
-		r, e = list.RPop(key)
+		r, e = list.rPop(key)
 	}
 	if expectError != nil {
 		require.Equal(t, expectError, e)
@@ -52,7 +52,7 @@ func ListPop(t *testing.T, list *List, key string, isLeft bool, expectVal *Recor
 }
 
 func ListCmp(t *testing.T, list *List, key string, expectRecords []*Record, isReverse bool) {
-	records, err := list.LRange(key, 0, -1)
+	records, err := list.lRange(key, 0, -1)
 	require.NoError(t, err)
 
 	if isReverse {
@@ -68,7 +68,7 @@ func ListCmp(t *testing.T, list *List, key string, expectRecords []*Record, isRe
 
 func TestList_LPush(t *testing.T) {
 	list := NewList()
-	// 测试 LPush
+	// 测试 lPush
 	key := string(GetTestBytes(0))
 	expectRecords := generateRecords(5)
 	seqInfo := HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
@@ -159,13 +159,13 @@ func TestList_LRem(t *testing.T) {
 	}
 
 	// r1 r1 r1 r2 r2
-	err := list.LRem(key, -1, cmp)
+	err := list.lRem(key, -1, cmp)
 	require.NoError(t, err)
 	expectRecords = append(expectRecords[0:4], expectRecords[5:]...)
 	ListCmp(t, list, key, expectRecords, false)
 
 	// r1 r2 r2
-	err = list.LRem(key, 2, cmp)
+	err = list.lRem(key, 2, cmp)
 	require.NoError(t, err)
 	expectRecords = expectRecords[2:]
 	ListCmp(t, list, key, expectRecords, false)
@@ -175,7 +175,7 @@ func TestList_LRem(t *testing.T) {
 	}
 
 	// r1
-	err = list.LRem(key, 0, cmp)
+	err = list.lRem(key, 0, cmp)
 	require.NoError(t, err)
 	expectRecords = expectRecords[0:1]
 	ListCmp(t, list, key, expectRecords, false)
@@ -194,7 +194,7 @@ func TestList_LTrim(t *testing.T) {
 		ListPush(t, list, string(newKey), expectRecords[i], false, nil)
 	}
 
-	err := list.LTrim(key, 1, 3)
+	err := list.lTrim(key, 1, 3)
 	require.NoError(t, err)
 	expectRecords = expectRecords[1 : len(expectRecords)-1]
 	ListCmp(t, list, key, expectRecords, false)
@@ -215,19 +215,19 @@ func TestList_LRemByIndex(t *testing.T) {
 	}
 
 	// r1 r2 r4 r5 r6 r7 r8
-	err := list.LRemByIndex(key, []int{2})
+	err := list.lRemByIndex(key, []int{2})
 	require.NoError(t, err)
 	expectRecords = append(expectRecords[0:2], expectRecords[3:]...)
 	ListCmp(t, list, key, expectRecords, false)
 
 	// r2 r6 r7 r8
-	err = list.LRemByIndex(key, []int{0, 2, 3})
+	err = list.lRemByIndex(key, []int{0, 2, 3})
 	require.NoError(t, err)
 	expectRecords = expectRecords[1:]
 	expectRecords = append(expectRecords[0:1], expectRecords[3:]...)
 	ListCmp(t, list, key, expectRecords, false)
 
-	err = list.LRemByIndex(key, []int{0, 0, 0})
+	err = list.lRemByIndex(key, []int{0, 0, 0})
 	require.NoError(t, err)
 	expectRecords = expectRecords[1:]
 	ListCmp(t, list, key, expectRecords, false)

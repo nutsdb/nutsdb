@@ -62,7 +62,7 @@ func (fr *fileRecovery) readEntry(off int64) (e *Entry, err error) {
 	headerBuf := buf[:headerSize]
 	remainingBuf := buf[headerSize:]
 
-	payloadSize := e.Meta.PayloadSize()
+	payloadSize := e.Meta.payloadSize()
 	dataBuf := make([]byte, payloadSize)
 	excessSize := size - headerSize
 
@@ -96,7 +96,7 @@ func (fr *fileRecovery) readBucket() (b *Bucket, err error) {
 		return nil, err
 	}
 	meta := new(BucketMeta)
-	meta.Decode(buf)
+	meta.decode(buf)
 	bucket := new(Bucket)
 	bucket.Meta = meta
 	dataBuf := make([]byte, meta.Size)
@@ -104,12 +104,12 @@ func (fr *fileRecovery) readBucket() (b *Bucket, err error) {
 	if err != nil {
 		return nil, err
 	}
-	err = bucket.Decode(dataBuf)
+	err = bucket.decode(dataBuf)
 	if err != nil {
 		return nil, err
 	}
 
-	if bucket.GetCRC(buf, dataBuf) != bucket.Meta.Crc {
+	if bucket.getCRC(buf, dataBuf) != bucket.Meta.Crc {
 		return nil, ErrBucketCrcInvalid
 	}
 

@@ -107,98 +107,98 @@ type MetaData struct {
 	BucketId   BucketId
 }
 
-func (meta *MetaData) Size() int64 {
+func (meta *MetaData) size() int64 {
 	// CRC
 	size := 4
 
-	size += UvarintSize(uint64(meta.KeySize))
-	size += UvarintSize(uint64(meta.ValueSize))
-	size += UvarintSize(meta.Timestamp)
-	size += UvarintSize(uint64(meta.TTL))
-	size += UvarintSize(uint64(meta.Flag))
-	size += UvarintSize(meta.TxID)
-	size += UvarintSize(uint64(meta.Status))
-	size += UvarintSize(uint64(meta.Ds))
-	size += UvarintSize(meta.BucketId)
+	size += uVarIntSize(uint64(meta.KeySize))
+	size += uVarIntSize(uint64(meta.ValueSize))
+	size += uVarIntSize(meta.Timestamp)
+	size += uVarIntSize(uint64(meta.TTL))
+	size += uVarIntSize(uint64(meta.Flag))
+	size += uVarIntSize(meta.TxID)
+	size += uVarIntSize(uint64(meta.Status))
+	size += uVarIntSize(uint64(meta.Ds))
+	size += uVarIntSize(meta.BucketId)
 
 	return int64(size)
 }
 
-func (meta *MetaData) PayloadSize() int64 {
+func (meta *MetaData) payloadSize() int64 {
 	return int64(meta.BucketSize) + int64(meta.KeySize) + int64(meta.ValueSize)
 }
 
-func NewMetaData() *MetaData {
+func newMetaData() *MetaData {
 	return new(MetaData)
 }
 
-func (meta *MetaData) WithKeySize(keySize uint32) *MetaData {
+func (meta *MetaData) withKeySize(keySize uint32) *MetaData {
 	meta.KeySize = keySize
 	return meta
 }
 
-func (meta *MetaData) WithValueSize(valueSize uint32) *MetaData {
+func (meta *MetaData) withValueSize(valueSize uint32) *MetaData {
 	meta.ValueSize = valueSize
 	return meta
 }
 
-func (meta *MetaData) WithTimeStamp(timestamp uint64) *MetaData {
+func (meta *MetaData) withTimeStamp(timestamp uint64) *MetaData {
 	meta.Timestamp = timestamp
 	return meta
 }
 
-func (meta *MetaData) WithTTL(ttl uint32) *MetaData {
+func (meta *MetaData) withTTL(ttl uint32) *MetaData {
 	meta.TTL = ttl
 	return meta
 }
 
-func (meta *MetaData) WithFlag(flag uint16) *MetaData {
+func (meta *MetaData) withFlag(flag uint16) *MetaData {
 	meta.Flag = flag
 	return meta
 }
 
-func (meta *MetaData) WithBucketSize(bucketSize uint32) *MetaData {
+func (meta *MetaData) withBucketSize(bucketSize uint32) *MetaData {
 	meta.BucketSize = bucketSize
 	return meta
 }
 
-func (meta *MetaData) WithTxID(txID uint64) *MetaData {
+func (meta *MetaData) withTxID(txID uint64) *MetaData {
 	meta.TxID = txID
 	return meta
 }
 
-func (meta *MetaData) WithStatus(status uint16) *MetaData {
+func (meta *MetaData) withStatus(status uint16) *MetaData {
 	meta.Status = status
 	return meta
 }
 
-func (meta *MetaData) WithDs(ds uint16) *MetaData {
+func (meta *MetaData) withDs(ds uint16) *MetaData {
 	meta.Ds = ds
 	return meta
 }
 
-func (meta *MetaData) WithCrc(crc uint32) *MetaData {
+func (meta *MetaData) withCrc(crc uint32) *MetaData {
 	meta.Crc = crc
 	return meta
 }
 
-func (meta *MetaData) WithBucketId(bucketID uint64) *MetaData {
+func (meta *MetaData) withBucketId(bucketID uint64) *MetaData {
 	meta.BucketId = bucketID
 	return meta
 }
 
-func (meta *MetaData) IsBPlusTree() bool {
+func (meta *MetaData) isBPlusTree() bool {
 	return meta.Ds == DataStructureBTree
 }
 
-func (meta *MetaData) IsSet() bool {
+func (meta *MetaData) isSet() bool {
 	return meta.Ds == DataStructureSet
 }
 
-func (meta *MetaData) IsSortSet() bool {
+func (meta *MetaData) isSortSet() bool {
 	return meta.Ds == DataStructureSortedSet
 }
 
-func (meta *MetaData) IsList() bool {
+func (meta *MetaData) isList() bool {
 	return meta.Ds == DataStructureList
 }
