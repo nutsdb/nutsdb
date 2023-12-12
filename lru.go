@@ -36,7 +36,7 @@ func (c *lRUCache) add(key interface{}, value interface{}) {
 		c.removeOldest()
 	}
 
-	e := &LruEntry{
+	e := &lruEntry{
 		Key:   key,
 		Value: value,
 	}
@@ -56,7 +56,7 @@ func (c *lRUCache) get(key interface{}) interface{} {
 	}
 
 	c.l.MoveToFront(entry)
-	return entry.Value.(*LruEntry).Value
+	return entry.Value.(*lruEntry).Value
 }
 
 // remove removes the entry associated with the given key from the cache.
@@ -97,14 +97,14 @@ func (c *lRUCache) removeOldest() {
 		return
 	}
 
-	key := entry.Value.(*LruEntry).Key
+	key := entry.Value.(*lruEntry).Key
 	delete(c.m, key)
 
 	c.l.Remove(entry)
 }
 
-// LruEntry is a struct that represents an entry in the LRU cache.
-type LruEntry struct {
+// lruEntry is a struct that represents an entry in the LRU cache.
+type lruEntry struct {
 	Key   interface{}
 	Value interface{}
 }

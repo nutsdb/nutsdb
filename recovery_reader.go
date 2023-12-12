@@ -117,10 +117,10 @@ func (fr *fileRecovery) readBucket() (b *bucket, err error) {
 }
 
 // calBufferSize calculates the buffer size of bufio.Reader
-// if the size < 4 * KB, use 4 * KB as the size of buffer in bufio.Reader
-// if the size > 4 * KB, use the nearly blockSize buffer as the size of buffer in bufio.Reader
+// if the size < 4 * kb, use 4 * kb as the size of buffer in bufio.Reader
+// if the size > 4 * kb, use the nearly blockSize buffer as the size of buffer in bufio.Reader
 func calBufferSize(size int) int {
-	blockSize := 4 * KB
+	blockSize := 4 * kb
 	if size < blockSize {
 		return blockSize
 	}

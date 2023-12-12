@@ -25,7 +25,7 @@ import (
 func TestDB_MergeForString(t *testing.T) {
 	bucket := "bucket"
 	opts := DefaultOptions
-	opts.SegmentSize = KB
+	opts.SegmentSize = kb
 	opts.Dir = "/tmp/test-string-merge/"
 
 	for _, idxMode := range []EntryIdxMode{HintKeyValAndRAMIdxMode, HintKeyAndRAMIdxMode} {
@@ -94,7 +94,7 @@ func TestDB_MergeForString(t *testing.T) {
 func TestDB_MergeForSet(t *testing.T) {
 	bucket := "bucket"
 	opts := DefaultOptions
-	opts.SegmentSize = KB
+	opts.SegmentSize = kb
 	opts.Dir = "/tmp/test-set-merge/"
 
 	for _, idxMode := range []EntryIdxMode{HintKeyValAndRAMIdxMode, HintKeyAndRAMIdxMode} {
@@ -191,7 +191,7 @@ func TestDB_MergeForZSet(t *testing.T) {
 	key := getTestBytes(0)
 	n := 1000
 	opts := DefaultOptions
-	opts.SegmentSize = KB
+	opts.SegmentSize = kb
 	opts.Dir = "/tmp/test-zset-merge/"
 
 	// test different EntryIdxMode
@@ -294,7 +294,7 @@ func TestDB_MergeForList(t *testing.T) {
 	bucket := "bucket"
 	key := getTestBytes(0)
 	opts := DefaultOptions
-	opts.SegmentSize = KB
+	opts.SegmentSize = kb
 	opts.Dir = "/tmp/test-list-merge/"
 
 	// test different EntryIdxMode

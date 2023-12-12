@@ -57,7 +57,7 @@ func Test_fileRecovery_readBucket(t *testing.T) {
 	_, err = fd.Write(bytes)
 	assert.Nil(t, err)
 
-	fr, err := newFileRecovery(filePath, 4*MB)
+	fr, err := newFileRecovery(filePath, 4*mb)
 	assert.Nil(t, err)
 	readBucket, err := fr.readBucket()
 	assert.Nil(t, err)

@@ -124,17 +124,17 @@ type Options struct {
 }
 
 const (
-	B = 1
+	b = 1
 
-	KB = 1024 * B
+	kb = 1024 * b
 
-	MB = 1024 * KB
+	mb = 1024 * kb
 
-	GB = 1024 * MB
+	gb = 1024 * mb
 )
 
 // defaultSegmentSize is default data file size.
-var defaultSegmentSize int64 = 256 * MB
+var defaultSegmentSize int64 = 256 * mb
 
 // DefaultOptions represents the default options.
 var DefaultOptions = func() Options {
@@ -144,7 +144,7 @@ var DefaultOptions = func() Options {
 		NodeNum:                   1,
 		RWMode:                    FileIO,
 		SyncEnable:                true,
-		CommitBufferSize:          4 * MB,
+		CommitBufferSize:          4 * mb,
 		MergeInterval:             2 * time.Hour,
 		MaxBatchSize:              (15 * defaultSegmentSize / 4) / 100,
 		MaxBatchCount:             (15 * defaultSegmentSize / 4) / 100 / 100,

@@ -11,7 +11,7 @@ import (
 var ErrCommitAfterFinish = errors.New("Batch commit not permitted after finish")
 
 const (
-	DefaultThrottleSize = 16
+	defaultThrottleSize = 16
 )
 
 // WriteBatch holds the necessary info to perform batched writes.
@@ -27,7 +27,7 @@ type WriteBatch struct {
 func (db *DB) NewWriteBatch() (*WriteBatch, error) {
 	wb := &WriteBatch{
 		db:       db,
-		throttle: newThrottle(DefaultThrottleSize),
+		throttle: newThrottle(defaultThrottleSize),
 	}
 
 	var err error
@@ -172,7 +172,7 @@ func (wb *WriteBatch) Reset() error {
 	if err != nil {
 		return err
 	}
-	wb.throttle = newThrottle(DefaultThrottleSize)
+	wb.throttle = newThrottle(defaultThrottleSize)
 	return err
 }
 

@@ -25,8 +25,8 @@ import (
 
 func TestRWManager_MMap_Release(t *testing.T) {
 	filePath := "/tmp/foo_rw_MMap"
-	fdm := newFileManager(MMap, 1024, 0.5, 256*MB)
-	rwmanager, err := fdm.getMMapRWManager(filePath, 1024, 256*MB)
+	fdm := newFileManager(MMap, 1024, 0.5, 256*mb)
+	rwmanager, err := fdm.getMMapRWManager(filePath, 1024, 256*mb)
 	if err != nil {
 		t.Error("err TestRWManager_MMap_Release getMMapRWManager")
 	}
@@ -78,7 +78,7 @@ func TestRWManager_MMap_WriteAt(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	mmManager := &MMapRWManager{filePath, fdm, m, 256 * MB}
+	mmManager := &MMapRWManager{filePath, fdm, m, 256 * mb}
 	b := []byte("test write at")
 	off := int64(3)
 	n, err := mmManager.WriteAt(b, off)
@@ -111,7 +111,7 @@ func TestRWManager_MMap_Sync(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	mmManager := &MMapRWManager{filePath, fdm, m, 256 * MB}
+	mmManager := &MMapRWManager{filePath, fdm, m, 256 * mb}
 	m[1] = 'z'
 	err = mmManager.Sync()
 	require.NoError(t, err)
@@ -142,7 +142,7 @@ func TestRWManager_MMap_Close(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	mmManager := &MMapRWManager{filePath, fdm, m, 256 * MB}
+	mmManager := &MMapRWManager{filePath, fdm, m, 256 * mb}
 	err = mmManager.Close()
 	err = isFileDescriptorClosed(fd.Fd())
 	if err == nil {

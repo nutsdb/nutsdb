@@ -797,9 +797,9 @@ func TestDB_CommitBuffer(t *testing.T) {
 	bucket := "bucket"
 
 	opts := DefaultOptions
-	opts.CommitBufferSize = 8 * MB
+	opts.CommitBufferSize = 8 * mb
 	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
-		require.Equal(t, int64(8*MB), db.opt.CommitBufferSize)
+		require.Equal(t, int64(8*mb), db.opt.CommitBufferSize)
 		// When the database starts, the commit buffer should be allocated with the size of CommitBufferSize.
 		require.Equal(t, 0, db.commitBuffer.Len())
 		require.Equal(t, db.opt.CommitBufferSize, int64(db.commitBuffer.Cap()))
@@ -812,9 +812,9 @@ func TestDB_CommitBuffer(t *testing.T) {
 	})
 
 	opts = DefaultOptions
-	opts.CommitBufferSize = 1 * KB
+	opts.CommitBufferSize = 1 * kb
 	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
-		require.Equal(t, int64(1*KB), db.opt.CommitBufferSize)
+		require.Equal(t, int64(1*kb), db.opt.CommitBufferSize)
 
 		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 		err := db.Update(func(tx *Tx) error {
