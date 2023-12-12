@@ -88,6 +88,10 @@ func (tx *Tx) PutIfExists(bucket string, key, value []byte, ttl uint32) error {
 // Get retrieves the value for a key in the bucket.
 // The returned value is only valid for the life of the transaction.
 func (tx *Tx) Get(bucket string, key []byte) (value []byte, err error) {
+	return tx.get(bucket, key)
+}
+
+func (tx *Tx) get(bucket string, key []byte) (value []byte, err error) {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return nil, err
 	}
@@ -120,38 +124,9 @@ func (tx *Tx) Get(bucket string, key []byte) (value []byte, err error) {
 	}
 }
 
-func (tx *Tx) GetLen(bucket string, key []byte) (int, error) {
-	if err := tx.checkTxIsClosed(); err != nil {
-		return 0, err
-	}
-
-	b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
-	if err != nil {
-		return 0, err
-	}
-	bucketId := b.Id
-
-	idx, ok := tx.db.Index.bTree.exist(bucketId)
-	if !ok {
-		return 0, ErrNotFoundBucket
-	}
-
-	record, found := idx.Find(key)
-	if !found {
-		return 0, ErrKeyNotFound
-	}
-
-	if record.IsExpired() {
-		tx.putDeleteLog(bucketId, key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureBTree)
-		return 0, ErrNotFoundKey
-	}
-
-	value, err := tx.db.getValueByRecord(record)
-	if err != nil {
-		return 0, err
-	}
-
-	return len(value), nil
+func (tx *Tx) ValueLen(bucket string, key []byte) (int, error) {
+	value, err := tx.get(bucket, key)
+	return len(value), err
 }
 
 func (tx *Tx) GetMaxKey(bucket string) ([]byte, error) {

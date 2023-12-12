@@ -1465,9 +1465,9 @@ func txPutIfExists(t *testing.T, db *DB, bucket string, key, value []byte, expec
 	assertErr(t, err, finalExpectErr)
 }
 
-func txGetLen(t *testing.T, db *DB, bucket string, key []byte, expectLength int, expectErr error) {
+func txValueLen(t *testing.T, db *DB, bucket string, key []byte, expectLength int, expectErr error) {
 	err := db.View(func(tx *Tx) error {
-		length, err := tx.GetLen(bucket, key)
+		length, err := tx.ValueLen(bucket, key)
 		if expectErr != nil {
 			require.Equal(t, expectErr, err)
 		} else {
