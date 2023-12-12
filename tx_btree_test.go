@@ -1023,7 +1023,7 @@ func TestTx_GetLen(t *testing.T) {
 
 	t.Run("bucket not exist", func(t *testing.T) {
 		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-			txGetLen(t, db, bucket, GetTestBytes(1), 5, ErrBucketNotExist)
+			txGetLen(t, db, bucket, GetTestBytes(1), 0, ErrBucketNotExist)
 		})
 	})
 
