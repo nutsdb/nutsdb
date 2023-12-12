@@ -1008,3 +1008,39 @@ func TestTx_PutIfNotExistsAndPutIfExists(t *testing.T) {
 
 	})
 }
+
+func TestTx_GetLen(t *testing.T) {
+	bucket := "bucket"
+	val := []byte("value")
+
+	t.Run("match length", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			txPut(t, db, bucket, GetTestBytes(1), val, Persistent, nil, nil)
+			txGetLen(t, db, bucket, GetTestBytes(1), 5, nil)
+		})
+	})
+
+	t.Run("bucket not exist", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			txGetLen(t, db, bucket, GetTestBytes(1), 5, ErrBucketNotExist)
+		})
+	})
+
+	t.Run("key not found", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			txPut(t, db, bucket, GetTestBytes(1), val, Persistent, nil, nil)
+			txGetLen(t, db, bucket, GetTestBytes(2), 0, ErrKeyNotFound)
+		})
+	})
+
+	t.Run("expired test", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			txPut(t, db, bucket, GetTestBytes(1), val, 1, nil, nil)
+			time.Sleep(3 * time.Second)
+			txGetLen(t, db, bucket, GetTestBytes(1), 0, ErrKeyNotFound)
+		})
+	})
+}
