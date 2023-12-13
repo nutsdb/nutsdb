@@ -61,13 +61,12 @@ err := db.Update(
         bucket := "bucket1"
         key := []byte("name1")
         val := []byte("val3")
-        newValue, oldValue, err := tx.GetSet(bucket, key, val)
+        oldValue, err := tx.GetSet(bucket, key, val)
         if err != nil {
             return err
         }
 
         fmt.Println("old value :", string(oldValue))
-        fmt.Println("new value :", string(newValue))
 
         return nil
     },
