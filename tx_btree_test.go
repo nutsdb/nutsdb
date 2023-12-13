@@ -1044,3 +1044,33 @@ func TestTx_ValueLen(t *testing.T) {
 		})
 	})
 }
+
+func TestTx_GetSet(t *testing.T) {
+	bucket := "bucket"
+	val := []byte("value")
+	newVal := []byte("new_value")
+
+	t.Run("match value", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			txPut(t, db, bucket, GetTestBytes(1), val, Persistent, nil, nil)
+			txGetSet(t, db, bucket, GetTestBytes(1), newVal, newVal, val, nil)
+			txGet(t, db, bucket, GetTestBytes(1), newVal, nil)
+		})
+	})
+
+	t.Run("bucket not exist", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			txGetSet(t, db, bucket, GetTestBytes(1), newVal, nil, nil, ErrBucketNotExist)
+		})
+	})
+
+	t.Run("expired test", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			txPut(t, db, bucket, GetTestBytes(1), val, 1, nil, nil)
+			time.Sleep(3 * time.Second)
+			txGetSet(t, db, bucket, GetTestBytes(1), newVal, nil, nil, ErrKeyNotFound)
+		})
+	})
+}

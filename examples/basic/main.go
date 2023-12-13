@@ -62,6 +62,11 @@ func main() {
 
 	// get value length
 	valueLen()
+
+	// get new value and old value
+	getSet()
+	// read
+	read()
 }
 
 func createBucket() {
@@ -128,6 +133,25 @@ func valueLen() {
 				return err
 			}
 			fmt.Println("value length:", value)
+
+			return nil
+		}); err != nil {
+		log.Println(err)
+	}
+}
+
+func getSet() {
+	if err := db.Update(
+		func(tx *nutsdb.Tx) error {
+			key := []byte("name1")
+			val := []byte("val3")
+			newValue, oldValue, err := tx.GetSet(bucket, key, val)
+			if err != nil {
+				return err
+			}
+
+			fmt.Println("old value :", string(oldValue))
+			fmt.Println("new value :", string(newValue))
 
 			return nil
 		}); err != nil {
