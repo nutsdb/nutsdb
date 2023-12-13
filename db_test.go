@@ -1488,3 +1488,22 @@ func txGetSet(t *testing.T, db *DB, bucket string, key, value []byte, expectOldV
 	})
 	require.NoError(t, err)
 }
+
+func txGetBit(t *testing.T, db *DB, bucket string, key []byte, offset int, expectVal byte, expectErr error, finalExpectErr error) {
+	err := db.View(func(tx *Tx) error {
+		value, err := tx.GetBit(bucket, key, offset)
+		assertErr(t, err, expectErr)
+		require.Equal(t, expectVal, value)
+		return nil
+	})
+	assertErr(t, err, finalExpectErr)
+}
+
+func txSetBit(t *testing.T, db *DB, bucket string, key []byte, offset int, value byte, expectErr error, finalExpectErr error) {
+	err := db.Update(func(tx *Tx) error {
+		err := tx.SetBit(bucket, key, offset, value)
+		assertErr(t, err, expectErr)
+		return nil
+	})
+	assertErr(t, err, finalExpectErr)
+}

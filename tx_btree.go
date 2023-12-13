@@ -343,7 +343,7 @@ func (tx *Tx) getHintIdxDataItemsWrapper(records []*Record, limitNum int, bucket
 	return values, nil
 }
 
-func (tx *Tx) update(bucket string, key []byte, getNewValue func([]byte) ([]byte, error)) error {
+func (tx *Tx) tryGet(bucket string, key []byte, solveRecord func(record *Record, found bool, bucketId BucketId) error) error {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return err
 	}
@@ -355,6 +355,14 @@ func (tx *Tx) update(bucket string, key []byte, getNewValue func([]byte) ([]byte
 
 	if idx, ok := tx.db.Index.bTree.exist(bucketId); ok {
 		record, found := idx.Find(key)
+		return solveRecord(record, found, bucketId)
+	} else {
+		return ErrBucketNotFound
+	}
+}
+
+func (tx *Tx) update(bucket string, key []byte, getNewValue func([]byte) ([]byte, error)) error {
+	return tx.tryGet(bucket, key, func(record *Record, found bool, bucketId BucketId) error {
 		if !found {
 			return ErrKeyNotFound
 		}
@@ -374,9 +382,26 @@ func (tx *Tx) update(bucket string, key []byte, getNewValue func([]byte) ([]byte
 		}
 
 		return tx.put(bucket, key, newValue, record.TTL, DataSetFlag, uint64(time.Now().Unix()), DataStructureBTree)
-	} else {
-		return ErrKeyNotFound
-	}
+	})
+}
+
+func (tx *Tx) updateOrPut(bucket string, key, value []byte, getUpdatedValue func([]byte) ([]byte, error)) error {
+	return tx.tryGet(bucket, key, func(record *Record, found bool, bucketId BucketId) error {
+		if !found {
+			return tx.put(bucket, key, value, Persistent, DataSetFlag, uint64(time.Now().Unix()), DataStructureBTree)
+		}
+
+		value, err := tx.db.getValueByRecord(record)
+		if err != nil {
+			return err
+		}
+		newValue, err := getUpdatedValue(value)
+		if err != nil {
+			return err
+		}
+
+		return tx.put(bucket, key, newValue, record.TTL, DataSetFlag, uint64(time.Now().Unix()), DataStructureBTree)
+	})
 }
 
 func bigIntIncr(a string, b string) string {
@@ -421,4 +446,41 @@ func (tx *Tx) IncrBy(bucket string, key []byte, increment int64) error {
 
 func (tx *Tx) DecrBy(bucket string, key []byte, decrement int64) error {
 	return tx.integerIncr(bucket, key, -1*decrement)
+}
+
+func (tx *Tx) GetBit(bucket string, key []byte, offset int) (byte, error) {
+	if offset >= math.MaxInt || offset < 0 {
+		return 0, ErrOffsetInvalid
+	}
+
+	value, err := tx.Get(bucket, key)
+	if err != nil {
+		return 0, err
+	}
+
+	if len(value) <= offset {
+		return 0, nil
+	}
+
+	return value[offset], nil
+}
+
+func (tx *Tx) SetBit(bucket string, key []byte, offset int, bit byte) error {
+	if offset >= math.MaxInt || offset < 0 {
+		return ErrOffsetInvalid
+	}
+
+	valueIfKeyNotFound := make([]byte, offset+1)
+	valueIfKeyNotFound[offset] = bit
+
+	return tx.updateOrPut(bucket, key, valueIfKeyNotFound, func(value []byte) ([]byte, error) {
+		if len(value) <= offset {
+			value = append(value, make([]byte, offset-len(value)+1)...)
+			value[offset] = bit
+			return value, nil
+		} else {
+			value[offset] = bit
+			return value, nil
+		}
+	})
 }

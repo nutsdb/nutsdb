@@ -17,7 +17,7 @@ NutsDB 是一个用纯 Go 编写的简单、快速、可嵌入且持久的键/�
 
 
 ### 公告
-* v0.14.3 发布，详情见： [https://github.com/nutsdb/nutsdb/releases/tag/v1.0.0](https://github.com/nutsdb/nutsdb/releases/tag/v1.0.0)
+* v1.0.0 发布，详情见： [https://github.com/nutsdb/nutsdb/releases/tag/v1.0.0](https://github.com/nutsdb/nutsdb/releases/tag/v1.0.0)
 * v0.14.3 发布，详情见： [https://github.com/nutsdb/nutsdb/releases/tag/v0.14.3](https://github.com/nutsdb/nutsdb/releases/tag/v0.14.3)
 * v0.14.2 发布，详情见：[https://github.com/nutsdb/nutsdb/releases/tag/v0.14.2](https://github.com/nutsdb/nutsdb/releases/tag/v0.14.2)
 * v0.14.1 发布，详情见：[https://github.com/nutsdb/nutsdb/releases/tag/v0.14.1](https://github.com/nutsdb/nutsdb/releases/tag/v0.14.1)
@@ -51,6 +51,9 @@ https://www.bilibili.com/video/BV1T34y1x7AS/
     - [迭代buckets](#迭代buckets)
     - [删除bucket](#删除bucket)
   - [使用键值对](#使用键值对)
+    - [基本功能](#基本功能)
+    - [对值的位操作](#对值的位操作)
+    - [对值的自增和自减操作](#对值的自增和自减操作)
   - [使用TTL](#使用ttl)
   - [对keys的扫描操作](#对keys的扫描操作)
     - [前缀扫描](#前缀扫描)
@@ -403,6 +406,8 @@ if err := db.Update(
 
 ### 使用键值对
 
+#### 基本操作
+
 将key-value键值对保存在一个bucket, 你可以使用 `tx.Put` 这个方法:
 
 * 添加数据
@@ -481,6 +486,92 @@ if err := db.Update(
     return nil
 }); err != nil {
     log.Fatal(err)
+}
+```
+
+#### 对值的位操作
+
+* 使用`tx.GetBit()`方法获取某一键所对应的值在某一偏移量上的值。当对应的键存在时，返回参数中偏移量所对应位置的上的值，当偏移量超出原有的数据范围时，将返回0且不报错；当对应的键不存在时，将报错提示键不存在。
+
+```golang
+if err := db.View(func(tx *nutsdb.Tx) error {
+	bucket := "bucket"
+	key := []byte("key")
+	offset := 2
+    bit, err := tx.GetBit(bucket, key, offset)
+    if err != nil {
+        return err
+    }
+    log.Println("get bit:", bit)
+    return nil
+}); err != nil {
+    log.Println(err)
+}
+```
+
+* 使用`tx.SetBit()`方法添加某一键所对应的值在某一偏移量上的值。当对应的键存在时，将会修改偏移量所对应的位上的值；当对应的键不存在或者偏移量超出原有的数据范围时，将会对原有值进行扩容直到能够在偏移量对应位置上修改。除偏移量对应位置之外，自动扩容产生的位的值均为0。
+
+```golang
+if err := db.Update(func(tx *nutsdb.Tx) error {
+	bucket := "bucket"
+	key := []byte("key")
+	offset := 2
+	bit := 1
+	return tx.SetBit(bucket, key, offset, bit)
+}); err != nil {
+    log.Println(err)
+}
+```
+
+#### 对值的自增和自减操作
+
+在对值进行自增和自减操作时需要键存在，否则将报错提示键不存在。当值的自增和自减结果将超出`int64`的范围时，将使用基于字符串的大数计算，所以不必担心值的范围过大。
+
+* 使用`tx.Incr()`方法让某一键所对应的值自增1
+
+```golang
+if err := db.Update(func(tx *nutsdb.Tx) error {
+	bucket := "bucket"
+	key := []byte("key")
+    return tx.Incr(bucket, key)
+}); err != nil {
+    log.Println(err)
+}
+```
+
+* 使用`tx.IncrBy()`方法让某一键所对应的值自增指定的值
+
+```golang
+if err := db.Update(func(tx *nutsdb.Tx) error {
+    bucket := "bucket"
+    key := []byte("key")
+    return tx.IncrBy(bucket, key, 10)
+}); err != nil {
+    log.Println(err)
+}
+```
+
+* 使用`tx.Decr()`方法让某一键所对应的值自减1
+
+```golang
+if err := db.Update(func(tx *nutsdb.Tx) error {
+	bucket := "bucket"
+	key := []byte("key")
+    return tx.Decr(bucket, key)
+}); err != nil {
+    log.Println(err)
+}
+```
+
+* 使用`tx.DecrBy()`方法让某一键所对应的值自减指定的值
+
+```golang
+if err := db.Update(func(tx *nutsdb.Tx) error {
+    bucket := "bucket"
+    key := []byte("key")
+    return tx.DecrBy(bucket, key, 10)
+}); err != nil {
+    log.Println(err)
 }
 ```
 
