@@ -20,7 +20,6 @@ func (tx *Tx) IterateBuckets(ds uint16, pattern string, f func(bucket string) bo
 		return err
 	}
 
-	var err error
 	if ds == DataStructureSet {
 		for bucketId := range tx.db.Index.set.idx {
 			bucket, err := tx.db.bm.GetBucketById(uint64(bucketId))
@@ -65,7 +64,7 @@ func (tx *Tx) IterateBuckets(ds uint16, pattern string, f func(bucket string) bo
 			}
 		}
 	}
-	return err
+	return nil
 }
 
 func (tx *Tx) NewKVBucket(name string) error {
