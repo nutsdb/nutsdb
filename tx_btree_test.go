@@ -1054,14 +1054,14 @@ func TestTx_GetSet(t *testing.T) {
 		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 			txPut(t, db, bucket, GetTestBytes(1), val, Persistent, nil, nil)
-			txGetSet(t, db, bucket, GetTestBytes(1), newVal, newVal, val, nil)
+			txGetSet(t, db, bucket, GetTestBytes(1), newVal, val, nil)
 			txGet(t, db, bucket, GetTestBytes(1), newVal, nil)
 		})
 	})
 
 	t.Run("bucket not exist", func(t *testing.T) {
 		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-			txGetSet(t, db, bucket, GetTestBytes(1), newVal, nil, nil, ErrBucketNotExist)
+			txGetSet(t, db, bucket, GetTestBytes(1), newVal, nil, ErrBucketNotExist)
 		})
 	})
 
@@ -1070,7 +1070,7 @@ func TestTx_GetSet(t *testing.T) {
 			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 			txPut(t, db, bucket, GetTestBytes(1), val, 1, nil, nil)
 			time.Sleep(3 * time.Second)
-			txGetSet(t, db, bucket, GetTestBytes(1), newVal, nil, nil, ErrKeyNotFound)
+			txGetSet(t, db, bucket, GetTestBytes(1), newVal, nil, ErrKeyNotFound)
 		})
 	})
 }
