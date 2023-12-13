@@ -208,12 +208,10 @@ func (tx *Tx) GetAll(bucket string) (values [][]byte, err error) {
 }
 
 func (tx *Tx) GetSet(bucket string, key, value []byte) (oldValue []byte, err error) {
-	err = tx.update(bucket, key, func(b []byte) ([]byte, error) {
+	return oldValue, tx.update(bucket, key, func(b []byte) ([]byte, error) {
 		oldValue = b
 		return value, nil
 	})
-
-	return oldValue, err
 }
 
 // RangeScan query a range at given bucket, start and end slice.
