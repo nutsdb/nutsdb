@@ -145,13 +145,12 @@ func getSet() {
 		func(tx *nutsdb.Tx) error {
 			key := []byte("name1")
 			val := []byte("val3")
-			newValue, oldValue, err := tx.GetSet(bucket, key, val)
+			oldValue, err := tx.GetSet(bucket, key, val)
 			if err != nil {
 				return err
 			}
 
 			fmt.Println("old value :", string(oldValue))
-			fmt.Println("new value :", string(newValue))
 
 			return nil
 		}); err != nil {
