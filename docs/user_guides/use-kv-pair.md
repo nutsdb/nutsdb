@@ -54,6 +54,28 @@ func(tx *nutsdb.Tx) error {
 }
 ```
 
+To retrieve the value and set the new value, we can use the `Tx.GetSet`:
+```go
+err := db.Update(
+    func(tx *nutsdb.Tx) error {
+        bucket := "bucket1"
+        key := []byte("name1")
+        val := []byte("val3")
+        oldValue, err := tx.GetSet(bucket, key, val)
+        if err != nil {
+            return err
+        }
+
+        fmt.Println("old value :", string(oldValue))
+
+        return nil
+    },
+); 
+if err != nil {
+    log.Println(err)
+}
+```
+
 Use the `tx.Delete()` to delete a key from the bucket:
 
 ```go

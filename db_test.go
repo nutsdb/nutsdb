@@ -1478,3 +1478,13 @@ func txValueLen(t *testing.T, db *DB, bucket string, key []byte, expectLength in
 	})
 	require.NoError(t, err)
 }
+
+func txGetSet(t *testing.T, db *DB, bucket string, key, value []byte, expectOldValue []byte, expectErr error) {
+	err := db.Update(func(tx *Tx) error {
+		oldValue, err := tx.GetSet(bucket, key, value)
+		assertErr(t, err, expectErr)
+		require.EqualValuesf(t, oldValue, expectOldValue, "err Tx GetSet. got %s want %s", string(oldValue), string(expectOldValue))
+		return nil
+	})
+	require.NoError(t, err)
+}
