@@ -20,20 +20,15 @@ func (tx *Tx) IterateBuckets(ds uint16, pattern string, f func(bucket string) bo
 		return err
 	}
 
-	handle := func(bucket string) error {
-		if end, err := MatchForRange(pattern, bucket, f); end || err != nil {
-			return err
-		}
-		return nil
-	}
-	var err error
 	if ds == DataStructureSet {
 		for bucketId := range tx.db.Index.set.idx {
 			bucket, err := tx.db.bm.GetBucketById(uint64(bucketId))
 			if err != nil {
 				return err
 			}
-			return handle(bucket.Name)
+			if end, err := MatchForRange(pattern, bucket.Name, f); end || err != nil {
+				return err
+			}
 		}
 	}
 	if ds == DataStructureSortedSet {
@@ -42,7 +37,9 @@ func (tx *Tx) IterateBuckets(ds uint16, pattern string, f func(bucket string) bo
 			if err != nil {
 				return err
 			}
-			return handle(bucket.Name)
+			if end, err := MatchForRange(pattern, bucket.Name, f); end || err != nil {
+				return err
+			}
 		}
 	}
 	if ds == DataStructureList {
@@ -51,7 +48,9 @@ func (tx *Tx) IterateBuckets(ds uint16, pattern string, f func(bucket string) bo
 			if err != nil {
 				return err
 			}
-			return handle(bucket.Name)
+			if end, err := MatchForRange(pattern, bucket.Name, f); end || err != nil {
+				return err
+			}
 		}
 	}
 	if ds == DataStructureBTree {
@@ -60,10 +59,12 @@ func (tx *Tx) IterateBuckets(ds uint16, pattern string, f func(bucket string) bo
 			if err != nil {
 				return err
 			}
-			return handle(bucket.Name)
+			if end, err := MatchForRange(pattern, bucket.Name, f); end || err != nil {
+				return err
+			}
 		}
 	}
-	return err
+	return nil
 }
 
 func (tx *Tx) NewKVBucket(name string) error {
