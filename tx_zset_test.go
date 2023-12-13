@@ -343,24 +343,33 @@ func TestTx_ZKeys(t *testing.T) {
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		txCreateBucket(t, db, DataStructureSortedSet, bucket, nil)
-		num := 3
-		for i := 0; i < num; i++ {
+		for i := 0; i < 3; i++ {
 			txZAdd(t, db, bucket, []byte(fmt.Sprintf(key, i)), val, float64(i), nil, nil)
 		}
+		txZAdd(t, db, bucket, []byte("foo"), val, 1, nil, nil)
 
+		tests := []struct {
+			pattern         string
+			expectedMatches int
+			expectedError   error
+		}{
+			{"*", 4, nil},         //  find all keys
+			{"key_*", 3, nil},     // find keys with 'key_' prefix
+			{"fake_key*", 0, nil}, // find non-existing keys
+		}
+
+		for _, test := range tests {
+			txZKeys(t, db, bucket, test.pattern, func(key string) bool { return true }, test.expectedMatches, test.expectedError)
+		}
+
+		// stop after finding the expected number of keys.
+		expectNum := 2
+		var foundKeys []string
 		txZKeys(t, db, bucket, "*", func(key string) bool {
-			return true
-		}, num, nil)
-
-		var keys []string
-		txZKeys(t, db, bucket, "*", func(key string) bool {
-			keys = append(keys, key)
-			return len(keys) != num-1
-		}, num-1, nil)
-
-		txZKeys(t, db, bucket, "fake_key*", func(key string) bool {
-			return true
-		}, 0, nil)
+			foundKeys = append(foundKeys, key)
+			return len(foundKeys) < expectNum
+		}, expectNum, nil)
+		assert.Equal(t, expectNum, len(foundKeys))
 	})
 }
 

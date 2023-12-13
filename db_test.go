@@ -291,16 +291,16 @@ func txSAdd(t *testing.T, db *DB, bucket string, key, value []byte, expectErr er
 
 func txSKeys(t *testing.T, db *DB, bucket, pattern string, f func(key string) bool, expectVal int, expectErr error) {
 	err := db.View(func(tx *Tx) error {
-		num := 0
+		patternMatchNum := 0
 		err := tx.SKeys(bucket, pattern, func(key string) bool {
-			num += 1
+			patternMatchNum += 1
 			return f(key)
 		})
 		if expectErr != nil {
 			assert.ErrorIs(t, expectErr, err)
 		} else {
 			assert.NoError(t, err)
-			assert.Equal(t, expectVal, num)
+			assert.Equal(t, expectVal, patternMatchNum)
 		}
 		return nil
 	})
@@ -554,16 +554,16 @@ func txZPop(t *testing.T, db *DB, bucket string, key []byte, isMax bool, expectV
 
 func txZKeys(t *testing.T, db *DB, bucket, pattern string, f func(key string) bool, expectVal int, expectErr error) {
 	err := db.View(func(tx *Tx) error {
-		num := 0
+		patternMatchNum := 0
 		err := tx.ZKeys(bucket, pattern, func(key string) bool {
-			num += 1
+			patternMatchNum += 1
 			return f(key)
 		})
 		if expectErr != nil {
 			assert.ErrorIs(t, expectErr, err)
 		} else {
 			assert.NoError(t, err)
-			assert.Equal(t, expectVal, num)
+			assert.Equal(t, expectVal, patternMatchNum)
 		}
 		return nil
 	})
