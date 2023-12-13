@@ -353,7 +353,7 @@ func TestTx_ZKeys(t *testing.T) {
 			expectedMatches int
 			expectedError   error
 		}{
-			{"*", 4, nil},         //  find all keys
+			{"*", 4, nil},         // find all keys
 			{"key_*", 3, nil},     // find keys with 'key_' prefix
 			{"fake_key*", 0, nil}, // find non-existing keys
 		}
