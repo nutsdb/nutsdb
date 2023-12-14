@@ -67,6 +67,18 @@ func main() {
 	getSet()
 	// read
 	read()
+
+	//put if not exists
+	put3()
+
+	//put if exits
+	put4()
+
+	// get remaining TTL
+	getTTL()
+
+	// save name2 as persistent
+	persist()
 }
 
 func createBucket() {
@@ -108,6 +120,29 @@ func put2() {
 		log.Fatal(err)
 	}
 }
+
+func put3() {
+	if err := db.Update(
+		func(tx *nutsdb.Tx) error {
+			key := []byte("name2")
+			val := []byte("val2")
+			return tx.PutIfNotExists(bucket, key, val, 0)
+		}); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func put4() {
+	if err := db.Update(
+		func(tx *nutsdb.Tx) error {
+			key := []byte("name2")
+			val := []byte("val2")
+			return tx.PutIfExists(bucket, key, val, 100)
+		}); err != nil {
+		log.Fatal(err)
+	}
+}
+
 func read() {
 	if err := db.View(
 		func(tx *nutsdb.Tx) error {
@@ -154,6 +189,29 @@ func getSet() {
 
 			return nil
 		}); err != nil {
+		log.Println(err)
+	}
+}
+
+func getTTL() {
+	if err := db.View(func(tx *nutsdb.Tx) error {
+		key := []byte("name2")
+		ttl, err := tx.GetTTL(bucket, key)
+		if err != nil {
+			return err
+		}
+		fmt.Println("ttl :", ttl)
+		return nil
+	}); err != nil {
+		log.Println(err)
+	}
+}
+
+func persist() {
+	if err := db.Update(func(tx *nutsdb.Tx) error {
+		key := []byte("name2")
+		return tx.Persist(bucket, key)
+	}); err != nil {
 		log.Println(err)
 	}
 }

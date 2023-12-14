@@ -199,3 +199,63 @@ if err := db.Update(func(tx *nutsdb.Tx) error {
     log.Println(err)
 }
 ```
+## PutIfNotExists and PutIfExits
+
+* Use `PutIfNotExists` set the value for a key in the bucket only if the key doesn't exist in bucket already.
+
+```golang
+if err := db.Update(func(tx *nutsdb.Tx) error {
+    bucket := "bucket"
+    key := []byte("key")
+    value := []byte("value")
+    ttl := unit32(100)
+    return tx.PutIfNotExists(bucket, key, value, ttl)
+}); err != nil {
+    log.Println(err)
+}
+```
+
+* Use `PutIfExits`` set the value for a key in the bucket only if the key already exits in bucket.
+
+```golang
+if err := db.Update(func(tx *nutsdb.Tx) error {
+    bucket := "bucket"
+    key := []byte("key")
+    value := []byte("value")
+    ttl := unit32(100)
+    return tx.PutIfExists(bucket, key, value, ttl)
+}); err != nil {
+    log.Println(err)
+}
+```
+
+## GetTTL and Persist 
+
+* Use `GetTTL` to get remaning TTL of a value by key. It returns (-1, nil) if TTL is Persistent, (0, ErrBucketNotFound|ErrKeyNotFound) If expired or bucket/key not found and (remaining TTL and nil) if the record exits.
+
+```golang
+if err := db.View(func(tx *nutsdb.Tx) error {
+    bucket := "bucket"
+    key := []byte("key")
+    ttl, err := tx.GetTTL(bucket, key)
+    if err != nil {
+        return err
+    }
+    log.Println(ttl)
+    return nil
+}); err != nil {
+    log.Println(err)
+}
+```
+
+* Use `Persist` to update record's TTL as Persistent if the record exits.
+
+```golang
+if err := db.Update(func(tx *nutsdb.Tx) error {
+    bucket := "bucket"
+    key := []byte("key")
+    return tx.Persist(bucket, key, value, ttl)
+}); err != nil {
+    log.Println(err)
+}
+```

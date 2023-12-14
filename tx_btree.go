@@ -62,6 +62,10 @@ func (tx *Tx) PutIfNotExists(bucket string, key, value []byte, ttl uint32) error
 
 // PutIfExits set the value for a key in the bucket only if the key already exits.
 func (tx *Tx) PutIfExists(bucket string, key, value []byte, ttl uint32) error {
+	return tx.updateIfExists(bucket, key, value, ttl, false)
+}
+
+func (tx *Tx) updateIfExists(bucket string, key, value []byte, ttl uint32, updateTTLOnly bool) error {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return err
 	}
@@ -79,6 +83,9 @@ func (tx *Tx) PutIfExists(bucket string, key, value []byte, ttl uint32) error {
 
 	record, recordExists := idx.Find(key)
 	if recordExists && !record.IsExpired() {
+		if updateTTLOnly {
+			return tx.put(bucket, key, record.Value, ttl, DataSetFlag, uint64(time.Now().UnixMilli()), DataStructureBTree)
+		}
 		return tx.put(bucket, key, value, ttl, DataSetFlag, uint64(time.Now().UnixMilli()), DataStructureBTree)
 	}
 
@@ -483,4 +490,53 @@ func (tx *Tx) SetBit(bucket string, key []byte, offset int, bit byte) error {
 			return value, nil
 		}
 	})
+}
+
+// GetTTL returns remaning TTL of a value by key.
+// It returns
+// (-1, nil) If TTL is Persistent
+// (0, ErrBucketNotFound|ErrKeyNotFound) If expired or not found
+// (TTL, nil) If the record exists with a TTL
+func (tx *Tx) GetTTL(bucket string, key []byte) (int64, error) {
+	if err := tx.checkTxIsClosed(); err != nil {
+		return 0, err
+	}
+
+	b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
+	if err != nil {
+		return 0, err
+	}
+	bucketId := b.Id
+
+	idx, bucketExists := tx.db.Index.bTree.exist(bucketId)
+
+	if !bucketExists {
+		return 0, ErrBucketNotFound
+	}
+
+	record, recordFound := idx.Find(key)
+
+	if !recordFound || record.IsExpired() {
+		return 0, ErrKeyNotFound
+	}
+
+	if record.TTL == Persistent {
+		return -1, nil
+	}
+
+	now := time.UnixMilli(time.Now().UnixMilli())
+	expireTime := time.UnixMilli(int64(record.Timestamp))
+	expireTime = expireTime.Add(time.Duration(record.TTL) * time.Second)
+
+	remTTL := expireTime.Sub(now).Seconds()
+	if remTTL >= 0 {
+		return int64(remTTL), nil
+	} else {
+		return 0, ErrKeyNotFound
+	}
+}
+
+// Persist updates record's TTL as Persistent if the record exits.
+func (tx *Tx) Persist(bucket string, key []byte) error {
+	return tx.updateIfExists(bucket, key, []byte{}, Persistent, true)
 }

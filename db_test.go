@@ -17,6 +17,7 @@ package nutsdb
 import (
 	"fmt"
 	"io/ioutil"
+	"math"
 	"os"
 	"strconv"
 	"testing"
@@ -1506,4 +1507,26 @@ func txSetBit(t *testing.T, db *DB, bucket string, key []byte, offset int, value
 		return nil
 	})
 	assertErr(t, err, finalExpectErr)
+}
+
+func txGetTTL(t *testing.T, db *DB, bucket string, key []byte, expectedTTL int64, expectedErr error) {
+	err := db.View(func(tx *Tx) error {
+		ttl, err := tx.GetTTL(bucket, key)
+		assertErr(t, err, expectedErr)
+
+		// If diff between expectedTTL and realTTL lesser than 1s, We'll consider as equal
+		diff := int(math.Abs(float64(ttl - expectedTTL)))
+		assert.LessOrEqual(t, diff, 1)
+		return nil
+	})
+	require.NoError(t, err)
+}
+
+func txPersist(t *testing.T, db *DB, bucket string, key []byte, expectedErr error) {
+	err := db.Update(func(tx *Tx) error {
+		err := tx.Persist(bucket, key)
+		assertErr(t, err, expectedErr)
+		return nil
+	})
+	require.NoError(t, err)
 }
