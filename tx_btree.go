@@ -502,11 +502,10 @@ func (tx *Tx) GetTTL(bucket string, key []byte) (int64, error) {
 		return 0, err
 	}
 
-	b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
+	bucketId, err := tx.db.bm.GetBucketID(DataStructureBTree, bucket)
 	if err != nil {
 		return 0, err
 	}
-	bucketId := b.Id
 
 	idx, bucketExists := tx.db.Index.bTree.exist(bucketId)
 
@@ -524,13 +523,9 @@ func (tx *Tx) GetTTL(bucket string, key []byte) (int64, error) {
 		return -1, nil
 	}
 
-	now := time.UnixMilli(time.Now().UnixMilli())
-	expireTime := time.UnixMilli(int64(record.Timestamp))
-	expireTime = expireTime.Add(time.Duration(record.TTL) * time.Second)
-
-	remTTL := expireTime.Sub(now).Seconds()
+	remTTL := tx.db.expireTime(record.Timestamp, record.TTL)
 	if remTTL >= 0 {
-		return int64(remTTL), nil
+		return int64(remTTL.Seconds()), nil
 	} else {
 		return 0, ErrKeyNotFound
 	}
