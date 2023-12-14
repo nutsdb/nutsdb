@@ -492,7 +492,7 @@ func (tx *Tx) SetBit(bucket string, key []byte, offset int, bit byte) error {
 	})
 }
 
-// GetTTL returns remaning TTL of a value by key.
+// GetTTL returns remaining TTL of a value by key.
 // It returns
 // (-1, nil) If TTL is Persistent
 // (0, ErrBucketNotFound|ErrKeyNotFound) If expired or not found

@@ -201,7 +201,7 @@ if err := db.Update(func(tx *nutsdb.Tx) error {
 ```
 ## PutIfNotExists and PutIfExits
 
-* Use `PutIfNotExists` set the value for a key in the bucket only if the key doesn't exist in bucket already.
+* Use `PutIfNotExists` set the value for a key in bucket only if the key doesn't exist in the bucket already.
 
 ```golang
 if err := db.Update(func(tx *nutsdb.Tx) error {
@@ -215,7 +215,7 @@ if err := db.Update(func(tx *nutsdb.Tx) error {
 }
 ```
 
-* Use `PutIfExits`` set the value for a key in the bucket only if the key already exits in bucket.
+* Use `PutIfExits`` set the value for a key in  bucket only if the key already exits in the bucket.
 
 ```golang
 if err := db.Update(func(tx *nutsdb.Tx) error {
@@ -231,7 +231,7 @@ if err := db.Update(func(tx *nutsdb.Tx) error {
 
 ## GetTTL and Persist 
 
-* Use `GetTTL` to get remaning TTL of a value by key. It returns (-1, nil) if TTL is Persistent, (0, ErrBucketNotFound|ErrKeyNotFound) If expired or bucket/key not found and (remaining TTL and nil) if the record exits.
+* Use `GetTTL` to get remaining TTL of a value by key. It returns (-1, nil) if TTL is Persistent, (0, ErrBucketNotFound|ErrKeyNotFound) If expired or bucket/key not found and (remaining TTL and nil) if the record exits.
 
 ```golang
 if err := db.View(func(tx *nutsdb.Tx) error {
