@@ -526,3 +526,69 @@ func (tx *Tx) Persist(bucket string, key []byte) error {
 		return Persistent, nil
 	})
 }
+
+func (tx *Tx) MSet(bucket string, ttl uint32, args ...[]byte) error {
+	if len(args) == 0 {
+		return nil
+	}
+
+	if len(args)%2 != 0 {
+		return ErrKVArgsLenNotEven
+	}
+
+	for i := 0; i < len(args); i += 2 {
+		if err := tx.put(bucket, args[i], args[i+1], ttl, DataSetFlag, uint64(time.Now().Unix()), DataStructureBTree); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (tx *Tx) MGet(bucket string, keys ...[]byte) ([][]byte, error) {
+	if len(keys) == 0 {
+		return nil, nil
+	}
+
+	values := make([][]byte, len(keys))
+	for i, key := range keys {
+		value, err := tx.Get(bucket, key)
+		if err != nil {
+			return nil, err
+		}
+		values[i] = value
+	}
+
+	return values, nil
+}
+
+func (tx *Tx) Append(bucket string, key, appendage []byte) error {
+	if len(appendage) == 0 {
+		return nil
+	}
+
+	return tx.updateOrPut(bucket, key, appendage, func(value []byte) ([]byte, error) {
+		return append(value, appendage...), nil
+	})
+}
+
+func (tx *Tx) GetRange(bucket string, key []byte, start, end int) ([]byte, error) {
+	if start > end {
+		return nil, ErrStartGreaterThanEnd
+	}
+
+	value, err := tx.get(bucket, key)
+	if err != nil {
+		return nil, err
+	}
+
+	if start >= len(value) {
+		return nil, nil
+	}
+
+	if end >= len(value) {
+		return value[start:], nil
+	}
+
+	return value[start : end+1], nil
+}

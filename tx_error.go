@@ -56,4 +56,8 @@ var (
 	ErrValueNotInteger = errors.New("value is not an integer")
 
 	ErrOffsetInvalid = errors.New("offset is invalid")
+
+	ErrKVArgsLenNotEven = errors.New("parameters is used to represent key value pairs and cannot be odd numbers")
+
+	ErrStartGreaterThanEnd = errors.New("start is greater than end")
 )

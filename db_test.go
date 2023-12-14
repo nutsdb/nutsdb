@@ -1548,3 +1548,41 @@ func txPersist(t *testing.T, db *DB, bucket string, key []byte, expectedErr erro
 	})
 	require.NoError(t, err)
 }
+
+func txMSet(t *testing.T, db *DB, bucket string, args [][]byte, ttl uint32, expectErr error, finalExpectErr error) {
+	err := db.Update(func(tx *Tx) error {
+		err := tx.MSet(bucket, ttl, args...)
+		assertErr(t, err, expectErr)
+		return nil
+	})
+	assertErr(t, err, finalExpectErr)
+}
+
+func txMGet(t *testing.T, db *DB, bucket string, keys [][]byte, expectValues [][]byte, expectErr error, finalExpectErr error) {
+	err := db.View(func(tx *Tx) error {
+		values, err := tx.MGet(bucket, keys...)
+		assertErr(t, err, expectErr)
+		require.EqualValues(t, expectValues, values)
+		return nil
+	})
+	assertErr(t, err, finalExpectErr)
+}
+
+func txAppend(t *testing.T, db *DB, bucket string, key, appendage []byte, expectErr error, expectFinalErr error) {
+	err := db.Update(func(tx *Tx) error {
+		err := tx.Append(bucket, key, appendage)
+		assertErr(t, err, expectErr)
+		return nil
+	})
+	assertErr(t, err, expectFinalErr)
+}
+
+func txGetRange(t *testing.T, db *DB, bucket string, key []byte, start, end int, expectVal []byte, expectErr error, expectFinalErr error) {
+	err := db.View(func(tx *Tx) error {
+		value, err := tx.GetRange(bucket, key, start, end)
+		assertErr(t, err, expectErr)
+		require.EqualValues(t, expectVal, value)
+		return nil
+	})
+	assertErr(t, err, expectFinalErr)
+}
