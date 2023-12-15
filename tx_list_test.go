@@ -56,6 +56,21 @@ func TestTx_RPush(t *testing.T) {
 	})
 }
 
+func TestTx_MPush(t *testing.T) {
+	bucket := "bucket"
+	t.Run("test", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			bbs := make([][]byte, 0)
+			bbs = append(bbs, GetTestBytes(2))
+			bbs = append(bbs, GetTestBytes(3))
+			bbs = append(bbs, GetTestBytes(4))
+			txCreateBucket(t, db, DataStructureList, bucket, nil)
+			txMPush(t, db, bucket, GetTestBytes(1), bbs, false, nil, nil)
+			txLRange(t, db, bucket, GetTestBytes(1), 0, 2, 3, bbs, nil)
+		})
+	})
+}
+
 func TestTx_LPush(t *testing.T) {
 	bucket := "bucket"
 
