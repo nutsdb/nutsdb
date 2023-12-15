@@ -1166,7 +1166,7 @@ func TestTx_GetSet(t *testing.T) {
 }
 
 func TestTx_GetTTLAndPersist(t *testing.T) {
-	bucket := "bucket"
+	bucket := "bucket1"
 	key := []byte("key1")
 	value := []byte("value1")
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
@@ -1175,7 +1175,7 @@ func TestTx_GetTTLAndPersist(t *testing.T) {
 		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 		txGetTTL(t, db, bucket, key, 0, ErrKeyNotFound)
-		txPersist(t, db, bucket, key, nil)
+		txPersist(t, db, bucket, key, ErrKeyNotFound)
 
 		txPut(t, db, bucket, key, value, 1, nil, nil)
 		time.Sleep(2 * time.Second) // Wait till value to expire

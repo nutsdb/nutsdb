@@ -62,34 +62,11 @@ func (tx *Tx) PutIfNotExists(bucket string, key, value []byte, ttl uint32) error
 
 // PutIfExits set the value for a key in the bucket only if the key already exits.
 func (tx *Tx) PutIfExists(bucket string, key, value []byte, ttl uint32) error {
-	return tx.updateIfExists(bucket, key, value, ttl, false)
-}
-
-func (tx *Tx) updateIfExists(bucket string, key, value []byte, ttl uint32, updateTTLOnly bool) error {
-	if err := tx.checkTxIsClosed(); err != nil {
-		return err
-	}
-
-	b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
-	if err != nil {
-		return err
-	}
-	bucketId := b.Id
-
-	idx, bucketExists := tx.db.Index.bTree.exist(bucketId)
-	if !bucketExists {
-		return ErrNotFoundBucket
-	}
-
-	record, recordExists := idx.Find(key)
-	if recordExists && !record.IsExpired() {
-		if updateTTLOnly {
-			return tx.put(bucket, key, record.Value, ttl, DataSetFlag, uint64(time.Now().UnixMilli()), DataStructureBTree)
-		}
-		return tx.put(bucket, key, value, ttl, DataSetFlag, uint64(time.Now().UnixMilli()), DataStructureBTree)
-	}
-
-	return nil
+	return tx.update(bucket, key, func(_ []byte) ([]byte, error) {
+		return value, nil
+	}, func(_ uint32) (uint32, error) {
+		return ttl, nil
+	})
 }
 
 // Get retrieves the value for a key in the bucket.
@@ -218,6 +195,8 @@ func (tx *Tx) GetSet(bucket string, key, value []byte) (oldValue []byte, err err
 	return oldValue, tx.update(bucket, key, func(b []byte) ([]byte, error) {
 		oldValue = b
 		return value, nil
+	}, func(oldTTL uint32) (uint32, error) {
+		return oldTTL, nil
 	})
 }
 
@@ -368,7 +347,7 @@ func (tx *Tx) tryGet(bucket string, key []byte, solveRecord func(record *Record,
 	}
 }
 
-func (tx *Tx) update(bucket string, key []byte, getNewValue func([]byte) ([]byte, error)) error {
+func (tx *Tx) update(bucket string, key []byte, getNewValue func([]byte) ([]byte, error), getNewTTL func(uint32) (uint32, error)) error {
 	return tx.tryGet(bucket, key, func(record *Record, found bool, bucketId BucketId) error {
 		if !found {
 			return ErrKeyNotFound
@@ -388,7 +367,12 @@ func (tx *Tx) update(bucket string, key []byte, getNewValue func([]byte) ([]byte
 			return err
 		}
 
-		return tx.put(bucket, key, newValue, record.TTL, DataSetFlag, uint64(time.Now().Unix()), DataStructureBTree)
+		newTTL, err := getNewTTL(record.TTL)
+		if err != nil {
+			return err
+		}
+
+		return tx.put(bucket, key, newValue, newTTL, DataSetFlag, uint64(time.Now().Unix()), DataStructureBTree)
 	})
 }
 
@@ -436,6 +420,8 @@ func (tx *Tx) integerIncr(bucket string, key []byte, increment int64) error {
 
 		atomic.AddInt64(&intValue, increment)
 		return []byte(strconv2.Int64ToStr(intValue)), nil
+	}, func(oldTTL uint32) (uint32, error) {
+		return oldTTL, nil
 	})
 }
 
@@ -497,6 +483,8 @@ func (tx *Tx) SetBit(bucket string, key []byte, offset int, bit byte) error {
 // (-1, nil) If TTL is Persistent
 // (0, ErrBucketNotFound|ErrKeyNotFound) If expired or not found
 // (TTL, nil) If the record exists with a TTL
+// Note: The returned remaining TTL will be in seconds. For example,
+// remainingTTL is 500ms, It'll return 0.
 func (tx *Tx) GetTTL(bucket string, key []byte) (int64, error) {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return 0, err
@@ -506,7 +494,6 @@ func (tx *Tx) GetTTL(bucket string, key []byte) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-
 	idx, bucketExists := tx.db.Index.bTree.exist(bucketId)
 
 	if !bucketExists {
@@ -533,5 +520,9 @@ func (tx *Tx) GetTTL(bucket string, key []byte) (int64, error) {
 
 // Persist updates record's TTL as Persistent if the record exits.
 func (tx *Tx) Persist(bucket string, key []byte) error {
-	return tx.updateIfExists(bucket, key, []byte{}, Persistent, true)
+	return tx.update(bucket, key, func(oldValue []byte) ([]byte, error) {
+		return oldValue, nil
+	}, func(_ uint32) (uint32, error) {
+		return Persistent, nil
+	})
 }
