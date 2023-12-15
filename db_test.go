@@ -291,16 +291,16 @@ func txSAdd(t *testing.T, db *DB, bucket string, key, value []byte, expectErr er
 
 func txSKeys(t *testing.T, db *DB, bucket, pattern string, f func(key string) bool, expectVal int, expectErr error) {
 	err := db.View(func(tx *Tx) error {
-		num := 0
+		patternMatchNum := 0
 		err := tx.SKeys(bucket, pattern, func(key string) bool {
-			num += 1
+			patternMatchNum += 1
 			return f(key)
 		})
 		if expectErr != nil {
 			assert.ErrorIs(t, expectErr, err)
 		} else {
 			assert.NoError(t, err)
-			assert.Equal(t, expectVal, num)
+			assert.Equal(t, expectVal, patternMatchNum)
 		}
 		return nil
 	})
@@ -550,6 +550,24 @@ func txZPop(t *testing.T, db *DB, bucket string, key []byte, isMax bool, expectV
 		return nil
 	})
 	assert.NoError(t, err)
+}
+
+func txZKeys(t *testing.T, db *DB, bucket, pattern string, f func(key string) bool, expectVal int, expectErr error) {
+	err := db.View(func(tx *Tx) error {
+		patternMatchNum := 0
+		err := tx.ZKeys(bucket, pattern, func(key string) bool {
+			patternMatchNum += 1
+			return f(key)
+		})
+		if expectErr != nil {
+			assert.ErrorIs(t, expectErr, err)
+		} else {
+			assert.NoError(t, err)
+			assert.Equal(t, expectVal, patternMatchNum)
+		}
+		return nil
+	})
+	require.NoError(t, err)
 }
 
 func txPop(t *testing.T, db *DB, bucket string, key, expectVal []byte, expectErr error, isLeft bool) {
@@ -919,7 +937,7 @@ func TestDB_HintKeyAndRAMIdxMode_RestartDB(t *testing.T) {
 func TestDB_HintKeyAndRAMIdxMode_LruCache(t *testing.T) {
 	opts := DefaultOptions
 	opts.EntryIdxMode = HintKeyAndRAMIdxMode
-	//opts.HintKeyAndRAMIdxCacheSize = 0
+	// opts.HintKeyAndRAMIdxCacheSize = 0
 	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
 		bucket := "bucket"
 		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
