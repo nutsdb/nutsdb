@@ -614,15 +614,13 @@ func txMPush(t *testing.T, db *DB, bucket string, key []byte, vals [][]byte, isL
 	err := db.Update(func(tx *Tx) error {
 		var err error
 
-		for _, val := range vals {
-			if isLeft {
-				err = tx.LPush(bucket, key, val)
-			} else {
-				err = tx.RPush(bucket, key, val)
-			}
-
-			assertErr(t, err, expectErr)
+		if isLeft {
+			err = tx.LPush(bucket, key, vals...)
+		} else {
+			err = tx.RPush(bucket, key, vals...)
 		}
+
+		assertErr(t, err, expectErr)
 
 		return nil
 	})

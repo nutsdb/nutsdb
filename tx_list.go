@@ -82,7 +82,13 @@ func (tx *Tx) RPeek(bucket string, key []byte) ([]byte, error) {
 // push sets values for list stored in the bucket at given bucket, key, flag and values.
 func (tx *Tx) push(bucket string, key []byte, flag uint16, values ...[]byte) error {
 	for _, value := range values {
-		newKey := tx.getListNewKey(bucket, key, false)
+		newKey := key
+		if flag == DataRPushFlag {
+			newKey = tx.getListNewKey(bucket, key, false)
+		} else if flag == DataLPushFlag {
+			newKey = tx.getListNewKey(bucket, key, true)
+		}
+
 		err := tx.put(bucket, newKey, value, Persistent, flag, uint64(time.Now().Unix()), DataStructureList)
 		if err != nil {
 			return err
@@ -135,8 +141,7 @@ func (tx *Tx) LPush(bucket string, key []byte, values ...[]byte) error {
 		return ErrSeparatorForListKey
 	}
 
-	newKey := tx.getListNewKey(bucket, key, true)
-	return tx.push(bucket, newKey, DataLPushFlag, values...)
+	return tx.push(bucket, key, DataLPushFlag, values...)
 }
 
 func (tx *Tx) isKeyValid(bucket string, key []byte) error {
