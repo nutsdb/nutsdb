@@ -77,6 +77,18 @@ func TestTx_MPush(t *testing.T) {
 		})
 	})
 
+	t.Run("Test Error LPush ", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			bbs := make([][]byte, 0)
+			bbs = append(bbs, GetTestBytes(2))
+			bbs = append(bbs, GetTestBytes(3))
+			bbs = append(bbs, GetTestBytes(4))
+
+			txCreateBucket(t, db, DataStructureList, bucket, nil)
+			txMPush(t, db, "test1", GetTestBytes(1), bbs, true, ErrorBucketNotExist, nil)
+		})
+	})
+
 	t.Run("Test Multiple RPush ", func(t *testing.T) {
 		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 			bbs := make([][]byte, 0)
