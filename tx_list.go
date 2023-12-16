@@ -121,8 +121,15 @@ func (tx *Tx) RPush(bucket string, key []byte, values ...[]byte) error {
 		return ErrSeparatorForListKey
 	}
 
-	newKey := tx.getListNewKey(bucket, key, false)
-	return tx.push(bucket, newKey, DataRPushFlag, values...)
+	for _, value := range values {
+		newKey := tx.getListNewKey(bucket, key, false)
+		err := tx.push(bucket, newKey, DataLPushFlag, value)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // LPush inserts the values at the head of the list stored in the bucket at given bucket,key and values.
@@ -135,8 +142,15 @@ func (tx *Tx) LPush(bucket string, key []byte, values ...[]byte) error {
 		return ErrSeparatorForListKey
 	}
 
-	newKey := tx.getListNewKey(bucket, key, true)
-	return tx.push(bucket, newKey, DataLPushFlag, values...)
+	for _, value := range values {
+		newKey := tx.getListNewKey(bucket, key, true)
+		err := tx.push(bucket, newKey, DataLPushFlag, value)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (tx *Tx) isKeyValid(bucket string, key []byte) error {
