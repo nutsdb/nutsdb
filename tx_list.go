@@ -82,14 +82,7 @@ func (tx *Tx) RPeek(bucket string, key []byte) ([]byte, error) {
 // push sets values for list stored in the bucket at given bucket, key, flag and values.
 func (tx *Tx) push(bucket string, key []byte, flag uint16, values ...[]byte) error {
 	for _, value := range values {
-		newKey := key
-		if flag == DataRPushFlag {
-			newKey = tx.getListNewKey(bucket, key, false)
-		} else if flag == DataLPushFlag {
-			newKey = tx.getListNewKey(bucket, key, true)
-		}
-
-		err := tx.put(bucket, newKey, value, Persistent, flag, uint64(time.Now().Unix()), DataStructureList)
+		err := tx.put(bucket, key, value, Persistent, flag, uint64(time.Now().Unix()), DataStructureList)
 		if err != nil {
 			return err
 		}
@@ -128,7 +121,15 @@ func (tx *Tx) RPush(bucket string, key []byte, values ...[]byte) error {
 		return ErrSeparatorForListKey
 	}
 
-	return tx.push(bucket, key, DataRPushFlag, values...)
+	for _, value := range values {
+		newKey := tx.getListNewKey(bucket, key, false)
+		err := tx.push(bucket, newKey, DataLPushFlag, value)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // LPush inserts the values at the head of the list stored in the bucket at given bucket,key and values.
@@ -141,7 +142,15 @@ func (tx *Tx) LPush(bucket string, key []byte, values ...[]byte) error {
 		return ErrSeparatorForListKey
 	}
 
-	return tx.push(bucket, key, DataLPushFlag, values...)
+	for _, value := range values {
+		newKey := tx.getListNewKey(bucket, key, true)
+		err := tx.push(bucket, newKey, DataLPushFlag, value)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (tx *Tx) isKeyValid(bucket string, key []byte) error {
