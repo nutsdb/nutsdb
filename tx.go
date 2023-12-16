@@ -34,21 +34,61 @@ const (
 	txStatusClosed = 3
 )
 
+// pendingBucketList the uncommitted bucket changes in this Tx
+type pendingBucketList map[Ds]map[BucketName]*Bucket
+
+// pendingEntryList the uncommitted Entry changes in this Tx
+type pendingEntryList struct {
+	entries map[Ds]map[BucketName][]*Entry
+	size    int
+}
+
 // Tx represents a transaction.
 type Tx struct {
 	id                uint64
 	db                *DB
 	writable          bool
 	status            atomic.Value
-	pendingWrites     []*Entry
+	pendingWrites     *pendingEntryList
 	size              int64
-	pendingBucketList map[Ds]map[BucketName]*Bucket
+	pendingBucketList pendingBucketList
 }
 
 type txnCb struct {
 	commit func() error
 	user   func(error)
 	err    error
+}
+
+func (ens *pendingEntryList) toList() []*Entry {
+	list := make([]*Entry, ens.size)
+	var i int
+	for _, entriesInDS := range ens.entries {
+		for _, entries := range entriesInDS {
+			for _, entry := range entries {
+				list[i] = entry
+				i++
+			}
+		}
+	}
+	return list
+}
+
+func (tx *Tx) submitEntry(e *Entry) error {
+	ds := e.Meta.Ds
+	ens := tx.pendingWrites
+	if ens.entries[ds] == nil {
+		ens.entries[ds] = map[BucketName][]*Entry{}
+	}
+	bucket, err := tx.db.bm.GetBucketById(e.Meta.BucketId)
+	if err != nil {
+		return err
+	}
+	entries := ens.entries[ds][bucket.Name]
+	entries = append(entries, e)
+	ens.entries[ds][bucket.Name] = entries
+	ens.size++
+	return nil
 }
 
 func runTxnCallback(cb *txnCb) {
@@ -97,7 +137,7 @@ func newTx(db *DB, writable bool) (tx *Tx, err error) {
 	tx = &Tx{
 		db:                db,
 		writable:          writable,
-		pendingWrites:     []*Entry{},
+		pendingWrites:     &pendingEntryList{entries: map[Ds]map[BucketName][]*Entry{}},
 		pendingBucketList: make(map[Ds]map[BucketName]*Bucket),
 	}
 
@@ -116,7 +156,7 @@ func (tx *Tx) CommitWith(cb func(error)) {
 		panic("Nil callback provided to CommitWith")
 	}
 
-	if len(tx.pendingWrites) == 0 {
+	if tx.pendingWrites.size == 0 {
 		// Do not run these callbacks from here, because the CommitWith and the
 		// callback might be acquiring the same locks. Instead run the callback
 		// from another goroutine.
@@ -147,7 +187,7 @@ func (tx *Tx) commitAndSend() (func() error, error) {
 }
 
 func (tx *Tx) checkSize() error {
-	count := len(tx.pendingWrites)
+	count := tx.pendingWrites.size
 	if int64(count) >= tx.db.getMaxBatchCount() || tx.size >= tx.db.getMaxBatchSize() {
 		return ErrTxnTooBig
 	}
@@ -213,22 +253,21 @@ func (tx *Tx) Commit() (err error) {
 	tx.setStatusCommitting()
 	defer tx.setStatusClosed()
 
-	writesLen := len(tx.pendingWrites)
 	writesBucketLen := len(tx.pendingBucketList)
-
-	if writesLen == 0 && writesBucketLen == 0 {
+	if tx.pendingWrites.size == 0 && writesBucketLen == 0 {
 		return nil
 	}
-
-	lastIndex := writesLen - 1
 
 	buff := tx.allocCommitBuffer()
 	defer tx.db.commitBuffer.Reset()
 
 	var records []*Record
 
+	pendingWriteList := tx.pendingWrites.toList()
+	writesLen := tx.pendingWrites.size
+	lastIndex := writesLen - 1
 	for i := 0; i < writesLen; i++ {
-		entry := tx.pendingWrites[i]
+		entry := pendingWriteList[i]
 		entrySize := entry.Size()
 		if entrySize > tx.db.opt.SegmentSize {
 			return ErrDataSizeExceed
@@ -275,7 +314,7 @@ func (tx *Tx) Commit() (err error) {
 		return err
 	}
 
-	if err := tx.buildIdxes(records, tx.pendingWrites); err != nil {
+	if err := tx.buildIdxes(records, pendingWriteList); err != nil {
 		panic(err.Error())
 	}
 	tx.db.RecordCount += curWriteCount
@@ -614,7 +653,10 @@ func (tx *Tx) put(bucket string, key, value []byte, ttl uint32, flag uint16, tim
 	if err != nil {
 		return err
 	}
-	tx.pendingWrites = append(tx.pendingWrites, e)
+	err = tx.submitEntry(e)
+	if err != nil {
+		return err
+	}
 	tx.size += e.Size()
 
 	return nil
@@ -629,7 +671,7 @@ func (tx *Tx) putDeleteLog(bucketId BucketId, key, value []byte, ttl uint32, fla
 		WithTTL(ttl).WithStatus(UnCommitted).WithDs(ds).WithTxID(tx.id).WithBucketId(bucket.Id)
 
 	e := NewEntry().WithKey(key).WithMeta(meta).WithValue(value)
-	tx.pendingWrites = append(tx.pendingWrites, e)
+	tx.submitEntry(e)
 	tx.size += e.Size()
 }
 
@@ -756,14 +798,16 @@ func (tx *Tx) buildBucketInIndex() error {
 func (tx *Tx) getChangeCountInEntriesChanges() int64 {
 	var res int64
 	var err error
-	writeLen := len(tx.pendingWrites)
-	for i := 0; i < writeLen; i++ {
-		entry := tx.pendingWrites[i]
-		curRecordCnt, _ := tx.getEntryNewAddRecordCount(entry)
-		if err != nil {
-			return res
+	for _, entriesInDS := range tx.pendingWrites.entries {
+		for _, entries := range entriesInDS {
+			for _, entry := range entries {
+				curRecordCnt, _ := tx.getEntryNewAddRecordCount(entry)
+				if err != nil {
+					return res
+				}
+				res += curRecordCnt
+			}
 		}
-		res += curRecordCnt
 	}
 	return res
 }
