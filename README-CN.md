@@ -54,6 +54,9 @@ https://www.bilibili.com/video/BV1T34y1x7AS/
     - [基本功能](#基本功能)
     - [对值的位操作](#对值的位操作)
     - [对值的自增和自减操作](#对值的自增和自减操作)
+    - [对值的连续多次Set和Get](#对值的连续多次Set和Get)
+    - [对值的增补操作](#对值的增补操作)
+    - [获取值的一部分](#获取值的一部分)
   - [使用TTL](#使用ttl)
   - [对keys的扫描操作](#对keys的扫描操作)
     - [前缀扫描](#前缀扫描)
@@ -570,6 +573,79 @@ if err := db.Update(func(tx *nutsdb.Tx) error {
     bucket := "bucket"
     key := []byte("key")
     return tx.DecrBy(bucket, key, 10)
+}); err != nil {
+    log.Println(err)
+}
+```
+
+#### 对值的连续多次Set和Get
+
+* 使用`tx.MSet()`方法连续多次设置键值对。当使用`tx.MSet()`需要以`...[]byte`类型传入若干个键值对。此处要求参数的总数为偶数个，设i为从0开始的偶数，则第i个参数和第i+1个参数将分别成为一个键值对的键和值。
+
+```golang
+if err := db.Update(func(tx *nutsdb.Tx) error {
+	bucekt := "bucket"
+	args := [][]byte{
+        []byte("1"), []byte("2"), []byte("3"), []byte("4"),
+    }
+    return tx.MSet(bucket, nutsdb.Persistent, args...)
+}); err != nil {
+    log.Println(err)
+}
+```
+
+* 使用`tx.MGet()`方法连续多次取值。当使用`tx.MGet()`需要以`...[]byte`类型传入若干个键，若其中任何一个键不存在都会返回`key not found`错误。返回值是一个切片，长度与传入的参数相同，并且根据切片索引一一对应。
+
+```golang
+if err := db.View(func(tx *nutsdb.Tx) error {
+	bucket := "bucket"
+	key := [][]byte{
+		[]byte("1"), []byte("2"), []byte("3"), []byte("4"),
+    }
+    values, err := tx.MGet(bucket, key...)
+    if err != nil {
+        return err
+    }
+    for i, value := range values {
+        log.Printf("get value by MGet, the %d value is '%s'", i, string(value))
+    }
+    return nil
+}); err != nil {
+    log.Println(err)
+}
+```
+
+#### 对值的增补操作
+
+* 使用`tx.Append()`方法对值进行增补。
+
+```golang
+if err := db.Update(func(tx *nutsdb.Tx) error {
+	bucket := "bucket"
+	key := "key"
+	appendage := "appendage"
+    return tx.Append(bucket, []byte(key), []byte(appendage))
+}); err != nil {
+    log.Println(err)
+}
+```
+
+#### 获取值的一部分
+
+* 使用`tx.GetRange()`方法可以根据给定的索引获取值的一部分。通过两个`int`类型的参数确定一个闭区间，返回闭区间所对应部分的值。
+
+```golang
+if err := db.View(func(tx *nutsdb.Tx) error {
+	bucket := "bucket"
+	key := "key"
+	start := 0
+	end := 2
+    value, err := tx.GetRange(bucket, []byte(key), start, end)
+    if err != nil {
+        return err
+    }
+    log.Printf("got value: '%s'", string(value))
+    return nil
 }); err != nil {
     log.Println(err)
 }

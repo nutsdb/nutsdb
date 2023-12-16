@@ -199,6 +199,7 @@ if err := db.Update(func(tx *nutsdb.Tx) error {
     log.Println(err)
 }
 ```
+
 ## PutIfNotExists and PutIfExits
 
 * Use `PutIfNotExists` set the value for a key in bucket only if the key doesn't exist in the bucket already.
@@ -229,7 +230,44 @@ if err := db.Update(func(tx *nutsdb.Tx) error {
 }
 ```
 
-## GetTTL and Persist 
+## Multi-operations on keys
+
+* Set key-value pairs multiple times in succession using the `tx.MSet()` method. When using `tx.MSet()` it is necessary to pass several key-value pairs as `... []byte` type to pass in several key-value pairs. Here the total number of parameters is required to be an even number, let i be an even number starting from 0. The ith parameter and the i+1th parameter will be the key and value of a key-value pair respectively.
+
+```golang
+if err := db.Update(func(tx *nutsdb.Tx) error {
+    bucket := "bucket"
+    args := [][]byte{
+        []byte("1"), []byte("2"), []byte("3"), []byte("4"),
+    }
+    return tx.MSet(bucket, nutsdb.Persistent, args...)
+}); err != nil {
+    log.Println(err)
+}
+```
+
+* Use the `tx.MGet()` method to take values multiple times in succession. When using `tx.MGet()` requires passing in several keys of type `... []byte` type is passed several keys, a `key not found` error is returned if any of the keys do not exist. The return value is a slice, of the same length as the passed parameters, and corresponding one-to-one according to the slice index.
+
+```golang
+if err := db.View(func(tx *nutsdb.Tx) error {
+	bucket := "bucket"
+	key := [][]byte{
+		[]byte("1"), []byte("2"), []byte("3"), []byte("4"),
+    }
+    values, err := tx.MGet(bucket, key...)
+    if err != nil {
+        return err
+    }
+    for i, value := range values {
+        log.Printf("get value by MGet, the %d value is '%s'", i, string(value))
+    }
+    return nil
+}); err != nil {
+    log.Println(err)
+}
+```
+
+## GetTTL and Persist
 
 * Use `GetTTL` to get remaining TTL of a value by key. It returns (-1, nil) if TTL is Persistent, (0, ErrBucketNotFound|ErrKeyNotFound) If expired or bucket/key not found and (remaining TTL and nil) if the record exits.
 
@@ -242,10 +280,6 @@ if err := db.View(func(tx *nutsdb.Tx) error {
         return err
     }
     log.Println(ttl)
-    return nil
-}); err != nil {
-    log.Println(err)
-}
 ```
 
 * Use `Persist` to update record's TTL as Persistent if the record exits.
@@ -255,6 +289,42 @@ if err := db.Update(func(tx *nutsdb.Tx) error {
     bucket := "bucket"
     key := []byte("key")
     return tx.Persist(bucket, key, value, ttl)
+}); err != nil {
+    log.Println(err)
+}
+```
+
+## Append operation for a value
+
+* Use the `tx.Append()` method to append values.
+
+```golang
+if err := db.Update(func(tx *nutsdb.Tx) error {
+    bucket := "bucket"
+    key := "key"
+    appendage := "appendage"
+    return tx.Append(bucket, []byte(key), []byte(appendage))
+}); err != nil {
+    log.Println(err)
+}
+```
+
+## Get part of a value by a closed interval
+
+* Use the `tx.GetRange()` method to get a portion of a value based on a given index. A closed interval is determined by two parameters of type `int`, and the value of the portion corresponding to the closed interval is returned.
+
+```golang
+if err := db.View(func(tx *nutsdb.Tx) error {
+    bucket := "bucket"
+    key := "key"
+    start := 0
+    end := 2
+    value, err := tx.GetRange(bucket, []byte(key), start, end)
+    if err != nil {
+        return err
+    }
+    log.Printf("got value: '%s'", string(value))
+    return nil
 }); err != nil {
     log.Println(err)
 }

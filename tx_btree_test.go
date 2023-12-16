@@ -1188,3 +1188,116 @@ func TestTx_GetTTLAndPersist(t *testing.T) {
 		txGetTTL(t, db, bucket, key, -1, nil)
 	})
 }
+
+func TestTx_MSetMGet(t *testing.T) {
+	bucket := "bucket"
+
+	t.Run("use MSet and MGet with 0 args", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+			txMSet(t, db, bucket, nil, Persistent, nil, nil)
+			txMGet(t, db, bucket, nil, nil, nil, nil)
+		})
+	})
+
+	t.Run("use MSet by using odd number of args ", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+			txMSet(t, db, bucket, [][]byte{
+				GetTestBytes(0), GetTestBytes(1), GetTestBytes(2),
+			}, Persistent, ErrKVArgsLenNotEven, nil)
+		})
+	})
+
+	t.Run("use MSet and MGet normally", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+			txMSet(t, db, bucket, [][]byte{
+				GetTestBytes(0), GetTestBytes(1), GetTestBytes(2), GetTestBytes(3),
+			}, Persistent, nil, nil)
+			txMGet(t, db, bucket, [][]byte{
+				GetTestBytes(0), GetTestBytes(2),
+			}, [][]byte{
+				GetTestBytes(1), GetTestBytes(3),
+			}, nil, nil)
+		})
+	})
+}
+
+func TestTx_Append(t *testing.T) {
+	bucket := "bucket"
+	key := GetTestBytes(0)
+
+	t.Run("use Append with a nil appendage", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+			txAppend(t, db, bucket, key, []byte(""), nil, nil)
+			txAppend(t, db, bucket, key, nil, nil, nil)
+		})
+	})
+
+	t.Run("use Append on a non-exist key", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+			txAppend(t, db, bucket, key, GetTestBytes(1), nil, nil)
+			txGet(t, db, bucket, key, GetTestBytes(1), nil)
+		})
+	})
+
+	t.Run("use append on an exist key", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+			txPut(t, db, bucket, key, []byte("test"), Persistent, nil, nil)
+			txAppend(t, db, bucket, key, []byte("test"), nil, nil)
+			txGet(t, db, bucket, key, []byte("testtest"), nil)
+		})
+	})
+}
+
+func TestTx_GetRange(t *testing.T) {
+	bucket := "bucket"
+	key := GetTestBytes(0)
+
+	t.Run("use GetRange with start greater than less", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+			txGetRange(t, db, bucket, key, 5, 1, nil, ErrStartGreaterThanEnd, nil)
+		})
+	})
+
+	t.Run("use GetRange with start greater than size of value", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+			txPut(t, db, bucket, key, []byte("test"), Persistent, nil, nil)
+			txGetRange(t, db, bucket, key, 5, 10, nil, nil, nil)
+		})
+	})
+
+	t.Run("use GetRange with end greater than size of value", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+			txPut(t, db, bucket, key, []byte("test"), Persistent, nil, nil)
+			txGetRange(t, db, bucket, key, 2, 10, []byte("st"), nil, nil)
+		})
+	})
+
+	t.Run("use GetRange normally", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+			txPut(t, db, bucket, key, []byte("test"), Persistent, nil, nil)
+			txGetRange(t, db, bucket, key, 1, 2, []byte("es"), nil, nil)
+			txGetRange(t, db, bucket, key, 1, 3, []byte("est"), nil, nil)
+			txGetRange(t, db, bucket, key, 1, 4, []byte("est"), nil, nil)
+		})
+	})
+}
