@@ -176,6 +176,48 @@ func TestTx_ZPop(t *testing.T) {
 	})
 }
 
+func TestTx_ZPeekMin(t *testing.T) {
+	bucket := "bucket"
+	key := GetTestBytes(0)
+
+	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureSortedSet, bucket, nil)
+
+		for i := 0; i < 30; i++ {
+			txZAdd(t, db, bucket, key, GetTestBytes(i), float64(i), nil, nil)
+		}
+
+		// get minimum node
+		err := db.View(func(tx *Tx) error {
+			node, err1 := tx.ZPeekMin(bucket, key)
+			require.NoError(t, err1)
+			require.Equal(t, &SortedSetMember{
+				Value: GetTestBytes(0),
+				Score: float64(0),
+			}, node)
+			return nil
+		})
+		require.NoError(t, err)
+
+		//  bucket not exists
+		err = db.View(func(tx *Tx) error {
+			_, err1 := tx.ZPeekMin("non-exists-bucket", key)
+			require.Error(t, ErrBucketNotExist, err1)
+			return err1
+		})
+		require.Error(t, ErrBucketNotExist, err)
+
+		// key not exists
+		err = db.View(func(tx *Tx) error {
+			_, err1 := tx.ZPeekMin(bucket, []byte("non-exists-key"))
+			require.Error(t, ErrSortedSetNotFound, err1)
+			return err1
+		})
+		require.Error(t, ErrSortedSetNotFound, err)
+
+	})
+}
+
 func TestTx_ZRangeByRank(t *testing.T) {
 	bucket := "bucket"
 	key := GetTestBytes(0)
