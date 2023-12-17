@@ -8,14 +8,14 @@ val := []byte("val001")
 
 bucket001 := "bucket001"
 
-if err := db.Update(func(tx *Tx) error {
+if err := db.Update(func(tx *nutsdb.Tx) error {
     // you should call Bucket with data structure and the name of bucket first
-    return tx.NewBucket(DataStructureBTree, bucket001)
+    return tx.NewBucket(nutsdb.DataStructureBTree, bucket001)
 }); err != nil {
     log.Fatal(err)
 }
 
-if err := db.Update(func(tx *Tx) error {
+if err := db.Update(func(tx *nutsdb.Tx) error {
     return tx.Put(bucket001, key, val, 0)
 }); err != nil {
     log.Fatal(err)
@@ -41,13 +41,13 @@ The current version of `ds` (represents the data structure):
 
 - DataStructureSet
 - DataStructureSortedSet
-- DataStructureBPTree
+- DataStructureBTree
 - DataStructureList
 
 ```go
 if err := db.View(
     func(tx *nutsdb.Tx) error {
-        return tx.IterateBuckets(nutsdb.DataStructureBPTree, "*", func(bucket string) bool {
+        return tx.IterateBuckets(nutsdb.DataStructureBTree, "*", func(bucket string) bool {
             fmt.Println("bucket: ", bucket)
             // true: continue, false: break
             return true
@@ -70,15 +70,14 @@ The current version of `ds` (represents the data structure)：
 
 - DataStructureSet
 - DataStructureSortedSet
-- DataStructureBPTree
+- DataStructureBTree
 - DataStructureList
 
 ```go
 if err := db.Update(
     func(tx *nutsdb.Tx) error {
-        return tx.DeleteBucket(nutsdb.DataStructureBPTree, bucket)
+        return tx.DeleteBucket(nutsdb.DataStructureBTree, bucket)
     }); err != nil {
     log.Fatal(err)
 }
-   
 ```

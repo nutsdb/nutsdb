@@ -784,7 +784,7 @@ if err := db.View(
     func(tx *nutsdb.Tx) error {
         bucket := "myZSet1"
         key := []byte("key1")
-        num, err := tx.ZCard(bucket, string(key))
+        num, err := tx.ZCard(bucket, key)
         if err != nil {
             return err
         }
@@ -800,7 +800,7 @@ if err := db.View(
   <summary><b>ZCount</b></summary>
 Returns the number of elements in the sorted set specified by key in a bucket with a score between min and max and opts.
 
-Opts includes the following parameters:
+Opts include the following parameters:
 
 - Limit int // limit the max nodes to return
 - ExcludeStart bool // exclude start value, so it search in interval (start, end] or (start, end)
@@ -811,7 +811,7 @@ if err := db.View(
     func(tx *nutsdb.Tx) error {
         bucket := "myZSet1"
         key := []byte("key1")
-        num, err := tx.ZCount(bucket, string(key), 0, 1, nil)
+        num, err := tx.ZCount(bucket, key, 0, 1, nil)
         if err != nil {
             return err
         }
@@ -832,7 +832,7 @@ if err := db.View(
     func(tx *nutsdb.Tx) error {
         bucket := "myZSet1"
         key := []byte("key1")
-        score, err := tx.ZScore(bucket, string(key), []byte("val1"))
+        score, err := tx.ZScore(bucket, key, []byte("val1"))
         if err != nil {
             return err
         }
@@ -853,7 +853,7 @@ if err := db.View(
     func(tx *nutsdb.Tx) error {
         bucket := "myZSet1"
         key := []byte("key1")
-        nodes, err := tx.ZMembers(bucket, string(key))
+        nodes, err := tx.ZMembers(bucket, key)
         if err != nil {
             return err
         }
@@ -876,7 +876,7 @@ if err := db.View(
     func(tx *nutsdb.Tx) error {
         bucket := "myZSet1"
         key := []byte("key1")
-        node, err := tx.ZPeekMax(bucket, string(key))
+        node, err := tx.ZPeekMax(bucket, key))
         if err != nil {
             return err
         }
@@ -897,7 +897,7 @@ if err := db.View(
     func(tx *nutsdb.Tx) error {
         bucket := "myZSet1"
         key := []byte("key1")
-        node, err := tx.ZPeekMin(bucket, string(key))
+        node, err := tx.ZPeekMin(bucket, key)
         if err != nil {
             return err
         }
@@ -918,7 +918,7 @@ if err := db.Update(
     func(tx *nutsdb.Tx) error {
         bucket := "myZSet1"
         key := []byte("key1")
-        node, err := tx.ZPopMax(bucket, string(key))
+        node, err := tx.ZPopMax(bucket, key)
         if err != nil {
             return err
         }
@@ -939,7 +939,7 @@ if err := db.Update(
     func(tx *nutsdb.Tx) error {
         bucket := "myZSet1"
         key := []byte("key1")
-        node, err := tx.ZPopMin(bucket, string(key))
+        node, err := tx.ZPopMin(bucket, key)
         if err != nil {
             return err
         }
@@ -987,7 +987,7 @@ if err := db.View(
     func(tx *nutsdb.Tx) error {
         bucket := "myZSet1"
         key := []byte("key1")
-        nodes, err := tx.ZRangeByRank(bucket, string(key), 1, 3)
+        nodes, err := tx.ZRangeByRank(bucket, key, 1, 3)
         if err != nil {
             return err
         }
@@ -1037,12 +1037,12 @@ if err := db.View(
     func(tx *nutsdb.Tx) error {
         bucket := "myZSet1"
         key := []byte("key1")
-        nodes, err := tx.ZRangeByScore(bucket, string(key), 80, 100, nil)
+        nodes, err := tx.ZRangeByScore(bucket, key, 80, 100, nil)
         if err != nil {
             return err
         }
         for _, node := range nodes {
-            fmt.Println("item:", node.Value, node.Score)
+            fmt.Println("item:", string(node.Value), node.Score)
         }
         return nil
     }); err != nil {
@@ -1061,7 +1061,7 @@ if err := db.View(
     func(tx *nutsdb.Tx) error {
         bucket := "myZSet1"
         key := []byte("key1")
-        rank, err := tx.ZRank(bucket, string(key), []byte("val1"))
+        rank, err := tx.ZRank(bucket, key, []byte("val1"))
         if err != nil {
             return err
         }
@@ -1075,7 +1075,7 @@ if err := db.View(
     func(tx *nutsdb.Tx) error {
         bucket := "myZSet1"
         key := []byte("key1")
-        rank, err := tx.ZRank(bucket, string(key), []byte("val2"))
+        rank, err := tx.ZRank(bucket, key, []byte("val2"))
         if err != nil {
             return err
         }
@@ -1089,7 +1089,7 @@ if err := db.View(
     func(tx *nutsdb.Tx) error {
         bucket := "myZSet1"
         key := []byte("key1")
-        rank, err := tx.ZRank(bucket, string(key), []byte("val3"))
+        rank, err := tx.ZRank(bucket, key, []byte("val3"))
         if err != nil {
             return err
         }
@@ -1111,7 +1111,7 @@ if err := db.View(
     func(tx *nutsdb.Tx) error {
         bucket := "myZSet1"
         key := []byte("key1")
-        rank, err := tx.ZRank(bucket, string(key), []byte("val1"))
+        rank, err := tx.ZRank(bucket, key, []byte("val1"))
         if err != nil {
             return err
         }
@@ -1124,7 +1124,7 @@ if err := db.View(
     func(tx *nutsdb.Tx) error {
         bucket := "myZSet1"
         key := []byte("key1")
-        rank, err := tx.ZRank(bucket, string(key), []byte("val2"))
+        rank, err := tx.ZRank(bucket, key, []byte("val2"))
         if err != nil {
             return err
         }
@@ -1137,7 +1137,7 @@ if err := db.View(
     func(tx *nutsdb.Tx) error {
         bucket := "myZSet1"
         key := []byte("key1")
-        rank, err := tx.ZRank(bucket, string(key), []byte("val3"))
+        rank, err := tx.ZRank(bucket, key, []byte("val3"))
         if err != nil {
             return err
         }
@@ -1151,14 +1151,14 @@ if err := db.View(
 
 <details>
   <summary><b>ZRem</b></summary>
-Returns the member with the lowest score in the sorted set specified by key in a bucket.
+Removes the member with the lowest score in the sorted set specified by key in a bucket.
 
 ```go
 if err := db.Update(
     func(tx *nutsdb.Tx) error {
         bucket := "myZSet1"
         key := []byte("key1")
-        return tx.ZRem(bucket, string(key), []byte("val3"))
+        return tx.ZRem(bucket, key, []byte("val3"))
     }); err != nil {
     log.Fatal(err)
 }
@@ -1167,7 +1167,7 @@ if err := db.View(
     func(tx *nutsdb.Tx) error {
         bucket := "myZSet1"
         key := []byte("key1")
-        nodes, err := tx.ZMembers(bucket, string(key))
+        nodes, err := tx.ZMembers(bucket, key)
         if err != nil {
             return err
         }
@@ -1191,7 +1191,7 @@ if err := db.Update(
     func(tx *nutsdb.Tx) error {
         bucket := "myZSet1"
         key := []byte("key1")
-        return tx.ZRemRangeByRank(bucket, string(key), 1, 2)
+        return tx.ZRemRangeByRank(bucket, key, 1, 2)
     }); err != nil {
     log.Fatal(err)
 }
@@ -1200,11 +1200,11 @@ if err := db.View(
     func(tx *nutsdb.Tx) error {
         bucket := "myZSet1"
         key := []byte("key1")
-        nodes, err := tx.ZMembers(bucket, string(key))
+        nodes, err := tx.ZMembers(bucket, key)
         if err != nil {
             return err
         }
-        fmt.Println("after ZRemRangeByRank, ZMembers nodes is 0")
+        fmt.Println("after ZRemRangeByRank, ZMembers nodes is", len(nodes))
         for node := range nodes {
             fmt.Println("item:", node.Score, string(node.Value))
         }
