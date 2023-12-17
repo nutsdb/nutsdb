@@ -308,9 +308,6 @@ func (tx *Tx) Commit() (err error) {
 		}
 
 		records = append(records, record)
-
-		// add to cache
-		tx.db.hintKeyAndRAMIdxModeLru.Add(hint,entry)
 	}
 
 	if err := tx.SubmitBucket(); err != nil {

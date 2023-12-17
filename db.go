@@ -230,7 +230,7 @@ func (db *DB) getValueByRecord(record *Record) ([]byte, error) {
 	}
 
 	// firstly we find data in cache
-	if db.hintKeyAndRAMIdxModeLru.Get(record) != nil {
+	if db.getHintKeyAndRAMIdxCacheSize() > 0 && db.hintKeyAndRAMIdxModeLru.Get(record) != nil {
 		return db.hintKeyAndRAMIdxModeLru.Get(record).([]byte), nil
 	}
 
@@ -253,7 +253,10 @@ func (db *DB) getValueByRecord(record *Record) ([]byte, error) {
 	}
 
 	// saved in cache
-	db.hintKeyAndRAMIdxModeLru.Add(string(item.Value), item)
+	if db.getHintKeyAndRAMIdxCacheSize() > 0 {
+		db.hintKeyAndRAMIdxModeLru.Add(string(item.Value), item)
+	}
+
 	return item.Value, nil
 }
 
