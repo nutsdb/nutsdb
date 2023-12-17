@@ -127,9 +127,13 @@ func main() {
 - [Benchmark](./docs/user_guides/benchmarks.md)
 </details>
 
-## Contributing
+## Contributors
 
-See [CONTRIBUTING](https://github.com/nutsdb/nutsdb/blob/master/CONTRIBUTING.md) for details on submitting patches and the contribution workflow.
+Thank you for considering contributing to NutsDB! The contribution guide can be found in the [CONTRIBUTING](https://github.com/nutsdb/nutsdb/blob/master/CONTRIBUTING.md) for details on submitting patches and the contribution workflow.
+
+<a href="https://github.com/nutsdb/nutsdb/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=nutsdb/nutsdb" />
+</a>
 
 ## Acknowledgements
 

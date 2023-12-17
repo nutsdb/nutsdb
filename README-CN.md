@@ -2382,6 +2382,12 @@ nutsDB不会出现“不可重复读”这种情况，当高并发的时候，�
 * 提pull requests
 * 优化修改README文档
 
+感谢以下贡献者，感谢你们的付出！
+
+<a href="https://github.com/nutsdb/nutsdb/graphs/contributors">
+<img src="https://contrib.rocks/image?repo=nutsdb/nutsdb" />
+</a>
+
 #### 代码风格指南参考
 
 https://github.com/golang/go/wiki/CodeReviewComments
