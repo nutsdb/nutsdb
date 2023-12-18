@@ -1,0 +1,51 @@
+name: Deploy Docs to Github Pages
+
+on:
+  pull_request:
+    branches:
+      - docs
+  push:
+    branches:
+      - docs
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.github-pages.outputs.url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: '**/package-lock.json'
+      - run: npm ci
+          # https://stackoverflow.com/a/61560798
+          - name: Echo the combined string
+          run: echo "/${GITHUB_REPOSITORY#*/}"
+          shell: bash
+      - name: Replace URL
+         if you put those in secrets, you can replace vars by secrets
+        run: |
+          sed -i "s#https://urlplaceholder.com#${{ vars.GH_PAGES_URL }}#g" ./docusaurus.config.js
+          sed -i "s#/baseurlplaceholder#${{ vars.GH_PAGES_BASEURL }}#g" ./docusaurus.config.js
+
+      - name: Build website
+        run: npm run build
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v2
+        with:
+          # Upload entire repository
+          path: './build'
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v2
