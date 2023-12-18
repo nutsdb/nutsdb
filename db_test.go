@@ -553,6 +553,22 @@ func txZPop(t *testing.T, db *DB, bucket string, key []byte, isMax bool, expectV
 	assert.NoError(t, err)
 }
 
+func txZPeekMin(t *testing.T, db *DB, bucket string, key, expectVal []byte, expectScore float64, expectErr, finalExpectErr error) {
+	err := db.View(func(tx *Tx) error {
+		minMem, err1 := tx.ZPeekMin(bucket, key)
+		assertErr(t, err1, finalExpectErr)
+
+		if expectErr == nil {
+			require.Equal(t, &SortedSetMember{
+				Value: expectVal,
+				Score: expectScore,
+			}, minMem)
+		}
+		return err1
+	})
+	assertErr(t, err, finalExpectErr)
+}
+
 func txZKeys(t *testing.T, db *DB, bucket, pattern string, f func(key string) bool, expectVal int, expectErr error) {
 	err := db.View(func(tx *Tx) error {
 		patternMatchNum := 0

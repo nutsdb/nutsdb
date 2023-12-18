@@ -188,33 +188,51 @@ func TestTx_ZPeekMin(t *testing.T) {
 		}
 
 		// get minimum node
-		err := db.View(func(tx *Tx) error {
-			node, err1 := tx.ZPeekMin(bucket, key)
-			require.NoError(t, err1)
-			require.Equal(t, &SortedSetMember{
-				Value: GetTestBytes(0),
-				Score: float64(0),
-			}, node)
-			return nil
-		})
-		require.NoError(t, err)
+		txZPeekMin(t, db, bucket, key, GetTestBytes(0), float64(0), nil, nil)
 
 		//  bucket not exists
-		err = db.View(func(tx *Tx) error {
-			_, err1 := tx.ZPeekMin("non-exists-bucket", key)
-			require.Error(t, ErrBucketNotExist, err1)
-			return err1
-		})
-		require.Error(t, ErrBucketNotExist, err)
+		txZPeekMin(t, db, "non-exists-bucket", key, []byte{}, float64(0), ErrBucketNotExist, ErrBucketNotExist)
 
 		// key not exists
-		err = db.View(func(tx *Tx) error {
-			_, err1 := tx.ZPeekMin(bucket, []byte("non-exists-key"))
-			require.Error(t, ErrSortedSetNotFound, err1)
-			return err1
-		})
-		require.Error(t, ErrSortedSetNotFound, err)
+		txZPeekMin(t, db, bucket, []byte("non-exists-key"), []byte{}, float64(0), ErrSortedSetNotFound, ErrSortedSetNotFound)
 
+		// add nodes
+
+		// add node that will not affect the minimum node
+		txZAdd(t, db, bucket, key, []byte("new-mem"), float64(3), nil, nil)
+		txZPeekMin(t, db, bucket, key, GetTestBytes(0), float64(0), nil, nil)
+		// add a new minimum value
+		txZAdd(t, db, bucket, key, []byte("new-min"), float64(0), nil, nil)
+		txZPeekMin(t, db, bucket, key, []byte("new-min"), float64(0), nil, nil)
+
+		// remove nodes
+
+		// remove minimum node
+		txZRem(t, db, bucket, key, []byte("new-min"), nil)
+		txZPeekMin(t, db, bucket, key, GetTestBytes(0), float64(0), nil, nil)
+
+		// remove non-minimum node
+		txZRem(t, db, bucket, key, GetTestBytes(5), nil)
+		txZPeekMin(t, db, bucket, key, GetTestBytes(0), float64(0), nil, nil)
+
+		// remove range by rank
+		err := db.Update(func(tx *Tx) error {
+			err := tx.ZRemRangeByRank(bucket, key, 1, 10)
+			assert.NoError(t, err)
+			return nil
+		})
+		assert.NoError(t, err)
+		txZPeekMin(t, db, bucket, key, GetTestBytes(10), float64(10), nil, nil)
+
+		// pop
+
+		// pop min
+		txZPop(t, db, bucket, key, false, GetTestBytes(10), float64(10), nil)
+		txZPeekMin(t, db, bucket, key, GetTestBytes(11), float64(11), nil, nil)
+
+		// pop max
+		txZPop(t, db, bucket, key, true, GetTestBytes(29), float64(29), nil)
+		txZPeekMin(t, db, bucket, key, GetTestBytes(11), float64(11), nil, nil)
 	})
 }
 
