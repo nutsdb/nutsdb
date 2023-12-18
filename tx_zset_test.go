@@ -176,6 +176,66 @@ func TestTx_ZPop(t *testing.T) {
 	})
 }
 
+func TestTx_ZPeekMin(t *testing.T) {
+	bucket := "bucket"
+	key := GetTestBytes(0)
+
+	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureSortedSet, bucket, nil)
+
+		for i := 0; i < 30; i++ {
+			txZAdd(t, db, bucket, key, GetTestBytes(i), float64(i), nil, nil)
+		}
+
+		// get minimum node
+		txZPeekMin(t, db, bucket, key, GetTestBytes(0), float64(0), nil, nil)
+
+		//  bucket not exists
+		txZPeekMin(t, db, "non-exists-bucket", key, []byte{}, float64(0), ErrBucketNotExist, ErrBucketNotExist)
+
+		// key not exists
+		txZPeekMin(t, db, bucket, []byte("non-exists-key"), []byte{}, float64(0), ErrSortedSetNotFound, ErrSortedSetNotFound)
+
+		// add nodes
+
+		// add node that will not affect the minimum node
+		txZAdd(t, db, bucket, key, []byte("new-mem"), float64(3), nil, nil)
+		txZPeekMin(t, db, bucket, key, GetTestBytes(0), float64(0), nil, nil)
+		// add a new minimum value
+		txZAdd(t, db, bucket, key, []byte("new-min"), float64(0), nil, nil)
+		txZPeekMin(t, db, bucket, key, []byte("new-min"), float64(0), nil, nil)
+
+		// remove nodes
+
+		// remove minimum node
+		txZRem(t, db, bucket, key, []byte("new-min"), nil)
+		txZPeekMin(t, db, bucket, key, GetTestBytes(0), float64(0), nil, nil)
+
+		// remove non-minimum node
+		txZRem(t, db, bucket, key, GetTestBytes(5), nil)
+		txZPeekMin(t, db, bucket, key, GetTestBytes(0), float64(0), nil, nil)
+
+		// remove range by rank
+		err := db.Update(func(tx *Tx) error {
+			err := tx.ZRemRangeByRank(bucket, key, 1, 10)
+			assert.NoError(t, err)
+			return nil
+		})
+		assert.NoError(t, err)
+		txZPeekMin(t, db, bucket, key, GetTestBytes(10), float64(10), nil, nil)
+
+		// pop
+
+		// pop min
+		txZPop(t, db, bucket, key, false, GetTestBytes(10), float64(10), nil)
+		txZPeekMin(t, db, bucket, key, GetTestBytes(11), float64(11), nil, nil)
+
+		// pop max
+		txZPop(t, db, bucket, key, true, GetTestBytes(29), float64(29), nil)
+		txZPeekMin(t, db, bucket, key, GetTestBytes(11), float64(11), nil, nil)
+	})
+}
+
 func TestTx_ZRangeByRank(t *testing.T) {
 	bucket := "bucket"
 	key := GetTestBytes(0)
