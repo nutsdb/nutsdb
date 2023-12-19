@@ -92,6 +92,8 @@ func main() {
 	}
 
 	bucket = "bucketForString"
+	// create bucket first
+	createBucket()
 
 	readJobs := make(chan int, 10)
 	writeJobs := make(chan int, 10)
@@ -122,5 +124,14 @@ func main() {
 	}
 	for a := 1; a <= 10; a++ {
 		<-writeResults
+	}
+}
+
+func createBucket() {
+	if err := db.Update(
+		func(tx *nutsdb.Tx) error {
+			return tx.NewBucket(nutsdb.DataStructureBTree, bucket)
+		}); err != nil {
+		//log.Fatal(err)
 	}
 }

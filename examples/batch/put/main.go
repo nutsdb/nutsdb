@@ -21,12 +21,23 @@ func init() {
 		// nutsdb.WithRWMode(nutsdb.MMap),
 		// nutsdb.WithSyncEnable(false),
 	)
-	bucket = "bucket1"
+}
+
+func createBucket() {
+	if err := db.Update(
+		func(tx *nutsdb.Tx) error {
+			return tx.NewBucket(nutsdb.DataStructureBTree, "bucket1")
+		}); err != nil {
+		//log.Fatal(err)
+	}
 }
 
 func main() {
 	time2.Start()
 
+	bucket = "bucket1"
+	// create bucket first
+	createBucket()
 	end := 1
 
 	for j := 1; j <= end; j++ {
