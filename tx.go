@@ -34,15 +34,6 @@ const (
 	txStatusClosed = 3
 )
 
-// pendingBucketList the uncommitted bucket changes in this Tx
-type pendingBucketList map[Ds]map[BucketName]*Bucket
-
-// pendingEntryList the uncommitted Entry changes in this Tx
-type pendingEntryList struct {
-	entries map[Ds]map[BucketName][]*Entry
-	size    int
-}
-
 // Tx represents a transaction.
 type Tx struct {
 	id                uint64
@@ -58,20 +49,6 @@ type txnCb struct {
 	commit func() error
 	user   func(error)
 	err    error
-}
-
-func (ens *pendingEntryList) toList() []*Entry {
-	list := make([]*Entry, ens.size)
-	var i int
-	for _, entriesInDS := range ens.entries {
-		for _, entries := range entriesInDS {
-			for _, entry := range entries {
-				list[i] = entry
-				i++
-			}
-		}
-	}
-	return list
 }
 
 func (tx *Tx) submitEntry(e *Entry) error {
@@ -814,41 +791,41 @@ func (tx *Tx) getChangeCountInEntriesChanges() int64 {
 
 func (tx *Tx) getChangeCountInBucketChanges() int64 {
 	var res int64
-	for _, bucketsInDs := range tx.pendingBucketList {
-		for _, bucket := range bucketsInDs {
-			bucketId := bucket.Id
-			if bucket.Meta.Op == BucketDeleteOperation {
-				switch bucket.Ds {
-				case DataStructureBTree:
-					if bTree, ok := tx.db.Index.bTree.idx[bucketId]; ok {
-						res -= int64(bTree.Count())
-					}
-				case DataStructureSet:
-					if set, ok := tx.db.Index.set.idx[bucketId]; ok {
-						for key := range set.M {
-							res -= int64(set.SCard(key))
-						}
-					}
-				case DataStructureSortedSet:
-					if sortedSet, ok := tx.db.Index.sortedSet.idx[bucketId]; ok {
-						for key := range sortedSet.M {
-							curLen, _ := sortedSet.ZCard(key)
-							res -= int64(curLen)
-						}
-					}
-				case DataStructureList:
-					if list, ok := tx.db.Index.list.idx[bucketId]; ok {
-						for key := range list.Items {
-							curLen, _ := list.Size(key)
-							res -= int64(curLen)
-						}
-					}
-				default:
-					panic(fmt.Sprintf("there is an unexpected data structure that is unimplemented in our database.:%d", bucket.Ds))
+	var f = func(bucket *Bucket) error {
+		bucketId := bucket.Id
+		if bucket.Meta.Op == BucketDeleteOperation {
+			switch bucket.Ds {
+			case DataStructureBTree:
+				if bTree, ok := tx.db.Index.bTree.idx[bucketId]; ok {
+					res -= int64(bTree.Count())
 				}
+			case DataStructureSet:
+				if set, ok := tx.db.Index.set.idx[bucketId]; ok {
+					for key := range set.M {
+						res -= int64(set.SCard(key))
+					}
+				}
+			case DataStructureSortedSet:
+				if sortedSet, ok := tx.db.Index.sortedSet.idx[bucketId]; ok {
+					for key := range sortedSet.M {
+						curLen, _ := sortedSet.ZCard(key)
+						res -= int64(curLen)
+					}
+				}
+			case DataStructureList:
+				if list, ok := tx.db.Index.list.idx[bucketId]; ok {
+					for key := range list.Items {
+						curLen, _ := list.Size(key)
+						res -= int64(curLen)
+					}
+				}
+			default:
+				panic(fmt.Sprintf("there is an unexpected data structure that is unimplemented in our database.:%d", bucket.Ds))
 			}
 		}
+		return nil
 	}
+	_ = tx.pendingBucketList.rangeBucket(f)
 	return res
 }
 
