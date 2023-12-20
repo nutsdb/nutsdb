@@ -967,6 +967,7 @@ func TestDB_HintKeyAndRAMIdxMode_LruCache(t *testing.T) {
 				val := []byte(fmt.Sprintf("%10d", i))
 				txPut(t, db, bucket, key, val, Persistent, nil, nil)
 				txGet(t, db, bucket, key, val, nil)
+				txGet(t, db, bucket, key, val, nil)
 			}
 			db.Close()
 		})
