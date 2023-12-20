@@ -230,8 +230,10 @@ func (db *DB) getValueByRecord(record *Record) ([]byte, error) {
 	}
 
 	// firstly we find data in cache
-	if db.getHintKeyAndRAMIdxCacheSize() > 0 && db.hintKeyAndRAMIdxModeLru.Get(record) != nil {
-		return db.hintKeyAndRAMIdxModeLru.Get(record).([]byte), nil
+	if db.getHintKeyAndRAMIdxCacheSize() > 0 {
+		if value := db.hintKeyAndRAMIdxModeLru.Get(record); value != nil {
+			return value.([]byte), nil
+		}
 	}
 
 	dirPath := getDataPath(record.FileID, db.opt.Dir)
