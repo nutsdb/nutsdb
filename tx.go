@@ -292,7 +292,7 @@ func (tx *Tx) Commit() (err error) {
 	}
 
 	if err := tx.buildIdxes(records, pendingWriteList); err != nil {
-		panic(err.Error())
+		return err
 	}
 	tx.db.RecordCount += curWriteCount
 
