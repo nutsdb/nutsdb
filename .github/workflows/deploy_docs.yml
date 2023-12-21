@@ -11,9 +11,6 @@ on:
 permissions:
   contents: write
 
-secrets:
-  TOKEN: ${{ secrets.TOKEN }}
-
 jobs:
   deploy:
     name: Deploy to GitHub Pages
