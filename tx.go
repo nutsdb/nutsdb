@@ -280,8 +280,8 @@ func (tx *Tx) Commit() (err error) {
 		record := tx.db.createRecordByModeWithFidAndOff(tx.db.ActiveFile.fileID, uint64(offset), entry)
 
 		// add to cache
-		if tx.db.opt.EntryIdxMode == HintKeyAndRAMIdxMode {
-			tx.db.hintKeyAndRAMIdxModeLru.Add(string(entry.Value), entry)
+		if tx.db.getHintKeyAndRAMIdxCacheSize() > 0 && tx.db.opt.EntryIdxMode == HintKeyAndRAMIdxMode {
+			tx.db.hintKeyAndRAMIdxModeLru.Add(record, entry)
 		}
 
 		records = append(records, record)
