@@ -148,7 +148,7 @@ var DefaultOptions = func() Options {
 		MergeInterval:     2 * time.Hour,
 		MaxBatchSize:      (15 * defaultSegmentSize / 4) / 100,
 		MaxBatchCount:     (15 * defaultSegmentSize / 4) / 100 / 100,
-		HintKeyAndRAMIdxCacheSize: 50000,
+		HintKeyAndRAMIdxCacheSize: 0,
 		ExpiredDeleteType: TimeWheel,
 	}
 }()
