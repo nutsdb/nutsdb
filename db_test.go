@@ -971,18 +971,23 @@ func TestDB_HintKeyAndRAMIdxMode_RestartDB(t *testing.T) {
 func TestDB_HintKeyAndRAMIdxMode_LruCache(t *testing.T) {
 	opts := DefaultOptions
 	opts.EntryIdxMode = HintKeyAndRAMIdxMode
-	// opts.HintKeyAndRAMIdxCacheSize = 0
-	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
-		bucket := "bucket"
-		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
-		for i := 0; i < 10000; i++ {
-			key := []byte(fmt.Sprintf("%10d", i))
-			val := []byte(fmt.Sprintf("%10d", i))
-			txPut(t, db, bucket, key, val, Persistent, nil, nil)
-			txGet(t, db, bucket, key, val, nil)
-		}
-		db.Close()
-	})
+	lruCacheSizes := []int{0, 5000, 10000, 20000}
+
+	for _, lruCacheSize := range lruCacheSizes {
+		opts.HintKeyAndRAMIdxCacheSize = lruCacheSize
+		runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
+			bucket := "bucket"
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			for i := 0; i < 10000; i++ {
+				key := []byte(fmt.Sprintf("%10d", i))
+				val := []byte(fmt.Sprintf("%10d", i))
+				txPut(t, db, bucket, key, val, Persistent, nil, nil)
+				txGet(t, db, bucket, key, val, nil)
+				txGet(t, db, bucket, key, val, nil)
+			}
+			db.Close()
+		})
+	}
 }
 
 func TestDB_ChangeMode_RestartDB(t *testing.T) {
