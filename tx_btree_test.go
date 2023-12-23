@@ -1301,3 +1301,26 @@ func TestTx_GetRange(t *testing.T) {
 		})
 	})
 }
+
+func TestBTreeInternalVisibility(t *testing.T) {
+	bucket := "bucket"
+	key := GetTestBytes(0)
+
+	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+		txPut(t, db, bucket, key, []byte("test"), Persistent, nil, nil)
+		err := db.Update(func(tx *Tx) error {
+			err := tx.Put(bucket, key, []byte("test-updated"), Persistent)
+			assert.Nil(t, err)
+			value, err := tx.Get(bucket, key)
+			assert.Nil(t, err)
+			assert.Equal(t, "test-updated", string(value))
+			err = tx.DeleteBucket(DataStructureBTree, bucket)
+			assert.Nil(t, err)
+			err = tx.Put(bucket, key, []byte("test-updated"), Persistent)
+			assert.Equal(t, ErrBucketNotFound, err)
+			return nil
+		})
+		assert.Equal(t, ErrBucketNotExist, err)
+	})
+}

@@ -86,6 +86,20 @@ func (tx *Tx) get(bucket string, key []byte) (value []byte, err error) {
 	}
 	bucketId := b.Id
 
+	bucketStatus := tx.getBucketStatus(DataStructureBTree, bucket)
+	if bucketStatus == BucketStatusDelete {
+		return nil, ErrBucketNotFound
+	}
+
+	status, entry := tx.findEntryAndItsStatus(DataStructureBTree, bucket, string(key))
+	if status != NotFoundEntry && entry != nil {
+		if status == EntryDeleted {
+			return nil, ErrKeyNotFound
+		} else {
+			return entry.Value, nil
+		}
+	}
+
 	if idx, ok := tx.db.Index.bTree.exist(bucketId); ok {
 		record, found := idx.Find(key)
 		if !found {

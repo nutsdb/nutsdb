@@ -34,6 +34,14 @@ const (
 	txStatusClosed = 3
 )
 
+type EntryStatus = uint8
+
+const (
+	NotFoundEntry EntryStatus = 0
+	EntryDeleted  EntryStatus = 1
+	EntryUpdated  EntryStatus = 2
+)
+
 // Tx represents a transaction.
 type Tx struct {
 	id                uint64
@@ -608,6 +616,11 @@ func (tx *Tx) put(bucket string, key, value []byte, ttl uint32, flag uint16, tim
 		return err
 	}
 
+	bucketStatus := tx.getBucketStatus(DataStructureBTree, bucket)
+	if bucketStatus == BucketStatusDelete {
+		return ErrBucketNotFound
+	}
+
 	if !tx.db.bm.ExistBucket(ds, bucket) {
 		return ErrorBucketNotExist
 	}
@@ -848,4 +861,28 @@ func (tx *Tx) getBucketStatus(ds Ds, name BucketName) BucketStatus {
 		return BucketStatusExistAlready
 	}
 	return BucketStatusUnknown
+}
+
+// findEntryStatus finds the latest status for the certain Entry in Tx
+func (tx *Tx) findEntryAndItsStatus(ds Ds, bucket BucketName, key string) (EntryStatus, *Entry) {
+	if tx.pendingWrites.size == 0 {
+		return NotFoundEntry, nil
+	}
+	pendingWriteEntries := tx.pendingWrites.entries
+	if pendingWriteEntries[ds] == nil {
+		return NotFoundEntry, nil
+	}
+	if pendingWriteEntries[ds][bucket] == nil {
+		return NotFoundEntry, nil
+	}
+	entries := pendingWriteEntries[ds][bucket]
+	for _, entry := range entries {
+		switch entry.Meta.Flag {
+		case DataDeleteFlag:
+			return EntryDeleted, nil
+		default:
+			return EntryUpdated, entry
+		}
+	}
+	return NotFoundEntry, nil
 }
