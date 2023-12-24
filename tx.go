@@ -876,12 +876,16 @@ func (tx *Tx) findEntryAndItsStatus(ds Ds, bucket BucketName, key string) (Entry
 		return NotFoundEntry, nil
 	}
 	entries := pendingWriteEntries[ds][bucket]
-	for _, entry := range entries {
-		switch entry.Meta.Flag {
-		case DataDeleteFlag:
-			return EntryDeleted, nil
-		default:
-			return EntryUpdated, entry
+	size := len(entries)
+	for i := size - 1; i >= 0; i-- {
+		entry := entries[i]
+		if string(entry.Key) == key {
+			switch entry.Meta.Flag {
+			case DataDeleteFlag:
+				return EntryDeleted, nil
+			default:
+				return EntryUpdated, entry
+			}
 		}
 	}
 	return NotFoundEntry, nil
