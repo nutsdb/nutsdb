@@ -59,21 +59,8 @@ type txnCb struct {
 	err    error
 }
 
-func (tx *Tx) submitEntry(e *Entry) error {
-	ds := e.Meta.Ds
-	ens := tx.pendingWrites
-	if ens.entries[ds] == nil {
-		ens.entries[ds] = map[BucketName][]*Entry{}
-	}
-	bucket, err := tx.db.bm.GetBucketById(e.Meta.BucketId)
-	if err != nil {
-		return err
-	}
-	entries := ens.entries[ds][bucket.Name]
-	entries = append(entries, e)
-	ens.entries[ds][bucket.Name] = entries
-	ens.size++
-	return nil
+func (tx *Tx) submitEntry(ds uint16, bucket string, e *Entry) {
+	tx.pendingWrites.submitEntry(ds, bucket, e)
 }
 
 func runTxnCallback(cb *txnCb) {
@@ -122,7 +109,7 @@ func newTx(db *DB, writable bool) (tx *Tx, err error) {
 	tx = &Tx{
 		db:                db,
 		writable:          writable,
-		pendingWrites:     &pendingEntryList{entries: map[Ds]map[BucketName][]*Entry{}},
+		pendingWrites:     NewPendingEntriesList(),
 		pendingBucketList: make(map[Ds]map[BucketName]*Bucket),
 	}
 
@@ -643,7 +630,7 @@ func (tx *Tx) put(bucket string, key, value []byte, ttl uint32, flag uint16, tim
 	if err != nil {
 		return err
 	}
-	err = tx.submitEntry(e)
+	tx.submitEntry(ds, bucket, e)
 	if err != nil {
 		return err
 	}
@@ -661,7 +648,7 @@ func (tx *Tx) putDeleteLog(bucketId BucketId, key, value []byte, ttl uint32, fla
 		WithTTL(ttl).WithStatus(UnCommitted).WithDs(ds).WithTxID(tx.id).WithBucketId(bucket.Id)
 
 	e := NewEntry().WithKey(key).WithMeta(meta).WithValue(value)
-	tx.submitEntry(e)
+	tx.submitEntry(ds, bucket.Name, e)
 	tx.size += e.Size()
 }
 
@@ -788,6 +775,15 @@ func (tx *Tx) buildBucketInIndex() error {
 func (tx *Tx) getChangeCountInEntriesChanges() int64 {
 	var res int64
 	var err error
+	for _, entriesInDS := range tx.pendingWrites.entriesInBTree {
+		for _, entry := range entriesInDS {
+			curRecordCnt, _ := tx.getEntryNewAddRecordCount(entry)
+			if err != nil {
+				return res
+			}
+			res += curRecordCnt
+		}
+	}
 	for _, entriesInDS := range tx.pendingWrites.entries {
 		for _, entries := range entriesInDS {
 			for _, entry := range entries {
@@ -868,24 +864,20 @@ func (tx *Tx) findEntryAndItsStatus(ds Ds, bucket BucketName, key string) (Entry
 	if tx.pendingWrites.size == 0 {
 		return NotFoundEntry, nil
 	}
-	pendingWriteEntries := tx.pendingWrites.entries
-	if pendingWriteEntries[ds] == nil {
+	pendingWriteEntries := tx.pendingWrites.entriesInBTree
+	if pendingWriteEntries == nil {
 		return NotFoundEntry, nil
 	}
-	if pendingWriteEntries[ds][bucket] == nil {
+	if pendingWriteEntries[bucket] == nil {
 		return NotFoundEntry, nil
 	}
-	entries := pendingWriteEntries[ds][bucket]
-	size := len(entries)
-	for i := size - 1; i >= 0; i-- {
-		entry := entries[i]
-		if string(entry.Key) == key {
-			switch entry.Meta.Flag {
-			case DataDeleteFlag:
-				return EntryDeleted, nil
-			default:
-				return EntryUpdated, entry
-			}
+	entries := pendingWriteEntries[bucket]
+	if entry, exist := entries[key]; exist {
+		switch entry.Meta.Flag {
+		case DataDeleteFlag:
+			return EntryDeleted, nil
+		default:
+			return EntryUpdated, entry
 		}
 	}
 	return NotFoundEntry, nil
