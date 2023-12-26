@@ -1,5 +1,33 @@
 package nutsdb
 
+// EntryStatus represents the Entry status in the current Tx
+type EntryStatus = uint8
+
+const (
+	// NotFoundEntry means there is no changes for this entry in current Tx
+	NotFoundEntry EntryStatus = 0
+	// EntryDeleted means this Entry has been deleted in the current Tx
+	EntryDeleted EntryStatus = 1
+	// EntryUpdated means this Entry has been updated in the current Tx
+	EntryUpdated EntryStatus = 2
+)
+
+// BucketStatus represents the current status of bucket in current Tx
+type BucketStatus = uint8
+
+const (
+	// BucketStatusExistAlready means this bucket already exists
+	BucketStatusExistAlready = 1
+	// BucketStatusDeleted means this bucket is already deleted
+	BucketStatusDeleted = 2
+	// BucketStatusNew means this bucket is created in current Tx
+	BucketStatusNew = 3
+	// BucketStatusUpdated means this bucket is updated in current Tx
+	BucketStatusUpdated = 4
+	// BucketStatusUnknown means this bucket doesn't exist
+	BucketStatusUnknown = 5
+)
+
 // pendingBucketList the uncommitted bucket changes in this Tx
 type pendingBucketList map[Ds]map[BucketName]*Bucket
 
@@ -13,7 +41,8 @@ type pendingEntryList struct {
 	size           int
 }
 
-func NewPendingEntriesList() *pendingEntryList {
+// newPendingEntriesList create a new pendingEntryList object for a Tx
+func newPendingEntriesList() *pendingEntryList {
 	pending := &pendingEntryList{
 		entriesInBTree: map[BucketName]map[string]*Entry{},
 		entries:        map[Ds]map[BucketName][]*Entry{},
@@ -22,6 +51,7 @@ func NewPendingEntriesList() *pendingEntryList {
 	return pending
 }
 
+// submitEntry submit an entry into pendingEntryList
 func (pending *pendingEntryList) submitEntry(ds Ds, bucket string, e *Entry) {
 	switch ds {
 	case DataStructureBTree:

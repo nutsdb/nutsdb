@@ -34,14 +34,6 @@ const (
 	txStatusClosed = 3
 )
 
-type EntryStatus = uint8
-
-const (
-	NotFoundEntry EntryStatus = 0
-	EntryDeleted  EntryStatus = 1
-	EntryUpdated  EntryStatus = 2
-)
-
 // Tx represents a transaction.
 type Tx struct {
 	id                uint64
@@ -109,7 +101,7 @@ func newTx(db *DB, writable bool) (tx *Tx, err error) {
 	tx = &Tx{
 		db:                db,
 		writable:          writable,
-		pendingWrites:     NewPendingEntriesList(),
+		pendingWrites:     newPendingEntriesList(),
 		pendingBucketList: make(map[Ds]map[BucketName]*Bucket),
 	}
 
@@ -604,7 +596,7 @@ func (tx *Tx) put(bucket string, key, value []byte, ttl uint32, flag uint16, tim
 	}
 
 	bucketStatus := tx.getBucketStatus(DataStructureBTree, bucket)
-	if bucketStatus == BucketStatusDelete {
+	if bucketStatus == BucketStatusDeleted {
 		return ErrBucketNotFound
 	}
 
@@ -846,7 +838,7 @@ func (tx *Tx) getBucketStatus(ds Ds, name BucketName) BucketStatus {
 				case BucketInsertOperation:
 					return BucketStatusNew
 				case BucketDeleteOperation:
-					return BucketStatusDelete
+					return BucketStatusDeleted
 				case BucketUpdateOperation:
 					return BucketStatusUpdated
 				}

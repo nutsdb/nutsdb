@@ -87,7 +87,7 @@ func (tx *Tx) get(bucket string, key []byte) (value []byte, err error) {
 	bucketId := b.Id
 
 	bucketStatus := tx.getBucketStatus(DataStructureBTree, bucket)
-	if bucketStatus == BucketStatusDelete {
+	if bucketStatus == BucketStatusDeleted {
 		return nil, ErrBucketNotFound
 	}
 
