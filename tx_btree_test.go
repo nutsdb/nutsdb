@@ -77,63 +77,50 @@ func TestTx_PutAndGet(t *testing.T) {
 
 }
 
-func TestTx_GetAll(t *testing.T) {
-	bucket := "bucket_for_scanAll"
+func TestTx_GetAll_GetKeys_GetValues(t *testing.T) {
+	bucket := "bucket"
 
-	t.Run("get_all_from_empty_db", func(t *testing.T) {
+	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
-		withDefaultDB(t, func(t *testing.T, db *DB) {
+		txGetAll(t, db, bucket, nil, nil, nil)
 
-			tx, err := db.Begin(false)
+		n := 10
+		keys := make([][]byte, n)
+		values := make([][]byte, n)
+		for i := 0; i < n; i++ {
+			keys[i] = GetTestBytes(i)
+			values[i] = GetRandomBytes(10)
+			txPut(t, db, bucket, keys[i], values[i], Persistent, nil, nil)
+		}
+
+		txGetAll(t, db, bucket, keys, values, nil)
+
+		keys = append(keys, GetTestBytes(10))
+		values = append(values, GetRandomBytes(10))
+		txPut(t, db, bucket, keys[10], values[10], Persistent, nil, nil)
+		txGetAll(t, db, bucket, keys, values, nil)
+
+		txDel(t, db, bucket, keys[0], nil)
+		keys = keys[1:]
+		values = values[1:]
+		txGetAll(t, db, bucket, keys, values, nil)
+
+		txPut(t, db, bucket, GetTestBytes(11), GetRandomBytes(10), 1, nil, nil)
+		time.Sleep(1100 * time.Millisecond)
+		txGetAll(t, db, bucket, keys, values, nil)
+
+		require.NoError(t, db.View(func(tx *Tx) error {
+			keysInBucket, err := tx.GetKeys(bucket)
 			require.NoError(t, err)
-			defer assert.NoError(t, tx.Commit())
-
-			_, err = tx.GetAll(bucket)
-			assert.Error(t, err)
-		})
-	})
-
-	t.Run("get_all_from_db", func(t *testing.T) {
-
-		withDefaultDB(t, func(t *testing.T, db *DB) {
-
-			{
-				// setup the data
-				txCreateBucket(t, db, DataStructureBTree, bucket, nil)
-				tx, err := db.Begin(true)
-				require.NoError(t, err)
-
-				key0 := []byte("key_" + fmt.Sprintf("%07d", 0))
-				val0 := []byte("val" + fmt.Sprintf("%07d", 0))
-				err = tx.Put(bucket, key0, val0, Persistent)
-				assert.NoError(t, err)
-
-				key1 := []byte("key_" + fmt.Sprintf("%07d", 1))
-				val1 := []byte("val" + fmt.Sprintf("%07d", 1))
-				err = tx.Put(bucket, key1, val1, Persistent)
-				assert.NoError(t, err)
-
-				assert.NoError(t, tx.Commit())
+			valuesInBucket, err := tx.GetValues(bucket)
+			require.NoError(t, err)
+			for i := 0; i < n; i++ {
+				require.Equal(t, keys[i], keysInBucket[i])
+				require.Equal(t, values[i], valuesInBucket[i])
 			}
-
-			{
-				// check the data
-
-				tx, err = db.Begin(false)
-				require.NoError(t, err)
-
-				values, err := tx.GetAll(bucket)
-				assert.NoError(t, err)
-
-				for i, value := range values {
-					wantVal := []byte("val" + fmt.Sprintf("%07d", i))
-					assert.Equal(t, wantVal, value)
-				}
-
-				assert.NoError(t, tx.Commit())
-
-			}
-		})
+			return nil
+		}))
 	})
 }
 

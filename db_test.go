@@ -91,6 +91,23 @@ func txGet(t *testing.T, db *DB, bucket string, key []byte, expectVal []byte, ex
 	require.NoError(t, err)
 }
 
+func txGetAll(t *testing.T, db *DB, bucket string, expectKeys [][]byte, expectValues [][]byte, expectErr error) {
+	require.NoError(t, db.View(func(tx *Tx) error {
+		keys, values, err := tx.GetAll(bucket)
+		if expectErr != nil {
+			require.Equal(t, expectErr, err)
+		} else {
+			require.NoError(t, err)
+			n := len(keys)
+			for i := 0; i < n; i++ {
+				require.Equal(t, expectKeys[i], keys[i])
+				require.Equal(t, expectValues[i], values[i])
+			}
+		}
+		return nil
+	}))
+}
+
 func txDel(t *testing.T, db *DB, bucket string, key []byte, expectErr error) {
 	err := db.Update(func(tx *Tx) error {
 		err := tx.Delete(bucket, key)

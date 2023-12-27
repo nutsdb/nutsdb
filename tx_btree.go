@@ -25,6 +25,12 @@ import (
 	"github.com/xujiajun/utils/strconv2"
 )
 
+const (
+	getAllType    uint8 = 0
+	getKeysType   uint8 = 1
+	getValuesType uint8 = 2
+)
+
 func (tx *Tx) PutWithTimestamp(bucket string, key, value []byte, ttl uint32, timestamp uint64) error {
 	return tx.put(bucket, key, value, ttl, DataSetFlag, timestamp, DataStructureBTree)
 }
@@ -174,35 +180,57 @@ func (tx *Tx) getMaxOrMinKey(bucket string, isMax bool) ([]byte, error) {
 }
 
 // GetAll returns all keys and values of the bucket stored at given bucket.
-func (tx *Tx) GetAll(bucket string) (values [][]byte, err error) {
+func (tx *Tx) GetAll(bucket string) ([][]byte, [][]byte, error) {
+	return tx.getAllOrKeysOrValues(bucket, getAllType)
+}
+
+// GetKeys returns all keys of the bucket stored at given bucket.
+func (tx *Tx) GetKeys(bucket string) ([][]byte, error) {
+	keys, _, err := tx.getAllOrKeysOrValues(bucket, getKeysType)
+	return keys, err
+}
+
+// GetValues returns all values of the bucket stored at given bucket.
+func (tx *Tx) GetValues(bucket string) ([][]byte, error) {
+	_, values, err := tx.getAllOrKeysOrValues(bucket, getValuesType)
+	return values, err
+}
+
+func (tx *Tx) getAllOrKeysOrValues(bucket string, typ uint8) ([][]byte, [][]byte, error) {
 	if err := tx.checkTxIsClosed(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
+	bucketId, err := tx.db.bm.GetBucketID(DataStructureBTree, bucket)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	bucketId := b.Id
 
 	if index, ok := tx.db.Index.bTree.exist(bucketId); ok {
 		records := index.All()
 
-		if len(records) == 0 {
-			return nil, ErrBucketEmpty
+		var (
+			keys   [][]byte
+			values [][]byte
+		)
+
+		switch typ {
+		case getAllType:
+			keys, values, err = tx.getHintIdxDataItemsWrapper(records, ScanNoLimit, bucketId, true, true)
+		case getKeysType:
+			keys, _, err = tx.getHintIdxDataItemsWrapper(records, ScanNoLimit, bucketId, true, false)
+		case getValuesType:
+			_, values, err = tx.getHintIdxDataItemsWrapper(records, ScanNoLimit, bucketId, false, true)
 		}
 
-		values, err = tx.getHintIdxDataItemsWrapper(records, ScanNoLimit, bucketId)
 		if err != nil {
-			return nil, ErrBucketEmpty
+			return nil, nil, err
 		}
+
+		return keys, values, nil
 	}
 
-	if len(values) == 0 {
-		return nil, ErrBucketEmpty
-	}
-
-	return
+	return nil, nil, nil
 }
 
 func (tx *Tx) GetSet(bucket string, key, value []byte) (oldValue []byte, err error) {
@@ -231,7 +259,7 @@ func (tx *Tx) RangeScan(bucket string, start, end []byte) (values [][]byte, err 
 			return nil, ErrRangeScan
 		}
 
-		values, err = tx.getHintIdxDataItemsWrapper(records, ScanNoLimit, bucketId)
+		_, values, err = tx.getHintIdxDataItemsWrapper(records, ScanNoLimit, bucketId, false, true)
 		if err != nil {
 			return nil, ErrRangeScan
 		}
@@ -258,7 +286,7 @@ func (tx *Tx) PrefixScan(bucket string, prefix []byte, offsetNum int, limitNum i
 
 	if idx, ok := tx.db.Index.bTree.exist(bucketId); ok {
 		records := idx.PrefixScan(prefix, offsetNum, limitNum)
-		values, err = tx.getHintIdxDataItemsWrapper(records, limitNum, bucketId)
+		_, values, err = tx.getHintIdxDataItemsWrapper(records, limitNum, bucketId, false, true)
 		if err != nil {
 			return nil, ErrPrefixScan
 		}
@@ -285,7 +313,7 @@ func (tx *Tx) PrefixSearchScan(bucket string, prefix []byte, reg string, offsetN
 
 	if idx, ok := tx.db.Index.bTree.exist(bucketId); ok {
 		records := idx.PrefixSearchScan(prefix, reg, offsetNum, limitNum)
-		values, err = tx.getHintIdxDataItemsWrapper(records, limitNum, bucketId)
+		_, values, err = tx.getHintIdxDataItemsWrapper(records, limitNum, bucketId, false, true)
 		if err != nil {
 			return nil, ErrPrefixSearchScan
 		}
@@ -320,27 +348,30 @@ func (tx *Tx) Delete(bucket string, key []byte) error {
 	return tx.put(bucket, key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureBTree)
 }
 
-// getHintIdxDataItemsWrapper returns wrapped entries when prefix scanning or range scanning.
-func (tx *Tx) getHintIdxDataItemsWrapper(records []*Record, limitNum int, bucketId BucketId) (values [][]byte, err error) {
+// getHintIdxDataItemsWrapper returns keys and values when prefix scanning or range scanning.
+func (tx *Tx) getHintIdxDataItemsWrapper(records []*Record, limitNum int, bucketId BucketId, needKeys bool, needValues bool) (keys [][]byte, values [][]byte, err error) {
 	for _, record := range records {
-		bucket, err := tx.db.bm.GetBucketById(bucketId)
-		if err != nil {
-			return nil, err
-		}
 		if record.IsExpired() {
-			tx.putDeleteLog(bucket.Id, record.Key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureBTree)
+			tx.putDeleteLog(bucketId, record.Key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureBTree)
 			continue
 		}
+
 		if limitNum > 0 && len(values) < limitNum || limitNum == ScanNoLimit {
-			value, err := tx.db.getValueByRecord(record)
-			if err != nil {
-				return nil, err
+			if needKeys {
+				keys = append(keys, record.Key)
 			}
-			values = append(values, value)
+
+			if needValues {
+				value, err := tx.db.getValueByRecord(record)
+				if err != nil {
+					return nil, nil, err
+				}
+				values = append(values, value)
+			}
 		}
 	}
 
-	return values, nil
+	return keys, values, nil
 }
 
 func (tx *Tx) tryGet(bucket string, key []byte, solveRecord func(record *Record, found bool, bucketId BucketId) error) error {

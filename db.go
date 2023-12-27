@@ -829,11 +829,11 @@ func (db *DB) managed(writable bool, fn func(tx *Tx) error) (err error) {
 	if err != nil {
 		return err
 	}
-	//defer func() {
-	//	if r := recover(); r != nil {
-	//		err = fmt.Errorf("panic when executing tx, err is %+v", r)
-	//	}
-	//}()
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic when executing tx, err is %+v", r)
+		}
+	}()
 
 	if err = fn(tx); err == nil {
 		err = tx.Commit()
