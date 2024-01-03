@@ -18,4 +18,4 @@ package nutsdb
 
 import "math"
 
-const MAX_SIZE = math.MaxInt32
+const MAX_SIZE = math.MaxUint32
