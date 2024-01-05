@@ -176,6 +176,52 @@ func TestTx_ZPop(t *testing.T) {
 	})
 }
 
+func TestTx_ZRangeByScore(t *testing.T) {
+	bucket := "bucket"
+	key := GetTestBytes(0)
+
+	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureSortedSet, bucket, nil)
+		err := db.View((func(tx *Tx) error {
+			_, err := tx.ZRangeByScore(bucket, key, 1, 10, nil)
+			require.Error(t, err)
+			return nil
+		}))
+		require.NoError(t, err)
+		for i := 0; i < 10; i++ {
+			txZAdd(t, db, bucket, key, GetTestBytes(i), float64(i), nil, nil)
+		}
+
+		err = db.View(func(tx *Tx) error {
+			members, err := tx.ZRangeByScore(bucket, key, 0, 11, nil)
+			require.NoError(t, err)
+			require.Len(t, members, 10)
+			return nil
+		})
+		require.NoError(t, err)
+		err = db.View(func(tx *Tx) error {
+			members, err := tx.ZRangeByScore(bucket, key, -1, 2, nil)
+			require.NoError(t, err)
+			require.Len(t, members, 3)
+			return nil
+		})
+		require.NoError(t, err)
+		err = db.View(func(tx *Tx) error {
+			members, err := tx.ZRangeByScore(bucket, key, 8, 12, nil)
+			require.NoError(t, err)
+			require.Len(t, members, 2)
+			return nil
+		})
+		require.NoError(t, err)
+		err = db.View(func(tx *Tx) error {
+			members, err := tx.ZRangeByScore(bucket, key, 5, 2, nil)
+			require.NoError(t, err)
+			require.Len(t, members, 4)
+			return nil
+		})
+		require.NoError(t, err)
+	})
+}
 func TestTx_ZPeekMin(t *testing.T) {
 	bucket := "bucket"
 	key := GetTestBytes(0)
