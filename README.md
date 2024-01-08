@@ -15,9 +15,11 @@
 
 English | [简体中文](https://github.com/nutsdb/nutsdb/blob/master/README-CN.md)
 
-NutsDB is a simple, fast, embeddable and persistent key/value store written in pure Go. 
+NutsDB is a simple, fast, embeddable and persistent key/value store written in pure Go.
 
 It supports fully serializable transactions and many data structures such as list、set、sorted set. All operations happen inside a Tx. Tx represents a transaction, which can be read-only or read-write. Read-only transactions can read values for a given bucket and a given key or iterate over a set of key-value pairs. Read-write transactions can read, update and delete keys from the DB.
+
+We can learn more about NutsDB in details on the documents site of NutsDB: [NutsDB Documents](https://nutsdb.github.io/nutsdb-docs/)
 
 ## Announcement
 
