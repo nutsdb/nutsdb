@@ -58,7 +58,10 @@ func (pending *pendingEntryList) submitEntry(ds Ds, bucket string, e *Entry) {
 		if _, exist := pending.entriesInBTree[bucket]; !exist {
 			pending.entriesInBTree[bucket] = map[string]*Entry{}
 		}
-		pending.entriesInBTree[bucket][string(e.Key)] = e
+		if _, exist := pending.entriesInBTree[bucket][string(e.Key)]; !exist {
+			pending.entriesInBTree[bucket][string(e.Key)] = e
+			pending.size++
+		}
 	default:
 		if _, exist := pending.entries[ds]; !exist {
 			pending.entries[ds] = map[BucketName][]*Entry{}
@@ -66,8 +69,8 @@ func (pending *pendingEntryList) submitEntry(ds Ds, bucket string, e *Entry) {
 		entries := pending.entries[ds][bucket]
 		entries = append(entries, e)
 		pending.entries[ds][bucket] = entries
+		pending.size++
 	}
-	pending.size++
 }
 
 // rangeBucket input a range handler function f and call it with every bucket in pendingBucketList
@@ -85,19 +88,16 @@ func (p pendingBucketList) rangeBucket(f func(bucket *Bucket) error) error {
 
 // toList collect all the entries in pendingEntryList to a list.
 func (pending *pendingEntryList) toList() []*Entry {
-	list := make([]*Entry, pending.size)
-	var i int
+	list := make([]*Entry, 0, pending.size)
 	for _, entriesInBucket := range pending.entriesInBTree {
 		for _, entry := range entriesInBucket {
-			list[i] = entry
-			i++
+			list = append(list, entry)
 		}
 	}
 	for _, entriesInDS := range pending.entries {
 		for _, entries := range entriesInDS {
 			for _, entry := range entries {
-				list[i] = entry
-				i++
+				list = append(list, entry)
 			}
 		}
 	}
