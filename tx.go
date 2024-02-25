@@ -228,9 +228,8 @@ func (tx *Tx) Commit() (err error) {
 	var records []*Record
 
 	pendingWriteList := tx.pendingWrites.toList()
-	writesLen := tx.pendingWrites.size
-	lastIndex := writesLen - 1
-	for i := 0; i < writesLen; i++ {
+	lastIndex := len(pendingWriteList) - 1
+	for i := 0; i < len(pendingWriteList); i++ {
 		entry := pendingWriteList[i]
 		entrySize := entry.Size()
 		if entrySize > tx.db.opt.SegmentSize {
