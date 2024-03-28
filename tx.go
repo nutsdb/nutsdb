@@ -291,11 +291,11 @@ func (tx *Tx) Commit() (err error) {
 
 func (tx *Tx) getNewAddRecordCount() (int64, error) {
 	var res int64
-	changeCountInEntries := tx.getChangeCountInEntriesChanges()
+	changeCountInEntries, err := tx.getChangeCountInEntriesChanges()
 	changeCountInBucket := tx.getChangeCountInBucketChanges()
 	res += changeCountInEntries
 	res += changeCountInBucket
-	return res, nil
+	return res, err
 }
 
 func (tx *Tx) getListHeadTailSeq(bucketId BucketId, key string) *HeadTailSeq {
@@ -622,9 +622,6 @@ func (tx *Tx) put(bucket string, key, value []byte, ttl uint32, flag uint16, tim
 		return err
 	}
 	tx.submitEntry(ds, bucket, e)
-	if err != nil {
-		return err
-	}
 	tx.size += e.Size()
 
 	return nil
@@ -763,14 +760,13 @@ func (tx *Tx) buildBucketInIndex() error {
 	return nil
 }
 
-func (tx *Tx) getChangeCountInEntriesChanges() int64 {
+func (tx *Tx) getChangeCountInEntriesChanges() (int64, error) {
 	var res int64
-	var err error
 	for _, entriesInDS := range tx.pendingWrites.entriesInBTree {
 		for _, entry := range entriesInDS {
-			curRecordCnt, _ := tx.getEntryNewAddRecordCount(entry)
+			curRecordCnt, err := tx.getEntryNewAddRecordCount(entry)
 			if err != nil {
-				return res
+				return res, nil
 			}
 			res += curRecordCnt
 		}
@@ -778,20 +774,20 @@ func (tx *Tx) getChangeCountInEntriesChanges() int64 {
 	for _, entriesInDS := range tx.pendingWrites.entries {
 		for _, entries := range entriesInDS {
 			for _, entry := range entries {
-				curRecordCnt, _ := tx.getEntryNewAddRecordCount(entry)
+				curRecordCnt, err := tx.getEntryNewAddRecordCount(entry)
 				if err != nil {
-					return res
+					return res, err
 				}
 				res += curRecordCnt
 			}
 		}
 	}
-	return res
+	return res, nil
 }
 
 func (tx *Tx) getChangeCountInBucketChanges() int64 {
 	var res int64
-	var f = func(bucket *Bucket) error {
+	f := func(bucket *Bucket) error {
 		bucketId := bucket.Id
 		if bucket.Meta.Op == BucketDeleteOperation {
 			switch bucket.Ds {

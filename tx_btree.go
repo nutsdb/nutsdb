@@ -255,9 +255,6 @@ func (tx *Tx) RangeScan(bucket string, start, end []byte) (values [][]byte, err 
 
 	if index, ok := tx.db.Index.bTree.exist(bucketId); ok {
 		records := index.Range(start, end)
-		if err != nil {
-			return nil, ErrRangeScan
-		}
 
 		_, values, err = tx.getHintIdxDataItemsWrapper(records, ScanNoLimit, bucketId, false, true)
 		if err != nil {
