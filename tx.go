@@ -765,10 +765,10 @@ func (tx *Tx) buildBucketInIndex() error {
 
 func (tx *Tx) getChangeCountInEntriesChanges() int64 {
 	var res int64
-	var err error
+
 	for _, entriesInDS := range tx.pendingWrites.entriesInBTree {
 		for _, entry := range entriesInDS {
-			curRecordCnt, _ := tx.getEntryNewAddRecordCount(entry)
+			curRecordCnt, err := tx.getEntryNewAddRecordCount(entry)
 			if err != nil {
 				return res
 			}
@@ -778,7 +778,7 @@ func (tx *Tx) getChangeCountInEntriesChanges() int64 {
 	for _, entriesInDS := range tx.pendingWrites.entries {
 		for _, entries := range entriesInDS {
 			for _, entry := range entries {
-				curRecordCnt, _ := tx.getEntryNewAddRecordCount(entry)
+				curRecordCnt, err := tx.getEntryNewAddRecordCount(entry)
 				if err != nil {
 					return res
 				}
