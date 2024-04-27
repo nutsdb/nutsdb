@@ -3,6 +3,8 @@ package nutsdb
 import (
 	"errors"
 	"os"
+
+	"github.com/nutsdb/nutsdb/internal/nutspath"
 )
 
 var ErrBucketNotExist = errors.New("bucket not exist")
@@ -26,18 +28,19 @@ type BucketManager struct {
 	Gen *IDGenerator
 }
 
-func NewBucketManager(dir string) (*BucketManager, error) {
+func NewBucketManager(dir nutspath.Path) (*BucketManager, error) {
 	bm := &BucketManager{
 		BucketInfoMapper: map[BucketId]*Bucket{},
 		BucketIDMarker:   map[BucketName]map[Ds]BucketId{},
 	}
-	bucketFilePath := dir + "/" + BucketStoreFileName
-	_, err := os.Stat(bucketFilePath)
+
+	bucketFilePath := dir.Join(BucketStoreFileName)
+	_, err := os.Stat(bucketFilePath.String())
 	mode := os.O_RDWR
 	if err != nil {
 		mode |= os.O_CREATE
 	}
-	fd, err := os.OpenFile(bucketFilePath, mode, os.ModePerm)
+	fd, err := os.OpenFile(bucketFilePath.String(), mode, os.ModePerm)
 	if err != nil {
 		return nil, err
 	}
@@ -134,4 +137,8 @@ func (bm *BucketManager) GetBucketID(ds Ds, name BucketName) (BucketId, error) {
 	} else {
 		return bucket.Id, nil
 	}
+}
+
+func (bm *BucketManager) close() error {
+	return bm.fd.Close()
 }

@@ -1,16 +1,18 @@
 package nutsdb
 
 import (
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"os"
 	"testing"
+
+	"github.com/nutsdb/nutsdb/internal/nutspath"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_readEntry(t *testing.T) {
-	path := "/tmp/test_read_entry"
+	path := nutspath.New("/tmp/test_read_entry")
 
-	fd, err := os.OpenFile(path, os.O_TRUNC|os.O_CREATE|os.O_RDWR, os.ModePerm)
+	fd, err := os.OpenFile(path.String(), os.O_TRUNC|os.O_CREATE|os.O_RDWR, os.ModePerm)
 	require.NoError(t, err)
 	meta := NewMetaData().WithKeySize(uint32(len("key"))).
 		WithValueSize(uint32(len("val"))).WithTimeStamp(1547707905).
@@ -35,7 +37,7 @@ func Test_readEntry(t *testing.T) {
 }
 
 func Test_fileRecovery_readBucket(t *testing.T) {
-	filePath := "bucket_test_data"
+	filePath := nutspath.New("bucket_test_data")
 	bucket := &Bucket{
 		Meta: &BucketMeta{
 			Op: BucketInsertOperation,
@@ -46,11 +48,11 @@ func Test_fileRecovery_readBucket(t *testing.T) {
 	}
 	bytes := bucket.Encode()
 
-	fd, err := os.OpenFile(filePath, os.O_RDWR|os.O_CREATE, os.ModePerm)
+	fd, err := os.OpenFile(filePath.String(), os.O_RDWR|os.O_CREATE, os.ModePerm)
 	defer func() {
 		err = fd.Close()
 		assert.Nil(t, err)
-		err = os.Remove(filePath)
+		err = os.Remove(filePath.String())
 		assert.Nil(t, nil)
 	}()
 	assert.Nil(t, err)

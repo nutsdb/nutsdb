@@ -4,6 +4,8 @@ import (
 	"bufio"
 	"io"
 	"os"
+
+	"github.com/nutsdb/nutsdb/internal/nutspath"
 )
 
 // fileRecovery use bufio.Reader to read entry
@@ -13,8 +15,8 @@ type fileRecovery struct {
 	size   int64
 }
 
-func newFileRecovery(path string, bufSize int) (fr *fileRecovery, err error) {
-	fd, err := os.OpenFile(path, os.O_RDWR, os.ModePerm)
+func newFileRecovery(path nutspath.Path, bufSize int) (fr *fileRecovery, err error) {
+	fd, err := os.OpenFile(path.String(), os.O_RDWR, os.ModePerm)
 	if err != nil {
 		return nil, err
 	}

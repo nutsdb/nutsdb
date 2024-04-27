@@ -23,6 +23,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nutsdb/nutsdb/internal/nutspath"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -53,19 +54,22 @@ func runNutsDBTest(t *testing.T, opts *Options, test func(t *testing.T, db *DB))
 	if opts == nil {
 		opts = &DefaultOptions
 	}
-	if opts.Dir == "" {
-		opts.Dir = NutsDBTestDirPath
+
+	if opts.Dir.String() == "" {
+		opts.Dir = nutspath.New(NutsDBTestDirPath)
 	}
-	defer removeDir(opts.Dir)
+
 	db, err := Open(*opts)
 	require.NoError(t, err)
-
-	test(t, db)
-	t.Cleanup(func() {
+	defer func() {
 		if !db.IsClose() {
 			require.NoError(t, db.Close())
 		}
-	})
+
+		removeDir(opts.Dir.String())
+	}()
+
+	test(t, db)
 }
 
 func txPut(t *testing.T, db *DB, bucket string, key, value []byte, ttl uint32, expectErr error, finalExpectErr error) {
@@ -167,7 +171,7 @@ func InitOpt(fileDir string, isRemoveFiles bool) {
 	}
 
 	opt = DefaultOptions
-	opt.Dir = fileDir
+	opt.Dir = nutspath.New(fileDir)
 	opt.SegmentSize = 8 * 1024
 	opt.CleanFdsCacheThreshold = 0.5
 	opt.MaxFdNumsInCache = 1024
@@ -206,7 +210,7 @@ func TestDB_ReopenWithDelete(t *testing.T) {
 	}
 	db, err := Open(*opts)
 	require.NoError(t, err)
-	defer removeDir(opts.Dir)
+	defer removeDir(opts.Dir.String())
 
 	bucket := "bucket"
 	txCreateBucket(t, db, DataStructureList, bucket, nil)
@@ -878,6 +882,9 @@ func TestDB_CommitBuffer(t *testing.T) {
 		// When tx is committed, content of commit buffer should be empty, but do not release memory
 		require.Equal(t, 0, db.commitBuffer.Len())
 		require.Equal(t, db.opt.CommitBufferSize, int64(db.commitBuffer.Cap()))
+
+		// we should close the first db to avoid deadlock
+		require.NoError(t, db.Close())
 	})
 
 	opts = DefaultOptions
@@ -885,7 +892,6 @@ func TestDB_CommitBuffer(t *testing.T) {
 	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
 		require.Equal(t, int64(1*KB), db.opt.CommitBufferSize)
 
-		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 		err := db.Update(func(tx *Tx) error {
 			// making this tx big enough, it should not use the commit buffer
 			for i := 0; i < 1000; i++ {
@@ -920,7 +926,7 @@ func withDBOption(t *testing.T, opt Options, fn func(t *testing.T, db *DB)) {
 	require.NoError(t, err)
 
 	defer func() {
-		os.RemoveAll(db.opt.Dir)
+		os.RemoveAll(db.opt.Dir.String())
 		db.Close()
 	}()
 
@@ -930,7 +936,7 @@ func withDBOption(t *testing.T, opt Options, fn func(t *testing.T, db *DB)) {
 func withDefaultDB(t *testing.T, fn func(t *testing.T, db *DB)) {
 	tmpdir, _ := os.MkdirTemp("", "nutsdb")
 	opt := DefaultOptions
-	opt.Dir = tmpdir
+	opt.Dir = nutspath.New(tmpdir)
 	opt.SegmentSize = 8 * 1024
 
 	withDBOption(t, opt, fn)
@@ -939,7 +945,7 @@ func withDefaultDB(t *testing.T, fn func(t *testing.T, db *DB)) {
 func withRAMIdxDB(t *testing.T, fn func(t *testing.T, db *DB)) {
 	tmpdir, _ := os.MkdirTemp("", "nutsdb")
 	opt := DefaultOptions
-	opt.Dir = tmpdir
+	opt.Dir = nutspath.New(tmpdir)
 	opt.EntryIdxMode = HintKeyAndRAMIdxMode
 
 	withDBOption(t, opt, fn)
@@ -958,10 +964,14 @@ func TestDB_HintKeyValAndRAMIdxMode_RestartDB(t *testing.T) {
 		txGet(t, db, bucket, key, val, nil)
 
 		db.Close()
+
 		// restart db with HintKeyValAndRAMIdxMode EntryIdxMode
 		db, err := Open(db.opt)
 		require.NoError(t, err)
 		txGet(t, db, bucket, key, val, nil)
+
+		// new created db should be closed manually, runNutsDBTest can't close it
+		db.Close()
 	})
 }
 
@@ -982,9 +992,13 @@ func TestDB_HintKeyAndRAMIdxMode_RestartDB(t *testing.T) {
 		db, err := Open(db.opt)
 		require.NoError(t, err)
 		txGet(t, db, bucket, key, val, nil)
+
+		// new created db should be closed manually, runNutsDBTest can't close it
+		db.Close()
 	})
 }
 
+// FIXME: over time (30s) on windows
 func TestDB_HintKeyAndRAMIdxMode_LruCache(t *testing.T) {
 	opts := DefaultOptions
 	opts.EntryIdxMode = HintKeyAndRAMIdxMode
@@ -1010,6 +1024,7 @@ func TestDB_HintKeyAndRAMIdxMode_LruCache(t *testing.T) {
 func TestDB_ChangeMode_RestartDB(t *testing.T) {
 	changeModeRestart := func(firstMode EntryIdxMode, secondMode EntryIdxMode) {
 		opts := DefaultOptions
+		opts.Dir = NutsDBTestDirPath
 		opts.EntryIdxMode = firstMode
 		var err error
 
@@ -1103,11 +1118,16 @@ func TestDB_ChangeMode_RestartDB(t *testing.T) {
 			for i := 3; i < 10; i++ {
 				txZScore(t, db, bucket, GetTestBytes(0), GetTestBytes(i), float64(i), nil)
 			}
+
+			db.Close()
 		})
 	}
 
 	// HintKeyValAndRAMIdxMode to HintKeyAndRAMIdxMode
 	changeModeRestart(HintKeyValAndRAMIdxMode, HintKeyAndRAMIdxMode)
+
+	require.NoError(t, os.RemoveAll(NutsDBTestDirPath))
+
 	// HintKeyAndRAMIdxMode to HintKeyValAndRAMIdxMode
 	changeModeRestart(HintKeyAndRAMIdxMode, HintKeyValAndRAMIdxMode)
 }
@@ -1134,11 +1154,14 @@ func TestTx_SmallFile(t *testing.T) {
 		db, _ = Open(opts)
 
 		txGet(t, db, bucket, GetTestBytes(10), GetTestBytes(10), nil)
+
+		db.Close()
 	})
 }
 
 func TestDB_DataStructureBTreeWriteRecordLimit(t *testing.T) {
 	opts := DefaultOptions
+	opts.Dir = NutsDBTestDirPath
 	limitCount := int64(1000)
 	opts.MaxWriteRecordCount = limitCount
 	bucket1 := "bucket1"
@@ -1186,13 +1209,18 @@ func TestDB_DataStructureBTreeWriteRecordLimit(t *testing.T) {
 			// Add items to bucket2
 			txPut(t, db, bucket2, []byte("key1"), []byte("value1"), Persistent, nil, nil)
 			txPut(t, db, bucket2, []byte("key2"), []byte("value2"), Persistent, nil, ErrTxnExceedWriteLimit)
+
+			db.Close()
 		})
+
+		require.NoError(t, os.RemoveAll(opts.Dir.String()))
 	}
 }
 
 func TestDB_DataStructureListWriteRecordLimit(t *testing.T) {
 	// Set options
 	opts := DefaultOptions
+	opts.Dir = NutsDBTestDirPath
 	limitCount := int64(1000)
 	opts.MaxWriteRecordCount = limitCount
 	// Define bucket names
@@ -1200,7 +1228,6 @@ func TestDB_DataStructureListWriteRecordLimit(t *testing.T) {
 	bucket2 := "bucket2"
 	// Iterate over EntryIdxMode options
 	for _, idxMode := range []EntryIdxMode{HintKeyValAndRAMIdxMode, HintKeyAndRAMIdxMode} {
-
 		opts.EntryIdxMode = idxMode
 		runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
 			txCreateBucket(t, db, DataStructureList, bucket1, nil)
@@ -1288,13 +1315,18 @@ func TestDB_DataStructureListWriteRecordLimit(t *testing.T) {
 			})
 			require.NoError(t, err)
 			txPush(t, db, bucket2, []byte("key1"), []byte("value1"), false, nil, ErrTxnExceedWriteLimit)
+
+			db.Close()
 		})
+
+		require.NoError(t, os.RemoveAll(opts.Dir.String()))
 	}
 }
 
 func TestDB_DataStructureSetWriteRecordLimit(t *testing.T) {
 	// Set default options and limitCount.
 	opts := DefaultOptions
+	opts.Dir = NutsDBTestDirPath
 	limitCount := int64(1000)
 	opts.MaxWriteRecordCount = limitCount
 	// Define bucket names.
@@ -1354,13 +1386,18 @@ func TestDB_DataStructureSetWriteRecordLimit(t *testing.T) {
 			require.NoError(t, err)
 			// Try to add one more item to bucket2 and check for ErrTxnExceedWriteLimit.
 			txSAdd(t, db, bucket2, []byte("key2"), []byte("value2"), nil, ErrTxnExceedWriteLimit)
+
+			db.Close()
 		})
+
+		require.NoError(t, os.RemoveAll(opts.Dir.String()))
 	}
 }
 
 func TestDB_DataStructureSortedSetWriteRecordLimit(t *testing.T) {
 	// Set up options
 	opts := DefaultOptions
+	opts.Dir = NutsDBTestDirPath
 	limitCount := int64(1000)
 	opts.MaxWriteRecordCount = limitCount
 	// Set up bucket names and score
@@ -1426,13 +1463,18 @@ func TestDB_DataStructureSortedSetWriteRecordLimit(t *testing.T) {
 			require.NoError(t, err)
 			// Trigger the limit
 			txZAdd(t, db, bucket2, []byte("key1"), []byte("value2"), score, nil, ErrTxnExceedWriteLimit)
+
+			db.Close()
 		})
+
+		require.NoError(t, os.RemoveAll(opts.Dir.String()))
 	}
 }
 
 func TestDB_AllDsWriteRecordLimit(t *testing.T) {
 	// Set up options
 	opts := DefaultOptions
+	opts.Dir = NutsDBTestDirPath
 	limitCount := int64(1000)
 	opts.MaxWriteRecordCount = limitCount
 	// Set up bucket names and score
@@ -1481,7 +1523,11 @@ func TestDB_AllDsWriteRecordLimit(t *testing.T) {
 			txPush(t, db, bucket2, []byte("key1"), []byte("value1"), false, nil, nil)
 			// Trigger the limit
 			txPush(t, db, bucket2, []byte("key2"), []byte("value2"), false, nil, ErrTxnExceedWriteLimit)
+
+			db.Close()
 		})
+
+		require.NoError(t, os.RemoveAll(opts.Dir.String()))
 	}
 }
 

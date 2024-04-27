@@ -23,6 +23,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/nutsdb/nutsdb/internal/nutspath"
 	"github.com/xujiajun/utils/strconv2"
 )
 
@@ -84,8 +85,13 @@ func (db *DB) merge() error {
 		return err
 	}
 
+	if err := db.ActiveFile.rwManager.Close(); err != nil {
+		db.mu.Unlock()
+		return err
+	}
+
 	var err error
-	path := getDataPath(db.MaxFileID, db.opt.Dir)
+	path := getDataPath(db.MaxFileID, db.opt.Dir.String())
 	db.ActiveFile, err = db.fm.getDataFile(path, db.opt.SegmentSize)
 	if err != nil {
 		db.mu.Unlock()
@@ -96,11 +102,11 @@ func (db *DB) merge() error {
 
 	db.mu.Unlock()
 
-	mergingPath := make([]string, len(pendingMergeFIds))
+	mergingPath := make([]nutspath.Path, len(pendingMergeFIds))
 
 	for i, pendingMergeFId := range pendingMergeFIds {
 		off = 0
-		path := getDataPath(int64(pendingMergeFId), db.opt.Dir)
+		path := getDataPath(int64(pendingMergeFId), db.opt.Dir.String())
 		fr, err := newFileRecovery(path, db.opt.BufferSizeOfRecovery)
 		if err != nil {
 			return err
@@ -182,7 +188,7 @@ func (db *DB) merge() error {
 	defer db.mu.Unlock()
 
 	for i := 0; i < len(mergingPath); i++ {
-		if err := os.Remove(mergingPath[i]); err != nil {
+		if err := os.Remove(mergingPath[i].String()); err != nil {
 			return fmt.Errorf("when merge err: %s", err)
 		}
 	}

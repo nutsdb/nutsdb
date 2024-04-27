@@ -15,13 +15,14 @@
 package nutsdb
 
 import (
+	"github.com/nutsdb/nutsdb/internal/nutspath"
 	"os"
 )
 
 // FileIORWManager represents the RWManager which using standard I/O.
 type FileIORWManager struct {
 	fd          *os.File
-	path        string
+	path        nutspath.Path
 	fdm         *fdManager
 	segmentSize int64
 }

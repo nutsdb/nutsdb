@@ -847,6 +847,8 @@ func TestTx_ExpiredDeletion(t *testing.T) {
 			txGet(t, db, bucket, GetTestBytes(1), GetTestBytes(1), nil)
 			txGet(t, db, bucket, GetTestBytes(3), GetTestBytes(3), nil)
 			txGet(t, db, bucket, GetTestBytes(4), GetTestBytes(4), nil)
+
+			db.Close()
 		})
 	})
 
