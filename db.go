@@ -147,9 +147,18 @@ func (db *DB) View(fn func(tx *Tx) error) error {
 
 // Backup copies the database to file directory at the given dir.
 func (db *DB) Backup(dir string) error {
-	return db.View(func(tx *Tx) error {
-		tx.db.flock.Unlock()
-		defer tx.db.flock.Lock()
+	return db.View(func(tx *Tx) (err error) {
+		err = tx.db.flock.Unlock()
+		if err != nil {
+			return err
+		}
+
+		defer func() {
+			err = tx.db.flock.Lock()
+			if err != nil {
+				return
+			}
+		}()
 
 		return filesystem.CopyDir(db.opt.Dir.String(), dir)
 	})
@@ -157,9 +166,18 @@ func (db *DB) Backup(dir string) error {
 
 // BackupTarGZ Backup copy the database to writer.
 func (db *DB) BackupTarGZ(w io.Writer) error {
-	return db.View(func(tx *Tx) error {
-		tx.db.flock.Unlock()
-		defer tx.db.flock.Lock()
+	return db.View(func(tx *Tx) (err error) {
+		err = tx.db.flock.Unlock()
+		if err != nil {
+			return err
+		}
+
+		defer func() {
+			err = tx.db.flock.Lock()
+			if err != nil {
+				return
+			}
+		}()
 
 		return tarGZCompress(w, db.opt.Dir.String())
 	})
@@ -485,7 +503,10 @@ func (db *DB) parseDataFiles(dataFileIds []int) (err error) {
 	}
 
 	readEntriesFromFile := func() error {
-		defer f.release()
+		defer func() {
+			_ = f.release()
+		}()
+
 		for {
 			entry, err := f.readEntry(off)
 			if err != nil {
@@ -657,20 +678,21 @@ func (db *DB) buildIdxes(record *Record, entry *Entry) error {
 	return nil
 }
 
-func (db *DB) deleteBucket(ds uint16, bucket BucketId) {
-	if ds == DataStructureSet {
-		db.Index.set.delete(bucket)
-	}
-	if ds == DataStructureSortedSet {
-		db.Index.sortedSet.delete(bucket)
-	}
-	if ds == DataStructureBTree {
-		db.Index.bTree.delete(bucket)
-	}
-	if ds == DataStructureList {
-		db.Index.list.delete(bucket)
-	}
-}
+// FIXME: it's useful?
+// func (db *DB) deleteBucket(ds uint16, bucket BucketId) {
+// 	if ds == DataStructureSet {
+// 		db.Index.set.delete(bucket)
+// 	}
+// 	if ds == DataStructureSortedSet {
+// 		db.Index.sortedSet.delete(bucket)
+// 	}
+// 	if ds == DataStructureBTree {
+// 		db.Index.bTree.delete(bucket)
+// 	}
+// 	if ds == DataStructureList {
+// 		db.Index.list.delete(bucket)
+// 	}
+// }
 
 // buildSetIdx builds set index when opening the DB.
 func (db *DB) buildSetIdx(record *Record, entry *Entry) error {

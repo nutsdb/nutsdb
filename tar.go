@@ -78,37 +78,38 @@ func tarCompress(dst io.Writer, src string) error {
 		})
 }
 
-func tarDecompress(dst string, src io.Reader) error {
-	tarReader := tar.NewReader(src)
+// FIXME: it's useful?
+// func tarDecompress(dst string, src io.Reader) error {
+// 	tarReader := tar.NewReader(src)
 
-	for {
-		header, err := tarReader.Next()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return err
-		}
+// 	for {
+// 		header, err := tarReader.Next()
+// 		if err == io.EOF {
+// 			break
+// 		}
+// 		if err != nil {
+// 			return err
+// 		}
 
-		path := filepath.Join(dst, header.Name)
-		info := header.FileInfo()
-		if info.IsDir() {
-			if err = os.MkdirAll(path, info.Mode()); err != nil {
-				return err
-			}
-			continue
-		}
+// 		path := filepath.Join(dst, header.Name)
+// 		info := header.FileInfo()
+// 		if info.IsDir() {
+// 			if err = os.MkdirAll(path, info.Mode()); err != nil {
+// 				return err
+// 			}
+// 			continue
+// 		}
 
-		file, err := os.OpenFile(filepath.Clean(path), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, info.Mode())
-		if err != nil {
-			return err
-		}
-		defer file.Close()
-		_, err = io.Copy(file, tarReader)
-		if err != nil {
-			return err
-		}
-	}
+// 		file, err := os.OpenFile(filepath.Clean(path), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, info.Mode())
+// 		if err != nil {
+// 			return err
+// 		}
+// 		defer file.Close()
+// 		_, err = io.Copy(file, tarReader)
+// 		if err != nil {
+// 			return err
+// 		}
+// 	}
 
-	return nil
-}
+// 	return nil
+// }

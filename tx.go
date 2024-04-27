@@ -662,6 +662,7 @@ func (tx *Tx) setStatusRunning() {
 	tx.status.Store(status)
 }
 
+// FIXME: it's useful?
 // isRunning will check if the tx status is txStatusRunning
 func (tx *Tx) isRunning() bool {
 	status := tx.status.Load().(int)
