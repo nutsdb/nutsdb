@@ -145,6 +145,8 @@ func TestRWManager_MMap_Close(t *testing.T) {
 
 	mmManager := &MMapRWManager{filePath, fdm, m, 256 * MB}
 	err = mmManager.Close()
+	require.NoError(t, err)
+
 	err = isFileDescriptorClosed(fd.Fd())
 	if err == nil {
 		t.Error("expected file descriptor to be closed, but it's still open")
