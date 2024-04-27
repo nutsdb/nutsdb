@@ -1,8 +1,9 @@
 package nutsdb
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestBucketManager_NewBucketAndDeleteBucket(t *testing.T) {
@@ -15,10 +16,11 @@ func TestBucketManager_NewBucketAndDeleteBucket(t *testing.T) {
 		txNewBucket(t, db, bucket2, DataStructureBTree, nil, nil)
 		exist = db.bm.ExistBucket(DataStructureBTree, bucket2)
 		assert.Equal(t, true, exist)
+
+		db.Close()
 	})
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txNewBucket(t, db, bucket1, DataStructureBTree, nil, nil)
 		exist := db.bm.ExistBucket(DataStructureBTree, bucket1)
 		assert.Equal(t, true, exist)
 		txDeleteBucketFunc(t, db, bucket1, DataStructureBTree, nil, nil)
@@ -44,7 +46,14 @@ func TestBucketManager_Recovery(t *testing.T) {
 	const bucket1 = "bucket_1"
 	const bucket2 = "bucket_2"
 	db, err := Open(DefaultOptions, WithDir(dir))
-	defer removeDir(dir)
+	defer func() {
+		if !db.IsClose() {
+			db.Close()
+		}
+
+		removeDir(dir)
+	}()
+
 	assert.NotNil(t, db)
 	assert.Nil(t, err)
 	txNewBucket(t, db, bucket1, DataStructureBTree, nil, nil)

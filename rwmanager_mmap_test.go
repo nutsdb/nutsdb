@@ -18,13 +18,14 @@ import (
 	"os"
 	"testing"
 
+	"github.com/nutsdb/nutsdb/internal/nutspath"
 	"github.com/stretchr/testify/require"
 
 	"github.com/xujiajun/mmap-go"
 )
 
 func TestRWManager_MMap_Release(t *testing.T) {
-	filePath := "/tmp/foo_rw_MMap"
+	filePath := nutspath.New("/tmp/foo_rw_MMap")
 	fdm := newFileManager(MMap, 1024, 0.5, 256*MB)
 	rwmanager, err := fdm.getMMapRWManager(filePath, 1024, 256*MB)
 	if err != nil {
@@ -57,7 +58,7 @@ func (rwmanager *MMapRWManager) IsActive() bool {
 }
 
 func TestRWManager_MMap_WriteAt(t *testing.T) {
-	filePath := "/tmp/foo_rw_filemmap"
+	filePath := nutspath.New("/tmp/foo_rw_filemmap")
 	maxFdNums := 1024
 	cleanThreshold := 0.5
 	var fdm = newFdm(maxFdNums, cleanThreshold)
@@ -90,7 +91,7 @@ func TestRWManager_MMap_WriteAt(t *testing.T) {
 }
 
 func TestRWManager_MMap_Sync(t *testing.T) {
-	filePath := "/tmp/foo_rw_filemmap"
+	filePath := nutspath.Path("/tmp/foo_rw_filemmap")
 	maxFdNums := 1024
 	cleanThreshold := 0.5
 	var fdm = newFdm(maxFdNums, cleanThreshold)
@@ -115,13 +116,13 @@ func TestRWManager_MMap_Sync(t *testing.T) {
 	m[1] = 'z'
 	err = mmManager.Sync()
 	require.NoError(t, err)
-	fileContents, err := os.ReadFile(filePath)
+	fileContents, err := os.ReadFile(filePath.String())
 	require.NoError(t, err)
 	require.Equal(t, fileContents, []byte(m[:]))
 }
 
 func TestRWManager_MMap_Close(t *testing.T) {
-	filePath := "/tmp/foo_rw_filemmap"
+	filePath := nutspath.New("/tmp/foo_rw_filemmap")
 	maxFdNums := 1024
 	cleanThreshold := 0.5
 	var fdm = newFdm(maxFdNums, cleanThreshold)
