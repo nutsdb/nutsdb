@@ -61,6 +61,8 @@ func (bm *BucketManager) SubmitPendingBucketChange(reqs []*bucketSubmitRequest) 
 		if _, exist := bm.BucketIDMarker[req.name]; !exist {
 			bm.BucketIDMarker[req.name] = map[Ds]BucketId{}
 		}
+		// recover maxid otherwise new bucket start from 1 again
+		bm.Gen.CompareAndSetMaxId(req.bucket.Id)
 		switch req.bucket.Meta.Op {
 		case BucketInsertOperation:
 			bm.BucketInfoMapper[req.bucket.Id] = req.bucket
@@ -85,6 +87,12 @@ type IDGenerator struct {
 func (g *IDGenerator) GenId() uint64 {
 	g.currentMaxId++
 	return g.currentMaxId
+}
+
+func (g *IDGenerator) CompareAndSetMaxId(id uint64) {
+	if id > g.currentMaxId {
+		g.currentMaxId = id
+	}
 }
 
 func (bm *BucketManager) ExistBucket(ds Ds, name BucketName) bool {
