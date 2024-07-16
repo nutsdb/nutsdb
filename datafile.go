@@ -16,6 +16,8 @@ package nutsdb
 
 import (
 	"errors"
+
+	"github.com/nutsdb/nutsdb/internal/nutspath"
 )
 
 var (
@@ -35,7 +37,7 @@ const (
 
 // DataFile records about data file information.
 type DataFile struct {
-	path       string
+	path       nutspath.Path
 	fileID     int64
 	writeOff   int64
 	ActualSize int64
@@ -43,7 +45,7 @@ type DataFile struct {
 }
 
 // NewDataFile will return a new DataFile Object.
-func NewDataFile(path string, rwManager RWManager) *DataFile {
+func NewDataFile(path nutspath.Path, rwManager RWManager) *DataFile {
 	dataFile := &DataFile{
 		path:      path,
 		rwManager: rwManager,

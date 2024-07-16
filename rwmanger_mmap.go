@@ -16,13 +16,14 @@ package nutsdb
 
 import (
 	"errors"
+	"github.com/nutsdb/nutsdb/internal/nutspath"
 
 	mmap "github.com/xujiajun/mmap-go"
 )
 
 // MMapRWManager represents the RWManager which using mmap.
 type MMapRWManager struct {
-	path        string
+	path        nutspath.Path
 	fdm         *fdManager
 	m           mmap.MMap
 	segmentSize int64
