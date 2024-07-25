@@ -573,6 +573,79 @@ func TestTx_PrefixScan_NotFound(t *testing.T) {
 	})
 }
 
+func TestTx_PrefixScanKeys_NotFound(t *testing.T) {
+	t.Run("prefix scan keys in empty bucket", func(t *testing.T) {
+		withDefaultDB(t, func(t *testing.T, db *DB) {
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+			tx, err := db.Begin(false)
+			assert.NoError(t, err)
+
+			prefix := []byte("key_")
+			entries, err := tx.PrefixScanKeys("foobucket", prefix, 0, 10)
+			assert.Error(t, err)
+			assert.Empty(t, entries)
+
+			assert.NoError(t, tx.Commit()) // tx commit
+		})
+	})
+
+	t.Run("prefix scan keys", func(t *testing.T) {
+		bucket := "bucket_prefix_scan_keys_test"
+
+		withDefaultDB(t, func(t *testing.T, db *DB) {
+			{ // write tx begin
+				txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+				tx, err := db.Begin(true)
+				require.NoError(t, err)
+
+				for i := 0; i <= 10; i++ {
+					key := []byte("key_" + fmt.Sprintf("%07d", i))
+					val := []byte("val" + fmt.Sprintf("%07d", i))
+					err = tx.Put(bucket, key, val, Persistent)
+					assert.NoError(t, err)
+				}
+
+				assert.NoError(t, tx.Commit()) // tx commit
+			}
+
+			{
+				tx, err = db.Begin(false)
+				require.NoError(t, err)
+
+				prefix := []byte("key_foo")
+				entries, err := tx.PrefixScanKeys(bucket, prefix, 0, 10)
+				assert.Error(t, err)
+				assert.NoError(t, tx.Commit())
+
+				assert.Empty(t, entries)
+			}
+
+			{
+				tx, err = db.Begin(false)
+				require.NoError(t, err)
+
+				entries, err := tx.PrefixScanKeys(bucket, []byte("key_"), 0, 10)
+				assert.NoError(t, err)
+				assert.NoError(t, tx.Commit())
+
+				assert.NotEmpty(t, entries)
+
+			}
+
+			{ // scan by closed tx
+				entries, err := tx.PrefixScanKeys(bucket, []byte("key_"), 0, 10)
+				assert.Error(t, err)
+				if len(entries) > 0 || err == nil {
+					t.Error("err TestTx_PrefixScanKeys_NotFound")
+				}
+			}
+
+		})
+	})
+}
+
 func TestTx_PrefixSearchScan_NotFound(t *testing.T) {
 	regs := "(.+)"
 	bucket := "bucket_prefix_search_scan_test"
