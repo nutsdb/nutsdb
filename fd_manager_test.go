@@ -6,6 +6,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/nutsdb/nutsdb/internal/nutspath"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -29,17 +30,18 @@ func TestFdManager_All(t *testing.T) {
 		assert.Nil(t, err)
 	}()
 
-	var fdm *fdManager
 	t.Run("test init fdm", func(t *testing.T) {
-		fdm = newFdm(maxFdNums, cleanThreshold)
-		assert.NotNil(t, fdm)
-		assert.Equal(t, maxFdNums, fdm.maxFdNums)
-		assert.Equal(t, int(math.Floor(cleanThreshold*float64(fdm.maxFdNums))), fdm.cleanThresholdNums)
+		f := newFdm(maxFdNums, cleanThreshold)
+		assert.NotNil(t, f)
+		assert.Equal(t, maxFdNums, f.maxFdNums)
+		assert.Equal(t, int(math.Floor(cleanThreshold*float64(f.maxFdNums))), f.cleanThresholdNums)
 	})
+
+	fdm := newFdm(maxFdNums, cleanThreshold)
 
 	t.Run("create fd to cache", func(t *testing.T) {
 		for i := startFdNums; i < createFileLimit; i++ {
-			path := testBasePath + fmt.Sprint(i)
+			path := nutspath.New(testBasePath).Join(fmt.Sprint(i))
 			fd, err := fdm.getFd(path)
 			assert.Nil(t, err)
 			assert.NotNil(t, fd)
@@ -69,7 +71,7 @@ func TestFdManager_All(t *testing.T) {
 		})
 
 		t.Run("test get middle item in cache", func(t *testing.T) {
-			path := testBasePath + fmt.Sprint(5)
+			path := nutspath.New(testBasePath).Join(fmt.Sprint(5))
 			fd, err := fdm.getFd(path)
 			assert.Nil(t, err)
 			assert.NotNil(t, fd)
@@ -80,7 +82,7 @@ func TestFdManager_All(t *testing.T) {
 	})
 
 	t.Run("test reduce using", func(t *testing.T) {
-		path := testBasePath + fmt.Sprint(5)
+		path := nutspath.New(testBasePath).Join(fmt.Sprint(5))
 		_, err := fdm.getFd(path)
 		assert.Nil(t, err)
 		using := fdm.fdList.head.next.using
@@ -95,11 +97,11 @@ func TestFdManager_All(t *testing.T) {
 	t.Run("test clean fd in cache", func(t *testing.T) {
 		preReducePath := []int{2, 3, 4, 6, 7, 8}
 		for _, pathNum := range preReducePath {
-			path := testBasePath + fmt.Sprint(pathNum)
+			path := nutspath.New(testBasePath).Join(fmt.Sprint(pathNum))
 			fdm.reduceUsing(path)
 			assert.Nil(t, err)
 		}
-		path := testBasePath + fmt.Sprint(11)
+		path := nutspath.New(testBasePath).Join(fmt.Sprint(11))
 		fd, err := fdm.getFd(path)
 		assert.Nil(t, err)
 		assert.NotNil(t, fd)
@@ -124,7 +126,7 @@ func TestDoubleLinkedList_All(t *testing.T) {
 	t.Run("test add node", func(t *testing.T) {
 		for i := 1; i <= 10; i++ {
 			fd := &FdInfo{
-				path: fmt.Sprint(i),
+				path: nutspath.New(fmt.Sprint(i)),
 			}
 			list.addNode(fd)
 			nodeMap[i] = fd
@@ -170,7 +172,7 @@ func TestDoubleLinkedList_All(t *testing.T) {
 	})
 }
 
-func getAllNodePathFromHead(list *doubleLinkedList) (res []string) {
+func getAllNodePathFromHead(list *doubleLinkedList) (res []nutspath.Path) {
 	node := list.head.next
 	for node != nil {
 		res = append(res, node.path)
@@ -179,7 +181,7 @@ func getAllNodePathFromHead(list *doubleLinkedList) (res []string) {
 	return res
 }
 
-func getAllNodePathFromTail(list *doubleLinkedList) (res []string) {
+func getAllNodePathFromTail(list *doubleLinkedList) (res []nutspath.Path) {
 	node := list.tail.prev
 	for node != nil {
 		res = append(res, node.path)

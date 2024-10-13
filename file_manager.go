@@ -1,6 +1,7 @@
 package nutsdb
 
 import (
+	"github.com/nutsdb/nutsdb/internal/nutspath"
 	"github.com/xujiajun/mmap-go"
 )
 
@@ -22,7 +23,7 @@ func newFileManager(rwMode RWMode, maxFdNums int, cleanThreshold float64, segmen
 }
 
 // getDataFile will return a DataFile Object
-func (fm *fileManager) getDataFile(path string, capacity int64) (datafile *DataFile, err error) {
+func (fm *fileManager) getDataFile(path nutspath.Path, capacity int64) (datafile *DataFile, err error) {
 	if capacity <= 0 {
 		return nil, ErrCapacity
 	}
@@ -47,7 +48,7 @@ func (fm *fileManager) getDataFile(path string, capacity int64) (datafile *DataF
 }
 
 // getFileRWManager will return a FileIORWManager Object
-func (fm *fileManager) getFileRWManager(path string, capacity int64, segmentSize int64) (*FileIORWManager, error) {
+func (fm *fileManager) getFileRWManager(path nutspath.Path, capacity int64, segmentSize int64) (*FileIORWManager, error) {
 	fd, err := fm.fdm.getFd(path)
 	if err != nil {
 		return nil, err
@@ -61,7 +62,7 @@ func (fm *fileManager) getFileRWManager(path string, capacity int64, segmentSize
 }
 
 // getMMapRWManager will return a MMapRWManager Object
-func (fm *fileManager) getMMapRWManager(path string, capacity int64, segmentSize int64) (*MMapRWManager, error) {
+func (fm *fileManager) getMMapRWManager(path nutspath.Path, capacity int64, segmentSize int64) (*MMapRWManager, error) {
 	fd, err := fm.fdm.getFd(path)
 	if err != nil {
 		return nil, err

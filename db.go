@@ -22,7 +22,6 @@ import (
 	"log"
 	"os"
 	"path"
-	"path/filepath"
 	"runtime"
 	"sort"
 	"strings"
@@ -83,13 +82,13 @@ func open(opt Options) (*DB, error) {
 
 	db.commitBuffer = createNewBufferWithSize(int(db.opt.CommitBufferSize))
 
-	if ok := filesystem.PathIsExist(db.opt.Dir); !ok {
-		if err := os.MkdirAll(db.opt.Dir, os.ModePerm); err != nil {
+	if ok := filesystem.PathIsExist(db.opt.Dir.String()); !ok {
+		if err := os.MkdirAll(db.opt.Dir.String(), os.ModePerm); err != nil {
 			return nil, err
 		}
 	}
 
-	fileLock := flock.New(filepath.Join(opt.Dir, FLockName))
+	fileLock := flock.New(opt.Dir.Join(FLockName).String())
 	if ok, err := fileLock.TryLock(); err != nil {
 		return nil, err
 	} else if !ok {
@@ -148,15 +147,39 @@ func (db *DB) View(fn func(tx *Tx) error) error {
 
 // Backup copies the database to file directory at the given dir.
 func (db *DB) Backup(dir string) error {
-	return db.View(func(tx *Tx) error {
-		return filesystem.CopyDir(db.opt.Dir, dir)
+	return db.View(func(tx *Tx) (err error) {
+		err = tx.db.flock.Unlock()
+		if err != nil {
+			return err
+		}
+
+		defer func() {
+			err = tx.db.flock.Lock()
+			if err != nil {
+				return
+			}
+		}()
+
+		return filesystem.CopyDir(db.opt.Dir.String(), dir)
 	})
 }
 
 // BackupTarGZ Backup copy the database to writer.
 func (db *DB) BackupTarGZ(w io.Writer) error {
-	return db.View(func(tx *Tx) error {
-		return tarGZCompress(w, db.opt.Dir)
+	return db.View(func(tx *Tx) (err error) {
+		err = tx.db.flock.Unlock()
+		if err != nil {
+			return err
+		}
+
+		defer func() {
+			err = tx.db.flock.Lock()
+			if err != nil {
+				return
+			}
+		}()
+
+		return tarGZCompress(w, db.opt.Dir.String())
 	})
 }
 
@@ -188,6 +211,11 @@ func (db *DB) release() error {
 		return err
 	}
 
+	err = db.ActiveFile.Close()
+	if err != nil {
+		return err
+	}
+
 	db.Index = nil
 
 	db.ActiveFile = nil
@@ -199,6 +227,10 @@ func (db *DB) release() error {
 	}
 
 	db.mergeWorkCloseCh <- struct{}{}
+
+	if err := db.bm.close(); err != nil {
+		return err
+	}
 
 	if !db.flock.Locked() {
 		return ErrDirUnlocked
@@ -236,7 +268,7 @@ func (db *DB) getValueByRecord(record *Record) ([]byte, error) {
 		}
 	}
 
-	dirPath := getDataPath(record.FileID, db.opt.Dir)
+	dirPath := getDataPath(record.FileID, db.opt.Dir.String())
 	df, err := db.fm.getDataFile(dirPath, db.opt.SegmentSize)
 	if err != nil {
 		return nil, err
@@ -392,7 +424,14 @@ func (db *DB) doWrites() {
 
 // setActiveFile sets the ActiveFile (DataFile object).
 func (db *DB) setActiveFile() (err error) {
-	activeFilePath := getDataPath(db.MaxFileID, db.opt.Dir)
+	if db.ActiveFile != nil {
+		err = db.ActiveFile.Close()
+		if err != nil {
+			return
+		}
+	}
+
+	activeFilePath := getDataPath(db.MaxFileID, db.opt.Dir.String())
 	db.ActiveFile, err = db.fm.getDataFile(activeFilePath, db.opt.SegmentSize)
 	if err != nil {
 		return
@@ -405,7 +444,7 @@ func (db *DB) setActiveFile() (err error) {
 
 // getMaxFileIDAndFileIds returns max fileId and fileIds.
 func (db *DB) getMaxFileIDAndFileIDs() (maxFileID int64, dataFileIds []int) {
-	files, _ := os.ReadDir(db.opt.Dir)
+	files, _ := os.ReadDir(db.opt.Dir.String())
 
 	if len(files) == 0 {
 		return 0, nil
@@ -464,11 +503,15 @@ func (db *DB) parseDataFiles(dataFileIds []int) (err error) {
 	}
 
 	readEntriesFromFile := func() error {
+		defer func() {
+			_ = f.release()
+		}()
+
 		for {
 			entry, err := f.readEntry(off)
 			if err != nil {
 				// whatever which logic branch it will choose, we will release the fd.
-				_ = f.release()
+				// _ = f.release()
 				if errors.Is(err, io.EOF) || errors.Is(err, ErrIndexOutOfBound) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, ErrEntryZero) || errors.Is(err, ErrHeaderSizeOutOfBounds) {
 					break
 				}
@@ -524,7 +567,7 @@ func (db *DB) parseDataFiles(dataFileIds []int) (err error) {
 	for _, dataID := range dataFileIds {
 		off = 0
 		fID = int64(dataID)
-		dataPath := getDataPath(fID, db.opt.Dir)
+		dataPath := getDataPath(fID, db.opt.Dir.String())
 		f, err = newFileRecovery(dataPath, db.opt.BufferSizeOfRecovery)
 		if err != nil {
 			return err
@@ -635,20 +678,21 @@ func (db *DB) buildIdxes(record *Record, entry *Entry) error {
 	return nil
 }
 
-func (db *DB) deleteBucket(ds uint16, bucket BucketId) {
-	if ds == DataStructureSet {
-		db.Index.set.delete(bucket)
-	}
-	if ds == DataStructureSortedSet {
-		db.Index.sortedSet.delete(bucket)
-	}
-	if ds == DataStructureBTree {
-		db.Index.bTree.delete(bucket)
-	}
-	if ds == DataStructureList {
-		db.Index.list.delete(bucket)
-	}
-}
+// FIXME: it's useful?
+// func (db *DB) deleteBucket(ds uint16, bucket BucketId) {
+// 	if ds == DataStructureSet {
+// 		db.Index.set.delete(bucket)
+// 	}
+// 	if ds == DataStructureSortedSet {
+// 		db.Index.sortedSet.delete(bucket)
+// 	}
+// 	if ds == DataStructureBTree {
+// 		db.Index.bTree.delete(bucket)
+// 	}
+// 	if ds == DataStructureList {
+// 		db.Index.list.delete(bucket)
+// 	}
+// }
 
 // buildSetIdx builds set index when opening the DB.
 func (db *DB) buildSetIdx(record *Record, entry *Entry) error {
@@ -893,8 +937,7 @@ func (db *DB) buildExpireCallback(bucket string, key []byte) func() {
 }
 
 func (db *DB) rebuildBucketManager() error {
-	bucketFilePath := db.opt.Dir + "/" + BucketStoreFileName
-	f, err := newFileRecovery(bucketFilePath, db.opt.BufferSizeOfRecovery)
+	f, err := newFileRecovery(db.opt.Dir.Join(BucketStoreFileName), db.opt.BufferSizeOfRecovery)
 	if err != nil {
 		return nil
 	}
