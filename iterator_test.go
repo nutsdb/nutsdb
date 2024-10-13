@@ -15,15 +15,16 @@
 package nutsdb
 
 import (
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestIterator(t *testing.T) {
 	bucket := "bucket"
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+		// txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 		for i := 0; i < 100; i++ {
 			txPut(t, db, bucket, GetTestBytes(i), GetTestBytes(i), Persistent, nil, nil)

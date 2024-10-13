@@ -891,7 +891,7 @@ func TestDB_CommitBuffer(t *testing.T) {
 	opts.CommitBufferSize = 1 * KB
 	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
 		require.Equal(t, int64(1*KB), db.opt.CommitBufferSize)
-
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 		err := db.Update(func(tx *Tx) error {
 			// making this tx big enough, it should not use the commit buffer
 			for i := 0; i < 1000; i++ {

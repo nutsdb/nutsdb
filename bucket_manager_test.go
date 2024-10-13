@@ -21,6 +21,7 @@ func TestBucketManager_NewBucketAndDeleteBucket(t *testing.T) {
 	})
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txNewBucket(t, db, bucket1, DataStructureBTree, nil, nil)
 		exist := db.bm.ExistBucket(DataStructureBTree, bucket1)
 		assert.Equal(t, true, exist)
 		txDeleteBucketFunc(t, db, bucket1, DataStructureBTree, nil, nil)
