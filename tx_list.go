@@ -123,7 +123,7 @@ func (tx *Tx) RPush(bucket string, key []byte, values ...[]byte) error {
 
 	for _, value := range values {
 		newKey := tx.getListNewKey(bucket, key, false)
-		err := tx.push(bucket, newKey, DataLPushFlag, value)
+		err := tx.push(bucket, newKey, DataRPushFlag, value)
 		if err != nil {
 			return err
 		}
