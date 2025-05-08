@@ -84,7 +84,7 @@ type Options struct {
 	// BufferSizeOfRecovery represents the buffer size of recoveryReader buffer Size
 	BufferSizeOfRecovery int
 
-	// CcWhenClose represent initiative GC when calling db.Close()
+	// GcWhenClose represent initiative GC when calling db.Close()
 	GCWhenClose bool
 
 	// CommitBufferSize represent allocated memory for tx
@@ -139,17 +139,17 @@ var defaultSegmentSize int64 = 256 * MB
 // DefaultOptions represents the default options.
 var DefaultOptions = func() Options {
 	return Options{
-		EntryIdxMode:      HintKeyValAndRAMIdxMode,
-		SegmentSize:       defaultSegmentSize,
-		NodeNum:           1,
-		RWMode:            FileIO,
-		SyncEnable:        true,
-		CommitBufferSize:  4 * MB,
-		MergeInterval:     2 * time.Hour,
-		MaxBatchSize:      (15 * defaultSegmentSize / 4) / 100,
-		MaxBatchCount:     (15 * defaultSegmentSize / 4) / 100 / 100,
+		EntryIdxMode:              HintKeyValAndRAMIdxMode,
+		SegmentSize:               defaultSegmentSize,
+		NodeNum:                   1,
+		RWMode:                    FileIO,
+		SyncEnable:                true,
+		CommitBufferSize:          4 * MB,
+		MergeInterval:             2 * time.Hour,
+		MaxBatchSize:              (15 * defaultSegmentSize / 4) / 100,
+		MaxBatchCount:             (15 * defaultSegmentSize / 4) / 100 / 100,
 		HintKeyAndRAMIdxCacheSize: 0,
-		ExpiredDeleteType: TimeWheel,
+		ExpiredDeleteType:         TimeWheel,
 	}
 }()
 
@@ -186,9 +186,9 @@ func WithMaxBatchCount(count int64) Option {
 }
 
 func WithHintKeyAndRAMIdxCacheSize(size int) Option {
-    return func(opt *Options) {
-        opt.HintKeyAndRAMIdxCacheSize = size
-    }
+	return func(opt *Options) {
+		opt.HintKeyAndRAMIdxCacheSize = size
+	}
 }
 
 func WithMaxBatchSize(size int64) Option {
