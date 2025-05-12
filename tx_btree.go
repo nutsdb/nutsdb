@@ -206,31 +206,32 @@ func (tx *Tx) getAllOrKeysOrValues(bucket string, typ uint8) ([][]byte, [][]byte
 		return nil, nil, err
 	}
 
-	if index, ok := tx.db.Index.bTree.exist(bucketId); ok {
-		records := index.All()
-
-		var (
-			keys   [][]byte
-			values [][]byte
-		)
-
-		switch typ {
-		case getAllType:
-			keys, values, err = tx.getHintIdxDataItemsWrapper(records, ScanNoLimit, bucketId, true, true)
-		case getKeysType:
-			keys, _, err = tx.getHintIdxDataItemsWrapper(records, ScanNoLimit, bucketId, true, false)
-		case getValuesType:
-			_, values, err = tx.getHintIdxDataItemsWrapper(records, ScanNoLimit, bucketId, false, true)
-		}
-
-		if err != nil {
-			return nil, nil, err
-		}
-
-		return keys, values, nil
+	idx, bucketExists := tx.db.Index.bTree.exist(bucketId)
+	if !bucketExists {
+		return nil, nil, ErrNotFoundBucket
 	}
 
-	return nil, nil, nil
+	records := idx.All()
+
+	var (
+		keys   [][]byte
+		values [][]byte
+	)
+
+	switch typ {
+	case getAllType:
+		keys, values, err = tx.getHintIdxDataItemsWrapper(records, ScanNoLimit, bucketId, true, true)
+	case getKeysType:
+		keys, _, err = tx.getHintIdxDataItemsWrapper(records, ScanNoLimit, bucketId, true, false)
+	case getValuesType:
+		_, values, err = tx.getHintIdxDataItemsWrapper(records, ScanNoLimit, bucketId, false, true)
+	}
+
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return keys, values, nil
 }
 
 func (tx *Tx) GetSet(bucket string, key, value []byte) (oldValue []byte, err error) {
