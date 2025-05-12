@@ -66,7 +66,7 @@ func (tx *Tx) PutIfNotExists(bucket string, key, value []byte, ttl uint32) error
 	return tx.put(bucket, key, value, ttl, DataSetFlag, uint64(time.Now().UnixMilli()), DataStructureBTree)
 }
 
-// PutIfExits set the value for a key in the bucket only if the key already exits.
+// PutIfExists set the value for a key in the bucket only if the key already exits.
 func (tx *Tx) PutIfExists(bucket string, key, value []byte, ttl uint32) error {
 	return tx.update(bucket, key, func(_ []byte) ([]byte, error) {
 		return value, nil
