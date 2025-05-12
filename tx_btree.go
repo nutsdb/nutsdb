@@ -184,13 +184,13 @@ func (tx *Tx) GetAll(bucket string) ([][]byte, [][]byte, error) {
 	return tx.getAllOrKeysOrValues(bucket, getAllType)
 }
 
-// GetKeys returns all keys of the bucket stored at given bucket.
+// GetKeys returns all keys in the given bucket.
 func (tx *Tx) GetKeys(bucket string) ([][]byte, error) {
 	keys, _, err := tx.getAllOrKeysOrValues(bucket, getKeysType)
 	return keys, err
 }
 
-// GetValues returns all values of the bucket stored at given bucket.
+// GetValues returns all values in the given bucket.
 func (tx *Tx) GetValues(bucket string) ([][]byte, error) {
 	_, values, err := tx.getAllOrKeysOrValues(bucket, getValuesType)
 	return values, err
