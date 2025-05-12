@@ -179,7 +179,7 @@ func (tx *Tx) getMaxOrMinKey(bucket string, isMax bool) ([]byte, error) {
 	}
 }
 
-// GetAll returns all keys and values of the bucket stored at given bucket.
+// GetAll returns all keys and values in the given bucket.
 func (tx *Tx) GetAll(bucket string) ([][]byte, [][]byte, error) {
 	return tx.getAllOrKeysOrValues(bucket, getAllType)
 }
