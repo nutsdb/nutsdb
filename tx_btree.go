@@ -66,7 +66,7 @@ func (tx *Tx) PutIfNotExists(bucket string, key, value []byte, ttl uint32) error
 	return tx.put(bucket, key, value, ttl, DataSetFlag, uint64(time.Now().UnixMilli()), DataStructureBTree)
 }
 
-// PutIfExits set the value for a key in the bucket only if the key already exits.
+// PutIfExists set the value for a key in the bucket only if the key already exits.
 func (tx *Tx) PutIfExists(bucket string, key, value []byte, ttl uint32) error {
 	return tx.update(bucket, key, func(_ []byte) ([]byte, error) {
 		return value, nil
@@ -179,18 +179,18 @@ func (tx *Tx) getMaxOrMinKey(bucket string, isMax bool) ([]byte, error) {
 	}
 }
 
-// GetAll returns all keys and values of the bucket stored at given bucket.
+// GetAll returns all keys and values in the given bucket.
 func (tx *Tx) GetAll(bucket string) ([][]byte, [][]byte, error) {
 	return tx.getAllOrKeysOrValues(bucket, getAllType)
 }
 
-// GetKeys returns all keys of the bucket stored at given bucket.
+// GetKeys returns all keys in the given bucket.
 func (tx *Tx) GetKeys(bucket string) ([][]byte, error) {
 	keys, _, err := tx.getAllOrKeysOrValues(bucket, getKeysType)
 	return keys, err
 }
 
-// GetValues returns all values of the bucket stored at given bucket.
+// GetValues returns all values in the given bucket.
 func (tx *Tx) GetValues(bucket string) ([][]byte, error) {
 	_, values, err := tx.getAllOrKeysOrValues(bucket, getValuesType)
 	return values, err
@@ -206,31 +206,32 @@ func (tx *Tx) getAllOrKeysOrValues(bucket string, typ uint8) ([][]byte, [][]byte
 		return nil, nil, err
 	}
 
-	if index, ok := tx.db.Index.bTree.exist(bucketId); ok {
-		records := index.All()
-
-		var (
-			keys   [][]byte
-			values [][]byte
-		)
-
-		switch typ {
-		case getAllType:
-			keys, values, err = tx.getHintIdxDataItemsWrapper(records, ScanNoLimit, bucketId, true, true)
-		case getKeysType:
-			keys, _, err = tx.getHintIdxDataItemsWrapper(records, ScanNoLimit, bucketId, true, false)
-		case getValuesType:
-			_, values, err = tx.getHintIdxDataItemsWrapper(records, ScanNoLimit, bucketId, false, true)
-		}
-
-		if err != nil {
-			return nil, nil, err
-		}
-
-		return keys, values, nil
+	idx, bucketExists := tx.db.Index.bTree.exist(bucketId)
+	if !bucketExists {
+		return nil, nil, ErrNotFoundBucket
 	}
 
-	return nil, nil, nil
+	records := idx.All()
+
+	var (
+		keys   [][]byte
+		values [][]byte
+	)
+
+	switch typ {
+	case getAllType:
+		keys, values, err = tx.getHintIdxDataItemsWrapper(records, ScanNoLimit, bucketId, true, true)
+	case getKeysType:
+		keys, _, err = tx.getHintIdxDataItemsWrapper(records, ScanNoLimit, bucketId, true, false)
+	case getValuesType:
+		_, values, err = tx.getHintIdxDataItemsWrapper(records, ScanNoLimit, bucketId, false, true)
+	}
+
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return keys, values, nil
 }
 
 func (tx *Tx) GetSet(bucket string, key, value []byte) (oldValue []byte, err error) {
