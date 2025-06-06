@@ -3,13 +3,13 @@ package nutsdb
 import (
 	"testing"
 
+	"github.com/nutsdb/nutsdb/internal/nutspath"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestRWManager_FileIO_All(t *testing.T) {
-
-	filePath := "/tmp/foo_rw_fileio"
+	filePath := nutspath.New("/tmp/foo_rw_fileio")
 	maxFdNums := 20
 	cleanThreshold := 0.5
 	var fdm *fdManager

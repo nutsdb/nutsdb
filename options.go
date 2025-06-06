@@ -14,7 +14,11 @@
 
 package nutsdb
 
-import "time"
+import (
+	"time"
+
+	"github.com/nutsdb/nutsdb/internal/nutspath"
+)
 
 // EntryIdxMode represents entry index mode.
 type EntryIdxMode int
@@ -54,7 +58,7 @@ type LessFunc func(l, r string) bool
 // Options records params for creating DB object.
 type Options struct {
 	// Dir represents Open the database located in which dir.
-	Dir string
+	Dir nutspath.Path
 
 	// EntryIdxMode represents using which mode to index the entries.
 	EntryIdxMode EntryIdxMode
@@ -157,7 +161,7 @@ type Option func(*Options)
 
 func WithDir(dir string) Option {
 	return func(opt *Options) {
-		opt.Dir = dir
+		opt.Dir = nutspath.New(dir)
 	}
 }
 

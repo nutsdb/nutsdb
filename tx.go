@@ -513,8 +513,12 @@ func (tx *Tx) rotateActiveFile() error {
 		return err
 	}
 
+	if err := tx.db.ActiveFile.rwManager.Close(); err != nil {
+		return err
+	}
+
 	// reset ActiveFile
-	path := getDataPath(tx.db.MaxFileID, tx.db.opt.Dir)
+	path := getDataPath(tx.db.MaxFileID, tx.db.opt.Dir.String())
 	tx.db.ActiveFile, err = tx.db.fm.getDataFile(path, tx.db.opt.SegmentSize)
 	if err != nil {
 		return err
@@ -677,6 +681,7 @@ func (tx *Tx) setStatusRunning() {
 	tx.status.Store(status)
 }
 
+// FIXME: it's useful?
 // isRunning will check if the tx status is txStatusRunning
 func (tx *Tx) isRunning() bool {
 	status := tx.status.Load().(int)

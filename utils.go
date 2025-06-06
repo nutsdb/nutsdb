@@ -23,12 +23,14 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/nutsdb/nutsdb/internal/nutspath"
+
 	"github.com/xujiajun/utils/strconv2"
 )
 
 // Truncate changes the size of the file.
-func Truncate(path string, capacity int64, f *os.File) error {
-	fileInfo, _ := os.Stat(path)
+func Truncate(path nutspath.Path, capacity int64, f *os.File) error {
+	fileInfo, _ := os.Stat(path.String())
 	if fileInfo.Size() < capacity {
 		if err := f.Truncate(capacity); err != nil {
 			return err
@@ -85,9 +87,8 @@ func MatchForRange(pattern, bucket string, f func(bucket string) bool) (end bool
 }
 
 // getDataPath returns the data path for the given file ID.
-func getDataPath(fID int64, dir string) string {
-	separator := string(filepath.Separator)
-	return dir + separator + strconv2.Int64ToStr(fID) + DataSuffix
+func getDataPath(fID int64, dir string) nutspath.Path {
+	return nutspath.New(dir).Join(strconv2.Int64ToStr(fID) + DataSuffix)
 }
 
 func OneOfUint16Array(value uint16, array []uint16) bool {
