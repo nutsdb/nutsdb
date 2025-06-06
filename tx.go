@@ -300,9 +300,28 @@ func (tx *Tx) getNewAddRecordCount() (int64, error) {
 
 func (tx *Tx) getListHeadTailSeq(bucketId BucketId, key string) *HeadTailSeq {
 	res := HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
+
+	// 首先尝试从索引中获取已存在的序列号
 	if _, ok := tx.db.Index.list.idx[bucketId]; ok {
-		if _, ok := tx.db.Index.list.idx[bucketId].Seq[key]; ok {
-			res = *tx.db.Index.list.idx[bucketId].Seq[key]
+		if seq, ok := tx.db.Index.list.idx[bucketId].Seq[key]; ok {
+			res = *seq
+			return &res
+		}
+
+		// 如果索引中没有序列号，但存在列表项，则从现有项推断序列号
+		if l, ok := tx.db.Index.list.idx[bucketId]; ok {
+			if items, ok := l.Items[key]; ok && items.Count() > 0 {
+				// 获取现有列表中的最小和最大序列号
+				allItems := items.AllItems()
+				if len(allItems) > 0 {
+					minSeq := ConvertBigEndianBytesToUint64(allItems[0].key)
+					maxSeq := ConvertBigEndianBytesToUint64(allItems[len(allItems)-1].key)
+					res = HeadTailSeq{Head: minSeq - 1, Tail: maxSeq + 1}
+
+					// 更新索引中的序列号
+					l.Seq[key] = &res
+				}
+			}
 		}
 	}
 
