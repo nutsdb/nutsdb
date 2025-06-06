@@ -1,7 +1,11 @@
 github.com/antlabs/stl v0.0.1 h1:TRD3csCrjREeLhLoQ/supaoCvFhNLBTNIwuRGrDIs6Q=
 github.com/antlabs/stl v0.0.1/go.mod h1:wvVwP1loadLG3cRjxUxK8RL4Co5xujGaZlhbztmUEqQ=
+github.com/antlabs/stl v0.0.2 h1:sna1AXR5yIkNE9lWhCcKbheFJSVfCa3vugnGyakI79s=
+github.com/antlabs/stl v0.0.2/go.mod h1:kKrO4xrn9cfS1mJVo+/BqePZjAYMXqD0amGF2Ouq7ac=
 github.com/antlabs/timer v0.0.11 h1:z75oGFLeTqJHMOcWzUPBKsBbQAz4Ske3AfqJ7bsdcwU=
 github.com/antlabs/timer v0.0.11/go.mod h1:JNV8J3yGvMKhCavGXgj9HXrVZkfdQyKCcqXBT8RdyuU=
+github.com/antlabs/timer v0.1.4 h1:MHdE00MDnNfhJCmqSOdLXs35uGNwfkMwfbynxrGmQ1c=
+github.com/antlabs/timer v0.1.4/go.mod h1:mpw4zlD5KVjstEyUDp43DGLWsY076Mdo4bS78NTseRE=
 github.com/bwmarrin/snowflake v0.3.0 h1:xm67bEhkKh6ij1790JB83OujPR5CzNe8QuQqAgISZN0=
 github.com/bwmarrin/snowflake v0.3.0/go.mod h1:NdZxfVWX+oR6y2K0o6qAYv6gIOP9rjG0/E9WsDpxqwE=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
