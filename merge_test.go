@@ -28,6 +28,9 @@ func TestDB_MergeForString(t *testing.T) {
 	opts.SegmentSize = KB
 	opts.Dir = "/tmp/test-string-merge/"
 
+	// Clean the test directory at the start
+	removeDir(opts.Dir)
+
 	for _, idxMode := range []EntryIdxMode{HintKeyValAndRAMIdxMode, HintKeyAndRAMIdxMode} {
 		opts.EntryIdxMode = idxMode
 		db, err := Open(opts)
@@ -96,6 +99,9 @@ func TestDB_MergeForSet(t *testing.T) {
 	opts := DefaultOptions
 	opts.SegmentSize = KB
 	opts.Dir = "/tmp/test-set-merge/"
+
+	// Clean the test directory at the start
+	removeDir(opts.Dir)
 
 	for _, idxMode := range []EntryIdxMode{HintKeyValAndRAMIdxMode, HintKeyAndRAMIdxMode} {
 		opts.EntryIdxMode = idxMode
@@ -193,6 +199,9 @@ func TestDB_MergeForZSet(t *testing.T) {
 	opts := DefaultOptions
 	opts.SegmentSize = KB
 	opts.Dir = "/tmp/test-zset-merge/"
+
+	// Clean the test directory at the start
+	removeDir(opts.Dir)
 
 	// test different EntryIdxMode
 	for _, idxMode := range []EntryIdxMode{HintKeyValAndRAMIdxMode, HintKeyAndRAMIdxMode} {
@@ -296,6 +305,9 @@ func TestDB_MergeForList(t *testing.T) {
 	opts := DefaultOptions
 	opts.SegmentSize = KB
 	opts.Dir = "/tmp/test-list-merge/"
+
+	// Clean the test directory at the start
+	removeDir(opts.Dir)
 
 	// test different EntryIdxMode
 	for _, idxMode := range []EntryIdxMode{HintKeyValAndRAMIdxMode, HintKeyAndRAMIdxMode} {
