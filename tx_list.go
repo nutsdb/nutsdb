@@ -24,8 +24,6 @@ import (
 	"github.com/xujiajun/utils/strconv2"
 )
 
-var bucketKeySeqMap map[string]*HeadTailSeq
-
 // ErrSeparatorForListKey returns when list key contains the SeparatorForListKey.
 var ErrSeparatorForListKey = errors.Errorf("contain separator (%s) for List key", SeparatorForListKey)
 
@@ -92,23 +90,37 @@ func (tx *Tx) push(bucket string, key []byte, flag uint16, values ...[]byte) err
 }
 
 func (tx *Tx) getListNewKey(bucket string, key []byte, isLeft bool) []byte {
-	if bucketKeySeqMap == nil {
-		bucketKeySeqMap = make(map[string]*HeadTailSeq)
-	}
-
 	b, err := tx.db.bm.GetBucket(DataStructureList, bucket)
 	if err != nil {
 		return nil
 	}
 	bucketId := b.Id
 
-	bucketKey := bucket + string(key)
-	if _, ok := bucketKeySeqMap[bucketKey]; !ok {
-		bucketKeySeqMap[bucketKey] = tx.getListHeadTailSeq(bucketId, string(key))
+	// 确保列表索引存在
+	l := tx.db.Index.list.getWithDefault(bucketId)
+
+	// 获取或创建HeadTailSeq
+	keyStr := string(key)
+	seq, ok := l.Seq[keyStr]
+	if !ok {
+		// 如果不存在，先尝试从现有项推断
+		if items, exists := l.Items[keyStr]; exists && items.Count() > 0 {
+			allItems := items.AllItems()
+			if len(allItems) > 0 {
+				minSeq := ConvertBigEndianBytesToUint64(allItems[0].key)
+				maxSeq := ConvertBigEndianBytesToUint64(allItems[len(allItems)-1].key)
+				seq = &HeadTailSeq{Head: minSeq - 1, Tail: maxSeq + 1}
+			} else {
+				seq = &HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
+			}
+		} else {
+			seq = &HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
+		}
+		l.Seq[keyStr] = seq
 	}
 
-	seq := generateSeq(bucketKeySeqMap[bucketKey], isLeft)
-	return encodeListKey(key, seq)
+	seqValue := generateSeq(seq, isLeft)
+	return encodeListKey(key, seqValue)
 }
 
 // RPush inserts the values at the tail of the list stored in the bucket at given bucket,key and values.
