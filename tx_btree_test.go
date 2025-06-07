@@ -1311,3 +1311,101 @@ func TestBTreeInternalVisibility(t *testing.T) {
 		assert.Equal(t, ErrBucketNotExist, err)
 	})
 }
+
+// TestTx_EmptyBucketQuery tests GitHub Issue #595 about empty bucket query returning wrong error
+// Issue: When querying a key in an empty bucket, it should return "key not found" instead of "bucket not found"
+func TestTx_EmptyBucketQuery(t *testing.T) {
+	bucket := "empty_bucket_test"
+	key := GetTestBytes(0)
+
+	t.Run("empty bucket query after creation", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			// Create empty bucket
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+			// Query empty bucket should return ErrKeyNotFound, not ErrBucketNotFound
+			txGet(t, db, bucket, key, nil, ErrKeyNotFound)
+		})
+	})
+
+	t.Run("empty bucket query after restart", func(t *testing.T) {
+		opts := DefaultOptions
+		opts.Dir = "/tmp/nutsdb_empty_bucket_restart_test"
+
+		runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
+			// Create empty bucket
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+			// Close and reopen database to simulate restart
+			require.NoError(t, db.Close())
+
+			// Reopen database
+			db, err := Open(opts)
+			require.NoError(t, err)
+			defer func() {
+				if !db.IsClose() {
+					require.NoError(t, db.Close())
+				}
+			}()
+
+			// Query empty bucket after restart should still return ErrKeyNotFound
+			txGet(t, db, bucket, key, nil, ErrKeyNotFound)
+		})
+	})
+
+	t.Run("other methods on empty bucket", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			// Create empty bucket
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+			// Test GetMaxKey and GetMinKey should return ErrKeyNotFound
+			txGetMaxOrMinKey(t, db, bucket, true, nil, ErrKeyNotFound)
+			txGetMaxOrMinKey(t, db, bucket, false, nil, ErrKeyNotFound)
+
+			// Test GetAll should return empty arrays, not error
+			txGetAll(t, db, bucket, [][]byte{}, [][]byte{}, nil)
+
+			// Test Delete on empty bucket should return ErrKeyNotFound
+			txDel(t, db, bucket, key, ErrKeyNotFound)
+
+			// Test other Get methods return ErrKeyNotFound
+			err := db.View(func(tx *Tx) error {
+				// Test GetKeys
+				keys, err := tx.GetKeys(bucket)
+				require.NoError(t, err)
+				require.Empty(t, keys)
+
+				// Test GetValues
+				values, err := tx.GetValues(bucket)
+				require.NoError(t, err)
+				require.Empty(t, values)
+
+				return nil
+			})
+			require.NoError(t, err)
+		})
+	})
+
+	t.Run("normal functionality after fix", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			// Create bucket and add data
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+			value := GetTestBytes(1)
+			txPut(t, db, bucket, key, value, Persistent, nil, nil)
+
+			// Verify normal get works
+			txGet(t, db, bucket, key, value, nil)
+
+			// Query non-existing key should return ErrKeyNotFound
+			nonExistingKey := GetTestBytes(999)
+			txGet(t, db, bucket, nonExistingKey, nil, ErrKeyNotFound)
+
+			// Test GetAll works normally
+			txGetAll(t, db, bucket, [][]byte{key}, [][]byte{value}, nil)
+
+			// Test Delete non-existing key returns ErrKeyNotFound
+			txDel(t, db, bucket, nonExistingKey, ErrKeyNotFound)
+		})
+	})
+}
