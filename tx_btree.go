@@ -124,7 +124,7 @@ func (tx *Tx) get(bucket string, key []byte) (value []byte, err error) {
 		return value, nil
 
 	} else {
-		return nil, ErrNotFoundBucket
+		return nil, ErrKeyNotFound
 	}
 }
 
@@ -175,7 +175,7 @@ func (tx *Tx) getMaxOrMinKey(bucket string, isMax bool) ([]byte, error) {
 
 		return item.key, nil
 	} else {
-		return nil, ErrNotFoundBucket
+		return nil, ErrKeyNotFound
 	}
 }
 
@@ -208,7 +208,7 @@ func (tx *Tx) getAllOrKeysOrValues(bucket string, typ uint8) ([][]byte, [][]byte
 
 	idx, bucketExists := tx.db.Index.bTree.exist(bucketId)
 	if !bucketExists {
-		return nil, nil, ErrNotFoundBucket
+		return [][]byte{}, [][]byte{}, nil
 	}
 
 	records := idx.All()
@@ -340,7 +340,7 @@ func (tx *Tx) Delete(bucket string, key []byte) error {
 			return ErrKeyNotFound
 		}
 	} else {
-		return ErrNotFoundBucket
+		return ErrKeyNotFound
 	}
 
 	return tx.put(bucket, key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureBTree)
@@ -386,7 +386,7 @@ func (tx *Tx) tryGet(bucket string, key []byte, solveRecord func(record *Record,
 		record, found := idx.Find(key)
 		return solveRecord(record, found, bucketId)
 	} else {
-		return ErrBucketNotFound
+		return solveRecord(nil, false, bucketId)
 	}
 }
 
