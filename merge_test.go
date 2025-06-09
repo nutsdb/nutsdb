@@ -90,7 +90,7 @@ func TestDB_MergeForString(t *testing.T) {
 		}
 
 		require.NoError(t, db.Close())
-		removeDir(opts.Dir)
+		removeDir(opts.Dir.String())
 	}
 }
 
@@ -184,7 +184,7 @@ func TestDB_MergeForSet(t *testing.T) {
 			txSIsMember(t, db, bucket, key, v, true)
 		}
 		require.NoError(t, db.Close())
-		removeDir(opts.Dir)
+		removeDir(opts.Dir.String())
 	}
 }
 
@@ -292,7 +292,7 @@ func TestDB_MergeForZSet(t *testing.T) {
 		}
 
 		require.NoError(t, db.Close())
-		removeDir(opts.Dir)
+		removeDir(opts.Dir.String())
 	}
 }
 
@@ -374,6 +374,6 @@ func TestDB_MergeForList(t *testing.T) {
 		}
 
 		require.NoError(t, db.Close())
-		removeDir(opts.Dir)
+		removeDir(opts.Dir.String())
 	}
 }
