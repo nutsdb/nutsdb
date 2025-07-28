@@ -1188,6 +1188,15 @@ func TestTx_MSetMGet(t *testing.T) {
 		})
 	})
 
+	t.Run("use MSet and MGet with 60s TTL", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+			txMSet(t, db, bucket, nil, 60, nil, nil)
+			txMGet(t, db, bucket, nil, nil, nil, nil)
+		})
+	})
+
 	t.Run("use MSet by using odd number of args ", func(t *testing.T) {
 		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
@@ -1209,6 +1218,28 @@ func TestTx_MSetMGet(t *testing.T) {
 				GetTestBytes(0), GetTestBytes(2),
 			}, [][]byte{
 				GetTestBytes(1), GetTestBytes(3),
+			}, nil, nil)
+		})
+	})
+
+	t.Run("use MSet and MGet normally with TTL", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+			txMSet(t, db, bucket, [][]byte{
+				GetTestBytes(0), GetTestBytes(1), GetTestBytes(2), GetTestBytes(3),
+			}, 2, nil, nil)
+			time.Sleep(2 * time.Second)
+			txMSet(t, db, bucket, [][]byte{
+				GetTestBytes(4), GetTestBytes(5), GetTestBytes(6), GetTestBytes(7),
+			}, 2, nil, nil)
+			txMGet(t, db, bucket, [][]byte{
+				GetTestBytes(0), GetTestBytes(2),
+			}, nil, ErrNotFoundKey, nil)
+			txMGet(t, db, bucket, [][]byte{
+				GetTestBytes(4), GetTestBytes(6),
+			}, [][]byte{
+				GetTestBytes(5), GetTestBytes(7),
 			}, nil, nil)
 		})
 	})
