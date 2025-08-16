@@ -243,6 +243,34 @@ func (tx *Tx) GetSet(bucket string, key, value []byte) (oldValue []byte, err err
 	})
 }
 
+// Has returns true if the record exist. It checks without retrieving the value
+// from disk making lookups significantly faster while keeping memory usage
+// down as well. It does require the `HintKeyAndRAMIdxMode` option to be
+// enabled to function as described.
+func (tx *Tx) Has(bucket string, key []byte) (exists bool, err error) {
+	if err := tx.checkTxIsClosed(); err != nil {
+		return false, err
+	}
+
+	b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
+	if err != nil {
+		return false, err
+	}
+	bucketId := b.Id
+
+	idx, bucketExists := tx.db.Index.bTree.exist(bucketId)
+	if !bucketExists {
+		return false, ErrNotFoundBucket
+	}
+	record, recordExists := idx.Find(key)
+
+	if recordExists && !record.IsExpired() {
+		return true, nil
+	}
+
+	return false, nil
+}
+
 // RangeScan query a range at given bucket, start and end slice.
 func (tx *Tx) RangeScan(bucket string, start, end []byte) (values [][]byte, err error) {
 	if err := tx.checkTxIsClosed(); err != nil {

@@ -91,6 +91,20 @@ func txGet(t *testing.T, db *DB, bucket string, key []byte, expectVal []byte, ex
 	require.NoError(t, err)
 }
 
+func txHas(t *testing.T, db *DB, bucket string, key []byte, expectVal bool, expectErr error) {
+	err := db.View(func(tx *Tx) error {
+		exists, err := tx.Has(bucket, key)
+		if expectErr != nil {
+			require.Equal(t, expectErr, err)
+		} else {
+			require.NoError(t, err)
+			require.EqualValuesf(t, expectVal, exists, "err Tx Has. got %v want %v", exists, expectVal)
+		}
+		return nil
+	})
+	require.NoError(t, err)
+}
+
 func txGetAll(t *testing.T, db *DB, bucket string, expectKeys [][]byte, expectValues [][]byte, expectErr error) {
 	require.NoError(t, db.View(func(tx *Tx) error {
 		keys, values, err := tx.GetAll(bucket)

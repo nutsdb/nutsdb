@@ -27,7 +27,6 @@ import (
 )
 
 func TestTx_PutAndGet(t *testing.T) {
-
 	var (
 		bucket = "bucket1"
 		key    = []byte("key1")
@@ -35,9 +34,7 @@ func TestTx_PutAndGet(t *testing.T) {
 	)
 
 	t.Run("put_and_get", func(t *testing.T) {
-
 		withDefaultDB(t, func(t *testing.T, db *DB) {
-
 			{
 				txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
@@ -60,7 +57,6 @@ func TestTx_PutAndGet(t *testing.T) {
 
 				assert.Equal(t, val, value)
 			}
-
 		})
 	})
 
@@ -74,7 +70,6 @@ func TestTx_PutAndGet(t *testing.T) {
 			assert.Error(t, err)
 		})
 	})
-
 }
 
 func TestTx_GetAll_GetKeys_GetValues(t *testing.T) {
@@ -126,7 +121,6 @@ func TestTx_GetAll_GetKeys_GetValues(t *testing.T) {
 
 func TestTx_RangeScan_Err(t *testing.T) {
 	withDefaultDB(t, func(t *testing.T, db *DB) {
-
 		bucket := "bucket_for_rangeScan"
 
 		{
@@ -166,7 +160,6 @@ func TestTx_RangeScan(t *testing.T) {
 	bucket := "bucket_for_range"
 
 	withDefaultDB(t, func(t *testing.T, db *DB) {
-
 		{
 			// setup the data
 			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
@@ -214,17 +207,13 @@ func TestTx_RangeScan(t *testing.T) {
 			assert.Error(t, err)
 			assert.Empty(t, values)
 		}
-
 	})
-
 }
 
 func TestTx_PrefixScan(t *testing.T) {
-
 	bucket := "bucket_for_prefix_scan"
 
 	withDefaultDB(t, func(t *testing.T, db *DB) {
-
 		{
 			// setup the data
 			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
@@ -320,9 +309,7 @@ func TestTx_PrefixSearchScan(t *testing.T) {
 }
 
 func TestTx_DeleteAndGet(t *testing.T) {
-
 	withDefaultDB(t, func(t *testing.T, db *DB) {
-
 		bucket := "bucket_delete_test"
 
 		{
@@ -358,7 +345,6 @@ func TestTx_DeleteAndGet(t *testing.T) {
 			assert.Error(t, err)
 		}
 	})
-
 }
 
 func TestTx_DeleteFromMemory(t *testing.T) {
@@ -389,7 +375,6 @@ func TestTx_DeleteFromMemory(t *testing.T) {
 }
 
 func TestTx_GetAndScansFromHintKey(t *testing.T) {
-
 	bucket := "bucket_get_test"
 	withRAMIdxDB(t, func(t *testing.T, db *DB) {
 		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
@@ -440,11 +425,9 @@ func TestTx_GetAndScansFromHintKey(t *testing.T) {
 		// tx commit
 		assert.NoError(t, tx.Commit())
 	})
-
 }
 
 func TestTx_Put_Err(t *testing.T) {
-
 	bucket := "bucket_tx_put"
 
 	t.Run("write with read only tx", func(t *testing.T) {
@@ -568,7 +551,6 @@ func TestTx_PrefixScan_NotFound(t *testing.T) {
 					t.Error("err TestTx_PrefixScan_NotFound")
 				}
 			}
-
 		})
 	})
 }
@@ -593,7 +575,6 @@ func TestTx_PrefixSearchScan_NotFound(t *testing.T) {
 	})
 
 	t.Run("prefix search scan", func(t *testing.T) {
-
 		withDefaultDB(t, func(t *testing.T, db *DB) {
 			{ // set up the data
 				txCreateBucket(t, db, DataStructureBTree, bucket, nil)
@@ -637,7 +618,6 @@ func TestTx_PrefixSearchScan_NotFound(t *testing.T) {
 }
 
 func TestTx_RangeScan_NotFound(t *testing.T) {
-
 	bucket := "bucket_range_scan_test"
 
 	withDefaultDB(t, func(t *testing.T, db *DB) {
@@ -1406,6 +1386,43 @@ func TestTx_EmptyBucketQuery(t *testing.T) {
 
 			// Test Delete non-existing key returns ErrKeyNotFound
 			txDel(t, db, bucket, nonExistingKey, ErrKeyNotFound)
+		})
+	})
+}
+
+func TestTx_Has(t *testing.T) {
+	bucket := "bucket"
+	val := []byte("value")
+
+	t.Run("match value", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			txPut(t, db, bucket, GetTestBytes(1), val, Persistent, nil, nil)
+			txHas(t, db, bucket, GetTestBytes(1), true, nil)
+		})
+	})
+
+	t.Run("no match value", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			txPut(t, db, bucket, GetTestBytes(1), val, Persistent, nil, nil)
+			nonExistingKey := GetTestBytes(999)
+			txHas(t, db, bucket, nonExistingKey, false, nil)
+		})
+	})
+
+	t.Run("bucket not exist", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			txHas(t, db, bucket, GetTestBytes(1), false, ErrBucketNotExist)
+		})
+	})
+
+	t.Run("expired test", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			txPut(t, db, bucket, GetTestBytes(1), val, 1, nil, nil)
+			time.Sleep(3 * time.Second)
+			txHas(t, db, bucket, GetTestBytes(1), false, nil)
 		})
 	})
 }
