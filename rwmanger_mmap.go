@@ -17,7 +17,7 @@ package nutsdb
 import (
 	"errors"
 
-	mmap "github.com/xujiajun/mmap-go"
+	mmap "github.com/edsrzf/mmap-go"
 )
 
 // MMapRWManager represents the RWManager which using mmap.

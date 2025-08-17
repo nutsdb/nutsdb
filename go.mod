@@ -5,12 +5,12 @@ go 1.18
 require (
 	github.com/antlabs/timer v0.1.4
 	github.com/bwmarrin/snowflake v0.3.0
+	github.com/edsrzf/mmap-go v1.2.0
 	github.com/gofrs/flock v0.8.1
 	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.7.1
 	github.com/tidwall/btree v1.6.0
 	github.com/xujiajun/gorouter v1.2.0
-	github.com/xujiajun/mmap-go v1.0.1
 	github.com/xujiajun/utils v0.0.0-20220904132955-5f7c5b914235
 )
 
