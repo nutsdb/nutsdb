@@ -3,9 +3,10 @@ package nutsdb
 import (
 	"math"
 	"os"
-	"path/filepath"
 	"strings"
 	"sync"
+
+	"github.com/nutsdb/nutsdb/internal/nutspath"
 )
 
 const (
@@ -19,7 +20,7 @@ const (
 // fdManager hold a fd cache in memory, it lru based cache.
 type fdManager struct {
 	lock               sync.Mutex
-	cache              map[string]*FdInfo
+	cache              map[nutspath.Path]*FdInfo
 	fdList             *doubleLinkedList
 	size               int
 	cleanThresholdNums int
@@ -29,7 +30,7 @@ type fdManager struct {
 // newFdm will return a fdManager object
 func newFdm(maxFdNums int, cleanThreshold float64) (fdm *fdManager) {
 	fdm = &fdManager{
-		cache:     map[string]*FdInfo{},
+		cache:     map[nutspath.Path]*FdInfo{},
 		fdList:    initDoubleLinkedList(),
 		size:      0,
 		maxFdNums: DefaultMaxFileNums,
@@ -48,19 +49,18 @@ func newFdm(maxFdNums int, cleanThreshold float64) (fdm *fdManager) {
 // FdInfo holds base fd info
 type FdInfo struct {
 	fd    *os.File
-	path  string
+	path  nutspath.Path
 	using uint
 	next  *FdInfo
 	prev  *FdInfo
 }
 
 // getFd go through this method to get fd.
-func (fdm *fdManager) getFd(path string) (fd *os.File, err error) {
+func (fdm *fdManager) getFd(path nutspath.Path) (fd *os.File, err error) {
 	fdm.lock.Lock()
 	defer fdm.lock.Unlock()
-	cleanPath := filepath.Clean(path)
-	if fdInfo := fdm.cache[cleanPath]; fdInfo == nil {
-		fd, err = os.OpenFile(cleanPath, os.O_CREATE|os.O_RDWR, 0o644)
+	if fdInfo := fdm.cache[path]; fdInfo == nil {
+		fd, err = os.OpenFile(path.String(), os.O_CREATE|os.O_RDWR, 0o644)
 		if err == nil {
 			// if the numbers of fd in cache larger than the cleanThreshold in config, we will clean useless fd in cache
 			if fdm.size >= fdm.cleanThresholdNums {
@@ -71,7 +71,7 @@ func (fdm *fdManager) getFd(path string) (fd *os.File, err error) {
 				return fd, nil
 			}
 			// add this fd to cache
-			fdm.addToCache(fd, cleanPath)
+			fdm.addToCache(fd, path)
 			return fd, nil
 		} else {
 			// determine if there are too many open files, we will first clean useless fd in cache and try open this file again
@@ -82,12 +82,12 @@ func (fdm *fdManager) getFd(path string) (fd *os.File, err error) {
 					return nil, err
 				}
 				// try open this file again，if it still returns err, we will show this error to user
-				fd, err = os.OpenFile(cleanPath, os.O_CREATE|os.O_RDWR, 0o644)
+				fd, err = os.OpenFile(path.String(), os.O_CREATE|os.O_RDWR, 0o644)
 				if err != nil {
 					return nil, err
 				}
 				// add to cache if open this file successfully
-				fdm.addToCache(fd, cleanPath)
+				fdm.addToCache(fd, path)
 			}
 			return fd, err
 		}
@@ -99,23 +99,22 @@ func (fdm *fdManager) getFd(path string) (fd *os.File, err error) {
 }
 
 // addToCache add fd to cache
-func (fdm *fdManager) addToCache(fd *os.File, cleanPath string) {
+func (fdm *fdManager) addToCache(fd *os.File, path nutspath.Path) {
 	fdInfo := &FdInfo{
 		fd:    fd,
 		using: 1,
-		path:  cleanPath,
+		path:  path,
 	}
 	fdm.fdList.addNode(fdInfo)
 	fdm.size++
-	fdm.cache[cleanPath] = fdInfo
+	fdm.cache[path] = fdInfo
 }
 
 // reduceUsing when RWManager object close, it will go through this method let fdm know it return the fd to cache
-func (fdm *fdManager) reduceUsing(path string) {
+func (fdm *fdManager) reduceUsing(path nutspath.Path) {
 	fdm.lock.Lock()
 	defer fdm.lock.Unlock()
-	cleanPath := filepath.Clean(path)
-	node, isExist := fdm.cache[cleanPath]
+	node, isExist := fdm.cache[path]
 	if !isExist {
 		panic("unexpected the node is not in cache")
 	}
@@ -198,7 +197,7 @@ func (fdm *fdManager) cleanUselessFd() error {
 	return nil
 }
 
-func (fdm *fdManager) closeByPath(path string) error {
+func (fdm *fdManager) closeByPath(path nutspath.Path) error {
 	fdm.lock.Lock()
 	defer fdm.lock.Unlock()
 	fdInfo, ok := fdm.cache[path]

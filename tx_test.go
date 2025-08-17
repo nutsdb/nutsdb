@@ -39,7 +39,7 @@ func TestTx_Rollback(t *testing.T) {
 			}
 			if err = tx.Put(bucket, key, val, Persistent); err != nil {
 				// tx rollback
-				tx.Rollback()
+				_ = tx.Rollback()
 
 				if i < 7 {
 					t.Fatal("err TestTx_Rollback")
@@ -55,7 +55,7 @@ func TestTx_Rollback(t *testing.T) {
 			key := []byte("key_" + fmt.Sprintf("%03d", i))
 			if _, err := tx.Get(bucket, key); err != nil {
 				// tx rollback
-				tx.Rollback()
+				_ = tx.Rollback()
 			} else {
 				t.Fatal("err TestTx_Rollback")
 			}
@@ -83,7 +83,7 @@ func TestTx_Begin(t *testing.T) {
 			tx, err := db.Begin(true)
 			assert.NoError(t, err)
 
-			tx.Rollback()
+			_ = tx.Rollback()
 
 			err = db.Close()
 			assert.NoError(t, err)

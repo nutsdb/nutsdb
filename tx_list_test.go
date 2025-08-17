@@ -186,11 +186,12 @@ func TestTx_LPop(t *testing.T) {
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		txCreateBucket(t, db, DataStructureList, bucket, nil)
 		txPop(t, db, bucket, GetTestBytes(0), nil, ErrListNotFound, true)
+
+		db.Close()
 	})
 
 	// Insert some values for a key and validate them by using LPop
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, DataStructureList, bucket, nil)
 		pushDataByStartEnd(t, db, bucket, 0, 0, 2, true)
 		for i := 0; i < 3; i++ {
 			txPop(t, db, bucket, GetTestBytes(0), GetTestBytes(2-i), nil, true)
@@ -205,11 +206,12 @@ func TestTx_RPop(t *testing.T) {
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		txCreateBucket(t, db, DataStructureList, bucket, nil)
 		txPop(t, db, bucket, GetTestBytes(0), nil, ErrListNotFound, false)
+
+		db.Close()
 	})
 
 	// Calling RPop on a list with added data
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, DataStructureList, bucket, nil)
 		pushDataByStartEnd(t, db, bucket, 0, 0, 2, false)
 
 		txPop(t, db, "fake_bucket", GetTestBytes(0), nil, ErrBucketNotExist, false)
@@ -230,12 +232,12 @@ func TestTx_LRange(t *testing.T) {
 		txCreateBucket(t, db, DataStructureList, bucket, nil)
 
 		txLRange(t, db, bucket, GetTestBytes(0), 0, -1, 0, nil, ErrListNotFound)
+
+		db.Close()
 	})
 
 	// Calling LRange on a list with added data
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, DataStructureList, bucket, nil)
-
 		pushDataByStartEnd(t, db, bucket, 0, 0, 2, true)
 
 		txLRange(t, db, bucket, GetTestBytes(0), 0, -1, 3, [][]byte{
@@ -250,6 +252,7 @@ func TestTx_LRange(t *testing.T) {
 	})
 }
 
+// FIXME: work bad on windows
 func TestTx_LRem(t *testing.T) {
 	bucket := "bucket"
 
@@ -327,6 +330,7 @@ func TestTx_LRem(t *testing.T) {
 	})
 }
 
+// FIXME: work bad on windows
 func TestTx_LTrim(t *testing.T) {
 	bucket := "bucket"
 
@@ -358,6 +362,7 @@ func TestTx_LTrim(t *testing.T) {
 	})
 }
 
+// FIXME: work bad on windows
 func TestTx_LSize(t *testing.T) {
 	bucket := "bucket"
 
@@ -375,6 +380,7 @@ func TestTx_LSize(t *testing.T) {
 	})
 }
 
+// FIXME: work bad on windows
 func TestTx_LRemByIndex(t *testing.T) {
 	bucket := "bucket"
 
@@ -411,6 +417,7 @@ func TestTx_LRemByIndex(t *testing.T) {
 	})
 }
 
+// FIXME: work bad on windows
 func TestTx_ExpireList(t *testing.T) {
 	bucket := "bucket"
 
