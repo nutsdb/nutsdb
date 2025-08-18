@@ -4,7 +4,7 @@ NutsDB stores its keys in byte-sorted order within a bucket. This makes sequenti
 
 ### Prefix scans
 
-To iterate over a key prefix, we can use `PrefixScan` function, and the parameters `offsetNum` and `limitNum` constrain the number of entries returned :
+To iterate over a key prefix, we can use `PrefixScanEntries` function, and the parameters `offsetNum` and `limitNum` constrain the number of entries returned :
 
 ```go
 if err := db.View(
@@ -12,11 +12,11 @@ if err := db.View(
         prefix := []byte("user_")
         bucket := "user_list"
         // Constrain 100 entries returned 
-        if entries, _, err := tx.PrefixScan(bucket, prefix, 25, 100); err != nil {
+        if keys, values, err := tx.PrefixScanEntries(bucket, prefix, "", 25, 100, true, true); err != nil {
             return err
         } else {
-            for _, entry := range entries {
-                fmt.Println(string(entry.Key), string(entry.Value))
+            for k := range keys {
+                fmt.Println(string(keys[k]), string(values[k]))
             }
         }
         return nil
@@ -27,7 +27,7 @@ if err := db.View(
 
 ### Prefix search scans
 
-To iterate over a key prefix with search by regular expression on a second part of key without prefix, we can use `PrefixSearchScan` function, and the parameters `offsetNum`, `limitNum` constrain the number of entries returned :
+To iterate over a key prefix with search by regular expression on a second part of key without prefix, we can use `PrefixScanEntries` function when using the reg parameter,the parameters `offsetNum`, `limitNum` constrain the number of entries returned :
 
 ```go
 if err := db.View(
@@ -36,11 +36,11 @@ if err := db.View(
         reg := "username"
         bucket := "user_list"
         // Constrain 100 entries returned 
-        if entries, _, err := tx.PrefixSearchScan(bucket, prefix, reg, 25, 100); err != nil {
+        if keys, values, err := tx.PrefixScanEntries(bucket, prefix, reg, 25, 100, true, true); err != nil {
             return err
         } else {
-            for _, entry := range entries {
-                fmt.Println(string(entry.Key), string(entry.Value))
+            for k := range keys {
+                fmt.Println(string(keys[k]), string(values[k]))
             }
         }
         return nil
@@ -51,7 +51,7 @@ if err := db.View(
 
 ### Range scans
 
-To scan over a range, we can use `RangeScan` function. For example：
+To scan over a range, we can use `RangeScanEntries` function. For example：
 
 ```go
 if err := db.View(
@@ -61,11 +61,11 @@ if err := db.View(
         start := []byte("user_0010001")
         end := []byte("user_0010010")
         bucket := "user_list"
-        if entries, err := tx.RangeScan(bucket, start, end); err != nil {
+        if keys, values, err := tx.RangeScanEntries(bucket, start, end, true, true); err != nil {
             return err
         } else {
-            for _, entry := range entries {
-                fmt.Println(string(entry.Key), string(entry.Value))
+            for k := range entries {
+                fmt.Println(string(key[k]), string(values[k]))
             }
         }
         return nil
