@@ -352,7 +352,7 @@ func (tx *Tx) PrefixScanEntries(bucket string, prefix []byte, reg string, offset
 	return
 }
 
-// prefixScan iterates over a key prefix at given bucket, prefix and limitNum.
+// PrefixScan iterates over a key prefix at given bucket, prefix and limitNum.
 // LimitNum will limit the number of entries return.
 func (tx *Tx) PrefixScan(bucket string, prefix []byte, offsetNum int, limitNum int) (values [][]byte, err error) {
 	// PrefixScan is kept as an API call to not break upstream projects

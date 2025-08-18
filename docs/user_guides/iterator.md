@@ -64,8 +64,8 @@ if err := db.View(
         if keys, values, err := tx.RangeScanEntries(bucket, start, end, true, true); err != nil {
             return err
         } else {
-            for k := range entries {
-                fmt.Println(string(key[k]), string(values[k]))
+            for k := range keys {
+                fmt.Println(string(keys[k]), string(values[k]))
             }
         }
         return nil
