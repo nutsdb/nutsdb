@@ -271,85 +271,103 @@ func (tx *Tx) Has(bucket string, key []byte) (exists bool, err error) {
 	return false, nil
 }
 
-// RangeScan query a range at given bucket, start and end slice.
-func (tx *Tx) RangeScan(bucket string, start, end []byte) (values [][]byte, err error) {
+// RangeScanEntries query a range at given bucket, start and end slice. It will
+// return keys and/or values based on the includeKeys and includeValues flags.
+func (tx *Tx) RangeScanEntries(bucket string, start, end []byte, includeKeys, includeValues bool) (keys, values [][]byte, err error) {
 	if err := tx.checkTxIsClosed(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	bucketId := b.Id
 
 	if index, ok := tx.db.Index.bTree.exist(bucketId); ok {
 		records := index.Range(start, end)
 
-		_, values, err = tx.getHintIdxDataItemsWrapper(records, ScanNoLimit, bucketId, false, true)
+		keys, values, err = tx.getHintIdxDataItemsWrapper(records, ScanNoLimit, bucketId, includeKeys, includeValues)
 		if err != nil {
-			return nil, ErrRangeScan
+			return nil, nil, ErrRangeScan
 		}
 	}
 
 	if len(values) == 0 {
-		return nil, ErrRangeScan
+		return nil, nil, ErrRangeScan
 	}
 
 	return
 }
 
-// PrefixScan iterates over a key prefix at given bucket, prefix and limitNum.
-// LimitNum will limit the number of entries return.
-func (tx *Tx) PrefixScan(bucket string, prefix []byte, offsetNum int, limitNum int) (values [][]byte, err error) {
+// RangeScan query a range at given bucket, start and end slice.
+func (tx *Tx) RangeScan(bucket string, start, end []byte) (values [][]byte, err error) {
+	// RangeScan is kept as an API call to not break upstream projects that
+	// rely on it.
+	_, values, err = tx.RangeScanEntries(bucket, start, end, false, true)
+	return
+}
+
+// PrefixScanEntries iterates over a key prefix at given bucket, prefix and
+// limitNum.  If reg is set a regular expression will be used to filter the
+// found entries. LimitNum will limit the number of entries return. It will
+// return keys and/or values based on the includeKeys and includeValues flags.
+func (tx *Tx) PrefixScanEntries(bucket string, prefix []byte, reg string, offsetNum int, limitNum int, includeKeys, includeValues bool) (keys, values [][]byte, err error) {
+	// This function is a bit awkward but that is to maintain backwards
+	// compatibility while enabling the caller to pick and choose which
+	// variation to call.
 	if err := tx.checkTxIsClosed(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	bucketId := b.Id
 
+	xerr := func(e error) error {
+		// Return expected error types based on Scan/SearchScan.
+		if reg == "" {
+			return ErrPrefixScan
+		}
+		return ErrPrefixSearchScan
+	}
+
 	if idx, ok := tx.db.Index.bTree.exist(bucketId); ok {
-		records := idx.PrefixScan(prefix, offsetNum, limitNum)
-		_, values, err = tx.getHintIdxDataItemsWrapper(records, limitNum, bucketId, false, true)
+		var records []*Record
+		if reg == "" {
+			records = idx.PrefixScan(prefix, offsetNum, limitNum)
+		} else {
+			records = idx.PrefixSearchScan(prefix, reg, offsetNum, limitNum)
+		}
+		keys, values, err = tx.getHintIdxDataItemsWrapper(records, limitNum, bucketId, includeKeys, includeValues)
 		if err != nil {
-			return nil, ErrPrefixScan
+			return nil, nil, xerr(err)
 		}
 	}
 
 	if len(values) == 0 {
-		return nil, ErrPrefixScan
+		return nil, nil, xerr(err)
 	}
 
 	return
+}
+
+// prefixScan iterates over a key prefix at given bucket, prefix and limitNum.
+// LimitNum will limit the number of entries return.
+func (tx *Tx) PrefixScan(bucket string, prefix []byte, offsetNum int, limitNum int) (values [][]byte, err error) {
+	// PrefixScan is kept as an API call to not break upstream projects
+	// that rely on it.
+	_, values, err = tx.PrefixScanEntries(bucket, prefix, "", offsetNum, limitNum, false, true)
+	return values, err
 }
 
 // PrefixSearchScan iterates over a key prefix at given bucket, prefix, match regular expression and limitNum.
 // LimitNum will limit the number of entries return.
 func (tx *Tx) PrefixSearchScan(bucket string, prefix []byte, reg string, offsetNum int, limitNum int) (values [][]byte, err error) {
-	if err := tx.checkTxIsClosed(); err != nil {
-		return nil, err
-	}
-	b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
-	if err != nil {
-		return nil, err
-	}
-	bucketId := b.Id
-
-	if idx, ok := tx.db.Index.bTree.exist(bucketId); ok {
-		records := idx.PrefixSearchScan(prefix, reg, offsetNum, limitNum)
-		_, values, err = tx.getHintIdxDataItemsWrapper(records, limitNum, bucketId, false, true)
-		if err != nil {
-			return nil, ErrPrefixSearchScan
-		}
-	}
-
-	if len(values) == 0 {
-		return nil, ErrPrefixSearchScan
-	}
-
-	return
+	// PrefixSearchScan is kept as an API call to not break upstream projects
+	// that rely on it.
+	_, values, err = tx.PrefixScanEntries(bucket, prefix, reg, offsetNum, limitNum, false, true)
+	return values, err
 }
 
 // Delete removes a key from the bucket at given bucket and key.

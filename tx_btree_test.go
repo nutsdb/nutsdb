@@ -256,6 +256,88 @@ func TestTx_PrefixScan(t *testing.T) {
 				assert.Equal(t, wantVal, values[i])
 			}
 		}
+
+		{
+			tx, err = db.Begin(false)
+			require.NoError(t, err)
+
+			var (
+				offset = 5
+				limit  = 3
+			)
+
+			prefix := []byte("key1_")
+			keys, values, err := tx.PrefixScanEntries(bucket, prefix, "", offset, limit, true, true)
+			assert.NoError(t, err)
+
+			assert.NoError(t, tx.Commit())
+
+			assert.Equal(t, limit, len(keys))
+			assert.Equal(t, limit, len(values))
+
+			for i := 0; i < limit; i++ {
+				valIndex := offset + i
+
+				wantKey := []byte("key1_" + fmt.Sprintf("%07d", valIndex))
+				assert.Equal(t, wantKey, keys[i])
+
+				wantVal := []byte("foobar" + fmt.Sprintf("%d%07d", 1, valIndex))
+				assert.Equal(t, wantVal, values[i])
+			}
+		}
+	})
+}
+
+func TestTx_PrefixSearchScanEntries(t *testing.T) {
+	bucket := "bucket_for_prefix_search_scan_entries"
+
+	withDefaultDB(t, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+		regs := "1"
+
+		tx, err := db.Begin(true)
+		require.NoError(t, err)
+
+		key := []byte("key_" + fmt.Sprintf("%07d", 0))
+		val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 0))
+		err = tx.Put(bucket, key, val, Persistent)
+		assert.NoError(t, err)
+
+		assert.NoError(t, tx.Commit()) // tx commit
+
+		tx, err = db.Begin(true)
+		require.NoError(t, err)
+
+		key = []byte("key_" + fmt.Sprintf("%07d", 1))
+		val = []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 1))
+		err = tx.Put(bucket, key, val, Persistent)
+		assert.NoError(t, err)
+
+		assert.NoError(t, tx.Commit()) // tx commit
+
+		tx, err = db.Begin(false)
+		require.NoError(t, err)
+
+		prefix := []byte("key_")
+		keys, values, err := tx.PrefixScanEntries(bucket, prefix, regs, 0, 1, true, true)
+		assert.NoError(t, err)
+
+		assert.NoError(t, tx.Commit()) // tx commit
+
+		c := 0
+		for k, value := range values {
+			wantKey := []byte("key_" + fmt.Sprintf("%07d", 1))
+
+			assert.Equal(t, wantKey, keys[k])
+
+			wantVal := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 1))
+
+			assert.Equal(t, wantVal, value)
+			c++
+		}
+
+		assert.Equal(t, 1, c)
 	})
 }
 
