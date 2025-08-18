@@ -285,14 +285,16 @@ func (tx *Tx) RangeScanEntries(bucket string, start, end []byte, includeKeys, in
 
 	if index, ok := tx.db.Index.bTree.exist(bucketId); ok {
 		records := index.Range(start, end)
-
 		keys, values, err = tx.getHintIdxDataItemsWrapper(records, ScanNoLimit, bucketId, includeKeys, includeValues)
 		if err != nil {
 			return nil, nil, ErrRangeScan
 		}
 	}
 
-	if len(values) == 0 {
+	if includeKeys && len(keys) == 0 {
+		return nil, nil, ErrRangeScan
+	}
+	if includeValues && len(values) == 0 {
 		return nil, nil, ErrRangeScan
 	}
 
@@ -345,7 +347,10 @@ func (tx *Tx) PrefixScanEntries(bucket string, prefix []byte, reg string, offset
 		}
 	}
 
-	if len(values) == 0 {
+	if includeKeys && len(keys) == 0 {
+		return nil, nil, xerr(err)
+	}
+	if includeValues && len(values) == 0 {
 		return nil, nil, xerr(err)
 	}
 
