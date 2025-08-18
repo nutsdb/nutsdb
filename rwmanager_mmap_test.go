@@ -20,7 +20,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/xujiajun/mmap-go"
+	"github.com/edsrzf/mmap-go"
 )
 
 func TestRWManager_MMap_Release(t *testing.T) {
