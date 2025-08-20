@@ -1,9 +1,5 @@
 package nutsdb
 
-import (
-	"github.com/edsrzf/mmap-go"
-)
-
 // fileManager holds the fd cache and file-related operations go through the manager to obtain the file processing object
 type fileManager struct {
 	rwMode      RWMode
@@ -72,12 +68,12 @@ func (fm *fileManager) getMMapRWManager(path string, capacity int64, segmentSize
 		return nil, err
 	}
 
-	m, err := mmap.Map(fd, mmap.RDWR, 0)
-	if err != nil {
-		return nil, err
-	}
+	// m, err := mmap.Map(fd, mmap.RDWR, 0)
+	// if err != nil {
+	// 	return nil, err
+	// }
 
-	return &MMapRWManager{m: m, path: path, fdm: fm.fdm, segmentSize: segmentSize}, nil
+	return &MMapRWManager{fd: fd, path: path, fdm: fm.fdm, segmentSize: segmentSize}, nil
 }
 
 // close will close fdm resource

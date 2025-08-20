@@ -16,17 +16,12 @@ package nutsdb
 
 import (
 	"errors"
+	"os"
 
-	mmap "github.com/edsrzf/mmap-go"
+	"github.com/edsrzf/mmap-go"
 )
 
-// MMapRWManager represents the RWManager which using mmap.
-type MMapRWManager struct {
-	path        string
-	fdm         *fdManager
-	m           mmap.MMap
-	segmentSize int64
-}
+const mmapBlockSize int = 2 * MB
 
 var (
 	// ErrUnmappedMemory is returned when a function is called on unmapped memory
@@ -36,39 +31,53 @@ var (
 	ErrIndexOutOfBound = errors.New("offset out of mapped region")
 )
 
+// MMapRWManager represents the RWManager which using mmap.
+type MMapRWManager struct {
+	fd          *os.File
+	path        string
+	fdm         *fdManager
+	segmentSize int64
+}
+
 // WriteAt copies data to mapped region from the b slice starting at
 // given off and returns number of bytes copied to the mapped region.
 func (mm *MMapRWManager) WriteAt(b []byte, off int64) (n int, err error) {
-	if mm.m == nil {
-		return 0, ErrUnmappedMemory
-	} else if off >= int64(len(mm.m)) || off < 0 {
-		return 0, ErrIndexOutOfBound
+	lb := len(b)
+	startOffset := mm.alignOffset(off)
+	diff := off - startOffset
+	curmmap, err := mm.getTargetMMap(startOffset, lb+int(diff), mmap.RDWR)
+	if err != nil {
+		return 0, err
 	}
-
-	return copy(mm.m[off:], b), nil
+	n = copy(curmmap[diff:], b)
+	err = curmmap.Unmap()
+	return n, err
 }
 
 // ReadAt copies data to b slice from mapped region starting at
 // given off and returns number of bytes copied to the b slice.
 func (mm *MMapRWManager) ReadAt(b []byte, off int64) (n int, err error) {
-	if mm.m == nil {
-		return 0, ErrUnmappedMemory
-	} else if off >= int64(len(mm.m)) || off < 0 {
-		return 0, ErrIndexOutOfBound
+	lb := len(b)
+	startOffset := mm.alignOffset(off)
+	diff := off - startOffset
+	curmmap, err := mm.getTargetMMap(startOffset, lb+int(diff), mmap.RDONLY)
+	if err != nil {
+		return 0, err
 	}
-
-	return copy(b, mm.m[off:]), nil
+	n = copy(b, curmmap[diff:])
+	err = curmmap.Unmap()
+	return n, err
 }
 
 // Sync synchronizes the mapping's contents to the file's contents on disk.
 func (mm *MMapRWManager) Sync() (err error) {
-	return mm.m.Flush()
+	return nil
 }
 
 // Release deletes the memory mapped region, flushes any remaining changes
 func (mm *MMapRWManager) Release() (err error) {
 	mm.fdm.reduceUsing(mm.path)
-	return mm.m.Unmap()
+	return nil
 }
 
 func (mm *MMapRWManager) Size() int64 {
@@ -78,4 +87,12 @@ func (mm *MMapRWManager) Size() int64 {
 // Close will remove the cache in the fdm of the specified path, and call the close method of the os of the file
 func (mm *MMapRWManager) Close() (err error) {
 	return mm.fdm.closeByPath(mm.path)
+}
+
+func (mm *MMapRWManager) getTargetMMap(offset int64, length int, prot int) (mmap.MMap, error) {
+	return mmap.MapRegion(mm.fd, length, prot, 0, offset)
+}
+
+func (mm *MMapRWManager) alignOffset(offset int64) int64 {
+	return offset / int64(mmapBlockSize) * int64(mmapBlockSize)
 }
