@@ -21,7 +21,9 @@ import (
 	"github.com/edsrzf/mmap-go"
 )
 
-const mmapBlockSize int = 2 * MB
+const (
+	mmapBlockSize int64 = 32 * MB
+)
 
 var (
 	// ErrUnmappedMemory is returned when a function is called on unmapped memory
@@ -31,26 +33,50 @@ var (
 	ErrIndexOutOfBound = errors.New("offset out of mapped region")
 )
 
+func newMMapRWManager(fd *os.File, path string, fdm *fdManager, segmentSize int64) *MMapRWManager {
+	m := &MMapRWManager{
+		fd:          fd,
+		path:        path,
+		fdm:         fdm,
+		segmentSize: segmentSize,
+	}
+	m.mmaps = make([]mmap.MMap, segmentSize/mmapBlockSize)
+	m.mmapsProt = make([]int, segmentSize/mmapBlockSize)
+	for i := 0; i < len(m.mmaps); i++ {
+		m.mmaps[i] = nil
+		m.mmapsProt[i] = -1
+	}
+	return m
+}
+
 // MMapRWManager represents the RWManager which using mmap.
 type MMapRWManager struct {
 	fd          *os.File
 	path        string
 	fdm         *fdManager
 	segmentSize int64
+
+	mmaps     []mmap.MMap
+	mmapsProt []int
 }
 
 // WriteAt copies data to mapped region from the b slice starting at
 // given off and returns number of bytes copied to the mapped region.
 func (mm *MMapRWManager) WriteAt(b []byte, off int64) (n int, err error) {
 	lb := len(b)
-	startOffset := mm.alignOffset(off)
-	diff := off - startOffset
-	curmmap, err := mm.getTargetMMap(startOffset, lb+int(diff), mmap.RDWR)
-	if err != nil {
-		return 0, err
+	index := mm.selectMMap(off)
+	diff := off - int64(index)*mmapBlockSize
+	for n < lb {
+		err = mm.prepareMMap(mmap.RDWR, index)
+		if err != nil {
+			break
+		}
+		curN := copy(mm.mmaps[index][diff:], b)
+		b = b[curN:]
+		n += curN
+		diff = 0
+		index++
 	}
-	n = copy(curmmap[diff:], b)
-	err = curmmap.Unmap()
 	return n, err
 }
 
@@ -58,14 +84,19 @@ func (mm *MMapRWManager) WriteAt(b []byte, off int64) (n int, err error) {
 // given off and returns number of bytes copied to the b slice.
 func (mm *MMapRWManager) ReadAt(b []byte, off int64) (n int, err error) {
 	lb := len(b)
-	startOffset := mm.alignOffset(off)
-	diff := off - startOffset
-	curmmap, err := mm.getTargetMMap(startOffset, lb+int(diff), mmap.RDONLY)
-	if err != nil {
-		return 0, err
+	index := mm.selectMMap(off)
+	diff := off - int64(index)*mmapBlockSize
+	for n < lb {
+		err = mm.prepareMMap(mmap.COPY, index)
+		if err != nil {
+			break
+		}
+		curN := copy(b, mm.mmaps[index][diff:])
+		b = b[curN:]
+		n += curN
+		diff = 0
+		index++
 	}
-	n = copy(b, curmmap[diff:])
-	err = curmmap.Unmap()
 	return n, err
 }
 
@@ -89,10 +120,34 @@ func (mm *MMapRWManager) Close() (err error) {
 	return mm.fdm.closeByPath(mm.path)
 }
 
-func (mm *MMapRWManager) getTargetMMap(offset int64, length int, prot int) (mmap.MMap, error) {
-	return mmap.MapRegion(mm.fd, length, prot, 0, offset)
+func (mm *MMapRWManager) selectMMap(offset int64) int {
+	index := int64(0)
+	for i := 0; i < len(mm.mmaps); i++ {
+		if (mmapBlockSize*index) <= offset && offset < (mmapBlockSize*(index+1)) {
+			return int(index)
+		} else {
+			index++
+		}
+	}
+	return -1
 }
 
-func (mm *MMapRWManager) alignOffset(offset int64) int64 {
-	return offset / int64(mmapBlockSize) * int64(mmapBlockSize)
+func (mm *MMapRWManager) prepareMMap(prot int, index int) (err error) {
+	if mm.mmaps[index] != nil {
+		if mm.mmapsProt[index] != prot {
+			mm.mmapsProt[index] = -1
+			err = mm.mmaps[index].Unmap()
+			if err != nil {
+				return
+			}
+		} else {
+			return
+		}
+	}
+	mm.mmaps[index], err = mmap.MapRegion(mm.fd, int(mmapBlockSize), prot, 0, int64(index)*mmapBlockSize)
+	if err != nil {
+		return
+	}
+	mm.mmapsProt[index] = prot
+	return
 }
