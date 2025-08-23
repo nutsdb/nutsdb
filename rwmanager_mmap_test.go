@@ -74,7 +74,7 @@ func TestRWManager_MMap_WriteAt(t *testing.T) {
 
 	}
 
-	mmManager := newMMapRWManager(fd, filePath, fdm, 256*MB)
+	mmManager := getMMapRWManager(fd, filePath, fdm, 256*MB)
 	b := []byte("test write at")
 	off := int64(3)
 	n, err := mmManager.WriteAt(b, off)
@@ -107,7 +107,7 @@ func TestRWManager_MMap_Sync(t *testing.T) {
 
 	}
 
-	mmManager := newMMapRWManager(fd, filePath, fdm, 256*MB)
+	mmManager := getMMapRWManager(fd, filePath, fdm, 256*MB)
 	m, err := mmap.Map(fd, mmap.RDWR, 0)
 	if err != nil {
 		require.NoError(t, err)
@@ -138,7 +138,7 @@ func TestRWManager_MMap_Close(t *testing.T) {
 
 	}
 
-	mmManager := newMMapRWManager(fd, filePath, fdm, 256*MB)
+	mmManager := getMMapRWManager(fd, filePath, fdm, 256*MB)
 	err = mmManager.Close()
 	err = isFileDescriptorClosed(fd.Fd())
 	if err == nil {

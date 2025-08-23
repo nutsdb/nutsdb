@@ -68,12 +68,7 @@ func (fm *fileManager) getMMapRWManager(path string, capacity int64, segmentSize
 		return nil, err
 	}
 
-	// m, err := mmap.Map(fd, mmap.RDWR, 0)
-	// if err != nil {
-	// 	return nil, err
-	// }
-
-	return newMMapRWManager(fd, path, fm.fdm, segmentSize), nil
+	return getMMapRWManager(fd, path, fm.fdm, segmentSize), nil
 }
 
 // close will close fdm resource
