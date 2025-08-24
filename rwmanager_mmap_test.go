@@ -15,7 +15,9 @@
 package nutsdb
 
 import (
+	"errors"
 	"os"
+	"path"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -25,8 +27,8 @@ import (
 
 func TestRWManager_MMap_Release(t *testing.T) {
 	filePath := "/tmp/foo_rw_MMap"
-	fdm := newFileManager(MMap, 1024, 0.5, 256*MB)
-	rwmanager, err := fdm.getMMapRWManager(filePath, 1024, 256*MB)
+	fdm := newFileManager(MMap, 8*MB, 0.5, 8*MB)
+	rwmanager, err := fdm.getMMapRWManager(filePath, 8*MB, 8*MB)
 	if err != nil {
 		t.Error("err TestRWManager_MMap_Release getMMapRWManager")
 	}
@@ -68,17 +70,13 @@ func TestRWManager_MMap_WriteAt(t *testing.T) {
 	}
 	defer os.Remove(fd.Name())
 
-	err = Truncate(filePath, 1024, fd)
+	err = Truncate(filePath, 8*MB, fd)
 	if err != nil {
 		require.NoError(t, err)
 
 	}
-	m, err := mmap.Map(fd, mmap.RDWR, 0)
-	if err != nil {
-		require.NoError(t, err)
-	}
 
-	mmManager := &MMapRWManager{filePath, fdm, m, 256 * MB}
+	mmManager := getMMapRWManager(fd, filePath, fdm, 8*MB)
 	b := []byte("test write at")
 	off := int64(3)
 	n, err := mmManager.WriteAt(b, off)
@@ -86,11 +84,129 @@ func TestRWManager_MMap_WriteAt(t *testing.T) {
 		require.NoError(t, err)
 	}
 	require.Equal(t, len(b), n)
+	m, err := mmap.Map(fd, mmap.RDWR, 0)
+	if err != nil {
+		require.NoError(t, err)
+	}
 	require.Equal(t, append([]byte{0, 0, 0}, b...), []byte(m[:off+int64(len(b))]))
 }
 
+func TestRWManager_MMap_WriteAt_NotEnoughData(t *testing.T) {
+	filePath := path.Join(t.TempDir(), "rw_mmap")
+	maxFdNums := 1024
+	cleanThreshold := 0.5
+	var fdm = newFdm(maxFdNums, cleanThreshold)
+
+	fd, err := fdm.getFd(filePath)
+	require.NoError(t, err)
+
+	defer os.Remove(fd.Name())
+
+	err = Truncate(filePath, 8*MB, fd)
+	require.NoError(t, err)
+
+	m, err := mmap.Map(fd, mmap.RDWR, 0)
+	require.NoError(t, err)
+
+	b := []byte("test-data-message")
+	off := int64(8*MB - 4)
+	copy(m[off:], b)
+
+	mmManager := getMMapRWManager(fd, filePath, fdm, 8*MB)
+
+	n, err := mmManager.WriteAt(b, off)
+	require.NoError(t, err)
+	require.Equal(t, 4, n)
+
+	data := make([]byte, n)
+	copy(data, m[off:])
+	require.Equal(t, b[:n], data)
+}
+
+func TestRWManager_MMap_ReadAt_CrossBlock(t *testing.T) {
+	filePath := path.Join(t.TempDir(), "rw_mmap")
+	maxFdNums := 1024
+	cleanThreshold := 0.5
+	var fdm = newFdm(maxFdNums, cleanThreshold)
+
+	fd, err := fdm.getFd(filePath)
+	require.NoError(t, err)
+
+	defer os.Remove(fd.Name())
+
+	err = Truncate(filePath, 8*MB, fd)
+	require.NoError(t, err)
+
+	m, err := mmap.Map(fd, mmap.RDWR, 0)
+	require.NoError(t, err)
+
+	b := []byte("test-data-message")
+	off := int64(mmapBlockSize - 5)
+	copy(m[off:], b)
+
+	mmManager := getMMapRWManager(fd, filePath, fdm, 8*MB)
+
+	data := make([]byte, len(b))
+	n, err := mmManager.ReadAt(data, off)
+	require.NoError(t, err)
+	require.Equal(t, len(b), n)
+	require.Equal(t, b, data)
+}
+
+func TestRWManager_MMap_ReadAt_NotEnoughBytes(t *testing.T) {
+	filePath := path.Join(t.TempDir(), "rw_mmap")
+	maxFdNums := 1024
+	cleanThreshold := 0.5
+	var fdm = newFdm(maxFdNums, cleanThreshold)
+
+	fd, err := fdm.getFd(filePath)
+	require.NoError(t, err)
+
+	defer os.Remove(fd.Name())
+
+	err = Truncate(filePath, 8*MB, fd)
+	require.NoError(t, err)
+
+	m, err := mmap.Map(fd, mmap.RDWR, 0)
+	require.NoError(t, err)
+
+	b := []byte("test")
+	off := int64(8*MB - 4)
+	copy(m[off:], b)
+
+	mmManager := getMMapRWManager(fd, filePath, fdm, 8*MB)
+
+	data := make([]byte, 10)
+	n, err := mmManager.ReadAt(data, off)
+	require.NoError(t, err)
+	require.Equal(t, len(b), n)
+	require.Equal(t, b, data[0:4])
+}
+
+func TestRWManager_MMap_ReadAt_ErrIndexOutOfBound(t *testing.T) {
+	filePath := path.Join(t.TempDir(), "rw_mmap")
+	maxFdNums := 1024
+	cleanThreshold := 0.5
+	var fdm = newFdm(maxFdNums, cleanThreshold)
+
+	fd, err := fdm.getFd(filePath)
+	require.NoError(t, err)
+
+	defer os.Remove(fd.Name())
+
+	err = Truncate(filePath, 8*MB, fd)
+	require.NoError(t, err)
+
+	b := make([]byte, 16)
+	mmManager := getMMapRWManager(fd, filePath, fdm, 8*MB)
+	_, err = mmManager.ReadAt(b, 9*MB)
+	require.True(t, errors.Is(err, ErrIndexOutOfBound))
+	_, err = mmManager.ReadAt(b, -1)
+	require.True(t, errors.Is(err, ErrIndexOutOfBound))
+}
+
 func TestRWManager_MMap_Sync(t *testing.T) {
-	filePath := "/tmp/foo_rw_filemmap"
+	filePath := path.Join(t.TempDir(), t.Name())
 	maxFdNums := 1024
 	cleanThreshold := 0.5
 	var fdm = newFdm(maxFdNums, cleanThreshold)
@@ -101,17 +217,17 @@ func TestRWManager_MMap_Sync(t *testing.T) {
 	}
 	defer os.Remove(fd.Name())
 
-	err = Truncate(filePath, 1024, fd)
+	err = Truncate(filePath, 8*MB, fd)
 	if err != nil {
 		require.NoError(t, err)
 
 	}
+
+	mmManager := getMMapRWManager(fd, filePath, fdm, 8*MB)
 	m, err := mmap.Map(fd, mmap.RDWR, 0)
 	if err != nil {
 		require.NoError(t, err)
 	}
-
-	mmManager := &MMapRWManager{filePath, fdm, m, 256 * MB}
 	m[1] = 'z'
 	err = mmManager.Sync()
 	require.NoError(t, err)
@@ -121,7 +237,7 @@ func TestRWManager_MMap_Sync(t *testing.T) {
 }
 
 func TestRWManager_MMap_Close(t *testing.T) {
-	filePath := "/tmp/foo_rw_filemmap"
+	filePath := path.Join(t.TempDir(), t.Name())
 	maxFdNums := 1024
 	cleanThreshold := 0.5
 	var fdm = newFdm(maxFdNums, cleanThreshold)
@@ -132,17 +248,13 @@ func TestRWManager_MMap_Close(t *testing.T) {
 	}
 	defer os.Remove(fd.Name())
 
-	err = Truncate(filePath, 1024, fd)
+	err = Truncate(filePath, 8*MB, fd)
 	if err != nil {
 		require.NoError(t, err)
 
 	}
-	m, err := mmap.Map(fd, mmap.RDWR, 0)
-	if err != nil {
-		require.NoError(t, err)
-	}
 
-	mmManager := &MMapRWManager{filePath, fdm, m, 256 * MB}
+	mmManager := getMMapRWManager(fd, filePath, fdm, 8*MB)
 	err = mmManager.Close()
 	err = isFileDescriptorClosed(fd.Fd())
 	if err == nil {
