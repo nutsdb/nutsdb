@@ -27,6 +27,7 @@ var (
 	mmapBlockSize              = int64(os.Getpagesize()) * 4
 	mmapRWManagerInstancesLock = sync.Mutex{}
 	mmapRWManagerInstances     = make(map[string]*MMapRWManager)
+	mmapLRUCacheCapacity       = 1024
 )
 
 var (
@@ -49,9 +50,10 @@ func getMMapRWManager(fd *os.File, path string, fdm *fdManager, segmentSize int6
 		path:        path,
 		fdm:         fdm,
 		segmentSize: segmentSize,
-		readCache:   NewLruCache(1024),
-		writeCache:  NewLruCache(1024),
+		readCache:   NewLruCache(mmapLRUCacheCapacity),
+		writeCache:  NewLruCache(mmapLRUCacheCapacity),
 	}
+
 	mmapRWManagerInstances[path] = mm
 	return mm
 
@@ -73,10 +75,13 @@ type MMapRWManager struct {
 // WriteAt copies data to mapped region from the b slice starting at
 // given off and returns number of bytes copied to the mapped region.
 func (mm *MMapRWManager) WriteAt(b []byte, off int64) (n int, err error) {
+	if off >= int64(mm.segmentSize) || off < 0 {
+		return 0, ErrIndexOutOfBound
+	}
 	lb := len(b)
 	curOffset := mm.alignedOffset(off)
 	diff := off - curOffset
-	for ; n < lb; curOffset += mmapBlockSize {
+	for ; n < lb && curOffset < mm.segmentSize; curOffset += mmapBlockSize {
 		data, err := mm.accessMMap(mm.writeCache, curOffset, mmap.RDWR)
 		if err != nil {
 			return n, err
@@ -92,10 +97,13 @@ func (mm *MMapRWManager) WriteAt(b []byte, off int64) (n int, err error) {
 // ReadAt copies data to b slice from mapped region starting at
 // given off and returns number of bytes copied to the b slice.
 func (mm *MMapRWManager) ReadAt(b []byte, off int64) (n int, err error) {
+	if off >= int64(mm.segmentSize) || off < 0 {
+		return 0, ErrIndexOutOfBound
+	}
 	lb := len(b)
 	curOffset := mm.alignedOffset(off)
 	diff := off - curOffset
-	for ; n < lb; curOffset += mmapBlockSize {
+	for ; n < lb && curOffset < mm.segmentSize; curOffset += mmapBlockSize {
 		data, err := mm.accessMMap(mm.readCache, curOffset, mmap.RDONLY)
 		if err != nil {
 			return n, err
@@ -132,6 +140,8 @@ func (mm *MMapRWManager) alignedOffset(offset int64) int64 {
 	return offset - (offset & (mmapBlockSize - 1))
 }
 
+// accessMMap access the MMap data. If for this block the mmap data is not mmapped, will add
+// it into cache.
 func (mm *MMapRWManager) accessMMap(cache *LRUCache, offset int64, prot int) (data *mmapData, err error) {
 	item := cache.Get(offset)
 	if item == nil {
@@ -146,6 +156,7 @@ func (mm *MMapRWManager) accessMMap(cache *LRUCache, offset int64, prot int) (da
 	return
 }
 
+// mmapData is a struct to control the lifetime and access level of mmap.MMap
 type mmapData struct {
 	data   mmap.MMap
 	offset int64
