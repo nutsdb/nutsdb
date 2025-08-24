@@ -206,7 +206,7 @@ func TestRWManager_MMap_ReadAt_ErrIndexOutOfBound(t *testing.T) {
 }
 
 func TestRWManager_MMap_Sync(t *testing.T) {
-	filePath := "/tmp/foo_rw_filemmap"
+	filePath := path.Join(t.TempDir(), t.Name())
 	maxFdNums := 1024
 	cleanThreshold := 0.5
 	var fdm = newFdm(maxFdNums, cleanThreshold)
@@ -237,7 +237,7 @@ func TestRWManager_MMap_Sync(t *testing.T) {
 }
 
 func TestRWManager_MMap_Close(t *testing.T) {
-	filePath := "/tmp/foo_rw_filemmap"
+	filePath := path.Join(t.TempDir(), t.Name())
 	maxFdNums := 1024
 	cleanThreshold := 0.5
 	var fdm = newFdm(maxFdNums, cleanThreshold)
