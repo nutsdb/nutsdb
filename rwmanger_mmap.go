@@ -87,8 +87,8 @@ func (mm *MMapRWManager) WriteAt(b []byte, off int64) (n int, err error) {
 			return n, err
 		}
 		data.mut.Lock()
-		defer data.mut.Unlock()
 		n += copy(data.data[diff:mmapBlockSize], b[n:])
+		data.mut.Unlock()
 		diff = 0
 	}
 	return n, err
@@ -109,8 +109,8 @@ func (mm *MMapRWManager) ReadAt(b []byte, off int64) (n int, err error) {
 			return n, err
 		}
 		data.mut.RLock()
-		defer data.mut.RUnlock()
 		n += copy(b[n:], data.data[diff:mmapBlockSize])
+		data.mut.RUnlock()
 		diff = 0
 	}
 	return n, err
@@ -124,7 +124,7 @@ func (mm *MMapRWManager) Sync() (err error) {
 // Release deletes the memory mapped region, flushes any remaining changes
 func (mm *MMapRWManager) Release() (err error) {
 	mm.fdm.reduceUsing(mm.path)
-	return
+	return nil
 }
 
 func (mm *MMapRWManager) Size() int64 {
