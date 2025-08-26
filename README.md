@@ -5,7 +5,7 @@
 <div class="column" align="middle">
   <a href="https://godoc.org/github.com/nutsdb/nutsdb"><img src="https://godoc.org/github.com/nutsdb/nutsdb?status.svg" /></a>
   <a href="https://goreportcard.com/report/github.com/nutsdb/nutsdb"><img src="https://goreportcard.com/badge/github.com/nutsdb/nutsdb" /></a>
-  <a href="https://goreportcard.com/report/github.com/nutsdb/nutsdb"><img src="https://github.com/nutsdb/nutsdb/workflows/Go/badge.svg?branch=master"/></a>
+  <a href="https://github.com/nutsdb/nutsdb/actions/workflows/go.yml"><img src="https://github.com/nutsdb/nutsdb/actions/workflows/go.yml/badge.svg"/></a>
   <a href="https://codecov.io/gh/nutsdb/nutsdb"><img src="https://codecov.io/gh/nutsdb/nutsdb/branch/master/graph/badge.svg?token=CupujOXpbe"/></a>
   <a href="https://raw.githubusercontent.com/nutsdb/nutsdb/master/LICENSE"><img src="http://img.shields.io/badge/license-Apache_2-blue.svg?style=flat-square"/></a>
   <a href="https://github.com/avelino/awesome-go#database"><img src="https://awesome.re/mentioned-badge.svg"/></a>
