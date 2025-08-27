@@ -41,8 +41,8 @@ func IsExpired(ttl uint32, timestamp uint64) bool {
 		return false
 	}
 
-	now := time.UnixMilli(time.Now().UnixMilli())
-	expireTime := time.UnixMilli(int64(timestamp))
+	now := time.Now()
+	expireTime := time.Unix(int64(timestamp), 0)
 	expireTime = expireTime.Add(time.Duration(ttl) * time.Second)
 
 	return expireTime.Before(now)
