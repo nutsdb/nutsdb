@@ -1,4 +1,4 @@
 .idea/
 testdata/
-
+bin/
 */*.DS_Store
