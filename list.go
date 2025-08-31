@@ -111,8 +111,8 @@ func (l *List) LPop(key string) (*Record, error) {
 		return nil, err
 	}
 
-	l.Items[key].Delete(item.key)
-	l.Seq[key].Head = ConvertBigEndianBytesToUint64(item.key)
+	l.Items[key].Delete(item.record.Key)
+	l.Seq[key].Head = ConvertBigEndianBytesToUint64(item.record.Key)
 	return item.record, nil
 }
 
@@ -123,8 +123,8 @@ func (l *List) RPop(key string) (*Record, error) {
 		return nil, err
 	}
 
-	l.Items[key].Delete(item.key)
-	l.Seq[key].Tail = ConvertBigEndianBytesToUint64(item.key)
+	l.Items[key].Delete(item.record.Key)
+	l.Seq[key].Tail = ConvertBigEndianBytesToUint64(item.record.Key)
 	return item.record, nil
 }
 
@@ -213,7 +213,7 @@ func (l *List) getRemoveIndexes(key string, count int, cmp func(r *Record) (bool
 				return nil, err
 			}
 			if ok {
-				res = append(res, item.key)
+				res = append(res, item.record.Key)
 				count--
 			}
 		}
@@ -228,7 +228,7 @@ func (l *List) getRemoveIndexes(key string, count int, cmp func(r *Record) (bool
 				return nil, err
 			}
 			if ok {
-				res = append(res, allItems[i].key)
+				res = append(res, allItems[i].record.Key)
 				count++
 			}
 		}
@@ -269,7 +269,7 @@ func (l *List) LTrim(key string, start, end int) error {
 	allItems := list.AllItems()
 	for i, item := range allItems {
 		if i < start || i > end {
-			list.Delete(item.key)
+			list.Delete(item.record.Key)
 		}
 	}
 
@@ -291,7 +291,7 @@ func (l *List) LRemByIndex(key string, indexes []int) error {
 	allItems := list.AllItems()
 	for i, item := range allItems {
 		if _, ok := idxes[i]; ok {
-			list.Delete(item.key)
+			list.Delete(item.record.Key)
 		}
 	}
 

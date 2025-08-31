@@ -57,7 +57,7 @@ func (it *Iterator) Rewind() bool {
 }
 
 func (it *Iterator) Seek(key []byte) bool {
-	return it.iter.Seek(&Item{key: key})
+	return it.iter.Seek(&Item{record: &Record{Key: key}})
 }
 
 func (it *Iterator) Next() bool {
@@ -73,7 +73,7 @@ func (it *Iterator) Valid() bool {
 }
 
 func (it *Iterator) Key() []byte {
-	return it.iter.Item().key
+	return it.iter.Item().record.Key
 }
 
 func (it *Iterator) Value() ([]byte, error) {

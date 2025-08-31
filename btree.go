@@ -26,7 +26,6 @@ import (
 var ErrKeyNotFound = errors.New("key not found")
 
 type Item struct {
-	key    []byte
 	record *Record
 }
 
@@ -37,13 +36,13 @@ type BTree struct {
 func NewBTree() *BTree {
 	return &BTree{
 		btree: btree.NewBTreeG[*Item](func(a, b *Item) bool {
-			return bytes.Compare(a.key, b.key) == -1
+			return bytes.Compare(a.record.Key, b.record.Key) == -1
 		}),
 	}
 }
 
 func (bt *BTree) Find(key []byte) (*Record, bool) {
-	item, ok := bt.btree.Get(&Item{key: key})
+	item, ok := bt.btree.Get(&Item{record: &Record{Key: key}})
 	if ok {
 		return item.record, ok
 	}
@@ -51,17 +50,17 @@ func (bt *BTree) Find(key []byte) (*Record, bool) {
 }
 
 func (bt *BTree) Insert(record *Record) bool {
-	_, replaced := bt.btree.Set(&Item{key: record.Key, record: record})
+	_, replaced := bt.btree.Set(&Item{record: record})
 	return replaced
 }
 
 func (bt *BTree) InsertRecord(key []byte, record *Record) bool {
-	_, replaced := bt.btree.Set(&Item{key: key, record: record})
+	_, replaced := bt.btree.Set(&Item{record: record})
 	return replaced
 }
 
 func (bt *BTree) Delete(key []byte) bool {
-	_, deleted := bt.btree.Delete(&Item{key: key})
+	_, deleted := bt.btree.Delete(&Item{record: &Record{Key: key}})
 	return deleted
 }
 
@@ -84,8 +83,8 @@ func (bt *BTree) AllItems() []*Item {
 func (bt *BTree) Range(start, end []byte) []*Record {
 	records := make([]*Record, 0)
 
-	bt.btree.Ascend(&Item{key: start}, func(item *Item) bool {
-		if bytes.Compare(item.key, end) > 0 {
+	bt.btree.Ascend(&Item{record: &Record{Key: start}}, func(item *Item) bool {
+		if bytes.Compare(item.record.Key, end) > 0 {
 			return false
 		}
 		records = append(records, item.record)
@@ -98,8 +97,8 @@ func (bt *BTree) Range(start, end []byte) []*Record {
 func (bt *BTree) PrefixScan(prefix []byte, offset, limitNum int) []*Record {
 	records := make([]*Record, 0)
 
-	bt.btree.Ascend(&Item{key: prefix}, func(item *Item) bool {
-		if !bytes.HasPrefix(item.key, prefix) {
+	bt.btree.Ascend(&Item{record: &Record{Key: prefix}}, func(item *Item) bool {
+		if !bytes.HasPrefix(item.record.Key, prefix) {
 			return false
 		}
 
@@ -122,8 +121,8 @@ func (bt *BTree) PrefixSearchScan(prefix []byte, reg string, offset, limitNum in
 
 	rgx := regexp.MustCompile(reg)
 
-	bt.btree.Ascend(&Item{key: prefix}, func(item *Item) bool {
-		if !bytes.HasPrefix(item.key, prefix) {
+	bt.btree.Ascend(&Item{record: &Record{Key: prefix}}, func(item *Item) bool {
+		if !bytes.HasPrefix(item.record.Key, prefix) {
 			return false
 		}
 
@@ -132,7 +131,7 @@ func (bt *BTree) PrefixSearchScan(prefix []byte, reg string, offset, limitNum in
 			return true
 		}
 
-		if !rgx.Match(bytes.TrimPrefix(item.key, prefix)) {
+		if !rgx.Match(bytes.TrimPrefix(item.record.Key, prefix)) {
 			return true
 		}
 

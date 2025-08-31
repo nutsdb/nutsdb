@@ -314,8 +314,8 @@ func (tx *Tx) getListHeadTailSeq(bucketId BucketId, key string) *HeadTailSeq {
 				// 获取现有列表中的最小和最大序列号
 				allItems := items.AllItems()
 				if len(allItems) > 0 {
-					minSeq := ConvertBigEndianBytesToUint64(allItems[0].key)
-					maxSeq := ConvertBigEndianBytesToUint64(allItems[len(allItems)-1].key)
+					minSeq := ConvertBigEndianBytesToUint64(allItems[0].record.Key)
+					maxSeq := ConvertBigEndianBytesToUint64(allItems[len(allItems)-1].record.Key)
 					res = HeadTailSeq{Head: minSeq - 1, Tail: maxSeq + 1}
 
 					// 更新索引中的序列号

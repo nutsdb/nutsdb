@@ -107,8 +107,8 @@ func (tx *Tx) getListNewKey(bucket string, key []byte, isLeft bool) []byte {
 		if items, exists := l.Items[keyStr]; exists && items.Count() > 0 {
 			allItems := items.AllItems()
 			if len(allItems) > 0 {
-				minSeq := ConvertBigEndianBytesToUint64(allItems[0].key)
-				maxSeq := ConvertBigEndianBytesToUint64(allItems[len(allItems)-1].key)
+				minSeq := ConvertBigEndianBytesToUint64(allItems[0].record.Key)
+				maxSeq := ConvertBigEndianBytesToUint64(allItems[len(allItems)-1].record.Key)
 				seq = &HeadTailSeq{Head: minSeq - 1, Tail: maxSeq + 1}
 			} else {
 				seq = &HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}

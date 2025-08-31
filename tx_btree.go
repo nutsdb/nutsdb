@@ -169,11 +169,11 @@ func (tx *Tx) getMaxOrMinKey(bucket string, isMax bool) ([]byte, error) {
 		}
 
 		if item.record.IsExpired() {
-			tx.putDeleteLog(bucketId, item.key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureBTree)
+			tx.putDeleteLog(bucketId, item.record.Key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureBTree)
 			return nil, ErrNotFoundKey
 		}
 
-		return item.key, nil
+		return item.record.Key, nil
 	} else {
 		return nil, ErrKeyNotFound
 	}
