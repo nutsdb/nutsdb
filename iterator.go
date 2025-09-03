@@ -29,7 +29,7 @@ type IteratorOptions struct {
 }
 
 // Returns a new iterator.
-// The Release method must be called finished with iterator.
+// The Release method must be called when finished with the iterator.
 func NewIterator(tx *Tx, bucket string, options IteratorOptions) *Iterator {
 	b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
 	if err != nil {
