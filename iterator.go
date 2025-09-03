@@ -28,6 +28,8 @@ type IteratorOptions struct {
 	Reverse bool
 }
 
+// Returns a new iterator.
+// The Release method must be called finished with iterator.
 func NewIterator(tx *Tx, bucket string, options IteratorOptions) *Iterator {
 	b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
 	if err != nil {
@@ -78,4 +80,8 @@ func (it *Iterator) Key() []byte {
 
 func (it *Iterator) Value() ([]byte, error) {
 	return it.tx.db.getValueByRecord(it.iter.Item().record)
+}
+
+func (it *Iterator) Release() {
+	it.iter.Release()
 }
