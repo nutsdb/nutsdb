@@ -15,8 +15,9 @@
 package nutsdb
 
 import (
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestIterator(t *testing.T) {
@@ -31,6 +32,7 @@ func TestIterator(t *testing.T) {
 
 		_ = db.View(func(tx *Tx) error {
 			iterator := NewIterator(tx, bucket, IteratorOptions{Reverse: false})
+			defer iterator.Release()
 
 			i := 0
 
@@ -61,6 +63,7 @@ func TestIterator_Reverse(t *testing.T) {
 
 		_ = db.View(func(tx *Tx) error {
 			iterator := NewIterator(tx, bucket, IteratorOptions{Reverse: true})
+			defer iterator.Release()
 
 			i := 99
 			for {
@@ -90,6 +93,7 @@ func TestIterator_Seek(t *testing.T) {
 
 		_ = db.View(func(tx *Tx) error {
 			iterator := NewIterator(tx, bucket, IteratorOptions{Reverse: true})
+			defer iterator.Release()
 
 			iterator.Seek(GetTestBytes(40))
 
@@ -99,5 +103,27 @@ func TestIterator_Seek(t *testing.T) {
 
 			return nil
 		})
+	})
+}
+
+func TestIterator_Release(t *testing.T) {
+	bucket := "bucket"
+
+	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+		for i := 0; i < 100; i++ {
+			txPut(t, db, bucket, GetTestBytes(i), GetTestBytes(i), Persistent, nil, nil)
+		}
+
+		_ = db.View(func(tx *Tx) error {
+			iterator := NewIterator(tx, bucket, IteratorOptions{Reverse: true})
+			defer iterator.Release()
+			return nil
+		})
+
+		for i := 0; i < 100; i++ {
+			txDel(t, db, bucket, GetTestBytes(i), nil)
+		}
 	})
 }
