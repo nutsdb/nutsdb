@@ -99,6 +99,12 @@ func (tx *Tx) NewBucket(ds uint16, name string) (err error) {
 		tx.pendingBucketList[ds] = map[BucketName]*Bucket{}
 	}
 	tx.pendingBucketList[ds][name] = bucket
+	tx.db.bm.onholdBucketSubmitRequest(
+		&bucketSubmitRequest{
+			bucket: bucket,
+			ds:     bucket.Ds,
+			name:   bucket.Name,
+		})
 	return nil
 }
 

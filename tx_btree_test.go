@@ -1508,3 +1508,52 @@ func TestTx_Has(t *testing.T) {
 		})
 	})
 }
+
+func TestTx_ReadAndWriteInSameTransaction(t *testing.T) {
+	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		r := require.New(t)
+
+		bucket := `1`
+		key := []byte(`k`)
+		v1 := []byte(`v1`)
+		v2 := []byte(`v2`)
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+		r.NoError(db.Update(func(tx *Tx) error {
+			r.NoError(tx.Put(bucket, key, v1, 0))
+			_, err := tx.Get(bucket, key)
+			r.NoError(err)
+			return nil
+		}))
+
+		r.NoError(db.Update(func(tx *Tx) error {
+			item, err := tx.Get(bucket, key)
+			r.NoError(err)
+			r.EqualValues(v1, item)
+
+			r.NoError(tx.Put(bucket, key, v2, 0))
+			item, err = tx.Get(bucket, key)
+			r.NoError(err)
+			r.EqualValues(v2, item)
+			return nil
+		}))
+	})
+}
+
+func TestTx_CreateBucketAndWriteInSameTransaction(t *testing.T) {
+	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		r := require.New(t)
+
+		bucket := `1`
+		key := []byte(`k`)
+		v1 := []byte(`v1`)
+
+		r.NoError(db.Update(func(tx *Tx) error {
+			r.NoError(tx.NewKVBucket(bucket))
+			r.NoError(tx.Put(bucket, key, v1, 0))
+			_, err := tx.Get(bucket, key)
+			r.NoError(err)
+			return nil
+		}))
+	})
+}

@@ -63,21 +63,34 @@ func (bm *BucketManager) SubmitPendingBucketChange(reqs []*bucketSubmitRequest) 
 		}
 		// recover maxid otherwise new bucket start from 1 again
 		bm.Gen.CompareAndSetMaxId(req.bucket.Id)
-		switch req.bucket.Meta.Op {
-		case BucketInsertOperation:
-			bm.BucketInfoMapper[req.bucket.Id] = req.bucket
-			bm.BucketIDMarker[req.name][req.bucket.Ds] = req.bucket.Id
-		case BucketDeleteOperation:
-			if len(bm.BucketIDMarker[req.name]) == 1 {
-				delete(bm.BucketIDMarker, req.name)
-			} else {
-				delete(bm.BucketIDMarker[req.name], req.bucket.Ds)
-			}
-			delete(bm.BucketInfoMapper, req.bucket.Id)
-		}
+		bm.handleBucketSubmitRequest(req)
 	}
 	_, err := bm.fd.Write(bytes)
 	return err
+}
+
+func (bm *BucketManager) onholdBucketSubmitRequest(req *bucketSubmitRequest) {
+	// add bucket into bucket manager but don't persist it into disk.
+	if _, exist := bm.BucketIDMarker[req.name]; !exist {
+		bm.BucketIDMarker[req.name] = map[Ds]BucketId{}
+	}
+	bm.Gen.CompareAndSetMaxId(req.bucket.Id)
+	bm.handleBucketSubmitRequest(req)
+}
+
+func (bm *BucketManager) handleBucketSubmitRequest(req *bucketSubmitRequest) {
+	switch req.bucket.Meta.Op {
+	case BucketInsertOperation, BucketPendingInsertOperation:
+		bm.BucketInfoMapper[req.bucket.Id] = req.bucket
+		bm.BucketIDMarker[req.name][req.bucket.Ds] = req.bucket.Id
+	case BucketDeleteOperation:
+		if len(bm.BucketIDMarker[req.name]) == 1 {
+			delete(bm.BucketIDMarker, req.name)
+		} else {
+			delete(bm.BucketIDMarker[req.name], req.bucket.Ds)
+		}
+		delete(bm.BucketInfoMapper, req.bucket.Id)
+	}
 }
 
 type IDGenerator struct {
