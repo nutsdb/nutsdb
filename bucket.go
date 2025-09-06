@@ -16,10 +16,9 @@ const (
 type BucketOperation uint16
 
 const (
-	BucketInsertOperation        BucketOperation = 1
-	BucketUpdateOperation        BucketOperation = 2
-	BucketDeleteOperation        BucketOperation = 3
-	BucketPendingInsertOperation BucketOperation = 4
+	BucketInsertOperation BucketOperation = 1
+	BucketUpdateOperation BucketOperation = 2
+	BucketDeleteOperation BucketOperation = 3
 )
 
 var ErrBucketCrcInvalid = errors.New("bucket crc invalid")
