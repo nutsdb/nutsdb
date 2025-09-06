@@ -128,15 +128,3 @@ func (tx *Tx) DeleteBucket(ds uint16, bucket string) error {
 func (tx *Tx) ExistBucket(ds uint16, bucket string) bool {
 	return tx.db.bm.ExistBucket(ds, bucket)
 }
-
-func (tx *Tx) getBucketFromPendingBuckets(ds uint16, bucketName string) *Bucket {
-	innerMap, ok := tx.pendingBucketList[ds]
-	if !ok {
-		return nil
-	}
-	bucket, ok := innerMap[bucketName]
-	if !ok {
-		return nil
-	}
-	return bucket
-}

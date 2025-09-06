@@ -86,6 +86,15 @@ func (p pendingBucketList) rangeBucket(f func(bucket *Bucket) error) error {
 	return nil
 }
 
+func (p pendingBucketList) existBucket(ds uint16, bucketName string) (ok bool) {
+	if buckets, ok := p[ds]; ok {
+		if _, ok = buckets[bucketName]; ok {
+			return ok
+		}
+	}
+	return false
+}
+
 // toList collect all the entries in pendingEntryList to a list.
 func (pending *pendingEntryList) toList() []*Entry {
 	list := make([]*Entry, 0, pending.size)
