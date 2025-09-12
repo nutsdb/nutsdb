@@ -608,28 +608,20 @@ func (tx *Tx) checkTxIsClosed() error {
 
 // put sets the value for a key in the bucket.
 // Returns an error if tx is closed, if performing a write operation on a read-only transaction, if the key is empty.
-func (tx *Tx) put(bucket string, key, value []byte, ttl uint32, flag uint16, timestamp uint64, ds uint16) error {
+func (tx *Tx) put(bucket string, key, value []byte, ttl uint32, flag uint16, timestamp uint64, ds uint16) (err error) {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return err
 	}
 
-	bucketStatus := tx.getBucketStatus(DataStructureBTree, bucket)
-	if bucketStatus == BucketStatusDeleted {
+	bucketStatus, b := tx.getBucketAndItsStatus(DataStructureBTree, bucket)
+	if bucketStatus == BucketStatusDeleted || bucketStatus == BucketStatusUnknown {
 		return ErrBucketNotFound
-	}
-
-	if !tx.db.bm.ExistBucket(ds, bucket) {
-		return ErrorBucketNotExist
 	}
 
 	if !tx.writable {
 		return ErrTxNotWritable
 	}
-
-	bucketId, err := tx.db.bm.GetBucketID(ds, bucket)
-	if err != nil {
-		return err
-	}
+	bucketId := b.Id
 
 	meta := NewMetaData().WithTimeStamp(timestamp).WithKeySize(uint32(len(key))).WithValueSize(uint32(len(value))).WithFlag(flag).
 		WithTTL(ttl).WithStatus(UnCommitted).WithDs(ds).WithTxID(tx.id).WithBucketId(bucketId)
@@ -844,25 +836,27 @@ func (tx *Tx) getChangeCountInBucketChanges() int64 {
 	return res
 }
 
-func (tx *Tx) getBucketStatus(ds Ds, name BucketName) BucketStatus {
+// getBucketAndItsStatus, get bucket and it is status in pendingBucketList,
+// if bucket is already in bucket manager but not in pendingList, will return BucketStatusExistAlready.
+func (tx *Tx) getBucketAndItsStatus(ds Ds, name BucketName) (BucketStatus, *Bucket) {
 	if len(tx.pendingBucketList) > 0 {
 		if bucketInDs, exist := tx.pendingBucketList[ds]; exist {
 			if bucket, exist := bucketInDs[name]; exist {
 				switch bucket.Meta.Op {
 				case BucketInsertOperation:
-					return BucketStatusNew
+					return BucketStatusNew, bucket
 				case BucketDeleteOperation:
-					return BucketStatusDeleted
+					return BucketStatusDeleted, bucket
 				case BucketUpdateOperation:
-					return BucketStatusUpdated
+					return BucketStatusUpdated, bucket
 				}
 			}
 		}
 	}
-	if tx.db.bm.ExistBucket(ds, name) {
-		return BucketStatusExistAlready
+	if bucket, err := tx.db.bm.GetBucket(ds, name); err == nil {
+		return BucketStatusExistAlready, bucket
 	}
-	return BucketStatusUnknown
+	return BucketStatusUnknown, nil
 }
 
 // findEntryStatus finds the latest status for the certain Entry in Tx
@@ -887,4 +881,18 @@ func (tx *Tx) findEntryAndItsStatus(ds Ds, bucket BucketName, key string) (Entry
 		}
 	}
 	return NotFoundEntry, nil
+}
+
+func (tx *Tx) rangePendingEntries(_ Ds, bucketName BucketName, rangeFunc func(entry *Entry) bool) {
+	pendingWriteEntries := tx.pendingWrites.entriesInBTree
+	if pendingWriteEntries == nil {
+		return
+	}
+	entries := pendingWriteEntries[bucketName]
+	for _, entry := range entries {
+		ok := rangeFunc(entry)
+		if !ok {
+			break
+		}
+	}
 }

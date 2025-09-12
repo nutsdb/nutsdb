@@ -1541,19 +1541,50 @@ func TestTx_ReadAndWriteInSameTransaction(t *testing.T) {
 }
 
 func TestTx_CreateBucketAndWriteInSameTransaction(t *testing.T) {
-	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		r := require.New(t)
+	t.Run("test Get and Has", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			r := require.New(t)
 
-		bucket := `1`
-		key := []byte(`k`)
-		v1 := []byte(`v1`)
+			bucket := `1`
+			key := []byte(`k`)
+			v1 := []byte(`v1`)
 
-		r.NoError(db.Update(func(tx *Tx) error {
-			r.NoError(tx.NewKVBucket(bucket))
-			r.NoError(tx.Put(bucket, key, v1, 0))
-			_, err := tx.Get(bucket, key)
-			r.NoError(err)
-			return nil
-		}))
+			r.NoError(db.Update(func(tx *Tx) (err error) {
+				r.NoError(tx.NewKVBucket(bucket))
+				r.NoError(tx.Put(bucket, key, v1, 0))
+				v, err := tx.Get(bucket, key)
+				r.Equal(v1, v)
+				r.NoError(err)
+				exist, err := tx.Has(bucket, key)
+				r.True(exist)
+				r.NoError(err)
+				return
+			}))
+		})
+	})
+
+	t.Run("test GetMinOrMaxKey", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			r := require.New(t)
+
+			bucket := `1`
+			key1 := []byte(`k1`)
+			key2 := []byte("k2")
+			v1 := []byte(`v1`)
+
+			r.NoError(db.Update(func(tx *Tx) (err error) {
+				r.NoError(tx.NewKVBucket(bucket))
+				r.NoError(tx.Put(bucket, key1, v1, 0))
+				r.NoError(tx.Put(bucket, key2, v1, 0))
+
+				k, err := tx.GetMaxKey(bucket)
+				r.Nil(err)
+				r.Equal(key2, k)
+				k, err = tx.GetMinKey(bucket)
+				r.Nil(err)
+				r.Equal(key1, k)
+				return
+			}))
+		})
 	})
 }

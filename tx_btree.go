@@ -15,6 +15,7 @@
 package nutsdb
 
 import (
+	"bytes"
 	"errors"
 	"math"
 	"math/big"
@@ -86,16 +87,11 @@ func (tx *Tx) get(bucket string, key []byte) (value []byte, err error) {
 		return nil, err
 	}
 
-	b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
-	if err != nil {
-		return nil, err
-	}
-	bucketId := b.Id
-
-	bucketStatus := tx.getBucketStatus(DataStructureBTree, bucket)
-	if bucketStatus == BucketStatusDeleted {
+	status, b := tx.getBucketAndItsStatus(DataStructureBTree, bucket)
+	if isBucketNotFoundStatus(status) {
 		return nil, ErrBucketNotFound
 	}
+	bucketId := b.Id
 
 	status, entry := tx.findEntryAndItsStatus(DataStructureBTree, bucket, string(key))
 	if status != NotFoundEntry && entry != nil {
@@ -146,11 +142,37 @@ func (tx *Tx) getMaxOrMinKey(bucket string, isMax bool) ([]byte, error) {
 		return nil, err
 	}
 
-	b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
-	if err != nil {
-		return nil, err
+	status, b := tx.getBucketAndItsStatus(DataStructureBTree, bucket)
+	if isBucketNotFoundStatus(status) {
+		return nil, ErrBucketNotFound
 	}
 	bucketId := b.Id
+
+	var (
+		maxKey       []byte = nil
+		minKey       []byte = nil
+		pendingFound bool   = false
+	)
+
+	compareAndSwap := func(target []byte, other []byte, cmpVal int) []byte {
+		if target == nil {
+			target = other
+		}
+		if bytes.Compare(other, target) == cmpVal {
+			target = other
+		}
+		return target
+	}
+
+	tx.rangePendingEntries(
+		DataStructureBTree,
+		bucket,
+		func(entry *Entry) bool {
+			maxKey = compareAndSwap(maxKey, entry.Key, 1)
+			minKey = compareAndSwap(minKey, entry.Key, -1)
+			pendingFound = true
+			return true
+		})
 
 	if idx, ok := tx.db.Index.bTree.exist(bucketId); ok {
 		var (
@@ -165,17 +187,36 @@ func (tx *Tx) getMaxOrMinKey(bucket string, isMax bool) ([]byte, error) {
 		}
 
 		if !found {
-			return nil, ErrKeyNotFound
+			if pendingFound {
+				goto validReturn
+			}
+			goto keyNotFoundReturn
 		}
 
 		if item.record.IsExpired() {
 			tx.putDeleteLog(bucketId, item.key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureBTree)
-			return nil, ErrNotFoundKey
+			if pendingFound {
+				goto validReturn
+			}
+			goto keyNotFoundReturn
+		}
+		if isMax {
+			maxKey = compareAndSwap(maxKey, item.key, 1)
+		} else {
+			minKey = compareAndSwap(minKey, item.key, -1)
 		}
 
-		return item.key, nil
+	}
+	if pendingFound {
+		goto validReturn
+	}
+keyNotFoundReturn:
+	return nil, ErrKeyNotFound
+validReturn:
+	if isMax {
+		return maxKey, nil
 	} else {
-		return nil, ErrKeyNotFound
+		return minKey, nil
 	}
 }
 
@@ -252,11 +293,20 @@ func (tx *Tx) Has(bucket string, key []byte) (exists bool, err error) {
 		return false, err
 	}
 
-	b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
-	if err != nil {
-		return false, err
+	status, b := tx.getBucketAndItsStatus(DataStructureBTree, bucket)
+	if isBucketNotFoundStatus(status) {
+		return false, ErrBucketNotExist
 	}
 	bucketId := b.Id
+
+	status, entry := tx.findEntryAndItsStatus(DataStructureBTree, bucket, string(key))
+	if status != NotFoundEntry && entry != nil {
+		if status == EntryDeleted {
+			return false, ErrKeyNotFound
+		} else {
+			return true, nil
+		}
+	}
 
 	idx, bucketExists := tx.db.Index.bTree.exist(bucketId)
 	if !bucketExists {
