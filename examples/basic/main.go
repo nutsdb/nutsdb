@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 
@@ -17,7 +16,7 @@ var (
 func init() {
 	fileDir := "/tmp/nutsdb_example"
 
-	files, _ := ioutil.ReadDir(fileDir)
+	files, _ := os.ReadDir(fileDir)
 	for _, f := range files {
 		name := f.Name()
 		if name != "" {
@@ -79,6 +78,9 @@ func main() {
 
 	// save name2 as persistent
 	persist()
+
+	// get uncommitted update in same transaction
+	getUncommittedUpdateInSameTransaction()
 }
 
 func createBucket() {
@@ -213,5 +215,32 @@ func persist() {
 		return tx.Persist(bucket, key)
 	}); err != nil {
 		log.Println(err)
+	}
+}
+
+func getUncommittedUpdateInSameTransaction() {
+	log.Println("start run: Get uncommitted update in same transaction")
+	currBucket := "bucketForTransactionNew"
+	key := []byte("testkey")
+	val1 := []byte("value1")
+	// val2 := []byte("value2")
+	must := func(f func() error) {
+		if err := f(); err != nil {
+			panic(err)
+		}
+	}
+	if err := db.Update(func(tx *nutsdb.Tx) (err error) {
+		must(func() error {
+			return tx.NewKVBucket(currBucket)
+		})
+		must(func() error {
+			return tx.Put(currBucket, key, val1, 0)
+		})
+		vcurr, err := tx.Get(currBucket, key)
+		log.Printf("%v, %v", string(vcurr), err)
+		return
+	}); err != nil {
+		log.Printf("failed update: %v", err)
+		return
 	}
 }

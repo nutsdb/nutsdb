@@ -103,3 +103,9 @@ func (pending *pendingEntryList) toList() []*Entry {
 	}
 	return list
 }
+
+// isBucketNotFoundStatus return true for bucket is not found,
+// false for other status.
+func isBucketNotFoundStatus(status BucketStatus) bool {
+	return status == BucketStatusDeleted || status == BucketStatusUnknown
+}
