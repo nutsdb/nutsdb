@@ -882,17 +882,3 @@ func (tx *Tx) findEntryAndItsStatus(ds Ds, bucket BucketName, key string) (Entry
 	}
 	return NotFoundEntry, nil
 }
-
-func (tx *Tx) rangePendingEntries(_ Ds, bucketName BucketName, rangeFunc func(entry *Entry) bool) {
-	pendingWriteEntries := tx.pendingWrites.entriesInBTree
-	if pendingWriteEntries == nil {
-		return
-	}
-	entries := pendingWriteEntries[bucketName]
-	for _, entry := range entries {
-		ok := rangeFunc(entry)
-		if !ok {
-			break
-		}
-	}
-}

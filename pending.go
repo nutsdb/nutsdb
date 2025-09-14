@@ -104,6 +104,46 @@ func (pending *pendingEntryList) toList() []*Entry {
 	return list
 }
 
+func (pendingEntries *pendingEntryList) rangeEntries(_ Ds, bucketName BucketName, rangeFunc func(entry *Entry) bool) {
+	pendingWriteEntries := pendingEntries.entriesInBTree
+	if pendingWriteEntries == nil {
+		return
+	}
+	entries := pendingWriteEntries[bucketName]
+	for _, entry := range entries {
+		ok := rangeFunc(entry)
+		if !ok {
+			break
+		}
+	}
+}
+
+func (pendingEntries *pendingEntryList) MaxOrMinKey(bucketName string, isMax bool) (key []byte, found bool) {
+	var (
+		maxKey       []byte = nil
+		minKey       []byte = nil
+		pendingFound        = false
+	)
+
+	pendingEntries.rangeEntries(
+		DataStructureBTree,
+		bucketName,
+		func(entry *Entry) bool {
+			maxKey = compareAndReturn(maxKey, entry.Key, 1)
+			minKey = compareAndReturn(minKey, entry.Key, -1)
+			pendingFound = true
+			return true
+		})
+
+	if !pendingFound {
+		return nil, false
+	}
+	if isMax {
+		return maxKey, true
+	}
+	return minKey, true
+}
+
 // isBucketNotFoundStatus return true for bucket is not found,
 // false for other status.
 func isBucketNotFoundStatus(status BucketStatus) bool {

@@ -178,3 +178,13 @@ func UvarintSize(x uint64) int {
 	}
 	return i + 1
 }
+
+func compareAndReturn(target []byte, other []byte, cmpVal int) []byte {
+	if target == nil {
+		target = other
+	}
+	if bytes.Compare(other, target) == cmpVal {
+		target = other
+	}
+	return target
+}

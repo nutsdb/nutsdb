@@ -15,7 +15,6 @@
 package nutsdb
 
 import (
-	"bytes"
 	"errors"
 	"math"
 	"math/big"
@@ -149,30 +148,11 @@ func (tx *Tx) getMaxOrMinKey(bucket string, isMax bool) ([]byte, error) {
 	bucketId := b.Id
 
 	var (
-		maxKey       []byte = nil
-		minKey       []byte = nil
-		pendingFound bool   = false
+		key          []byte = nil
+		pendingFound        = false
 	)
 
-	compareAndSwap := func(target []byte, other []byte, cmpVal int) []byte {
-		if target == nil {
-			target = other
-		}
-		if bytes.Compare(other, target) == cmpVal {
-			target = other
-		}
-		return target
-	}
-
-	tx.rangePendingEntries(
-		DataStructureBTree,
-		bucket,
-		func(entry *Entry) bool {
-			maxKey = compareAndSwap(maxKey, entry.Key, 1)
-			minKey = compareAndSwap(minKey, entry.Key, -1)
-			pendingFound = true
-			return true
-		})
+	key, pendingFound = tx.pendingWrites.MaxOrMinKey(bucket, isMax)
 
 	if idx, ok := tx.db.Index.bTree.exist(bucketId); ok {
 		var (
@@ -201,11 +181,10 @@ func (tx *Tx) getMaxOrMinKey(bucket string, isMax bool) ([]byte, error) {
 			goto keyNotFoundReturn
 		}
 		if isMax {
-			maxKey = compareAndSwap(maxKey, item.key, 1)
+			key = compareAndReturn(key, item.key, 1)
 		} else {
-			minKey = compareAndSwap(minKey, item.key, -1)
+			key = compareAndReturn(key, item.key, -1)
 		}
-
 	}
 	if pendingFound {
 		goto validReturn
@@ -213,11 +192,7 @@ func (tx *Tx) getMaxOrMinKey(bucket string, isMax bool) ([]byte, error) {
 keyNotFoundReturn:
 	return nil, ErrKeyNotFound
 validReturn:
-	if isMax {
-		return maxKey, nil
-	} else {
-		return minKey, nil
-	}
+	return key, nil
 }
 
 // GetAll returns all keys and values in the given bucket.
