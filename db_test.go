@@ -925,7 +925,7 @@ func TestDB_DeleteBucket(t *testing.T) {
 		txGet(t, db, bucket, key, val, nil)
 
 		txDeleteBucket(t, db, DataStructureBTree, bucket, nil)
-		txPut(t, db, bucket, key, val, Persistent, ErrorBucketNotExist, nil)
+		txPut(t, db, bucket, key, val, Persistent, ErrBucketNotFound, nil)
 	})
 }
 

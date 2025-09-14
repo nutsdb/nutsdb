@@ -85,7 +85,7 @@ func TestTx_MPush(t *testing.T) {
 			bbs = append(bbs, GetTestBytes(4))
 
 			txCreateBucket(t, db, DataStructureList, bucket, nil)
-			txMPush(t, db, "test1", GetTestBytes(1), bbs, true, ErrorBucketNotExist, nil)
+			txMPush(t, db, "test1", GetTestBytes(1), bbs, true, ErrNotFoundBucket, nil)
 		})
 	})
 
@@ -109,7 +109,7 @@ func TestTx_MPush(t *testing.T) {
 			bbs = append(bbs, GetTestBytes(4))
 
 			txCreateBucket(t, db, DataStructureList, bucket, nil)
-			txMPush(t, db, "test1", GetTestBytes(1), bbs, false, ErrorBucketNotExist, nil)
+			txMPush(t, db, "test1", GetTestBytes(1), bbs, false, ErrNotFoundBucket, nil)
 		})
 	})
 }

@@ -613,8 +613,8 @@ func (tx *Tx) put(bucket string, key, value []byte, ttl uint32, flag uint16, tim
 		return err
 	}
 
-	bucketStatus, b := tx.getBucketAndItsStatus(DataStructureBTree, bucket)
-	if bucketStatus == BucketStatusDeleted || bucketStatus == BucketStatusUnknown {
+	bucketStatus, b := tx.getBucketAndItsStatus(ds, bucket)
+	if isBucketNotFoundStatus(bucketStatus) {
 		return ErrBucketNotFound
 	}
 

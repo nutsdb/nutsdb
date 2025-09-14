@@ -40,7 +40,7 @@ var (
 
 	ErrCannotRollbackAClosedTx = errors.New("can not rollback a closed tx")
 
-	// ErrNotFoundBucket is returned when key not found int the bucket on an view function.
+	// ErrNotFoundBucket is returned when bucket not found int the bucket on an view function.
 	ErrNotFoundBucket = errors.New("bucket not found")
 
 	// ErrTxnTooBig is returned if too many writes are fit into a single transaction.
@@ -50,8 +50,6 @@ var (
 	ErrTxnExceedWriteLimit = errors.New("txn is exceed max write record count")
 
 	ErrBucketAlreadyExist = errors.New("bucket is already exist")
-
-	ErrorBucketNotExist = errors.New("bucket is not exist yet, please use NewBucket function to create this bucket first")
 
 	ErrValueNotInteger = errors.New("value is not an integer")
 

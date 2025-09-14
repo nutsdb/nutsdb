@@ -88,7 +88,7 @@ func (tx *Tx) get(bucket string, key []byte) (value []byte, err error) {
 
 	status, b := tx.getBucketAndItsStatus(DataStructureBTree, bucket)
 	if isBucketNotFoundStatus(status) {
-		return nil, ErrBucketNotFound
+		return nil, ErrNotFoundBucket
 	}
 	bucketId := b.Id
 
@@ -143,16 +143,16 @@ func (tx *Tx) getMaxOrMinKey(bucket string, isMax bool) ([]byte, error) {
 
 	status, b := tx.getBucketAndItsStatus(DataStructureBTree, bucket)
 	if isBucketNotFoundStatus(status) {
-		return nil, ErrBucketNotFound
+		return nil, ErrNotFoundBucket
 	}
 	bucketId := b.Id
 
 	var (
-		key          []byte = nil
-		pendingFound        = false
+		key           []byte = nil
+		actuallyFound        = false
 	)
 
-	key, pendingFound = tx.pendingWrites.MaxOrMinKey(bucket, isMax)
+	key, actuallyFound = tx.pendingWrites.MaxOrMinKey(bucket, isMax)
 
 	if idx, ok := tx.db.Index.bTree.exist(bucketId); ok {
 		var (
@@ -167,15 +167,17 @@ func (tx *Tx) getMaxOrMinKey(bucket string, isMax bool) ([]byte, error) {
 		}
 
 		if !found {
-			if pendingFound {
+			if actuallyFound {
 				goto validReturn
 			}
 			goto keyNotFoundReturn
+		} else {
+			actuallyFound = found
 		}
 
 		if item.record.IsExpired() {
 			tx.putDeleteLog(bucketId, item.key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureBTree)
-			if pendingFound {
+			if actuallyFound {
 				goto validReturn
 			}
 			goto keyNotFoundReturn
@@ -186,7 +188,7 @@ func (tx *Tx) getMaxOrMinKey(bucket string, isMax bool) ([]byte, error) {
 			key = compareAndReturn(key, item.key, -1)
 		}
 	}
-	if pendingFound {
+	if actuallyFound {
 		goto validReturn
 	}
 keyNotFoundReturn:
@@ -270,7 +272,7 @@ func (tx *Tx) Has(bucket string, key []byte) (exists bool, err error) {
 
 	status, b := tx.getBucketAndItsStatus(DataStructureBTree, bucket)
 	if isBucketNotFoundStatus(status) {
-		return false, ErrBucketNotExist
+		return false, ErrNotFoundBucket
 	}
 	bucketId := b.Id
 
