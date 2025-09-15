@@ -18,6 +18,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestMarshalInts(t *testing.T) {
@@ -58,4 +59,30 @@ func TestMatchForRange(t *testing.T) {
 	})
 	assertions.NoError(err, "TestMatchForRange")
 	assertions.True(end, "TestMatchForRange")
+}
+
+func TestCompareAndRetrn(t *testing.T) {
+	r := require.New(t)
+
+	t.Run("target equal to others", func(t *testing.T) {
+		target := []byte("test1")
+		other := []byte("test1")
+
+		r.Equal(target, compareAndReturn(target, other, 1))
+		r.Equal(target, compareAndReturn(target, other, -1))
+	})
+
+	t.Run("target greater than others", func(t *testing.T) {
+		target := []byte("b-string")
+		other := []byte("c")
+		r.Equal(other, compareAndReturn(target, other, 1))
+		r.Equal(target, compareAndReturn(target, other, -1))
+	})
+
+	t.Run("target smaller than others", func(t *testing.T) {
+		target := []byte("a-string")
+		other := []byte("c")
+		r.Equal(other, compareAndReturn(target, other, 1))
+		r.Equal(target, compareAndReturn(target, other, -1))
+	})
 }
