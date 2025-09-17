@@ -61,7 +61,7 @@ func TestMatchForRange(t *testing.T) {
 	assertions.True(end, "TestMatchForRange")
 }
 
-func TestCompareAndRetrn(t *testing.T) {
+func TestCompareAndReturn(t *testing.T) {
 	r := require.New(t)
 
 	t.Run("target equal to others", func(t *testing.T) {

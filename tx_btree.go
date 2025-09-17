@@ -168,9 +168,9 @@ func (tx *Tx) getMaxOrMinKey(bucket string, isMax bool) ([]byte, error) {
 
 		if !found {
 			if actuallyFound {
-				goto validReturn
+				return key, nil
 			}
-			goto keyNotFoundReturn
+			return nil, ErrKeyNotFound
 		} else {
 			actuallyFound = found
 		}
@@ -178,9 +178,9 @@ func (tx *Tx) getMaxOrMinKey(bucket string, isMax bool) ([]byte, error) {
 		if item.record.IsExpired() {
 			tx.putDeleteLog(bucketId, item.key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureBTree)
 			if actuallyFound {
-				goto validReturn
+				return key, nil
 			}
-			goto keyNotFoundReturn
+			return nil, ErrKeyNotFound
 		}
 		if isMax {
 			key = compareAndReturn(key, item.key, 1)
@@ -189,12 +189,9 @@ func (tx *Tx) getMaxOrMinKey(bucket string, isMax bool) ([]byte, error) {
 		}
 	}
 	if actuallyFound {
-		goto validReturn
+		return key, nil
 	}
-keyNotFoundReturn:
 	return nil, ErrKeyNotFound
-validReturn:
-	return key, nil
 }
 
 // GetAll returns all keys and values in the given bucket.
