@@ -104,8 +104,8 @@ func (pending *pendingEntryList) toList() []*Entry {
 	return list
 }
 
-func (pendingEntries *pendingEntryList) rangeEntries(_ Ds, bucketName BucketName, rangeFunc func(entry *Entry) bool) {
-	pendingWriteEntries := pendingEntries.entriesInBTree
+func (pending *pendingEntryList) rangeEntries(_ Ds, bucketName BucketName, rangeFunc func(entry *Entry) bool) {
+	pendingWriteEntries := pending.entriesInBTree
 	if pendingWriteEntries == nil {
 		return
 	}
@@ -118,14 +118,14 @@ func (pendingEntries *pendingEntryList) rangeEntries(_ Ds, bucketName BucketName
 	}
 }
 
-func (pendingEntries *pendingEntryList) MaxOrMinKey(bucketName string, isMax bool) (key []byte, found bool) {
+func (pending *pendingEntryList) MaxOrMinKey(bucketName string, isMax bool) (key []byte, found bool) {
 	var (
 		maxKey       []byte = nil
 		minKey       []byte = nil
 		pendingFound        = false
 	)
 
-	pendingEntries.rangeEntries(
+	pending.rangeEntries(
 		DataStructureBTree,
 		bucketName,
 		func(entry *Entry) bool {
