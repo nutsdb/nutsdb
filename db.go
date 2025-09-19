@@ -606,8 +606,8 @@ func (db *DB) buildBTreeIdx(record *Record, entry *Entry) error {
 }
 
 func (db *DB) expireTime(timestamp uint64, ttl uint32) time.Duration {
-	now := time.UnixMilli(time.Now().UnixMilli())
-	expireTime := time.UnixMilli(int64(timestamp))
+	now := time.Unix(time.Now().Unix(), 0)
+	expireTime := time.Unix(int64(timestamp), 0)
 	expireTime = expireTime.Add(time.Duration(int64(ttl)) * time.Second)
 	return expireTime.Sub(now)
 }
