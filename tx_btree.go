@@ -47,15 +47,20 @@ func (tx *Tx) PutIfNotExists(bucket string, key, value []byte, ttl uint32) error
 		return err
 	}
 
-	b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
-	if err != nil {
-		return err
+	status, b := tx.getBucketAndItsStatus(DataStructureBTree, bucket)
+	if isBucketNotFoundStatus(status) {
+		return ErrNotFoundBucket
 	}
 	bucketId := b.Id
+	_, err := tx.pendingWrites.Get(DataStructureBTree, bucket, key)
+	if err == nil {
+		// the key-value is exists.
+		return nil
+	}
 
 	idx, bucketExists := tx.db.Index.bTree.exist(bucketId)
 	if !bucketExists {
-		return ErrNotFoundBucket
+		return tx.put(bucket, key, value, ttl, DataSetFlag, uint64(time.Now().UnixMilli()), DataStructureBTree)
 	}
 	record, recordExists := idx.Find(key)
 
@@ -451,11 +456,11 @@ func (tx *Tx) tryGet(bucket string, key []byte, solveRecord func(record *Record,
 	if err := tx.checkTxIsClosed(); err != nil {
 		return err
 	}
-
-	bucketId, err := tx.db.bm.GetBucketID(DataStructureBTree, bucket)
-	if err != nil {
-		return err
+	status, b := tx.getBucketAndItsStatus(DataStructureBTree, bucket)
+	if isBucketNotFoundStatus(status) {
+		return ErrNotFoundBucket
 	}
+	bucketId := b.Id
 
 	if idx, ok := tx.db.Index.bTree.exist(bucketId); ok {
 		record, found := idx.Find(key)
@@ -608,14 +613,17 @@ func (tx *Tx) GetTTL(bucket string, key []byte) (int64, error) {
 		return 0, err
 	}
 
-	bucketId, err := tx.db.bm.GetBucketID(DataStructureBTree, bucket)
-	if err != nil {
-		return 0, err
+	status, b := tx.getBucketAndItsStatus(DataStructureBTree, bucket)
+	if isBucketNotFoundStatus(status) {
+		return 0, ErrBucketNotFound
 	}
+	bucketId := b.Id
+
 	idx, bucketExists := tx.db.Index.bTree.exist(bucketId)
 
 	if !bucketExists {
-		return 0, ErrBucketNotFound
+		// get from pendingWrites
+		return tx.pendingWrites.GetTTL(DataStructureBTree, bucket, key)
 	}
 
 	record, recordFound := idx.Find(key)
@@ -628,7 +636,7 @@ func (tx *Tx) GetTTL(bucket string, key []byte) (int64, error) {
 		return -1, nil
 	}
 
-	remTTL := tx.db.expireTime(record.Timestamp, record.TTL)
+	remTTL := expireTime(record.Timestamp, record.TTL)
 	if remTTL >= 0 {
 		return int64(remTTL.Seconds()), nil
 	} else {

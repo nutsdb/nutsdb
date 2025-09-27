@@ -1587,4 +1587,64 @@ func TestTx_CreateBucketAndWriteInSameTransaction(t *testing.T) {
 			}))
 		})
 	})
+
+	t.Run("test GetTTL", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			r := require.New(t)
+
+			bucket := `1`
+			key := []byte(`k`)
+			v1 := []byte(`v1`)
+
+			r.NoError(db.Update(func(tx *Tx) (err error) {
+				r.NoError(tx.NewKVBucket(bucket))
+				r.NoError(tx.Put(bucket, key, v1, 3600))
+				ttl, err := tx.GetTTL(bucket, key)
+				r.Nil(err)
+				r.NotEqual(0, ttl)
+				return
+			}))
+		})
+	})
+
+	t.Run("test PutIfNotExists", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			r := require.New(t)
+
+			bucket := `1`
+			key := []byte(`k`)
+			v1 := []byte(`v1`)
+			v2 := []byte(`v2`)
+
+			r.NoError(db.Update(func(tx *Tx) (err error) {
+				r.NoError(tx.NewKVBucket(bucket))
+				r.NoError(tx.Put(bucket, key, v1, 3600))
+				v, _ := tx.get(bucket, key)
+				r.Equal(v1, v)
+				r.NoError(tx.PutIfNotExists(bucket, key, v2, 3600))
+				v, _ = tx.get(bucket, key)
+				r.Equal(v1, v)
+				return
+			}))
+		})
+	})
+
+	t.Run("test GetRange", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			r := require.New(t)
+
+			bucket := `1`
+			key := []byte(`k`)
+			v := []byte(`0123456789`)
+
+			r.NoError(db.Update(func(tx *Tx) (err error) {
+				r.NoError(tx.NewKVBucket(bucket))
+				r.NoError(tx.Put(bucket, key, v, 3600))
+				vnow, err := tx.GetRange(bucket, key, 1, 3)
+				r.Nil(err)
+				r.Equal("123", string(vnow))
+				return
+			}))
+		})
+	})
 }

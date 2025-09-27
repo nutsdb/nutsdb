@@ -22,6 +22,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/xujiajun/utils/strconv2"
 )
@@ -189,4 +190,11 @@ func compareAndReturn(target []byte, other []byte, cmpVal int) []byte {
 		return other
 	}
 	return target
+}
+
+func expireTime(timestamp uint64, ttl uint32) time.Duration {
+	now := time.UnixMilli(time.Now().UnixMilli())
+	expireTime := time.UnixMilli(int64(timestamp))
+	expireTime = expireTime.Add(time.Duration(int64(ttl)) * time.Second)
+	return expireTime.Sub(now)
 }

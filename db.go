@@ -27,7 +27,6 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/gofrs/flock"
 	"github.com/xujiajun/utils/filesystem"
@@ -596,20 +595,13 @@ func (db *DB) buildBTreeIdx(record *Record, entry *Entry) error {
 		bTree.Delete(key)
 	} else {
 		if meta.TTL != Persistent {
-			db.tm.add(bucketId, string(key), db.expireTime(meta.Timestamp, meta.TTL), db.buildExpireCallback(bucket.Name, key))
+			db.tm.add(bucketId, string(key), expireTime(meta.Timestamp, meta.TTL), db.buildExpireCallback(bucket.Name, key))
 		} else {
 			db.tm.del(bucketId, string(key))
 		}
 		bTree.Insert(record)
 	}
 	return nil
-}
-
-func (db *DB) expireTime(timestamp uint64, ttl uint32) time.Duration {
-	now := time.UnixMilli(time.Now().UnixMilli())
-	expireTime := time.UnixMilli(int64(timestamp))
-	expireTime = expireTime.Add(time.Duration(int64(ttl)) * time.Second)
-	return expireTime.Sub(now)
 }
 
 func (db *DB) buildIdxes(record *Record, entry *Entry) error {

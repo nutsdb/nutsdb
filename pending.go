@@ -1,5 +1,7 @@
 package nutsdb
 
+import "bytes"
+
 // EntryStatus represents the Entry status in the current Tx
 type EntryStatus = uint8
 
@@ -71,6 +73,45 @@ func (pending *pendingEntryList) submitEntry(ds Ds, bucket string, e *Entry) {
 		pending.entries[ds][bucket] = entries
 		pending.size++
 	}
+}
+
+func (pending *pendingEntryList) Get(ds Ds, bucket string, key []byte) (entry *Entry, err error) {
+	switch ds {
+	case DataStructureBTree:
+		if _, exist := pending.entriesInBTree[bucket]; exist {
+			if rec, ok := pending.entriesInBTree[bucket][string(key)]; ok {
+				return rec, nil
+			} else {
+				return nil, ErrKeyNotFound
+			}
+		}
+		return nil, ErrBucketNotFound
+	default:
+		if _, exist := pending.entries[ds]; exist {
+			if entries, ok := pending.entries[ds][bucket]; ok {
+				for _, e := range entries {
+					if bytes.Equal(key, e.Key) {
+						return e, nil
+					}
+				}
+				return nil, ErrKeyNotFound
+			} else {
+				return nil, ErrKeyNotFound
+			}
+		}
+		return nil, ErrBucketNotFound
+	}
+}
+
+func (pending *pendingEntryList) GetTTL(ds Ds, bucket string, key []byte) (ttl int64, err error) {
+	rec, err := pending.Get(ds, bucket, key)
+	if err != nil {
+		return 0, err
+	}
+	if rec.Meta.TTL == Persistent {
+		return -1, nil
+	}
+	return int64(expireTime(rec.Meta.Timestamp, rec.Meta.TTL).Seconds()), nil
 }
 
 // rangeBucket input a range handler function f and call it with every bucket in pendingBucketList
