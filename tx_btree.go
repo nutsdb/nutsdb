@@ -47,15 +47,20 @@ func (tx *Tx) PutIfNotExists(bucket string, key, value []byte, ttl uint32) error
 		return err
 	}
 
-	b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
-	if err != nil {
-		return err
+	status, b := tx.getBucketAndItsStatus(DataStructureBTree, bucket)
+	if isBucketNotFoundStatus(status) {
+		return ErrNotFoundBucket
 	}
 	bucketId := b.Id
+	_, err := tx.pendingWrites.Get(DataStructureBTree, bucket, key)
+	if err == nil {
+		// the key-value is exists.
+		return nil
+	}
 
 	idx, bucketExists := tx.db.Index.bTree.exist(bucketId)
 	if !bucketExists {
-		return ErrNotFoundBucket
+		return tx.put(bucket, key, value, ttl, DataSetFlag, uint64(time.Now().UnixMilli()), DataStructureBTree)
 	}
 	record, recordExists := idx.Find(key)
 
@@ -86,16 +91,11 @@ func (tx *Tx) get(bucket string, key []byte) (value []byte, err error) {
 		return nil, err
 	}
 
-	b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
-	if err != nil {
-		return nil, err
+	status, b := tx.getBucketAndItsStatus(DataStructureBTree, bucket)
+	if isBucketNotFoundStatus(status) {
+		return nil, ErrNotFoundBucket
 	}
 	bucketId := b.Id
-
-	bucketStatus := tx.getBucketStatus(DataStructureBTree, bucket)
-	if bucketStatus == BucketStatusDeleted {
-		return nil, ErrBucketNotFound
-	}
 
 	status, entry := tx.findEntryAndItsStatus(DataStructureBTree, bucket, string(key))
 	if status != NotFoundEntry && entry != nil {
@@ -146,11 +146,18 @@ func (tx *Tx) getMaxOrMinKey(bucket string, isMax bool) ([]byte, error) {
 		return nil, err
 	}
 
-	b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
-	if err != nil {
-		return nil, err
+	status, b := tx.getBucketAndItsStatus(DataStructureBTree, bucket)
+	if isBucketNotFoundStatus(status) {
+		return nil, ErrNotFoundBucket
 	}
 	bucketId := b.Id
+
+	var (
+		key           []byte = nil
+		actuallyFound        = false
+	)
+
+	key, actuallyFound = tx.pendingWrites.MaxOrMinKey(bucket, isMax)
 
 	if idx, ok := tx.db.Index.bTree.exist(bucketId); ok {
 		var (
@@ -165,18 +172,31 @@ func (tx *Tx) getMaxOrMinKey(bucket string, isMax bool) ([]byte, error) {
 		}
 
 		if !found {
+			if actuallyFound {
+				return key, nil
+			}
 			return nil, ErrKeyNotFound
+		} else {
+			actuallyFound = found
 		}
 
 		if item.record.IsExpired() {
 			tx.putDeleteLog(bucketId, item.key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureBTree)
-			return nil, ErrNotFoundKey
+			if actuallyFound {
+				return key, nil
+			}
+			return nil, ErrKeyNotFound
 		}
-
-		return item.key, nil
-	} else {
-		return nil, ErrKeyNotFound
+		if isMax {
+			key = compareAndReturn(key, item.key, 1)
+		} else {
+			key = compareAndReturn(key, item.key, -1)
+		}
 	}
+	if actuallyFound {
+		return key, nil
+	}
+	return nil, ErrKeyNotFound
 }
 
 // GetAll returns all keys and values in the given bucket.
@@ -252,11 +272,20 @@ func (tx *Tx) Has(bucket string, key []byte) (exists bool, err error) {
 		return false, err
 	}
 
-	b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
-	if err != nil {
-		return false, err
+	status, b := tx.getBucketAndItsStatus(DataStructureBTree, bucket)
+	if isBucketNotFoundStatus(status) {
+		return false, ErrNotFoundBucket
 	}
 	bucketId := b.Id
+
+	status, entry := tx.findEntryAndItsStatus(DataStructureBTree, bucket, string(key))
+	if status != NotFoundEntry && entry != nil {
+		if status == EntryDeleted {
+			return false, ErrKeyNotFound
+		} else {
+			return true, nil
+		}
+	}
 
 	idx, bucketExists := tx.db.Index.bTree.exist(bucketId)
 	if !bucketExists {
@@ -277,18 +306,28 @@ func (tx *Tx) RangeScanEntries(bucket string, start, end []byte, includeKeys, in
 	if err := tx.checkTxIsClosed(); err != nil {
 		return nil, nil, err
 	}
-	b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
-	if err != nil {
-		return nil, nil, err
+	status, b := tx.getBucketAndItsStatus(DataStructureBTree, bucket)
+	if isBucketNotFoundStatus(status) {
+		return nil, nil, ErrNotFoundBucket
 	}
 	bucketId := b.Id
-
+	pendingKeys, pendingValues := tx.pendingWrites.getDataByRange(start, end, b.Name)
 	if index, ok := tx.db.Index.bTree.exist(bucketId); ok {
 		records := index.Range(start, end)
-		keys, values, err = tx.getHintIdxDataItemsWrapper(records, ScanNoLimit, bucketId, includeKeys, includeValues)
-		if err != nil {
-			return nil, nil, ErrRangeScan
+		keys, values, err = tx.getHintIdxDataItemsWrapper(records, ScanNoLimit, bucketId, true, true)
+		if err != nil && len(pendingKeys) == 0 && len(pendingValues) == 0 {
+			// If there is no item in pending and persist db,
+			// return error itself.
+			return nil, nil, err
 		}
+	}
+
+	keys, values = mergeKeyValues(pendingKeys, pendingValues, keys, values)
+	if !includeKeys {
+		keys = nil
+	}
+	if !includeValues {
+		values = nil
 	}
 
 	if includeKeys && len(keys) == 0 {
@@ -353,7 +392,6 @@ func (tx *Tx) PrefixScanEntries(bucket string, prefix []byte, reg string, offset
 	if includeValues && len(values) == 0 {
 		return nil, nil, xerr(err)
 	}
-
 	return
 }
 
@@ -427,11 +465,11 @@ func (tx *Tx) tryGet(bucket string, key []byte, solveRecord func(record *Record,
 	if err := tx.checkTxIsClosed(); err != nil {
 		return err
 	}
-
-	bucketId, err := tx.db.bm.GetBucketID(DataStructureBTree, bucket)
-	if err != nil {
-		return err
+	status, b := tx.getBucketAndItsStatus(DataStructureBTree, bucket)
+	if isBucketNotFoundStatus(status) {
+		return ErrNotFoundBucket
 	}
+	bucketId := b.Id
 
 	if idx, ok := tx.db.Index.bTree.exist(bucketId); ok {
 		record, found := idx.Find(key)
@@ -584,14 +622,17 @@ func (tx *Tx) GetTTL(bucket string, key []byte) (int64, error) {
 		return 0, err
 	}
 
-	bucketId, err := tx.db.bm.GetBucketID(DataStructureBTree, bucket)
-	if err != nil {
-		return 0, err
+	status, b := tx.getBucketAndItsStatus(DataStructureBTree, bucket)
+	if isBucketNotFoundStatus(status) {
+		return 0, ErrBucketNotFound
 	}
+	bucketId := b.Id
+
 	idx, bucketExists := tx.db.Index.bTree.exist(bucketId)
 
 	if !bucketExists {
-		return 0, ErrBucketNotFound
+		// get from pendingWrites
+		return tx.pendingWrites.GetTTL(DataStructureBTree, bucket, key)
 	}
 
 	record, recordFound := idx.Find(key)
@@ -604,7 +645,7 @@ func (tx *Tx) GetTTL(bucket string, key []byte) (int64, error) {
 		return -1, nil
 	}
 
-	remTTL := tx.db.expireTime(record.Timestamp, record.TTL)
+	remTTL := expireTime(record.Timestamp, record.TTL)
 	if remTTL >= 0 {
 		return int64(remTTL.Seconds()), nil
 	} else {

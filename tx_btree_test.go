@@ -1508,3 +1508,223 @@ func TestTx_Has(t *testing.T) {
 		})
 	})
 }
+
+func TestTx_ReadAndWriteInSameTransaction(t *testing.T) {
+	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		r := require.New(t)
+
+		bucket := `1`
+		key := []byte(`k`)
+		v1 := []byte(`v1`)
+		v2 := []byte(`v2`)
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+		r.NoError(db.Update(func(tx *Tx) error {
+			r.NoError(tx.Put(bucket, key, v1, 0))
+			_, err := tx.Get(bucket, key)
+			r.NoError(err)
+			return nil
+		}))
+
+		r.NoError(db.Update(func(tx *Tx) error {
+			item, err := tx.Get(bucket, key)
+			r.NoError(err)
+			r.EqualValues(v1, item)
+
+			r.NoError(tx.Put(bucket, key, v2, 0))
+			item, err = tx.Get(bucket, key)
+			r.NoError(err)
+			r.EqualValues(v2, item)
+			return nil
+		}))
+	})
+}
+
+func TestTx_CreateBucketAndWriteInSameTransaction(t *testing.T) {
+	t.Run("test Get and Has", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			r := require.New(t)
+
+			bucket := `1`
+			key := []byte(`k`)
+			v1 := []byte(`v1`)
+
+			r.NoError(db.Update(func(tx *Tx) (err error) {
+				r.NoError(tx.NewKVBucket(bucket))
+				r.NoError(tx.Put(bucket, key, v1, 0))
+				v, err := tx.Get(bucket, key)
+				r.Equal(v1, v)
+				r.NoError(err)
+				exist, err := tx.Has(bucket, key)
+				r.True(exist)
+				r.NoError(err)
+				return
+			}))
+		})
+	})
+
+	t.Run("test GetMinOrMaxKey", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			r := require.New(t)
+
+			bucket := `1`
+			key1 := []byte(`k1`)
+			key2 := []byte("k2")
+			v1 := []byte(`v1`)
+
+			r.NoError(db.Update(func(tx *Tx) (err error) {
+				r.NoError(tx.NewKVBucket(bucket))
+				r.NoError(tx.Put(bucket, key1, v1, 0))
+				r.NoError(tx.Put(bucket, key2, v1, 0))
+
+				k, err := tx.GetMaxKey(bucket)
+				r.Nil(err)
+				r.Equal(key2, k)
+				k, err = tx.GetMinKey(bucket)
+				r.Nil(err)
+				r.Equal(key1, k)
+				return
+			}))
+		})
+	})
+
+	t.Run("test GetTTL", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			r := require.New(t)
+
+			bucket := `1`
+			key := []byte(`k`)
+			v1 := []byte(`v1`)
+
+			r.NoError(db.Update(func(tx *Tx) (err error) {
+				r.NoError(tx.NewKVBucket(bucket))
+				r.NoError(tx.Put(bucket, key, v1, 3600))
+				ttl, err := tx.GetTTL(bucket, key)
+				r.Nil(err)
+				r.NotEqual(0, ttl)
+				return
+			}))
+		})
+	})
+
+	t.Run("test PutIfNotExists", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			r := require.New(t)
+
+			bucket := `1`
+			key := []byte(`k`)
+			v1 := []byte(`v1`)
+			v2 := []byte(`v2`)
+
+			r.NoError(db.Update(func(tx *Tx) (err error) {
+				r.NoError(tx.NewKVBucket(bucket))
+				r.NoError(tx.Put(bucket, key, v1, 3600))
+				v, _ := tx.get(bucket, key)
+				r.Equal(v1, v)
+				r.NoError(tx.PutIfNotExists(bucket, key, v2, 3600))
+				v, _ = tx.get(bucket, key)
+				r.Equal(v1, v)
+				return
+			}))
+		})
+	})
+
+	t.Run("test GetRange", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			r := require.New(t)
+
+			bucket := `1`
+			key := []byte(`k`)
+			v := []byte(`0123456789`)
+
+			r.NoError(db.Update(func(tx *Tx) (err error) {
+				r.NoError(tx.NewKVBucket(bucket))
+				r.NoError(tx.Put(bucket, key, v, 3600))
+				vnow, err := tx.GetRange(bucket, key, 1, 3)
+				r.Nil(err)
+				r.Equal("123", string(vnow))
+				return
+			}))
+		})
+	})
+
+	t.Run("test RangeScanEntries, existed bucket", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			r := require.New(t)
+			bucket := "1"
+
+			txNewBucket(t, db, bucket, DataStructureBTree, nil, nil)
+
+			txPut(t, db, bucket, []byte("k03"), []byte("old-v03"), 0, nil, nil)
+			txPut(t, db, bucket, []byte("k06"), []byte("old-v06"), 0, nil, nil)
+
+			r.NoError(db.Update(func(tx *Tx) error {
+				for i := 0; i < 10; i++ {
+					key := []byte(fmt.Sprintf("k%02d", i))
+					val := []byte(fmt.Sprintf("v%02d", i))
+					tx.Put(bucket, key, val, Persistent)
+				}
+
+				keys, vals, err := tx.RangeScanEntries(bucket, []byte("k02"), []byte("k07"), true, true)
+				r.NoError(err)
+
+				r.EqualValues([][]byte{
+					[]byte("k02"),
+					[]byte("k03"),
+					[]byte("k04"),
+					[]byte("k05"),
+					[]byte("k06"),
+					[]byte("k07"),
+				}, keys)
+				r.EqualValues([][]byte{
+					[]byte("v02"),
+					[]byte("v03"),
+					[]byte("v04"),
+					[]byte("v05"),
+					[]byte("v06"),
+					[]byte("v07"),
+				}, vals)
+
+				return nil
+			}))
+		})
+	})
+
+	t.Run("test RangeScanEntries, new bucket", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			r := require.New(t)
+			bucket := "1"
+
+			r.NoError(db.Update(func(tx *Tx) error {
+				tx.NewKVBucket(bucket)
+				for i := 0; i < 10; i++ {
+					key := []byte(fmt.Sprintf("k%02d", i))
+					val := []byte(fmt.Sprintf("v%02d", i))
+					tx.Put(bucket, key, val, Persistent)
+				}
+
+				keys, vals, err := tx.RangeScanEntries(bucket, []byte("k02"), []byte("k07"), true, true)
+				r.NoError(err)
+
+				r.EqualValues([][]byte{
+					[]byte("k02"),
+					[]byte("k03"),
+					[]byte("k04"),
+					[]byte("k05"),
+					[]byte("k06"),
+					[]byte("k07"),
+				}, keys)
+				r.EqualValues([][]byte{
+					[]byte("v02"),
+					[]byte("v03"),
+					[]byte("v04"),
+					[]byte("v05"),
+					[]byte("v06"),
+					[]byte("v07"),
+				}, vals)
+
+				return nil
+			}))
+		})
+	})
+}

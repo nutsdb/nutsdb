@@ -1,5 +1,10 @@
 package nutsdb
 
+import (
+	"bytes"
+	"sort"
+)
+
 // EntryStatus represents the Entry status in the current Tx
 type EntryStatus = uint8
 
@@ -73,6 +78,68 @@ func (pending *pendingEntryList) submitEntry(ds Ds, bucket string, e *Entry) {
 	}
 }
 
+func (pending *pendingEntryList) Get(ds Ds, bucket string, key []byte) (entry *Entry, err error) {
+	switch ds {
+	case DataStructureBTree:
+		if _, exist := pending.entriesInBTree[bucket]; exist {
+			if rec, ok := pending.entriesInBTree[bucket][string(key)]; ok {
+				return rec, nil
+			} else {
+				return nil, ErrKeyNotFound
+			}
+		}
+		return nil, ErrBucketNotFound
+	default:
+		if _, exist := pending.entries[ds]; exist {
+			if entries, ok := pending.entries[ds][bucket]; ok {
+				for _, e := range entries {
+					if bytes.Equal(key, e.Key) {
+						return e, nil
+					}
+				}
+				return nil, ErrKeyNotFound
+			} else {
+				return nil, ErrKeyNotFound
+			}
+		}
+		return nil, ErrBucketNotFound
+	}
+}
+
+func (pending *pendingEntryList) GetTTL(ds Ds, bucket string, key []byte) (ttl int64, err error) {
+	rec, err := pending.Get(ds, bucket, key)
+	if err != nil {
+		return 0, err
+	}
+	if rec.Meta.TTL == Persistent {
+		return -1, nil
+	}
+	return int64(expireTime(rec.Meta.Timestamp, rec.Meta.TTL).Seconds()), nil
+}
+
+func (pending *pendingEntryList) getDataByRange(
+	start, end []byte, bucketName BucketName,
+) (keys, values [][]byte) {
+
+	mp, ok := pending.entriesInBTree[bucketName]
+	if !ok {
+		return nil, nil
+	}
+	keys = make([][]byte, 0)
+	values = make([][]byte, 0)
+	for _, v := range mp {
+		if bytes.Compare(start, v.Key) <= 0 && bytes.Compare(v.Key, end) <= 0 {
+			keys = append(keys, v.Key)
+			values = append(values, v.Value)
+		}
+	}
+	sort.Sort(&sortkv{
+		k: keys,
+		v: values,
+	})
+	return
+}
+
 // rangeBucket input a range handler function f and call it with every bucket in pendingBucketList
 func (p pendingBucketList) rangeBucket(f func(bucket *Bucket) error) error {
 	for _, bucketsInDs := range p {
@@ -102,4 +169,50 @@ func (pending *pendingEntryList) toList() []*Entry {
 		}
 	}
 	return list
+}
+
+func (pending *pendingEntryList) rangeEntries(_ Ds, bucketName BucketName, rangeFunc func(entry *Entry) bool) {
+	pendingWriteEntries := pending.entriesInBTree
+	if pendingWriteEntries == nil {
+		return
+	}
+	entries := pendingWriteEntries[bucketName]
+	for _, entry := range entries {
+		ok := rangeFunc(entry)
+		if !ok {
+			break
+		}
+	}
+}
+
+func (pending *pendingEntryList) MaxOrMinKey(bucketName string, isMax bool) (key []byte, found bool) {
+	var (
+		maxKey       []byte = nil
+		minKey       []byte = nil
+		pendingFound        = false
+	)
+
+	pending.rangeEntries(
+		DataStructureBTree,
+		bucketName,
+		func(entry *Entry) bool {
+			maxKey = compareAndReturn(maxKey, entry.Key, 1)
+			minKey = compareAndReturn(minKey, entry.Key, -1)
+			pendingFound = true
+			return true
+		})
+
+	if !pendingFound {
+		return nil, false
+	}
+	if isMax {
+		return maxKey, true
+	}
+	return minKey, true
+}
+
+// isBucketNotFoundStatus return true for bucket is not found,
+// false for other status.
+func isBucketNotFoundStatus(status BucketStatus) bool {
+	return status == BucketStatusDeleted || status == BucketStatusUnknown
 }

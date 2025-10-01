@@ -5,7 +5,7 @@ import (
 	"os"
 )
 
-var ErrBucketNotExist = errors.New("bucket not exist")
+var ErrBucketNotExist = errors.New("bucket not found")
 
 const BucketStoreFileName = "bucket.Meta"
 

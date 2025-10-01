@@ -16,7 +16,6 @@ package nutsdb
 
 import (
 	"fmt"
-	"io/ioutil"
 	"math"
 	"os"
 	"strconv"
@@ -168,7 +167,7 @@ func InitOpt(fileDir string, isRemoveFiles bool) {
 		fileDir = "/tmp/nutsdbtest"
 	}
 	if isRemoveFiles {
-		files, _ := ioutil.ReadDir(fileDir)
+		files, _ := os.ReadDir(fileDir)
 		for _, f := range files {
 			name := f.Name()
 			if name != "" {
@@ -925,7 +924,7 @@ func TestDB_DeleteBucket(t *testing.T) {
 		txGet(t, db, bucket, key, val, nil)
 
 		txDeleteBucket(t, db, DataStructureBTree, bucket, nil)
-		txPut(t, db, bucket, key, val, Persistent, ErrorBucketNotExist, nil)
+		txPut(t, db, bucket, key, val, Persistent, ErrBucketNotFound, nil)
 	})
 }
 
