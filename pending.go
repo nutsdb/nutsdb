@@ -140,12 +140,6 @@ func (pending *pendingEntryList) getDataByRange(
 	return
 }
 
-func (pending *pendingEntryList) getDataByPrefix(
-	prefix []byte, offsetNum int,
-) (keys, values [][]byte) {
-	return
-}
-
 // rangeBucket input a range handler function f and call it with every bucket in pendingBucketList
 func (p pendingBucketList) rangeBucket(f func(bucket *Bucket) error) error {
 	for _, bucketsInDs := range p {
