@@ -392,8 +392,6 @@ func (tx *Tx) PrefixScanEntries(bucket string, prefix []byte, reg string, offset
 	if includeValues && len(values) == 0 {
 		return nil, nil, xerr(err)
 	}
-
-	keys, values = limitReturnSize(keys, values, limitNum)
 	return
 }
 
