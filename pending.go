@@ -1,6 +1,9 @@
 package nutsdb
 
-import "bytes"
+import (
+	"bytes"
+	"sort"
+)
 
 // EntryStatus represents the Entry status in the current Tx
 type EntryStatus = uint8
@@ -112,6 +115,35 @@ func (pending *pendingEntryList) GetTTL(ds Ds, bucket string, key []byte) (ttl i
 		return -1, nil
 	}
 	return int64(expireTime(rec.Meta.Timestamp, rec.Meta.TTL).Seconds()), nil
+}
+
+func (pending *pendingEntryList) getDataByRange(
+	start, end []byte, bucketName BucketName,
+) (keys, values [][]byte) {
+
+	mp, ok := pending.entriesInBTree[bucketName]
+	if !ok {
+		return nil, nil
+	}
+	keys = make([][]byte, 0)
+	values = make([][]byte, 0)
+	for _, v := range mp {
+		if bytes.Compare(start, v.Key) <= 0 && bytes.Compare(v.Key, end) <= 0 {
+			keys = append(keys, v.Key)
+			values = append(values, v.Value)
+		}
+	}
+	sort.Sort(&sortkv{
+		k: keys,
+		v: values,
+	})
+	return
+}
+
+func (pending *pendingEntryList) getDataByPrefix(
+	prefix []byte, offsetNum int,
+) (keys, values [][]byte) {
+	return
 }
 
 // rangeBucket input a range handler function f and call it with every bucket in pendingBucketList

@@ -1647,4 +1647,84 @@ func TestTx_CreateBucketAndWriteInSameTransaction(t *testing.T) {
 			}))
 		})
 	})
+
+	t.Run("test RangeScanEntries, existed bucket", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			r := require.New(t)
+			bucket := "1"
+
+			txNewBucket(t, db, bucket, DataStructureBTree, nil, nil)
+
+			txPut(t, db, bucket, []byte("k03"), []byte("old-v03"), 0, nil, nil)
+			txPut(t, db, bucket, []byte("k06"), []byte("old-v06"), 0, nil, nil)
+
+			r.NoError(db.Update(func(tx *Tx) error {
+				for i := 0; i < 10; i++ {
+					key := []byte(fmt.Sprintf("k%02d", i))
+					val := []byte(fmt.Sprintf("v%02d", i))
+					tx.Put(bucket, key, val, Persistent)
+				}
+
+				keys, vals, err := tx.RangeScanEntries(bucket, []byte("k02"), []byte("k07"), true, true)
+				r.NoError(err)
+
+				r.EqualValues([][]byte{
+					[]byte("k02"),
+					[]byte("k03"),
+					[]byte("k04"),
+					[]byte("k05"),
+					[]byte("k06"),
+					[]byte("k07"),
+				}, keys)
+				r.EqualValues([][]byte{
+					[]byte("v02"),
+					[]byte("v03"),
+					[]byte("v04"),
+					[]byte("v05"),
+					[]byte("v06"),
+					[]byte("v07"),
+				}, vals)
+
+				return nil
+			}))
+		})
+	})
+
+	t.Run("test RangeScanEntries, new bucket", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			r := require.New(t)
+			bucket := "1"
+
+			r.NoError(db.Update(func(tx *Tx) error {
+				tx.NewKVBucket(bucket)
+				for i := 0; i < 10; i++ {
+					key := []byte(fmt.Sprintf("k%02d", i))
+					val := []byte(fmt.Sprintf("v%02d", i))
+					tx.Put(bucket, key, val, Persistent)
+				}
+
+				keys, vals, err := tx.RangeScanEntries(bucket, []byte("k02"), []byte("k07"), true, true)
+				r.NoError(err)
+
+				r.EqualValues([][]byte{
+					[]byte("k02"),
+					[]byte("k03"),
+					[]byte("k04"),
+					[]byte("k05"),
+					[]byte("k06"),
+					[]byte("k07"),
+				}, keys)
+				r.EqualValues([][]byte{
+					[]byte("v02"),
+					[]byte("v03"),
+					[]byte("v04"),
+					[]byte("v05"),
+					[]byte("v06"),
+					[]byte("v07"),
+				}, vals)
+
+				return nil
+			}))
+		})
+	})
 }

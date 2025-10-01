@@ -306,18 +306,28 @@ func (tx *Tx) RangeScanEntries(bucket string, start, end []byte, includeKeys, in
 	if err := tx.checkTxIsClosed(); err != nil {
 		return nil, nil, err
 	}
-	b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
-	if err != nil {
-		return nil, nil, err
+	status, b := tx.getBucketAndItsStatus(DataStructureBTree, bucket)
+	if isBucketNotFoundStatus(status) {
+		return nil, nil, ErrNotFoundBucket
 	}
 	bucketId := b.Id
-
+	pendingKeys, pendingValues := tx.pendingWrites.getDataByRange(start, end, b.Name)
 	if index, ok := tx.db.Index.bTree.exist(bucketId); ok {
 		records := index.Range(start, end)
-		keys, values, err = tx.getHintIdxDataItemsWrapper(records, ScanNoLimit, bucketId, includeKeys, includeValues)
-		if err != nil {
-			return nil, nil, ErrRangeScan
+		keys, values, err = tx.getHintIdxDataItemsWrapper(records, ScanNoLimit, bucketId, true, true)
+		if err != nil && len(pendingKeys) == 0 && len(pendingValues) == 0 {
+			// If there is no item in pending and persist db,
+			// return error itself.
+			return nil, nil, err
 		}
+	}
+
+	keys, values = mergeKeyValues(pendingKeys, pendingValues, keys, values)
+	if !includeKeys {
+		keys = nil
+	}
+	if !includeValues {
+		values = nil
 	}
 
 	if includeKeys && len(keys) == 0 {
@@ -383,6 +393,7 @@ func (tx *Tx) PrefixScanEntries(bucket string, prefix []byte, reg string, offset
 		return nil, nil, xerr(err)
 	}
 
+	keys, values = limitReturnSize(keys, values, limitNum)
 	return
 }
 

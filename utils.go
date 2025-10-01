@@ -198,3 +198,58 @@ func expireTime(timestamp uint64, ttl uint32) time.Duration {
 	expireTime = expireTime.Add(time.Duration(int64(ttl)) * time.Second)
 	return expireTime.Sub(now)
 }
+
+func mergeKeyValues(
+	k0, v0 [][]byte,
+	k1, v1 [][]byte,
+) (keys, values [][]byte) {
+	l0 := len(k0)
+	l1 := len(k1)
+	keys = make([][]byte, 0)
+	values = make([][]byte, 0)
+	cur0 := 0
+	cur1 := 0
+	for cur0 < l0 && cur1 < l1 {
+		if bytes.Compare(k0[cur0], k1[cur1]) <= 0 {
+			keys = append(keys, k0[cur0])
+			values = append(values, v0[cur0])
+			cur0++
+			if bytes.Equal(k0[cur0], k1[cur1]) {
+				// skip k1 item if k0 == k1
+				cur1++
+			}
+		} else {
+			keys = append(keys, k1[cur1])
+			values = append(values, v1[cur1])
+			cur1++
+		}
+	}
+	for cur0 < l0 {
+		keys = append(keys, k0[cur0])
+		values = append(values, v0[cur0])
+		cur0++
+	}
+	for cur1 < l1 {
+		keys = append(keys, k1[cur1])
+		values = append(values, v1[cur1])
+		cur1++
+	}
+	return
+}
+
+// This Type is for sort a pair of (k, v).
+type sortkv struct {
+	k, v [][]byte
+}
+
+func (skv *sortkv) Len() int {
+	return len(skv.k)
+}
+
+func (skv *sortkv) Swap(i, j int) {
+	skv.k[i], skv.v[i], skv.k[j], skv.v[j] = skv.k[j], skv.v[j], skv.k[i], skv.v[i]
+}
+
+func (skv *sortkv) Less(i, j int) bool {
+	return bytes.Compare(skv.k[i], skv.k[j]) < 0
+}
