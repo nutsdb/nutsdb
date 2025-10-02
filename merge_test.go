@@ -16,6 +16,8 @@ package nutsdb
 
 import (
 	"bytes"
+	"io"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -376,4 +378,405 @@ func TestDB_MergeForList(t *testing.T) {
 		require.NoError(t, db.Close())
 		removeDir(opts.Dir)
 	}
+}
+
+func TestDB_MergeWithHintFile(t *testing.T) {
+	bucket := "bucket"
+	opts := DefaultOptions
+	opts.SegmentSize = KB
+	(opts.Dir) = "/tmp/test-merge-hintfile/"
+	opts.EnableHintFile = true
+
+	// Clean the test directory at the start
+	removeDir(opts.Dir)
+
+	for _, idxMode := range []EntryIdxMode{HintKeyValAndRAMIdxMode, HintKeyAndRAMIdxMode} {
+		opts.EntryIdxMode = idxMode
+
+		// First, create a database with some data
+		db, err := Open(opts)
+		require.NoError(t, err)
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+		// Add some data to create multiple data files
+		n := 2000
+		for i := 0; i < n; i++ {
+			txPut(t, db, bucket, GetTestBytes(i), GetTestBytes(i), Persistent, nil, nil)
+		}
+
+		// Delete some data to create dirty entries
+		for i := 0; i < n/2; i++ {
+			txDel(t, db, bucket, GetTestBytes(i), nil)
+		}
+
+		// Get initial file IDs
+		_, _ = db.getMaxFileIDAndFileIDs()
+
+		// Close and reopen to ensure data is persisted
+		require.NoError(t, db.Close())
+		db, err = Open(opts)
+		require.NoError(t, err)
+
+		// Perform merge
+		require.NoError(t, db.Merge())
+
+		// Check that hint files are created for the merged files
+		_, mergedFileIDs := db.getMaxFileIDAndFileIDs()
+		require.Greater(t, len(mergedFileIDs), 0)
+
+		// Count total entries across all merged files' hint files
+		totalHintEntryCount := 0
+		for _, fileID := range mergedFileIDs {
+			hintPath := getHintPath(int64(fileID), opts.Dir)
+
+			// Verify hint file exists
+			_, err = os.Stat(hintPath)
+			require.NoError(t, err, "Hint file should exist after merge for file %d", fileID)
+
+			// Verify hint file content
+			reader := &HintFileReader{}
+			err = reader.Open(hintPath)
+			require.NoError(t, err)
+
+			// Count entries in this hint file
+			hintEntryCount := 0
+			for {
+				_, err := reader.Read()
+				if err == io.EOF {
+					break
+				}
+				require.NoError(t, err)
+				hintEntryCount++
+			}
+			reader.Close()
+
+			totalHintEntryCount += hintEntryCount
+		}
+
+		// Should have n/2 entries (the non-deleted ones) across all hint files
+		require.Equal(t, n/2, totalHintEntryCount)
+
+		// Verify data consistency after merge
+		dbCnt, err := db.getRecordCount()
+		require.NoError(t, err)
+		require.Equal(t, int64(n/2), dbCnt)
+
+		// Check the deleted data is deleted
+		for i := 0; i < n/2; i++ {
+			txGet(t, db, bucket, GetTestBytes(i), GetTestBytes(i), ErrKeyNotFound)
+		}
+
+		// Check the remaining data exists
+		for i := n / 2; i < n; i++ {
+			txGet(t, db, bucket, GetTestBytes(i), GetTestBytes(i), nil)
+		}
+
+		// Close and reopen to test hint file loading
+		require.NoError(t, db.Close())
+		db, err = Open(opts)
+		require.NoError(t, err)
+
+		// Verify data is still correct after reopening with hint file
+		dbCnt, err = db.getRecordCount()
+		require.NoError(t, err)
+		require.Equal(t, int64(n/2), dbCnt)
+
+		// Check the deleted data is still deleted
+		for i := 0; i < n/2; i++ {
+			txGet(t, db, bucket, GetTestBytes(i), GetTestBytes(i), ErrKeyNotFound)
+		}
+
+		// Check the remaining data still exists
+		for i := n / 2; i < n; i++ {
+			txGet(t, db, bucket, GetTestBytes(i), GetTestBytes(i), nil)
+		}
+
+		require.NoError(t, db.Close())
+		removeDir(opts.Dir)
+	}
+}
+
+func TestDB_MergeHintFileCleanup(t *testing.T) {
+	bucket := "bucket"
+	opts := DefaultOptions
+	opts.SegmentSize = KB
+	opts.Dir = "/tmp/test-merge-hintfile-cleanup/"
+	opts.EnableHintFile = true
+
+	// Clean the test directory at the start
+	removeDir(opts.Dir)
+
+	// Create a database with some data
+	db, err := Open(opts)
+	require.NoError(t, err)
+	txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+	// Add enough data to create multiple files
+	n := 500
+	for i := 0; i < n; i++ {
+		txPut(t, db, bucket, GetTestBytes(i), GetTestBytes(i), Persistent, nil, nil)
+	}
+
+	// Delete some data to trigger merge
+	for i := 0; i < n/4; i++ {
+		txDel(t, db, bucket, GetTestBytes(i), nil)
+	}
+
+	// Get initial file IDs before merge
+	_, initialFileIDs := db.getMaxFileIDAndFileIDs()
+
+	// Create hint files for initial files manually to test cleanup
+	for _, fileID := range initialFileIDs {
+		hintPath := getHintPath(int64(fileID), opts.Dir)
+		writer := &HintFileWriter{}
+		err := writer.Create(hintPath)
+		require.NoError(t, err)
+
+		// Write a dummy entry
+		entry := &HintEntry{
+			BucketId:  1,
+			KeySize:   3,
+			ValueSize: 3,
+			Timestamp: 1234567890,
+			TTL:       3600,
+			Flag:      DataSetFlag,
+			Status:    Committed,
+			Ds:        DataStructureBTree,
+			DataPos:   100,
+			FileID:    int64(fileID),
+			Key:       []byte("key"),
+		}
+
+		err = writer.Write(entry)
+		require.NoError(t, err)
+		err = writer.Close()
+		require.NoError(t, err)
+	}
+
+	// Verify hint files exist before merge
+	for _, fileID := range initialFileIDs {
+		hintPath := getHintPath(int64(fileID), opts.Dir)
+		_, err := os.Stat(hintPath)
+		require.NoError(t, err, "Hint file should exist before merge")
+	}
+
+	// Perform merge
+	require.NoError(t, db.Merge())
+
+	// Verify old hint files are cleaned up
+	for _, fileID := range initialFileIDs {
+		hintPath := getHintPath(int64(fileID), opts.Dir)
+		_, err := os.Stat(hintPath)
+		if err == nil {
+			t.Errorf("Old hint file %s should be cleaned up after merge", hintPath)
+		}
+	}
+
+	// Verify new hint files exist for all merged files
+	_, mergedFileIDs := db.getMaxFileIDAndFileIDs()
+	require.Greater(t, len(mergedFileIDs), 0)
+
+	// Check that hint files exist for all merged files
+	for _, fileID := range mergedFileIDs {
+		newHintPath := getHintPath(int64(fileID), opts.Dir)
+		_, err = os.Stat(newHintPath)
+		require.NoError(t, err, "New hint file should exist after merge for file %d", fileID)
+	}
+
+	require.NoError(t, db.Close())
+	removeDir(opts.Dir)
+}
+
+func TestDB_MergeHintFileDisabled(t *testing.T) {
+	bucket := "bucket"
+	opts := DefaultOptions
+	opts.SegmentSize = KB
+	opts.Dir = "/tmp/test-merge-hintfile-disabled/"
+	opts.EnableHintFile = false // Disable hint file
+
+	// Clean the test directory at the start
+	removeDir(opts.Dir)
+
+	// Create a database with some data
+	db, err := Open(opts)
+	require.NoError(t, err)
+	txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+	// Add some data
+	n := 500
+	for i := 0; i < n; i++ {
+		txPut(t, db, bucket, GetTestBytes(i), GetTestBytes(i), Persistent, nil, nil)
+	}
+
+	// Delete some data to trigger merge
+	for i := 0; i < n/4; i++ {
+		txDel(t, db, bucket, GetTestBytes(i), nil)
+	}
+
+	// Perform merge
+	require.NoError(t, db.Merge())
+
+	// Verify no hint files are created
+	_, mergedFileIDs := db.getMaxFileIDAndFileIDs()
+	for _, fileID := range mergedFileIDs {
+		hintPath := getHintPath(int64(fileID), opts.Dir)
+		_, err := os.Stat(hintPath)
+		if err == nil {
+			t.Errorf("Hint file %s should not exist when EnableHintFile is false", hintPath)
+		}
+	}
+
+	// Verify data is still correct after merge without hint files
+	dbCnt, err := db.getRecordCount()
+	require.NoError(t, err)
+	require.Equal(t, int64(3*n/4), dbCnt)
+
+	require.NoError(t, db.Close())
+	removeDir(opts.Dir)
+}
+
+func TestDB_MergeHintFileDifferentDataStructures(t *testing.T) {
+	opts := DefaultOptions
+	opts.SegmentSize = KB
+	opts.Dir = "/tmp/test-merge-hintfile-ds/"
+	opts.EnableHintFile = true
+
+	// Clean the test directory at the start
+	removeDir(opts.Dir)
+
+	db, err := Open(opts)
+	require.NoError(t, err)
+
+	// Test BTree
+	bucketBTree := "bucket_btree"
+	txCreateBucket(t, db, DataStructureBTree, bucketBTree, nil)
+	for i := 0; i < 100; i++ {
+		txPut(t, db, bucketBTree, GetTestBytes(i), GetTestBytes(i), Persistent, nil, nil)
+	}
+
+	// Test Set
+	bucketSet := "bucket_set"
+	txCreateBucket(t, db, DataStructureSet, bucketSet, nil)
+	key := GetTestBytes(0)
+	for i := 0; i < 50; i++ {
+		txSAdd(t, db, bucketSet, key, GetTestBytes(i), nil, nil)
+	}
+
+	// Test List
+	bucketList := "bucket_list"
+	txCreateBucket(t, db, DataStructureList, bucketList, nil)
+	listKey := GetTestBytes(0)
+	for i := 0; i < 30; i++ {
+		txPush(t, db, bucketList, listKey, GetTestBytes(i), true, nil, nil)
+	}
+
+	// Test SortedSet
+	bucketZSet := "bucket_zset"
+	txCreateBucket(t, db, DataStructureSortedSet, bucketZSet, nil)
+	zsetKey := GetTestBytes(0)
+	for i := 0; i < 20; i++ {
+		txZAdd(t, db, bucketZSet, zsetKey, GetTestBytes(i), float64(i), nil, nil)
+	}
+
+	// Delete some data from each structure
+	for i := 0; i < 25; i++ {
+		txDel(t, db, bucketBTree, GetTestBytes(i), nil)
+	}
+	for i := 0; i < 10; i++ {
+		txSRem(t, db, bucketSet, key, GetTestBytes(i), nil)
+	}
+	for i := 0; i < 5; i++ {
+		txPop(t, db, bucketList, listKey, GetTestBytes(i), nil, false)
+	}
+	for i := 0; i < 5; i++ {
+		txZRem(t, db, bucketZSet, zsetKey, GetTestBytes(i), nil)
+	}
+
+	// Perform merge
+	require.NoError(t, db.Merge())
+
+	// Verify hint files exist and contain entries for all data structures
+	_, mergedFileIDs := db.getMaxFileIDAndFileIDs()
+	require.Greater(t, len(mergedFileIDs), 0)
+
+	// Count entries by data structure across all hint files
+	btreeCount := 0
+	setCount := 0
+	listCount := 0
+	zsetCount := 0
+
+	// Check that hint files exist for all merged files and count entries
+	for _, fileID := range mergedFileIDs {
+		hintPath := getHintPath(int64(fileID), opts.Dir)
+		_, err = os.Stat(hintPath)
+		require.NoError(t, err, "Hint file should exist after merge for file %d", fileID)
+
+		// Verify hint file content
+		reader := &HintFileReader{}
+		err = reader.Open(hintPath)
+		require.NoError(t, err)
+
+		for {
+			entry, err := reader.Read()
+			if err == io.EOF {
+				break
+			}
+			require.NoError(t, err)
+
+			switch entry.Ds {
+			case DataStructureBTree:
+				btreeCount++
+			case DataStructureSet:
+				setCount++
+			case DataStructureList:
+				listCount++
+			case DataStructureSortedSet:
+				zsetCount++
+			}
+		}
+		reader.Close()
+	}
+
+	// Verify counts match expected remaining entries
+	require.Equal(t, 75, btreeCount) // 100 - 25 deleted
+	require.Equal(t, 40, setCount)   // 50 - 10 deleted
+	require.Equal(t, 25, listCount)  // 30 - 5 deleted
+	require.Equal(t, 15, zsetCount)  // 20 - 5 deleted
+
+	// Verify data integrity after merge and reopen
+	require.NoError(t, db.Close())
+	db, err = Open(opts)
+	require.NoError(t, err)
+
+	// Check BTree data
+	for i := 25; i < 100; i++ {
+		txGet(t, db, bucketBTree, GetTestBytes(i), GetTestBytes(i), nil)
+	}
+	for i := 0; i < 25; i++ {
+		txGet(t, db, bucketBTree, GetTestBytes(i), GetTestBytes(i), ErrKeyNotFound)
+	}
+
+	// Check Set data
+	for i := 10; i < 50; i++ {
+		txSIsMember(t, db, bucketSet, key, GetTestBytes(i), true)
+	}
+	for i := 0; i < 10; i++ {
+		txSIsMember(t, db, bucketSet, key, GetTestBytes(i), false)
+	}
+
+	// Check List data
+	for i := 29; i < 24; i++ {
+		txLRange(t, db, bucketList, listKey, i-5, i-5, 1, [][]byte{GetTestBytes(i)}, nil)
+	}
+
+	// Check SortedSet data
+	for i := 5; i < 20; i++ {
+		txZScore(t, db, bucketZSet, zsetKey, GetTestBytes(i), float64(i), nil)
+	}
+	for i := 0; i < 5; i++ {
+		txZScore(t, db, bucketZSet, zsetKey, GetTestBytes(i), 0, ErrSortedSetMemberNotExist)
+	}
+
+	require.NoError(t, db.Close())
+	removeDir(opts.Dir)
 }

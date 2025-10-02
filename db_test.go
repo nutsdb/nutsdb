@@ -1654,3 +1654,355 @@ func txGetRange(t *testing.T, db *DB, bucket string, key []byte, start, end int,
 	})
 	assertErr(t, err, expectFinalErr)
 }
+
+func TestDB_HintFileFastRecovery(t *testing.T) {
+	bucket := "bucket"
+	opts := DefaultOptions
+	opts.SegmentSize = KB
+	opts.Dir = "/tmp/test-hintfile-recovery/"
+	opts.EnableHintFile = true
+
+	// Clean the test directory at the start
+	removeDir(opts.Dir)
+
+	for _, idxMode := range []EntryIdxMode{HintKeyValAndRAMIdxMode, HintKeyAndRAMIdxMode} {
+		opts.EntryIdxMode = idxMode
+
+		// Create a database with some data
+		db, err := Open(opts)
+		require.NoError(t, err)
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+		// Add some data
+		n := 500
+		for i := 0; i < n; i++ {
+			txPut(t, db, bucket, GetTestBytes(i), GetTestBytes(i), Persistent, nil, nil)
+		}
+
+		// Perform merge to create hint files
+		require.NoError(t, db.Merge())
+
+		// Close the database
+		require.NoError(t, db.Close())
+
+		// Reopen the database - it should use hint files for fast recovery
+		db, err = Open(opts)
+		require.NoError(t, err)
+
+		// Verify all data is correctly recovered
+		for i := 0; i < n; i++ {
+			txGet(t, db, bucket, GetTestBytes(i), GetTestBytes(i), nil)
+		}
+
+		// Verify record count
+		dbCnt, err := db.getRecordCount()
+		require.NoError(t, err)
+		require.Equal(t, int64(n), dbCnt)
+
+		require.NoError(t, db.Close())
+		removeDir(opts.Dir)
+	}
+}
+
+func TestDB_HintFileMissingFallback(t *testing.T) {
+	bucket := "bucket"
+	opts := DefaultOptions
+	opts.SegmentSize = KB
+	opts.Dir = "/tmp/test-hintfile-missing/"
+	opts.EnableHintFile = true
+
+	// Clean the test directory at the start
+	removeDir(opts.Dir)
+
+	// Create a database with some data
+	db, err := Open(opts)
+	require.NoError(t, err)
+	txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+	// Add some data
+	n := 300
+	for i := 0; i < n; i++ {
+		txPut(t, db, bucket, GetTestBytes(i), GetTestBytes(i), Persistent, nil, nil)
+	}
+
+	// Perform merge to create hint files
+	require.NoError(t, db.Merge())
+
+	// Close the database
+	require.NoError(t, db.Close())
+
+	// Remove hint files to simulate missing hint files
+	_, fileIDs := db.getMaxFileIDAndFileIDs()
+	for _, fileID := range fileIDs {
+		hintPath := getHintPath(int64(fileID), opts.Dir)
+		os.Remove(hintPath)
+	}
+
+	// Reopen the database - it should fall back to scanning data files
+	db, err = Open(opts)
+	require.NoError(t, err)
+
+	// Verify all data is correctly recovered
+	for i := 0; i < n; i++ {
+		txGet(t, db, bucket, GetTestBytes(i), GetTestBytes(i), nil)
+	}
+
+	// Verify record count
+	dbCnt, err := db.getRecordCount()
+	require.NoError(t, err)
+	require.Equal(t, int64(n), dbCnt)
+
+	require.NoError(t, db.Close())
+	removeDir(opts.Dir)
+}
+
+func TestDB_HintFileCorruptedFallback(t *testing.T) {
+	bucket := "bucket"
+	opts := DefaultOptions
+	opts.SegmentSize = KB
+	opts.Dir = "/tmp/test-hintfile-corrupted"
+	opts.EnableHintFile = true
+
+	// Clean the test directory at the start
+	removeDir(opts.Dir)
+
+	// Create a database with some data
+	db, err := Open(opts)
+	require.NoError(t, err)
+	txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+	// Add some data
+	n := 200
+	for i := 0; i < n; i++ {
+		txPut(t, db, bucket, GetTestBytes(i), GetTestBytes(i), Persistent, nil, nil)
+	}
+
+	// Perform merge to create hint files
+	require.NoError(t, db.Merge())
+
+	// Close the database
+	require.NoError(t, db.Close())
+
+	// Corrupt hint files to simulate corrupted hint files
+	_, fileIDs := db.getMaxFileIDAndFileIDs()
+	for _, fileID := range fileIDs {
+		hintPath := getHintPath(int64(fileID), opts.Dir)
+		// Write garbage data to corrupt the file
+		err := os.WriteFile(hintPath, []byte{0xFF, 0xFF, 0xFF}, 0644)
+		require.NoError(t, err)
+	}
+
+	// Reopen the database - it should fall back to scanning data files
+	db, err = Open(opts)
+	require.NoError(t, err)
+
+	// Verify all data is correctly recovered
+	for i := 0; i < n; i++ {
+		txGet(t, db, bucket, GetTestBytes(i), GetTestBytes(i), nil)
+	}
+
+	// Verify record count
+	dbCnt, err := db.getRecordCount()
+	require.NoError(t, err)
+	require.Equal(t, int64(n), dbCnt)
+
+	require.NoError(t, db.Close())
+	removeDir(opts.Dir)
+}
+
+func TestDB_HintFileDifferentEntryIdxModes(t *testing.T) {
+	bucket := "bucket"
+	opts := DefaultOptions
+	opts.SegmentSize = KB
+	opts.Dir = "/tmp/test-hintfile-modes/"
+	opts.EnableHintFile = true
+
+	// Clean the test directory at the start
+	removeDir(opts.Dir)
+
+	// Test HintKeyValAndRAMIdxMode
+	opts.EntryIdxMode = HintKeyValAndRAMIdxMode
+
+	db, err := Open(opts)
+	require.NoError(t, err)
+	txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+	// Add some data
+	n := 100
+	for i := 0; i < n; i++ {
+		txPut(t, db, bucket, GetTestBytes(i), GetTestBytes(i), Persistent, nil, nil)
+	}
+
+	// Perform merge to create hint files
+	require.NoError(t, db.Merge())
+
+	// Close the database
+	require.NoError(t, db.Close())
+
+	// Reopen the database - it should use hint files for fast recovery
+	db, err = Open(opts)
+	require.NoError(t, err)
+
+	// Verify all data is correctly recovered
+	for i := 0; i < n; i++ {
+		txGet(t, db, bucket, GetTestBytes(i), GetTestBytes(i), nil)
+	}
+
+	require.NoError(t, db.Close())
+	removeDir(opts.Dir)
+
+	// Test HintKeyAndRAMIdxMode
+	opts.EntryIdxMode = HintKeyAndRAMIdxMode
+
+	db, err = Open(opts)
+	require.NoError(t, err)
+	txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+	// Add some data
+	for i := 0; i < n; i++ {
+		txPut(t, db, bucket, GetTestBytes(i), GetTestBytes(i), Persistent, nil, nil)
+	}
+
+	// Perform merge to create hint files
+	require.NoError(t, db.Merge())
+
+	// Close the database
+	require.NoError(t, db.Close())
+
+	// Reopen the database - it should use hint files for fast recovery
+	db, err = Open(opts)
+	require.NoError(t, err)
+
+	// Verify all data is correctly recovered
+	for i := 0; i < n; i++ {
+		txGet(t, db, bucket, GetTestBytes(i), GetTestBytes(i), nil)
+	}
+
+	require.NoError(t, db.Close())
+	removeDir(opts.Dir)
+}
+
+func TestDB_HintFileWithDifferentDataStructures(t *testing.T) {
+	opts := DefaultOptions
+	opts.SegmentSize = KB
+	opts.Dir = "/tmp/test-hintfile-ds-recovery/"
+	opts.EnableHintFile = true
+
+	// Clean the test directory at the start
+	removeDir(opts.Dir)
+
+	db, err := Open(opts)
+	require.NoError(t, err)
+
+	// Test BTree
+	bucketBTree := "bucket_btree"
+	txCreateBucket(t, db, DataStructureBTree, bucketBTree, nil)
+	for i := 0; i < 50; i++ {
+		txPut(t, db, bucketBTree, GetTestBytes(i), GetTestBytes(i), Persistent, nil, nil)
+	}
+
+	// Test Set
+	bucketSet := "bucket_set"
+	txCreateBucket(t, db, DataStructureSet, bucketSet, nil)
+	key := GetTestBytes(0)
+	for i := 0; i < 30; i++ {
+		txSAdd(t, db, bucketSet, key, GetTestBytes(i), nil, nil)
+	}
+
+	// Test List
+	bucketList := "bucket_list"
+	txCreateBucket(t, db, DataStructureList, bucketList, nil)
+	listKey := GetTestBytes(0)
+	for i := 0; i < 20; i++ {
+		txPush(t, db, bucketList, listKey, GetTestBytes(i), true, nil, nil)
+	}
+
+	// Test SortedSet
+	bucketZSet := "bucket_zset"
+	txCreateBucket(t, db, DataStructureSortedSet, bucketZSet, nil)
+	zsetKey := GetTestBytes(0)
+	for i := 0; i < 15; i++ {
+		txZAdd(t, db, bucketZSet, zsetKey, GetTestBytes(i), float64(i), nil, nil)
+	}
+
+	// Perform merge to create hint files
+	require.NoError(t, db.Merge())
+
+	// Close the database
+	require.NoError(t, db.Close())
+
+	// Reopen the database - it should use hint files for fast recovery
+	db, err = Open(opts)
+	require.NoError(t, err)
+
+	// Verify BTree data
+	for i := 0; i < 50; i++ {
+		txGet(t, db, bucketBTree, GetTestBytes(i), GetTestBytes(i), nil)
+	}
+
+	// Verify Set data
+	for i := 0; i < 30; i++ {
+		txSIsMember(t, db, bucketSet, key, GetTestBytes(i), true)
+	}
+
+	// Verify List data
+	txLRange(t, db, bucketList, listKey, 0, -1, 20, nil, nil)
+
+	// Verify SortedSet data
+	for i := 0; i < 15; i++ {
+		txZScore(t, db, bucketZSet, zsetKey, GetTestBytes(i), float64(i), nil)
+	}
+
+	require.NoError(t, db.Close())
+	removeDir(opts.Dir)
+}
+
+func TestDB_HintFileDisabled(t *testing.T) {
+	bucket := "bucket"
+	opts := DefaultOptions
+	opts.SegmentSize = KB
+	opts.Dir = "/tmp/test-hintfile-disabled-recovery/"
+	opts.EnableHintFile = false // Disable hint file
+
+	// Clean the test directory at the start
+	removeDir(opts.Dir)
+
+	// Create a database with some data
+	db, err := Open(opts)
+	require.NoError(t, err)
+	txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+	// Add some data
+	n := 100
+	for i := 0; i < n; i++ {
+		txPut(t, db, bucket, GetTestBytes(i), GetTestBytes(i), Persistent, nil, nil)
+	}
+
+	// Perform merge - should not create hint files
+	require.NoError(t, db.Merge())
+
+	// Close the database
+	require.NoError(t, db.Close())
+
+	// Verify no hint files are created
+	_, fileIDs := db.getMaxFileIDAndFileIDs()
+	for _, fileID := range fileIDs {
+		hintPath := getHintPath(int64(fileID), opts.Dir)
+		_, err := os.Stat(hintPath)
+		if err == nil {
+			t.Errorf("Hint file %s should not exist when EnableHintFile is false", hintPath)
+		}
+	}
+
+	// Reopen the database - it should scan data files
+	db, err = Open(opts)
+	require.NoError(t, err)
+
+	// Verify all data is correctly recovered
+	for i := 0; i < n; i++ {
+		txGet(t, db, bucket, GetTestBytes(i), GetTestBytes(i), nil)
+	}
+
+	require.NoError(t, db.Close())
+	removeDir(opts.Dir)
+}

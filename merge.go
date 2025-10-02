@@ -26,7 +26,7 @@ import (
 	"github.com/xujiajun/utils/strconv2"
 )
 
-var ErrDontNeedMerge = errors.New("the number of files waiting to be merged is at least 2")
+var ErrDontNeedMerge = errors.New("the number of files waiting to be merged is less than 2")
 
 func (db *DB) Merge() error {
 	db.mergeStartCh <- struct{}{}
@@ -93,10 +93,14 @@ func (db *DB) merge() error {
 	}
 
 	db.ActiveFile.fileID = db.MaxFileID
+	startFileID := db.MaxFileID
 
 	db.mu.Unlock()
 
 	mergingPath := make([]string, len(pendingMergeFIds))
+
+	// 用于收集所有已合并的条目信息，以便稍后写入 HintFile
+	var mergedEntries []mergedEntryInfo
 
 	for i, pendingMergeFId := range pendingMergeFIds {
 		off = 0
@@ -132,23 +136,35 @@ func (db *DB) merge() error {
 							return err
 						}
 						bucketName := bucket.Name
-						if entry.Meta.Flag == DataLPushFlag {
-							return tx.LPushRaw(bucketName, entry.Key, entry.Value)
+
+						switch entry.Meta.Flag {
+						case DataLPushFlag:
+							if err := tx.LPushRaw(bucketName, entry.Key, entry.Value); err != nil {
+								return err
+							}
+						case DataRPushFlag:
+							if err := tx.RPushRaw(bucketName, entry.Key, entry.Value); err != nil {
+								return err
+							}
+						default:
+							if err := tx.put(
+								bucketName,
+								entry.Key,
+								entry.Value,
+								entry.Meta.TTL,
+								entry.Meta.Flag,
+								entry.Meta.Timestamp,
+								entry.Meta.Ds,
+							); err != nil {
+								return err
+							}
 						}
 
-						if entry.Meta.Flag == DataRPushFlag {
-							return tx.RPushRaw(bucketName, entry.Key, entry.Value)
-						}
-
-						return tx.put(
-							bucketName,
-							entry.Key,
-							entry.Value,
-							entry.Meta.TTL,
-							entry.Meta.Flag,
-							entry.Meta.Timestamp,
-							entry.Meta.Ds,
-						)
+						// 记录已合并的条目信息，稍后从索引中获取实际位置
+						mergedEntries = append(mergedEntries, mergedEntryInfo{
+							entry:    entry,
+							bucketId: bucket.Id,
+						})
 					}
 
 					return nil
@@ -162,7 +178,6 @@ func (db *DB) merge() error {
 				if off >= db.opt.SegmentSize {
 					break
 				}
-
 			} else {
 				if errors.Is(err, io.EOF) || errors.Is(err, ErrIndexOutOfBound) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, ErrHeaderSizeOutOfBounds) {
 					break
@@ -178,12 +193,122 @@ func (db *DB) merge() error {
 		mergingPath[i] = path
 	}
 
+	// 现在所有数据已经写入，为所有新生成的数据文件创建 HintFile
+	// 只为 Merge 过程中实际生成的新文件创建 HintFile
+	db.mu.Lock()
+	endFileID := db.MaxFileID // 记录 merge 结束时的最大文件 ID
+	db.mu.Unlock()
+
+	// 只有当启用 HintFile 功能时才创建 HintFile
+	if db.opt.EnableHintFile {
+		if err := db.buildHintFilesAfterMerge(startFileID, endFileID); err != nil {
+			return fmt.Errorf("failed to build hint files after merge: %w", err)
+		}
+	}
+
 	db.mu.Lock()
 	defer db.mu.Unlock()
 
 	for i := 0; i < len(mergingPath); i++ {
 		if err := os.Remove(mergingPath[i]); err != nil {
 			return fmt.Errorf("when merge err: %s", err)
+		}
+
+		// 删除旧数据文件对应的 HintFile（如果存在）
+		oldHintPath := getHintPath(int64(pendingMergeFIds[i]), db.opt.Dir)
+		if _, err := os.Stat(oldHintPath); err == nil {
+			if removeErr := os.Remove(oldHintPath); removeErr != nil {
+				// 记录错误但不中断合并过程
+				fmt.Printf("warning: failed to remove old hint file %s: %v\n", oldHintPath, removeErr)
+			}
+		}
+	}
+
+	return nil
+}
+
+// buildHintFilesAfterMerge 在 merge 完成后，为所有新生成的数据文件创建 HintFile
+// 通过遍历索引找出所有指向新文件的记录
+// 只处理 [startFileID, endFileID] 范围内的文件
+func (db *DB) buildHintFilesAfterMerge(startFileID, endFileID int64) error {
+	if startFileID > endFileID {
+		return nil
+	}
+
+	for fileID := startFileID; fileID <= endFileID; fileID++ {
+		dataPath := getDataPath(fileID, db.opt.Dir)
+		fr, err := newFileRecovery(dataPath, db.opt.BufferSizeOfRecovery)
+		if err != nil {
+			return fmt.Errorf("failed to open data file %s: %w", dataPath, err)
+		}
+
+		hintPath := getHintPath(fileID, db.opt.Dir)
+		hintWriter := &HintFileWriter{}
+		if err := hintWriter.Create(hintPath); err != nil {
+			_ = fr.release()
+			return fmt.Errorf("failed to create hint file %s: %w", hintPath, err)
+		}
+
+		cleanup := func(remove bool) {
+			_ = hintWriter.Close()
+			_ = fr.release()
+			if remove {
+				_ = os.Remove(hintPath)
+			}
+		}
+
+		off := int64(0)
+		for {
+			entry, err := fr.readEntry(off)
+			if err != nil {
+				if errors.Is(err, io.EOF) || errors.Is(err, ErrIndexOutOfBound) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, ErrHeaderSizeOutOfBounds) {
+					break
+				}
+				cleanup(true)
+				return fmt.Errorf("failed to read entry from %s at offset %d: %w", dataPath, off, err)
+			}
+
+			if entry == nil {
+				break
+			}
+
+			hintEntry := &HintEntry{
+				BucketId:  entry.Meta.BucketId,
+				KeySize:   entry.Meta.KeySize,
+				ValueSize: entry.Meta.ValueSize,
+				Timestamp: entry.Meta.Timestamp,
+				TTL:       entry.Meta.TTL,
+				Flag:      entry.Meta.Flag,
+				Status:    entry.Meta.Status,
+				Ds:        entry.Meta.Ds,
+				DataPos:   uint64(off),
+				FileID:    fileID,
+				Key:       append([]byte(nil), entry.Key...),
+			}
+
+			if err := hintWriter.Write(hintEntry); err != nil {
+				cleanup(true)
+				return fmt.Errorf("failed to write hint entry to %s: %w", hintPath, err)
+			}
+
+			off += entry.Size()
+			if off >= fr.size {
+				break
+			}
+		}
+
+		if err := hintWriter.Sync(); err != nil {
+			cleanup(true)
+			return fmt.Errorf("failed to sync hint file %s: %w", hintPath, err)
+		}
+
+		if err := hintWriter.Close(); err != nil {
+			_ = fr.release()
+			return fmt.Errorf("failed to close hint file %s: %w", hintPath, err)
+		}
+
+		if err := fr.release(); err != nil {
+			return fmt.Errorf("failed to close data file %s: %w", dataPath, err)
 		}
 	}
 
@@ -224,7 +349,7 @@ func (db *DB) isPendingMergeEntry(entry *Entry) bool {
 	}
 	bucketId := bucket.Id
 	switch {
-	case entry.IsBelongsToBPlusTree():
+	case entry.IsBelongsToBTree():
 		return db.isPendingBtreeEntry(bucketId, entry)
 	case entry.IsBelongsToList():
 		return db.isPendingListEntry(bucketId, entry)
@@ -343,4 +468,10 @@ func (db *DB) isPendingListEntry(bucketId BucketId, entry *Entry) bool {
 	}
 
 	return false
+}
+
+// mergedEntryInfo 用于在 merge 过程中暂存条目信息
+type mergedEntryInfo struct {
+	entry    *Entry
+	bucketId BucketId
 }
