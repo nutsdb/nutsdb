@@ -33,6 +33,13 @@ func (db *DB) Merge() error {
 	return <-db.mergeEndCh
 }
 
+func (db *DB) merge() error {
+	if db.opt.EnableMergeV2 {
+		return db.mergeV2()
+	}
+	return db.mergeLegacy()
+}
+
 // Merge removes dirty data and reduce data redundancy,following these steps:
 //
 // 1. Filter delete or expired entry.
@@ -45,10 +52,10 @@ func (db *DB) Merge() error {
 //
 // Caveat: merge is Called means starting multiple write transactions, and it
 // will affect the other write request. so execute it at the appropriate time.
-func (db *DB) merge() error {
+func (db *DB) mergeLegacy() error {
 	var (
 		off              int64
-		pendingMergeFIds []int
+		pendingMergeFIds []int64
 	)
 
 	// to prevent the initiation of multiple merges simultaneously.
@@ -104,7 +111,7 @@ func (db *DB) merge() error {
 
 	for i, pendingMergeFId := range pendingMergeFIds {
 		off = 0
-		path := getDataPath(int64(pendingMergeFId), db.opt.Dir)
+		path := getDataPath(pendingMergeFId, db.opt.Dir)
 		fr, err := newFileRecovery(path, db.opt.BufferSizeOfRecovery)
 		if err != nil {
 			return err
@@ -272,19 +279,7 @@ func (db *DB) buildHintFilesAfterMerge(startFileID, endFileID int64) error {
 				break
 			}
 
-			hintEntry := &HintEntry{
-				BucketId:  entry.Meta.BucketId,
-				KeySize:   entry.Meta.KeySize,
-				ValueSize: entry.Meta.ValueSize,
-				Timestamp: entry.Meta.Timestamp,
-				TTL:       entry.Meta.TTL,
-				Flag:      entry.Meta.Flag,
-				Status:    entry.Meta.Status,
-				Ds:        entry.Meta.Ds,
-				DataPos:   uint64(off),
-				FileID:    fileID,
-				Key:       append([]byte(nil), entry.Key...),
-			}
+			hintEntry := newHintEntryFromEntry(entry, fileID, uint64(off))
 
 			if err := hintWriter.Write(hintEntry); err != nil {
 				cleanup(true)

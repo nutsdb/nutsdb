@@ -1734,7 +1734,7 @@ func TestDB_HintFileMissingFallback(t *testing.T) {
 	// Remove hint files to simulate missing hint files
 	_, fileIDs := db.getMaxFileIDAndFileIDs()
 	for _, fileID := range fileIDs {
-		hintPath := getHintPath(int64(fileID), opts.Dir)
+		hintPath := getHintPath(fileID, opts.Dir)
 		os.Remove(hintPath)
 	}
 
@@ -1786,7 +1786,7 @@ func TestDB_HintFileCorruptedFallback(t *testing.T) {
 	// Corrupt hint files to simulate corrupted hint files
 	_, fileIDs := db.getMaxFileIDAndFileIDs()
 	for _, fileID := range fileIDs {
-		hintPath := getHintPath(int64(fileID), opts.Dir)
+		hintPath := getHintPath(fileID, opts.Dir)
 		// Write garbage data to corrupt the file
 		err := os.WriteFile(hintPath, []byte{0xFF, 0xFF, 0xFF}, 0644)
 		require.NoError(t, err)
@@ -1987,7 +1987,7 @@ func TestDB_HintFileDisabled(t *testing.T) {
 	// Verify no hint files are created
 	_, fileIDs := db.getMaxFileIDAndFileIDs()
 	for _, fileID := range fileIDs {
-		hintPath := getHintPath(int64(fileID), opts.Dir)
+		hintPath := getHintPath(fileID, opts.Dir)
 		_, err := os.Stat(hintPath)
 		if err == nil {
 			t.Errorf("Hint file %s should not exist when EnableHintFile is false", hintPath)

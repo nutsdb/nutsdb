@@ -16,8 +16,10 @@ package nutsdb
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -40,6 +42,10 @@ var (
 // getHintPath returns the hint file path for the given file ID and directory
 func getHintPath(fid int64, dir string) string {
 	separator := string(filepath.Separator)
+	if IsMergeFile(fid) {
+		seq := GetMergeSeq(fid)
+		return dir + separator + fmt.Sprintf("merge_%d%s", seq, HintSuffix)
+	}
 	return dir + separator + strconv2.Int64ToStr(fid) + HintSuffix
 }
 
@@ -58,6 +64,23 @@ type HintEntry struct {
 	Key       []byte
 }
 
+func newHintEntryFromEntry(entry *Entry, fileID int64, offset uint64) *HintEntry {
+	meta := entry.Meta
+	return &HintEntry{
+		BucketId:  meta.BucketId,
+		KeySize:   meta.KeySize,
+		ValueSize: meta.ValueSize,
+		Timestamp: meta.Timestamp,
+		TTL:       meta.TTL,
+		Flag:      meta.Flag,
+		Status:    meta.Status,
+		Ds:        meta.Ds,
+		DataPos:   offset,
+		FileID:    fileID,
+		Key:       append([]byte(nil), entry.Key...),
+	}
+}
+
 // Size returns the size of the hint entry
 func (h *HintEntry) Size() int64 {
 	keySize := len(h.Key)
@@ -72,7 +95,7 @@ func (h *HintEntry) Size() int64 {
 	size += UvarintSize(uint64(h.Status))
 	size += UvarintSize(uint64(h.Ds))
 	size += UvarintSize(h.DataPos)
-	size += UvarintSize(uint64(h.FileID))
+	size += VarintSize(h.FileID)
 	size += keySize
 
 	return int64(size)
@@ -95,7 +118,7 @@ func (h *HintEntry) Encode() []byte {
 	index += binary.PutUvarint(buf[index:], uint64(h.Status))
 	index += binary.PutUvarint(buf[index:], uint64(h.Ds))
 	index += binary.PutUvarint(buf[index:], h.DataPos)
-	index += binary.PutUvarint(buf[index:], uint64(h.FileID))
+	index += binary.PutVarint(buf[index:], h.FileID)
 
 	copy(buf[index:], h.Key)
 	index += keySize
@@ -174,12 +197,12 @@ func (h *HintEntry) Decode(buf []byte) error {
 	index += n
 	h.DataPos = dataPos
 
-	fileID, n := binary.Uvarint(buf[index:])
-	if n <= 0 {
-		return ErrHintFileCorrupted
+	fileID, n, err := decodeCompatInt64(buf[index:])
+	if err != nil {
+		return err
 	}
 	index += n
-	h.FileID = int64(fileID)
+	h.FileID = fileID
 
 	if len(buf) < index+int(h.KeySize) {
 		return ErrHintFileCorrupted
@@ -286,11 +309,11 @@ func (r *HintFileReader) Read() (*HintEntry, error) {
 		return nil, err
 	}
 
-	fileID, err := readUvarint()
+	fileID, err := readCompatInt64(r.reader, &fieldsRead)
 	if err != nil {
 		return nil, err
 	}
-	entry.FileID = int64(fileID)
+	entry.FileID = fileID
 
 	if entry.KeySize > 0 {
 		entry.Key = make([]byte, entry.KeySize)
@@ -303,6 +326,76 @@ func (r *HintFileReader) Read() (*HintEntry, error) {
 	}
 
 	return entry, nil
+}
+
+func decodeCompatInt64(buf []byte) (int64, int, error) {
+	if len(buf) == 0 {
+		return 0, 0, ErrHintFileCorrupted
+	}
+	fileID, n := binary.Varint(buf)
+	if n > 0 {
+		var encoded [binary.MaxVarintLen64]byte
+		m := binary.PutVarint(encoded[:], fileID)
+		if n == m && bytes.Equal(buf[:n], encoded[:m]) {
+			return fileID, n, nil
+		}
+	}
+
+	uval, n2 := binary.Uvarint(buf)
+	if n2 > 0 {
+		return int64(uval), n2, nil
+	}
+
+	return 0, 0, ErrHintFileCorrupted
+}
+
+func readCompatInt64(r *bufio.Reader, fieldsRead *int) (int64, error) {
+	var scratch [binary.MaxVarintLen64]byte
+	var i int
+
+	for {
+		b, err := r.ReadByte()
+		if err != nil {
+			if err == io.EOF {
+				if i == 0 {
+					if fieldsRead != nil && *fieldsRead == 0 {
+						return 0, io.EOF
+					}
+					return 0, ErrHintFileCorrupted
+				}
+				return 0, ErrHintFileCorrupted
+			}
+			if err == io.ErrUnexpectedEOF {
+				return 0, ErrHintFileCorrupted
+			}
+			return 0, err
+		}
+
+		scratch[i] = b
+		i++
+
+		if b < 0x80 || i == len(scratch) {
+			break
+		}
+	}
+
+	if i == len(scratch) && scratch[i-1]&0x80 != 0 {
+		return 0, ErrHintFileCorrupted
+	}
+
+	val, n, err := decodeCompatInt64(scratch[:i])
+	if err != nil {
+		return 0, err
+	}
+	if n != i {
+		return 0, ErrHintFileCorrupted
+	}
+
+	if fieldsRead != nil {
+		(*fieldsRead)++
+	}
+
+	return val, nil
 }
 
 // Close closes the hint file

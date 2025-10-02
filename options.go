@@ -126,6 +126,10 @@ type Options struct {
 	// If EnableHintFile is true, hint files will be created and used for faster database startup.
 	// If EnableHintFile is false, hint files will not be created or used.
 	EnableHintFile bool
+
+	// EnableMergeV2 toggles the redesigned merge pipeline with deterministic merge files and manifest support.
+	// When disabled, NutsDB falls back to the legacy merge logic.
+	EnableMergeV2 bool
 }
 
 const (
@@ -156,6 +160,7 @@ var DefaultOptions = func() Options {
 		HintKeyAndRAMIdxCacheSize: 0,
 		ExpiredDeleteType:         TimeWheel,
 		EnableHintFile:            true,
+		EnableMergeV2:             false,
 	}
 }()
 
@@ -266,5 +271,11 @@ func WithMaxWriteRecordCount(maxWriteRecordCount int64) Option {
 func WithEnableHintFile(enable bool) Option {
 	return func(opt *Options) {
 		opt.EnableHintFile = enable
+	}
+}
+
+func WithEnableMergeV2(enable bool) Option {
+	return func(opt *Options) {
+		opt.EnableMergeV2 = enable
 	}
 }

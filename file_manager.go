@@ -42,6 +42,11 @@ func (fm *fileManager) getDataFile(path string, capacity int64) (datafile *DataF
 	return NewDataFile(path, rwManager), nil
 }
 
+func (fm *fileManager) getDataFileByID(dir string, fileID int64, capacity int64) (*DataFile, error) {
+	path := getDataPath(fileID, dir)
+	return fm.getDataFile(path, capacity)
+}
+
 // getFileRWManager will return a FileIORWManager Object
 func (fm *fileManager) getFileRWManager(path string, capacity int64, segmentSize int64) (*FileIORWManager, error) {
 	fd, err := fm.fdm.getFd(path)

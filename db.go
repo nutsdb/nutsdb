@@ -21,7 +21,6 @@ import (
 	"io"
 	"log"
 	"os"
-	"path"
 	"path/filepath"
 	"runtime"
 	"sort"
@@ -105,6 +104,10 @@ func open(opt Options) (*DB, error) {
 
 	if err := db.rebuildBucketManager(); err != nil {
 		return nil, fmt.Errorf("db.rebuildBucketManager err:%s", err)
+	}
+
+	if err := db.recoverMergeManifest(); err != nil {
+		return nil, fmt.Errorf("recover merge manifest: %w", err)
 	}
 
 	if err := db.buildIndexes(); err != nil {
@@ -401,36 +404,32 @@ func (db *DB) setActiveFile() (err error) {
 }
 
 // getMaxFileIDAndFileIds returns max fileId and fileIds.
-func (db *DB) getMaxFileIDAndFileIDs() (maxFileID int64, dataFileIds []int) {
-	files, _ := os.ReadDir(db.opt.Dir)
-
-	if len(files) == 0 {
+func (db *DB) getMaxFileIDAndFileIDs() (maxFileID int64, dataFileIds []int64) {
+	userIDs, mergeIDs, err := enumerateDataFileIDs(db.opt.Dir)
+	if err != nil {
 		return 0, nil
 	}
 
-	for _, file := range files {
-		filename := file.Name()
-		fileSuffix := path.Ext(path.Base(filename))
-		if fileSuffix != DataSuffix {
-			continue
-		}
+	if len(userIDs) > 0 {
+		maxFileID = userIDs[len(userIDs)-1]
+	}
 
-		filename = strings.TrimSuffix(filename, DataSuffix)
-		id, _ := strconv2.StrToInt(filename)
-		dataFileIds = append(dataFileIds, id)
+	dataFileIds = make([]int64, 0, len(userIDs)+len(mergeIDs))
+	dataFileIds = append(dataFileIds, userIDs...)
+	dataFileIds = append(dataFileIds, mergeIDs...)
+
+	if len(dataFileIds) > 1 {
+		sort.Slice(dataFileIds, func(i, j int) bool { return dataFileIds[i] < dataFileIds[j] })
 	}
 
 	if len(dataFileIds) == 0 {
-		return 0, nil
+		return maxFileID, nil
 	}
 
-	sort.Ints(dataFileIds)
-	maxFileID = int64(dataFileIds[len(dataFileIds)-1])
-
-	return
+	return maxFileID, dataFileIds
 }
 
-func (db *DB) parseDataFiles(dataFileIds []int) (err error) {
+func (db *DB) parseDataFiles(dataFileIds []int64) (err error) {
 	var (
 		off      int64
 		f        *fileRecovery
@@ -520,7 +519,7 @@ func (db *DB) parseDataFiles(dataFileIds []int) (err error) {
 
 	for _, dataID := range dataFileIds {
 		off = 0
-		fID = int64(dataID)
+		fID = dataID
 
 		// Try to load hint file first if enabled
 		if db.opt.EnableHintFile {
@@ -878,7 +877,7 @@ func (db *DB) buildListLRemIdx(value []byte, l *List, key []byte) error {
 func (db *DB) buildIndexes() (err error) {
 	var (
 		maxFileID   int64
-		dataFileIds []int
+		dataFileIds []int64
 	)
 
 	maxFileID, dataFileIds = db.getMaxFileIDAndFileIDs()
@@ -891,7 +890,7 @@ func (db *DB) buildIndexes() (err error) {
 		return
 	}
 
-	if dataFileIds == nil && maxFileID == 0 {
+	if len(dataFileIds) == 0 {
 		return
 	}
 
