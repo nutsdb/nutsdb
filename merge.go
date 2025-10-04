@@ -106,7 +106,7 @@ func (db *DB) mergeLegacy() error {
 
 	mergingPath := make([]string, len(pendingMergeFIds))
 
-	// 用于收集所有已合并的条目信息，以便稍后写入 HintFile
+	// Used to collect all merged entry information for later writing to the HintFile
 	var mergedEntries []mergedEntryInfo
 
 	for i, pendingMergeFId := range pendingMergeFIds {
@@ -167,7 +167,7 @@ func (db *DB) mergeLegacy() error {
 							}
 						}
 
-						// 记录已合并的条目信息，稍后从索引中获取实际位置
+						// Record merged entry information to get actual position from index later
 						mergedEntries = append(mergedEntries, mergedEntryInfo{
 							entry:    entry,
 							bucketId: bucket.Id,
@@ -200,10 +200,10 @@ func (db *DB) mergeLegacy() error {
 		mergingPath[i] = path
 	}
 
-	// 现在所有数据已经写入，为所有新生成的数据文件创建 HintFile
-	// 只为 Merge 过程中实际生成的新文件创建 HintFile
+	// Now that all data has been written, create HintFile for all newly generated data files
+	// Only create HintFile for new files actually generated during the Merge process
 	db.mu.Lock()
-	endFileID := db.MaxFileID // 记录 merge 结束时的最大文件 ID
+	endFileID := db.MaxFileID // Record the maximum file ID when merge ends
 	db.mu.Unlock()
 
 	// 只有当启用 HintFile 功能时才创建 HintFile
@@ -221,11 +221,11 @@ func (db *DB) mergeLegacy() error {
 			return fmt.Errorf("when merge err: %s", err)
 		}
 
-		// 删除旧数据文件对应的 HintFile（如果存在）
+		// Delete the HintFile corresponding to the old data file (if it exists)
 		oldHintPath := getHintPath(int64(pendingMergeFIds[i]), db.opt.Dir)
 		if _, err := os.Stat(oldHintPath); err == nil {
 			if removeErr := os.Remove(oldHintPath); removeErr != nil {
-				// 记录错误但不中断合并过程
+				// Log error but don't interrupt the merge process
 				fmt.Printf("warning: failed to remove old hint file %s: %v\n", oldHintPath, removeErr)
 			}
 		}
@@ -234,9 +234,9 @@ func (db *DB) mergeLegacy() error {
 	return nil
 }
 
-// buildHintFilesAfterMerge 在 merge 完成后，为所有新生成的数据文件创建 HintFile
-// 通过遍历索引找出所有指向新文件的记录
-// 只处理 [startFileID, endFileID] 范围内的文件
+// buildHintFilesAfterMerge creates HintFiles for all newly generated data files after merge
+// by traversing the index to find all records pointing to new files.
+// Only process files in the range [startFileID, endFileID]
 func (db *DB) buildHintFilesAfterMerge(startFileID, endFileID int64) error {
 	if startFileID > endFileID {
 		return nil

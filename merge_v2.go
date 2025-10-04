@@ -225,7 +225,7 @@ func (job *mergeV2Job) cleanupOldFiles() error {
 func (job *mergeV2Job) abort(err error) error {
 	var errs []error
 
-	// 清理所有输出文件
+	// Clean up all output files
 	for _, out := range job.outputs {
 		if out != nil {
 			if finalizeErr := out.finalize(); finalizeErr != nil {
