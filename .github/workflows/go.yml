@@ -1,7 +1,7 @@
-# This workflow will build a golang project
+# This workflow will build a golang project and generate coverage
 # For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-go
 
-name: Go
+name: Build and Coverage
 
 on:
   push:
@@ -11,24 +11,44 @@ on:
 
 jobs:
 
-  build:
+  build-and-coverage:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
     - uses: actions/checkout@v3
 
     - name: Set up Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@v4
       with:
-        go-version: 1.18
+        go-version: '1.21'
 
-    - name: Build
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+
+    - name: Clean test directories
+      run: |
+        sudo rm -rf /tmp/nutsdb* || true
+        sudo rm -rf /tmp/test-hintfile* || true
+
+    - name: Build project
       run: go build -v ./...
 
-    - name: Test
-      run: go test -v ./...
-      
-    - name: Run coverage
-      run: go test -race -coverprofile=coverage.out -covermode=atomic
-      
+    - name: Run coverage tests
+      run: |
+        # Set longer timeout for coverage collection
+        timeout 25m go test -race -timeout 20m -coverprofile=coverage.out -covermode=atomic ./...
+
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v4
+      with:
+        file: ./coverage.out
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false

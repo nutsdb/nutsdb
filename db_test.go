@@ -1810,20 +1810,47 @@ func TestDB_HintFileCorruptedFallback(t *testing.T) {
 	require.NoError(t, db.Close())
 
 	// Corrupt hint files to simulate corrupted hint files
-	// Wait a moment to ensure all files are properly written
-	time.Sleep(100 * time.Millisecond)
+	// Wait a moment to ensure all files are properly written and flushed to disk
+	time.Sleep(200 * time.Millisecond)
 
-	// Get file IDs before closing the database
+	// Get file IDs and validate they exist before corruption
 	fileIDs := enumerateDataFilesInDir(opts.Dir)
+	require.NotEmpty(t, fileIDs, "Should have at least one data file after merge")
+
+	corruptedFiles := 0
 	for _, fileID := range fileIDs {
 		hintPath := getHintPath(fileID, opts.Dir)
+
 		// Check if hint file exists before corrupting it
-		if _, err := os.Stat(hintPath); err == nil {
-			// Write garbage data to corrupt the file
-			err := os.WriteFile(hintPath, []byte{0xFF, 0xFF, 0xFF}, 0644)
-			require.NoError(t, err)
+		if stat, err := os.Stat(hintPath); err == nil {
+			t.Logf("Found hint file %s (size: %d bytes)", hintPath, stat.Size())
+
+			// Verify file is readable before corruption
+			if originalData, err := os.ReadFile(hintPath); err == nil {
+				t.Logf("Original hint file size: %d bytes", len(originalData))
+				require.Greater(t, len(originalData), 0, "Hint file should not be empty")
+
+				// Write garbage data to corrupt the file
+				corruptionData := []byte{0xFF, 0xFF, 0xFF, 0xFD, 0xFE, 0xFF} // Different pattern
+				err := os.WriteFile(hintPath, corruptionData, 0644)
+				require.NoError(t, err)
+
+				// Verify corruption was successful
+				if corruptedData, err := os.ReadFile(hintPath); err == nil {
+					t.Logf("Corrupted hint file %s, new size: %d bytes", hintPath, len(corruptedData))
+					require.NotEqual(t, originalData, corruptedData, "File should be corrupted")
+				}
+				corruptedFiles++
+			} else {
+				t.Logf("Warning: Could not read hint file %s: %v", hintPath, err)
+			}
+		} else {
+			t.Logf("Hint file %s does not exist, skipping corruption", hintPath)
 		}
 	}
+
+	t.Logf("Corrupted %d hint files out of %d data files", corruptedFiles, len(fileIDs))
+	require.Greater(t, corruptedFiles, 0, "Should have corrupted at least one hint file")
 
 	// Reopen the database - it should fall back to scanning data files
 	db, err = Open(opts)
