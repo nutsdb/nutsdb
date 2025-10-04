@@ -109,7 +109,9 @@ func TestEnumerateDataFileIDs(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		f.Close()
+		if err := f.Close(); err != nil {
+			t.Errorf("Failed to close file: %v", err)
+		}
 	}
 
 	createFile("0.dat")
@@ -150,7 +152,9 @@ func TestPurgeMergeFiles(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		f.Close()
+		if err := f.Close(); err != nil {
+			t.Errorf("Failed to close file: %v", err)
+		}
 	}
 
 	createFile("0.dat")

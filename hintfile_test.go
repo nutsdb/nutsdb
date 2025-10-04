@@ -275,7 +275,11 @@ func TestHintFileWriterReader(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open hint file: %v", err)
 	}
-	defer reader.Close()
+	defer func() {
+		if err := reader.Close(); err != nil {
+			t.Errorf("Failed to close hint file reader: %v", err)
+		}
+	}()
 
 	// Read and verify entries
 	for i, expectedEntry := range entries {
@@ -377,7 +381,11 @@ func TestHintFileReaderErrorHandling(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to open corrupted file: %v", err)
 		}
-		defer reader.Close()
+		defer func() {
+			if err := reader.Close(); err != nil {
+				t.Errorf("Failed to close corrupted file reader: %v", err)
+			}
+		}()
 
 		_, err = reader.Read()
 		if err == nil {

@@ -561,7 +561,12 @@ func (db *DB) loadHintFile(fid int64) (bool, error) {
 	if err := reader.Open(hintPath); err != nil {
 		return false, nil
 	}
-	defer reader.Close()
+	defer func() {
+		if err := reader.Close(); err != nil {
+			// Log error but don't fail the operation
+			log.Printf("Warning: failed to close hint file reader: %v", err)
+		}
+	}()
 
 	// Read all hint entries and build indexes
 	for {

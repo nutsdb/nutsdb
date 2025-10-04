@@ -74,7 +74,11 @@ func BenchmarkHintFileWrite(b *testing.B) {
 	if err != nil {
 		b.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			b.Errorf("Failed to remove temp dir: %v", err)
+		}
+	}()
 
 	hintPath := tmpDir + "/test.hint"
 

@@ -36,28 +36,12 @@ func mergeHintFileName(seq int) string {
 	return fmt.Sprintf("%s%d%s", mergeFilePrefix(), seq, HintSuffix)
 }
 
-func mergeTempDataFileName(seq int) string {
-	return fmt.Sprintf("merge_tmp_%d%s", seq, DataSuffix)
-}
-
-func mergeTempHintFileName(seq int) string {
-	return fmt.Sprintf("merge_tmp_%d%s", seq, HintSuffix)
-}
-
 func getMergeDataPath(dir string, seq int) string {
 	return filepath.Join(dir, mergeDataFileName(seq))
 }
 
 func getMergeHintPath(dir string, seq int) string {
 	return filepath.Join(dir, mergeHintFileName(seq))
-}
-
-func getMergeTempDataPath(dir string, seq int) string {
-	return filepath.Join(dir, mergeTempDataFileName(seq))
-}
-
-func getMergeTempHintPath(dir string, seq int) string {
-	return filepath.Join(dir, mergeTempHintFileName(seq))
 }
 
 func parseMergeSeq(name string) (int, bool) {
