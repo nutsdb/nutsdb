@@ -19,6 +19,7 @@ import (
 	"math"
 	"os"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -1732,7 +1733,7 @@ func TestDB_HintFileMissingFallback(t *testing.T) {
 	require.NoError(t, db.Close())
 
 	// Remove hint files to simulate missing hint files
-	_, fileIDs := db.getMaxFileIDAndFileIDs()
+	fileIDs := enumerateDataFilesInDir(opts.Dir)
 	for _, fileID := range fileIDs {
 		hintPath := getHintPath(fileID, opts.Dir)
 		os.Remove(hintPath)
@@ -1754,6 +1755,31 @@ func TestDB_HintFileMissingFallback(t *testing.T) {
 
 	require.NoError(t, db.Close())
 	removeDir(opts.Dir)
+}
+
+// enumerateDataFilesInDir returns all data file IDs in the directory
+func enumerateDataFilesInDir(dir string) []int64 {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil
+	}
+
+	var fileIDs []int64
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		// Check if it's a data file (ends with .data)
+		if strings.HasSuffix(name, DataSuffix) {
+			// Extract file ID from filename
+			idStr := strings.TrimSuffix(name, DataSuffix)
+			if id, err := strconv.ParseInt(idStr, 10, 64); err == nil {
+				fileIDs = append(fileIDs, id)
+			}
+		}
+	}
+	return fileIDs
 }
 
 func TestDB_HintFileCorruptedFallback(t *testing.T) {
@@ -1784,12 +1810,19 @@ func TestDB_HintFileCorruptedFallback(t *testing.T) {
 	require.NoError(t, db.Close())
 
 	// Corrupt hint files to simulate corrupted hint files
-	_, fileIDs := db.getMaxFileIDAndFileIDs()
+	// Wait a moment to ensure all files are properly written
+	time.Sleep(100 * time.Millisecond)
+
+	// Get file IDs before closing the database
+	fileIDs := enumerateDataFilesInDir(opts.Dir)
 	for _, fileID := range fileIDs {
 		hintPath := getHintPath(fileID, opts.Dir)
-		// Write garbage data to corrupt the file
-		err := os.WriteFile(hintPath, []byte{0xFF, 0xFF, 0xFF}, 0644)
-		require.NoError(t, err)
+		// Check if hint file exists before corrupting it
+		if _, err := os.Stat(hintPath); err == nil {
+			// Write garbage data to corrupt the file
+			err := os.WriteFile(hintPath, []byte{0xFF, 0xFF, 0xFF}, 0644)
+			require.NoError(t, err)
+		}
 	}
 
 	// Reopen the database - it should fall back to scanning data files
@@ -1985,7 +2018,7 @@ func TestDB_HintFileDisabled(t *testing.T) {
 	require.NoError(t, db.Close())
 
 	// Verify no hint files are created
-	_, fileIDs := db.getMaxFileIDAndFileIDs()
+	fileIDs := enumerateDataFilesInDir(opts.Dir)
 	for _, fileID := range fileIDs {
 		hintPath := getHintPath(fileID, opts.Dir)
 		_, err := os.Stat(hintPath)
