@@ -141,6 +141,240 @@ func TestDB_MergeForString(t *testing.T) {
 	})
 }
 
+func TestDB_MergeMultipleTimesWithRestarts(t *testing.T) {
+	runForMergeModes(t, func(t *testing.T, mode mergeTestMode) {
+		opts := DefaultOptions
+		opts.SegmentSize = KB
+		opts.EnableMergeV2 = mode.enableMergeV2
+		opts.Dir = fmt.Sprintf("/tmp/test-merge-multi-restart-%s/", mode.name)
+
+		const (
+			totalCycles     = 3
+			entriesPerCycle = 200
+		)
+
+		stringBucket := "bucket_multi_btree"
+		setBucket := "bucket_multi_set"
+		listBucket := "bucket_multi_list"
+		zsetBucket := "bucket_multi_zset"
+
+		type multiDSState struct {
+			stringExpected map[string][]byte
+			stringDeleted  map[string]struct{}
+			setExpected    map[string]struct{}
+			setDeleted     map[string]struct{}
+			listExpected   [][]byte
+			zsetExpected   map[string]float64
+			zsetDeleted    map[string]struct{}
+			setKey         []byte
+			listKey        []byte
+			zsetKey        []byte
+		}
+
+		validateState := func(db *DB, st *multiDSState) {
+			totalExpected := len(st.stringExpected) + len(st.setExpected) + len(st.listExpected) + len(st.zsetExpected)
+
+			dbCnt, err := db.getRecordCount()
+			require.NoError(t, err)
+			require.Equal(t, int64(totalExpected), dbCnt)
+
+			for keyStr, val := range st.stringExpected {
+				txGet(t, db, stringBucket, []byte(keyStr), val, nil)
+			}
+			for keyStr := range st.stringDeleted {
+				if _, ok := st.stringExpected[keyStr]; ok {
+					continue
+				}
+				txGet(t, db, stringBucket, []byte(keyStr), nil, ErrKeyNotFound)
+			}
+
+			for member := range st.setExpected {
+				txSIsMember(t, db, setBucket, st.setKey, []byte(member), true)
+			}
+			for member := range st.setDeleted {
+				if _, ok := st.setExpected[member]; ok {
+					continue
+				}
+				txSIsMember(t, db, setBucket, st.setKey, []byte(member), false)
+			}
+
+			txLRange(t, db, listBucket, st.listKey, 0, -1, len(st.listExpected), st.listExpected, nil)
+
+			for member, score := range st.zsetExpected {
+				txZScore(t, db, zsetBucket, st.zsetKey, []byte(member), score, nil)
+			}
+			for member := range st.zsetDeleted {
+				if _, ok := st.zsetExpected[member]; ok {
+					continue
+				}
+				txZScore(t, db, zsetBucket, st.zsetKey, []byte(member), 0, ErrSortedSetMemberNotExist)
+			}
+		}
+
+		for _, idxMode := range []EntryIdxMode{HintKeyValAndRAMIdxMode, HintKeyAndRAMIdxMode} {
+			removeDir(opts.Dir)
+			opts.EntryIdxMode = idxMode
+
+			db, err := Open(opts)
+			require.NoError(t, err)
+
+			txCreateBucket(t, db, DataStructureBTree, stringBucket, nil)
+			txCreateBucket(t, db, DataStructureSet, setBucket, nil)
+			txCreateBucket(t, db, DataStructureList, listBucket, nil)
+			txCreateBucket(t, db, DataStructureSortedSet, zsetBucket, nil)
+
+			state := &multiDSState{
+				stringExpected: make(map[string][]byte),
+				stringDeleted:  make(map[string]struct{}),
+				setExpected:    make(map[string]struct{}),
+				setDeleted:     make(map[string]struct{}),
+				listExpected:   nil,
+				zsetExpected:   make(map[string]float64),
+				zsetDeleted:    make(map[string]struct{}),
+				setKey:         GetTestBytes(0),
+				listKey:        GetTestBytes(1),
+				zsetKey:        GetTestBytes(2),
+			}
+
+			half := entriesPerCycle / 2
+
+			for cycle := 0; cycle < totalCycles; cycle++ {
+				if cycle > 0 {
+					if len(state.stringExpected) > 0 {
+						for keyStr := range state.stringExpected {
+							txDel(t, db, stringBucket, []byte(keyStr), nil)
+							state.stringDeleted[keyStr] = struct{}{}
+						}
+						state.stringExpected = make(map[string][]byte)
+					}
+
+					if len(state.setExpected) > 0 {
+						for member := range state.setExpected {
+							txSRem(t, db, setBucket, state.setKey, []byte(member), nil)
+							state.setDeleted[member] = struct{}{}
+						}
+						state.setExpected = make(map[string]struct{})
+					}
+
+					if len(state.listExpected) > 0 {
+						for _, val := range state.listExpected {
+							txLRem(t, db, listBucket, state.listKey, 0, val, nil)
+						}
+						state.listExpected = nil
+					}
+
+					if len(state.zsetExpected) > 0 {
+						for member := range state.zsetExpected {
+							txZRem(t, db, zsetBucket, state.zsetKey, []byte(member), nil)
+							state.zsetDeleted[member] = struct{}{}
+						}
+						state.zsetExpected = make(map[string]float64)
+					}
+				}
+
+				cycleBase := cycle * entriesPerCycle * 20
+				stringBase := cycleBase
+				setBase := cycleBase + entriesPerCycle*5
+				listBase := cycleBase + entriesPerCycle*10
+				zsetBase := cycleBase + entriesPerCycle*15
+
+				currentStringKeys := make([][]byte, 0, entriesPerCycle)
+				for i := 0; i < entriesPerCycle; i++ {
+					rawKey := GetTestBytes(stringBase + i)
+					txPut(t, db, stringBucket, rawKey, rawKey, Persistent, nil, nil)
+					currentStringKeys = append(currentStringKeys, rawKey)
+				}
+				for _, rawKey := range currentStringKeys {
+					txPut(t, db, stringBucket, rawKey, rawKey, Persistent, nil, nil)
+				}
+				for i, rawKey := range currentStringKeys {
+					keyStr := string(rawKey)
+					if i < half {
+						txDel(t, db, stringBucket, rawKey, nil)
+						state.stringDeleted[keyStr] = struct{}{}
+						continue
+					}
+					state.stringExpected[keyStr] = append([]byte(nil), rawKey...)
+				}
+
+				currentSetMembers := make([][]byte, 0, entriesPerCycle)
+				for i := 0; i < entriesPerCycle; i++ {
+					member := GetTestBytes(setBase + i)
+					txSAdd(t, db, setBucket, state.setKey, member, nil, nil)
+					currentSetMembers = append(currentSetMembers, member)
+				}
+				for _, member := range currentSetMembers {
+					txSAdd(t, db, setBucket, state.setKey, member, nil, nil)
+				}
+				for i, member := range currentSetMembers {
+					memberStr := string(member)
+					if i < half {
+						txSRem(t, db, setBucket, state.setKey, member, nil)
+						state.setDeleted[memberStr] = struct{}{}
+						continue
+					}
+					state.setExpected[memberStr] = struct{}{}
+				}
+
+				currentListValues := make([][]byte, 0, entriesPerCycle)
+				for i := 0; i < entriesPerCycle; i++ {
+					val := GetTestBytes(listBase + i)
+					txPush(t, db, listBucket, state.listKey, val, false, nil, nil)
+					currentListValues = append(currentListValues, val)
+				}
+				for _, val := range currentListValues {
+					txPush(t, db, listBucket, state.listKey, val, false, nil, nil)
+				}
+				for i := 0; i < half; i++ {
+					txLRem(t, db, listBucket, state.listKey, 0, currentListValues[i], nil)
+				}
+				state.listExpected = make([][]byte, 0, entriesPerCycle-half)
+				for i := half; i < entriesPerCycle; i++ {
+					val := currentListValues[i]
+					txLRem(t, db, listBucket, state.listKey, 1, val, nil)
+					state.listExpected = append(state.listExpected, append([]byte(nil), val...))
+				}
+
+				currentZSetMembers := make([][]byte, 0, entriesPerCycle)
+				for i := 0; i < entriesPerCycle; i++ {
+					member := GetTestBytes(zsetBase + i)
+					score1 := float64(zsetBase + i)
+					score2 := score1 + 0.5
+					txZAdd(t, db, zsetBucket, state.zsetKey, member, score1, nil, nil)
+					txZAdd(t, db, zsetBucket, state.zsetKey, member, score2, nil, nil)
+					currentZSetMembers = append(currentZSetMembers, member)
+				}
+				for i, member := range currentZSetMembers {
+					memberStr := string(member)
+					if i < half {
+						txZRem(t, db, zsetBucket, state.zsetKey, member, nil)
+						state.zsetDeleted[memberStr] = struct{}{}
+						continue
+					}
+					state.zsetExpected[memberStr] = float64(zsetBase+i) + 0.5
+				}
+
+				validateState(db, state)
+
+				require.NoError(t, db.Merge())
+
+				validateState(db, state)
+
+				require.NoError(t, db.Close())
+
+				db, err = Open(opts)
+				require.NoError(t, err)
+
+				validateState(db, state)
+			}
+
+			require.NoError(t, db.Close())
+		}
+
+		removeDir(opts.Dir)
+	})
+}
+
 func TestDB_MergeForSet(t *testing.T) {
 	runForMergeModes(t, func(t *testing.T, mode mergeTestMode) {
 		bucket := "bucket"
