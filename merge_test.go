@@ -1068,3 +1068,100 @@ func TestDB_MergeHintFileDifferentDataStructures(t *testing.T) {
 		removeDir(opts.Dir)
 	})
 }
+
+func TestDB_MergeModeSwitching(t *testing.T) {
+	const (
+		totalKeys = 300
+		valueSize = 512
+	)
+
+	dir := t.TempDir()
+
+	baseOpts := DefaultOptions
+	baseOpts.Dir = dir
+	baseOpts.EnableHintFile = true
+	baseOpts.SegmentSize = 4 * KB
+	baseOpts.RWMode = FileIO
+
+	legacyOpts := baseOpts
+	legacyOpts.EnableMergeV2 = false
+
+	v2Opts := baseOpts
+	v2Opts.EnableMergeV2 = true
+
+	bucket := "switch-bucket"
+
+	valueFor := func(stage byte, idx int) []byte {
+		body := bytes.Repeat([]byte{stage}, valueSize-8)
+		suffix := []byte(fmt.Sprintf("%08d", idx))
+		return append(body, suffix...)
+	}
+
+	writeStage := func(db *DB, stage byte) {
+		for i := 0; i < totalKeys; i++ {
+			key := []byte(fmt.Sprintf("key-%04d", i))
+			value := valueFor(stage, i)
+			require.NoError(t, db.Update(func(tx *Tx) error {
+				return tx.Put(bucket, key, value, Persistent)
+			}))
+		}
+	}
+
+	assertStage := func(db *DB, stage byte) {
+		require.NoError(t, db.View(func(tx *Tx) error {
+			for i := 0; i < totalKeys; i++ {
+				key := []byte(fmt.Sprintf("key-%04d", i))
+				expected := valueFor(stage, i)
+				got, err := tx.Get(bucket, key)
+				if err != nil {
+					return fmt.Errorf("get %q: %w", key, err)
+				}
+				if !bytes.Equal(got, expected) {
+					return fmt.Errorf("value mismatch for %q", key)
+				}
+			}
+			return nil
+		}))
+	}
+
+	openWith := func(opts Options) *DB {
+		db, err := Open(opts)
+		require.NoError(t, err)
+		return db
+	}
+
+	// Start with legacy merge to generate user data files and hint files.
+	db := openWith(legacyOpts)
+	require.NoError(t, db.Update(func(tx *Tx) error {
+		return tx.NewBucket(DataStructureBTree, bucket)
+	}))
+
+	writeStage(db, 'A')
+	assertStage(db, 'A')
+
+	require.NoError(t, db.Merge())
+	assertStage(db, 'A')
+	require.NoError(t, db.Close())
+
+	// Switch to merge v2 and ensure it can consume legacy outputs.
+	db = openWith(v2Opts)
+	assertStage(db, 'A')
+
+	writeStage(db, 'B')
+	assertStage(db, 'B')
+
+	require.NoError(t, db.Merge())
+	assertStage(db, 'B')
+	require.NoError(t, db.Close())
+
+	// Switch back to legacy merge and verify it handles merge v2 artifacts.
+	db = openWith(legacyOpts)
+	assertStage(db, 'B')
+
+	writeStage(db, 'C')
+	assertStage(db, 'C')
+
+	require.NoError(t, db.Merge())
+	assertStage(db, 'C')
+	require.NoError(t, db.Close())
+}
