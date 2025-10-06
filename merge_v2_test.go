@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -582,6 +583,63 @@ func TestMergeV2NewOutputOldHintRemovalFailure(t *testing.T) {
 	}
 }
 
+func TestMergeV2EnsureOutputRolloverCreatesNewSegment(t *testing.T) {
+	dir := t.TempDir()
+
+	opts := DefaultOptions
+	opts.Dir = dir
+	opts.SegmentSize = 256
+	opts.EnableHintFile = false
+	opts.RWMode = FileIO
+
+	db := &DB{
+		opt: opts,
+		fm:  newFileManager(opts.RWMode, 4, 0.5, opts.SegmentSize),
+	}
+
+	job := &mergeV2Job{db: db}
+
+	out1, err := job.ensureOutput(64)
+	if err != nil {
+		t.Fatalf("ensureOutput first segment: %v", err)
+	}
+	if out1 == nil {
+		t.Fatal("first output should not be nil")
+	}
+
+	out1.writeOff = opts.SegmentSize - 16
+
+	out2, err := job.ensureOutput(64)
+	if err != nil {
+		t.Fatalf("ensureOutput rollover: %v", err)
+	}
+	if out2 == nil {
+		t.Fatal("rollover output should not be nil")
+	}
+	if out1 == out2 {
+		t.Fatal("rollover should create a new output")
+	}
+	if len(job.outputs) != 2 {
+		t.Fatalf("expected two outputs, got %d", len(job.outputs))
+	}
+	if out2.seq != out1.seq+1 {
+		t.Fatalf("expected sequential output seq, got %d and %d", out1.seq, out2.seq)
+	}
+
+	for _, out := range job.outputs {
+		if out.dataFile != nil {
+			if err := out.dataFile.Close(); err != nil {
+				t.Fatalf("close data file: %v", err)
+			}
+		}
+		if out.collector != nil {
+			if err := out.collector.Close(); err != nil {
+				t.Fatalf("close collector: %v", err)
+			}
+		}
+	}
+}
+
 func TestMergeV2CommitCollectorFailure(t *testing.T) {
 	dir := t.TempDir()
 
@@ -634,7 +692,7 @@ func TestMergeV2CommitCollectorFailure(t *testing.T) {
 	}
 
 	entry := createTestEntry(bucketID, key, value, DataDeleteFlag, Committed, Persistent, timestamp, 1, DataStructureBTree)
-	if err := job.writeEntry(entry, oldFileID); err != nil {
+	if err := job.writeEntry(entry); err != nil {
 		t.Fatalf("writeEntry: %v", err)
 	}
 
@@ -643,323 +701,61 @@ func TestMergeV2CommitCollectorFailure(t *testing.T) {
 	}
 }
 
-func TestMergeV2CommitSkipsStaleEntries(t *testing.T) {
-	dir := t.TempDir()
-
-	opts := DefaultOptions
-	opts.Dir = dir
-	opts.SegmentSize = 1 << 16
-
-	bucketID := BucketId(1)
-	bucketName := "b"
-	key1 := []byte("key-current")
-	key2 := []byte("key-stale")
-	now := uint64(time.Now().Unix())
-
-	record1 := NewRecord().
-		WithKey(key1).
-		WithFileId(1).
-		WithDataPos(111).
-		WithTimestamp(now).
-		WithTTL(Persistent)
-
-	record2 := NewRecord().
-		WithKey(key2).
-		WithFileId(2).
-		WithDataPos(222).
-		WithTimestamp(now).
-		WithTTL(Persistent)
-
-	bt := NewBTree()
-	bt.InsertRecord(key1, record1)
-	bt.InsertRecord(key2, record2)
-
-	db := &DB{
-		opt:   opts,
-		Index: newIndex(),
-		bm: &BucketManager{
-			BucketInfoMapper: map[BucketId]*Bucket{
-				bucketID: {Meta: &BucketMeta{}, Id: bucketID, Name: bucketName, Ds: uint16(DataStructureBTree)},
-			},
-		},
-	}
-	db.Index.bTree.idx[bucketID] = bt
-
-	writer := &recordingHintWriter{}
-	collector := NewHintCollector(GetMergeFileID(1), writer, 1)
+func TestMergeV2FinalizeOutputsSuccess(t *testing.T) {
+	collector := NewHintCollector(1, &recordingHintWriter{}, 1)
+	mock := &mockRWManager{}
 	out := &mergeOutput{
-		seq:       1,
-		fileID:    GetMergeFileID(1),
-		dataFile:  &DataFile{rwManager: &mockRWManager{}},
+		dataFile:  &DataFile{rwManager: mock},
 		collector: collector,
 	}
+	job := &mergeV2Job{outputs: []*mergeOutput{out}}
 
-	job := &mergeV2Job{
-		db:          db,
-		outputs:     []*mergeOutput{out},
-		valueHasher: fnv.New32a(),
-		manifest:    &mergeManifest{},
-		pending:     []int64{1, 2},
+	if err := job.finalizeOutputs(); err != nil {
+		t.Fatalf("finalizeOutputs: %v", err)
+	}
+	if mock.syncCalls != 1 {
+		t.Fatalf("expected one sync call, got %d", mock.syncCalls)
+	}
+	if mock.closeCalls != 1 {
+		t.Fatalf("expected one close call, got %d", mock.closeCalls)
+	}
+	if err := collector.Add(&HintEntry{}); !errors.Is(err, errHintCollectorClosed) {
+		t.Fatalf("collector should be closed, got %v", err)
 	}
 
-	entry1 := createTestEntry(bucketID, key1, []byte("value1"), DataSetFlag, Committed, Persistent, now, 1, DataStructureBTree)
-	entry2 := createTestEntry(bucketID, key2, []byte("value2"), DataSetFlag, Committed, Persistent, now, 2, DataStructureBTree)
-
-	if err := job.writeEntry(entry1, record1.FileID); err != nil {
-		t.Fatalf("writeEntry #1: %v", err)
+	if err := job.finalizeOutputs(); err != nil {
+		t.Fatalf("finalizeOutputs should be idempotent: %v", err)
 	}
-	if err := job.writeEntry(entry2, record2.FileID); err != nil {
-		t.Fatalf("writeEntry #2: %v", err)
-	}
-
-	// Simulate a concurrent write moving record2 to a new file.
-	record2.WithFileId(999).WithDataPos(555)
-
-	if err := job.commit(); err != nil {
-		t.Fatalf("commit: %v", err)
-	}
-
-	if record1.FileID != out.fileID {
-		t.Fatalf("record1 should move to merge file, got %d want %d", record1.FileID, out.fileID)
-	}
-	if record2.FileID != 999 {
-		t.Fatalf("record2 should remain at new file, got %d", record2.FileID)
-	}
-
-	if len(writer.writes) != 1 {
-		t.Fatalf("expected 1 hint write, got %d", len(writer.writes))
-	}
-	if got := string(writer.writes[0].Key); got != string(key1) {
-		t.Fatalf("hint written for wrong key, got %s want %s", got, key1)
+	if mock.syncCalls != 1 || mock.closeCalls != 1 {
+		t.Fatalf("idempotent finalize should not resync/close, got sync=%d close=%d", mock.syncCalls, mock.closeCalls)
 	}
 }
 
-func TestMergeV2CommitSkipsTimestampMismatch(t *testing.T) {
-	dir := t.TempDir()
-
-	opts := DefaultOptions
-	opts.Dir = dir
-	opts.SegmentSize = 1 << 16
-
-	bucketID := BucketId(1)
-	bucketName := "b"
-	key := []byte("test-key")
-	oldTimestamp := uint64(time.Now().Unix())
-	newTimestamp := oldTimestamp + 100
-
-	record := NewRecord().
-		WithKey(key).
-		WithFileId(5).
-		WithDataPos(111).
-		WithTimestamp(oldTimestamp).
-		WithTTL(Persistent)
-
-	bt := NewBTree()
-	bt.InsertRecord(key, record)
-
-	db := &DB{
-		opt:   opts,
-		Index: newIndex(),
-		bm: &BucketManager{
-			BucketInfoMapper: map[BucketId]*Bucket{
-				bucketID: {Meta: &BucketMeta{}, Id: bucketID, Name: bucketName, Ds: uint16(DataStructureBTree)},
-			},
-		},
-	}
-	db.Index.bTree.idx[bucketID] = bt
-
-	writer := &recordingHintWriter{}
-	collector := NewHintCollector(GetMergeFileID(1), writer, 1)
+func TestMergeV2FinalizeOutputsFailure(t *testing.T) {
+	collector := NewHintCollector(1, &recordingHintWriter{}, 1)
+	mock := &mockRWManager{syncErr: errors.New("sync fail"), closeErr: errors.New("close fail")}
 	out := &mergeOutput{
-		seq:       1,
-		fileID:    GetMergeFileID(1),
-		dataFile:  &DataFile{rwManager: &mockRWManager{}},
+		dataFile:  &DataFile{rwManager: mock},
 		collector: collector,
 	}
+	job := &mergeV2Job{outputs: []*mergeOutput{out}}
 
-	job := &mergeV2Job{
-		db:          db,
-		outputs:     []*mergeOutput{out},
-		valueHasher: fnv.New32a(),
-		manifest:    &mergeManifest{},
-		pending:     []int64{5},
+	err := job.finalizeOutputs()
+	if err == nil {
+		t.Fatal("finalizeOutputs should return error when data file cleanup fails")
 	}
-
-	entry := createTestEntry(bucketID, key, []byte("value"), DataDeleteFlag, Committed, Persistent, oldTimestamp, 1, DataStructureBTree)
-	if err := job.writeEntry(entry, record.FileID); err != nil {
-		t.Fatalf("writeEntry: %v", err)
+	msg := err.Error()
+	if !strings.Contains(msg, "failed to sync data file") || !strings.Contains(msg, "failed to close data file") {
+		t.Fatalf("unexpected error message: %v", err)
 	}
-
-	// Simulate concurrent update changing timestamp
-	record.WithTimestamp(newTimestamp)
-
-	if err := job.commit(); err != nil {
-		t.Fatalf("commit: %v", err)
+	if mock.syncCalls != 1 || mock.closeCalls != 1 {
+		t.Fatalf("expected sync and close attempts despite failures, got sync=%d close=%d", mock.syncCalls, mock.closeCalls)
 	}
-
-	if record.Timestamp != newTimestamp {
-		t.Fatalf("record timestamp should remain new value %d, got %d", newTimestamp, record.Timestamp)
+	if err := collector.Add(&HintEntry{}); !errors.Is(err, errHintCollectorClosed) {
+		t.Fatalf("collector should be closed even on error, got %v", err)
 	}
-
-	if len(writer.writes) != 0 {
-		t.Fatalf("expected 0 hint writes for stale entry, got %d", len(writer.writes))
-	}
-}
-
-func TestMergeV2CommitSkipsStaleEntriesAllDataStructures(t *testing.T) {
-	dir := t.TempDir()
-
-	opts := DefaultOptions
-	opts.Dir = dir
-	opts.SegmentSize = 1 << 16
-
-	now := uint64(time.Now().Unix())
-
-	// Setup BTree
-	btreeBucketID := BucketId(1)
-	btreeKey := []byte("btree-key")
-	btreeRecord := NewRecord().
-		WithKey(btreeKey).
-		WithFileId(10).
-		WithDataPos(100).
-		WithTimestamp(now).
-		WithTTL(Persistent)
-	btree := NewBTree()
-	btree.InsertRecord(btreeKey, btreeRecord)
-
-	// Setup Set
-	setBucketID := BucketId(2)
-	setKey := []byte("set-key")
-	setValue := []byte("set-value")
-	setValueHash := fnv.New32a()
-	setValueHash.Write(setValue)
-	setHash := setValueHash.Sum32()
-	setRecord := NewRecord().
-		WithFileId(11).
-		WithDataPos(200).
-		WithTimestamp(now).
-		WithTTL(Persistent)
-	setIdx := NewSet()
-	setIdx.M[string(setKey)] = map[uint32]*Record{setHash: setRecord}
-
-	// Setup List
-	listBucketID := BucketId(3)
-	listKey := []byte("list-key")
-	listSeq := uint64(1)
-	listEncodedKey := encodeListKey(listKey, listSeq)
-	listRecord := NewRecord().
-		WithFileId(12).
-		WithDataPos(300).
-		WithTimestamp(now).
-		WithTTL(Persistent)
-	listIdx := NewList()
-	listIdx.Items[string(listKey)] = NewBTree()
-	listIdx.Items[string(listKey)].InsertRecord(ConvertUint64ToBigEndianBytes(listSeq), listRecord)
-
-	// Setup SortedSet
-	sortedBucketID := BucketId(4)
-	sortedKey := []byte("sorted-key")
-	sortedValue := []byte("sorted-value")
-	sortedValueHash := fnv.New32a()
-	sortedValueHash.Write(sortedValue)
-	sortedHash := sortedValueHash.Sum32()
-	sortedRecord := NewRecord().
-		WithFileId(13).
-		WithDataPos(400).
-		WithTimestamp(now).
-		WithTTL(Persistent)
-	sortedIdx := NewSortedSet(nil)
-	score := SCORE(1.5)
-	sortedSetKey := string(sortedKey) + SeparatorForZSetKey + "1.5"
-	sortedIdx.M[string(sortedKey)] = NewSortedSet(nil).M[string(sortedKey)]
-	if sortedIdx.M[string(sortedKey)] == nil {
-		sortedIdx.M[string(sortedKey)] = &SkipList{dict: make(map[uint32]*SkipListNode)}
-	}
-	sortedNode := &SkipListNode{score: score, record: sortedRecord}
-	sortedIdx.M[string(sortedKey)].dict[sortedHash] = sortedNode
-
-	db := &DB{
-		opt:   opts,
-		Index: newIndex(),
-		bm: &BucketManager{
-			BucketInfoMapper: map[BucketId]*Bucket{
-				btreeBucketID:  {Meta: &BucketMeta{}, Id: btreeBucketID, Name: "btree", Ds: uint16(DataStructureBTree)},
-				setBucketID:    {Meta: &BucketMeta{}, Id: setBucketID, Name: "set", Ds: uint16(DataStructureSet)},
-				listBucketID:   {Meta: &BucketMeta{}, Id: listBucketID, Name: "list", Ds: uint16(DataStructureList)},
-				sortedBucketID: {Meta: &BucketMeta{}, Id: sortedBucketID, Name: "sorted", Ds: uint16(DataStructureSortedSet)},
-			},
-		},
-	}
-	db.Index.bTree.idx[btreeBucketID] = btree
-	db.Index.set.idx[setBucketID] = setIdx
-	db.Index.list.idx[listBucketID] = listIdx
-	db.Index.sortedSet.idx[sortedBucketID] = sortedIdx
-
-	writer := &recordingHintWriter{}
-	collector := NewHintCollector(GetMergeFileID(1), writer, 1)
-	out := &mergeOutput{
-		seq:       1,
-		fileID:    GetMergeFileID(1),
-		dataFile:  &DataFile{rwManager: &mockRWManager{}},
-		collector: collector,
-	}
-
-	job := &mergeV2Job{
-		db:          db,
-		outputs:     []*mergeOutput{out},
-		valueHasher: fnv.New32a(),
-		manifest:    &mergeManifest{},
-		pending:     []int64{10, 11, 12, 13},
-	}
-
-	// Write entries for all data structures
-	btreeEntry := createTestEntry(btreeBucketID, btreeKey, []byte("btree-value"), DataDeleteFlag, Committed, Persistent, now, 1, DataStructureBTree)
-	if err := job.writeEntry(btreeEntry, btreeRecord.FileID); err != nil {
-		t.Fatalf("writeEntry btree: %v", err)
-	}
-
-	setEntry := createTestEntry(setBucketID, setKey, setValue, DataSetFlag, Committed, Persistent, now, 2, DataStructureSet)
-	if err := job.writeEntry(setEntry, setRecord.FileID); err != nil {
-		t.Fatalf("writeEntry set: %v", err)
-	}
-
-	listEntry := createTestEntry(listBucketID, listEncodedKey, []byte("list-value"), DataLPushFlag, Committed, Persistent, now, 3, DataStructureList)
-	if err := job.writeEntry(listEntry, listRecord.FileID); err != nil {
-		t.Fatalf("writeEntry list: %v", err)
-	}
-
-	sortedEntry := createTestEntry(sortedBucketID, []byte(sortedSetKey), sortedValue, DataZAddFlag, Committed, Persistent, now, 4, DataStructureSortedSet)
-	if err := job.writeEntry(sortedEntry, sortedRecord.FileID); err != nil {
-		t.Fatalf("writeEntry sorted: %v", err)
-	}
-
-	// Simulate concurrent updates (change FileID for half, Timestamp for other half)
-	btreeRecord.WithFileId(999) // BTree: FileID mismatch
-	setRecord.WithTimestamp(now + 100) // Set: Timestamp mismatch
-	listRecord.WithFileId(888) // List: FileID mismatch
-	sortedRecord.WithTimestamp(now + 200) // SortedSet: Timestamp mismatch
-
-	if err := job.commit(); err != nil {
-		t.Fatalf("commit: %v", err)
-	}
-
-	// Verify records remain at new values
-	if btreeRecord.FileID != 999 {
-		t.Fatalf("btree record should keep new FileID 999, got %d", btreeRecord.FileID)
-	}
-	if setRecord.Timestamp != now+100 {
-		t.Fatalf("set record should keep new Timestamp, got %d", setRecord.Timestamp)
-	}
-	if listRecord.FileID != 888 {
-		t.Fatalf("list record should keep new FileID 888, got %d", listRecord.FileID)
-	}
-	if sortedRecord.Timestamp != now+200 {
-		t.Fatalf("sorted record should keep new Timestamp, got %d", sortedRecord.Timestamp)
-	}
-
-	// All entries should be stale, no hints written
-	if len(writer.writes) != 0 {
-		t.Fatalf("expected 0 hint writes for all stale entries, got %d", len(writer.writes))
+	if !out.finalized {
+		t.Fatal("output should be marked finalized even when errors occur")
 	}
 }
 
@@ -1476,7 +1272,7 @@ func TestMergeV2WriteEntryHashesSetAndSortedSet(t *testing.T) {
 
 	setValue := []byte("set-value")
 	setEntry := createTestEntry(1, []byte("set-key"), setValue, DataSetFlag, Committed, Persistent, uint64(time.Now().Unix()), 1, DataStructureSet)
-	if err := job.writeEntry(setEntry, 1); err != nil {
+	if err := job.writeEntry(setEntry); err != nil {
 		t.Fatalf("writeEntry set: %v", err)
 	}
 
@@ -1492,7 +1288,7 @@ func TestMergeV2WriteEntryHashesSetAndSortedSet(t *testing.T) {
 
 	sortedValue := []byte("sorted-value")
 	sortedEntry := createTestEntry(2, []byte("sorted-key"), sortedValue, DataZAddFlag, Committed, Persistent, uint64(time.Now().Unix()), 2, DataStructureSortedSet)
-	if err := job.writeEntry(sortedEntry, 2); err != nil {
+	if err := job.writeEntry(sortedEntry); err != nil {
 		t.Fatalf("writeEntry sorted set: %v", err)
 	}
 
@@ -1505,190 +1301,6 @@ func TestMergeV2WriteEntryHashesSetAndSortedSet(t *testing.T) {
 	entry := job.lookup[1]
 	if !entry.hasValueHash || entry.valueHash != expectedSortedHash.Sum32() {
 		t.Fatalf("sorted set lookup should contain value hash")
-	}
-}
-
-func TestMergeV2ApplyLookupEdgeCases(t *testing.T) {
-	db := &DB{
-		opt:   DefaultOptions,
-		Index: newIndex(),
-		bm: &BucketManager{
-			BucketInfoMapper: map[BucketId]*Bucket{
-				1: {Meta: &BucketMeta{}, Id: 1, Name: "bucket", Ds: uint16(DataStructureBTree)},
-			},
-		},
-	}
-
-	bucketID := BucketId(1)
-	key := []byte("test-key")
-	record := NewRecord().
-		WithKey(key).
-		WithFileId(10).
-		WithDataPos(100).
-		WithTimestamp(1000).
-		WithTTL(Persistent)
-
-	bt := NewBTree()
-	bt.InsertRecord(key, record)
-	db.Index.bTree.idx[bucketID] = bt
-
-	job := &mergeV2Job{db: db}
-
-	// Test 1: nil entry
-	if job.applyLookup(nil) {
-		t.Fatal("applyLookup(nil) should return false")
-	}
-
-	// Test 2: entry with nil hint
-	if job.applyLookup(&mergeLookupEntry{hint: nil}) {
-		t.Fatal("applyLookup with nil hint should return false")
-	}
-
-	// Test 3: entry with nil collector (should still work for index update)
-	lookupWithoutCollector := &mergeLookupEntry{
-		hint: &HintEntry{
-			BucketId:  uint64(bucketID),
-			Key:       key,
-			Ds:        uint16(DataStructureBTree),
-			FileID:    20,
-			DataPos:   200,
-			Timestamp: 2000,
-			TTL:       Persistent,
-			ValueSize: 100,
-		},
-		collector:     nil, // No collector
-		origFileID:    record.FileID,
-		origTimestamp: record.Timestamp,
-		origTTL:       record.TTL,
-		origValueSize: record.ValueSize,
-		origTxID:      record.TxID,
-	}
-
-	if !job.applyLookup(lookupWithoutCollector) {
-		t.Fatal("applyLookup should succeed even without collector")
-	}
-
-	if record.FileID != 20 || record.DataPos != 200 {
-		t.Fatalf("record should be updated: got FileID=%d DataPos=%d", record.FileID, record.DataPos)
-	}
-
-	// Test 4: Bucket doesn't exist
-	nonExistentLookup := &mergeLookupEntry{
-		hint: &HintEntry{
-			BucketId:  9999, // Non-existent bucket
-			Key:       key,
-			Ds:        uint16(DataStructureBTree),
-			FileID:    30,
-			DataPos:   300,
-			Timestamp: 3000,
-		},
-		origFileID:    20,
-		origTimestamp: 2000,
-	}
-
-	if job.applyLookup(nonExistentLookup) {
-		t.Fatal("applyLookup should fail for non-existent bucket")
-	}
-
-	// Test 5: Record doesn't exist in index
-	missingKeyLookup := &mergeLookupEntry{
-		hint: &HintEntry{
-			BucketId:  uint64(bucketID),
-			Key:       []byte("missing-key"),
-			Ds:        uint16(DataStructureBTree),
-			FileID:    40,
-			DataPos:   400,
-			Timestamp: 4000,
-		},
-		origFileID:    10,
-		origTimestamp: 1000,
-	}
-
-	if job.applyLookup(missingKeyLookup) {
-		t.Fatal("applyLookup should fail for missing key")
-	}
-
-	// Test 6: Set without valueHash
-	setBucketID := BucketId(2)
-	db.bm.BucketInfoMapper[setBucketID] = &Bucket{Meta: &BucketMeta{}, Id: setBucketID, Name: "set", Ds: uint16(DataStructureSet)}
-	setIdx := NewSet()
-	setRecord := NewRecord().WithFileId(50).WithTimestamp(5000)
-	setIdx.M["set-key"] = map[uint32]*Record{12345: setRecord}
-	db.Index.set.idx[setBucketID] = setIdx
-
-	setLookupNoHash := &mergeLookupEntry{
-		hint: &HintEntry{
-			BucketId:  uint64(setBucketID),
-			Key:       []byte("set-key"),
-			Ds:        uint16(DataStructureSet),
-			FileID:    60,
-			DataPos:   600,
-			Timestamp: 6000,
-		},
-		hasValueHash:  false, // Missing value hash
-		origFileID:    50,
-		origTimestamp: 5000,
-	}
-
-	if job.applyLookup(setLookupNoHash) {
-		t.Fatal("applyLookup should fail for Set without value hash")
-	}
-
-	// Test 7: SortedSet without valueHash
-	sortedBucketID := BucketId(3)
-	db.bm.BucketInfoMapper[sortedBucketID] = &Bucket{Meta: &BucketMeta{}, Id: sortedBucketID, Name: "sorted", Ds: uint16(DataStructureSortedSet)}
-	sortedIdx := NewSortedSet(nil)
-	sortedRecord := NewRecord().WithFileId(70).WithTimestamp(7000)
-	sortedIdx.M["sorted-key"] = &SkipList{
-		dict: map[uint32]*SkipListNode{
-			54321: {score: SCORE(1.5), record: sortedRecord},
-		},
-	}
-	db.Index.sortedSet.idx[sortedBucketID] = sortedIdx
-
-	sortedLookupNoHash := &mergeLookupEntry{
-		hint: &HintEntry{
-			BucketId:  uint64(sortedBucketID),
-			Key:       []byte("sorted-key" + SeparatorForZSetKey + "1.5"),
-			Ds:        uint16(DataStructureSortedSet),
-			FileID:    80,
-			DataPos:   800,
-			Timestamp: 8000,
-		},
-		hasValueHash:  false, // Missing value hash
-		origFileID:    70,
-		origTimestamp: 7000,
-	}
-
-	if job.applyLookup(sortedLookupNoHash) {
-		t.Fatal("applyLookup should fail for SortedSet without value hash")
-	}
-
-	// Test 8: List with invalid flag (not LPush or RPush)
-	listBucketID := BucketId(4)
-	db.bm.BucketInfoMapper[listBucketID] = &Bucket{Meta: &BucketMeta{}, Id: listBucketID, Name: "list", Ds: uint16(DataStructureList)}
-	listIdx := NewList()
-	listRecord := NewRecord().WithFileId(90).WithTimestamp(9000)
-	listIdx.Items["list-key"] = NewBTree()
-	listIdx.Items["list-key"].InsertRecord(ConvertUint64ToBigEndianBytes(1), listRecord)
-	db.Index.list.idx[listBucketID] = listIdx
-
-	listLookupBadFlag := &mergeLookupEntry{
-		hint: &HintEntry{
-			BucketId:  uint64(listBucketID),
-			Key:       encodeListKey([]byte("list-key"), 1),
-			Ds:        uint16(DataStructureList),
-			Flag:      DataSetFlag, // Wrong flag for list
-			FileID:    100,
-			DataPos:   1000,
-			Timestamp: 10000,
-		},
-		origFileID:    90,
-		origTimestamp: 9000,
-	}
-
-	if job.applyLookup(listLookupBadFlag) {
-		t.Fatal("applyLookup should fail for List with invalid flag")
 	}
 }
 
@@ -1746,7 +1358,7 @@ func TestMergeV2ApplyLookupUpdatesSecondaryIndexes(t *testing.T) {
 	job := &mergeV2Job{db: db}
 
 	// Apply set lookup
-	if !job.applyLookup(&mergeLookupEntry{
+	job.applyLookup(&mergeLookupEntry{
 		hint: &HintEntry{
 			BucketId:  uint64(buckets[0].id),
 			Key:       []byte("set-key"),
@@ -1759,14 +1371,7 @@ func TestMergeV2ApplyLookupUpdatesSecondaryIndexes(t *testing.T) {
 		},
 		valueHash:    setHash.Sum32(),
 		hasValueHash: true,
-		origFileID:   setRecord.FileID,
-		origTimestamp: setRecord.Timestamp,
-		origTTL:       setRecord.TTL,
-		origValueSize: setRecord.ValueSize,
-		origTxID:      setRecord.TxID,
-	}) {
-		t.Fatal("set lookup should apply")
-	}
+	})
 
 	if setRecord.FileID != 100 || setRecord.DataPos != 1000 {
 		t.Fatalf("set record not updated: %+v", setRecord)
@@ -1774,7 +1379,7 @@ func TestMergeV2ApplyLookupUpdatesSecondaryIndexes(t *testing.T) {
 
 	// Apply list lookup
 	listKeyEncoded := encodeListKey(listKey, seq)
-	if !job.applyLookup(&mergeLookupEntry{
+	job.applyLookup(&mergeLookupEntry{
 		hint: &HintEntry{
 			BucketId:  uint64(buckets[1].id),
 			Key:       listKeyEncoded,
@@ -1786,14 +1391,7 @@ func TestMergeV2ApplyLookupUpdatesSecondaryIndexes(t *testing.T) {
 			TTL:       6,
 			ValueSize: 7,
 		},
-		origFileID:   listRecord.FileID,
-		origTimestamp: listRecord.Timestamp,
-		origTTL:       listRecord.TTL,
-		origValueSize: listRecord.ValueSize,
-		origTxID:      listRecord.TxID,
-	}) {
-		t.Fatal("list lookup should apply")
-	}
+	})
 
 	if listRecord.FileID != 200 || listRecord.DataPos != 2000 {
 		t.Fatalf("list record not updated: %+v", listRecord)
@@ -1801,7 +1399,7 @@ func TestMergeV2ApplyLookupUpdatesSecondaryIndexes(t *testing.T) {
 
 	// Apply sorted set lookup
 	sortedKey := []byte("zset-key" + SeparatorForZSetKey + "1.5")
-	if !job.applyLookup(&mergeLookupEntry{
+	job.applyLookup(&mergeLookupEntry{
 		hint: &HintEntry{
 			BucketId:  uint64(buckets[2].id),
 			Key:       sortedKey,
@@ -1814,18 +1412,539 @@ func TestMergeV2ApplyLookupUpdatesSecondaryIndexes(t *testing.T) {
 		},
 		valueHash:    sortedHash.Sum32(),
 		hasValueHash: true,
-		origFileID:   sortedRecord.FileID,
-		origTimestamp: sortedRecord.Timestamp,
-		origTTL:       sortedRecord.TTL,
-		origValueSize: sortedRecord.ValueSize,
-		origTxID:      sortedRecord.TxID,
-	}) {
-		t.Fatal("sorted set lookup should apply")
-	}
+	})
 
 	node := sortedIdx.M["zset-key"].dict[sortedHash.Sum32()]
 	if node == nil || node.record.FileID != 300 || node.record.DataPos != 3000 {
 		t.Fatalf("sorted set node not updated: %+v", node)
+	}
+}
+
+// TestMergeV2ConcurrentWritesDuringFullMerge tests the critical scenario where
+// db.Merge() runs concurrently with ongoing write transactions. This validates
+// that the merge operation doesn't corrupt data or lose updates.
+func TestMergeV2ConcurrentWritesDuringFullMerge(t *testing.T) {
+	dir := t.TempDir()
+
+	opts := DefaultOptions
+	opts.Dir = dir
+	opts.SegmentSize = 16 * 1024 // Small segments to force multiple files
+	opts.EnableMergeV2 = true
+	opts.RWMode = FileIO
+
+	db, err := Open(opts)
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer func() {
+		if db != nil {
+			_ = db.Close()
+		}
+	}()
+
+	bucket := "test-bucket"
+	if err := db.Update(func(tx *Tx) error {
+		return tx.NewBucket(DataStructureBTree, bucket)
+	}); err != nil {
+		t.Fatalf("create bucket: %v", err)
+	}
+
+	// Phase 1: Populate initial data (to be merged)
+	numInitialKeys := 500 // Increased to force multiple files
+	initialData := make(map[string][]byte)
+	valueSize := bytes.Repeat([]byte("x"), 200) // Larger values
+	for i := 0; i < numInitialKeys; i++ {
+		key := fmt.Sprintf("key-%04d", i)
+		value := append([]byte(fmt.Sprintf("initial-value-%04d-", i)), valueSize...)
+		initialData[key] = value
+
+		if err := db.Update(func(tx *Tx) error {
+			return tx.Put(bucket, []byte(key), value, Persistent)
+		}); err != nil {
+			t.Fatalf("put initial key %s: %v", key, err)
+		}
+	}
+
+	// Ensure multiple data files exist
+	userIDs, _, err := enumerateDataFileIDs(dir)
+	if err != nil {
+		t.Fatalf("enumerate data files: %v", err)
+	}
+	if len(userIDs) < 2 {
+		t.Fatalf("expected at least 2 data files, got %d", len(userIDs))
+	}
+
+	// Phase 2: Start merge in background
+	mergeDone := make(chan error, 1)
+	mergeStarted := make(chan struct{})
+
+	go func() {
+		close(mergeStarted)
+		mergeDone <- db.Merge()
+	}()
+
+	<-mergeStarted
+	time.Sleep(10 * time.Millisecond) // Give merge time to start
+
+	// Phase 3: Concurrent writes while merge is running
+	numConcurrentWrites := 100
+	concurrentData := make(map[string][]byte)
+	var dataMu sync.Mutex
+	var wg sync.WaitGroup
+
+	for i := 0; i < numConcurrentWrites; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+
+			key := fmt.Sprintf("key-%04d", idx) // Overwrite some existing keys
+			value := []byte(fmt.Sprintf("concurrent-value-%04d", idx))
+
+			if err := db.Update(func(tx *Tx) error {
+				return tx.Put(bucket, []byte(key), value, Persistent)
+			}); err != nil {
+				t.Errorf("concurrent write failed for key %s: %v", key, err)
+				return
+			}
+
+			// Track what we wrote
+			dataMu.Lock()
+			concurrentData[key] = value
+			dataMu.Unlock()
+		}(i)
+
+		// Add some new keys too
+		if i%2 == 0 {
+			wg.Add(1)
+			go func(idx int) {
+				defer wg.Done()
+
+				key := fmt.Sprintf("new-key-%04d", idx)
+				value := []byte(fmt.Sprintf("new-value-%04d", idx))
+
+				if err := db.Update(func(tx *Tx) error {
+					return tx.Put(bucket, []byte(key), value, Persistent)
+				}); err != nil {
+					t.Errorf("concurrent new key write failed for %s: %v", key, err)
+					return
+				}
+
+				dataMu.Lock()
+				concurrentData[key] = value
+				dataMu.Unlock()
+			}(i)
+		}
+	}
+
+	wg.Wait()
+
+	// Wait for merge to complete
+	if err := <-mergeDone; err != nil {
+		t.Fatalf("merge failed: %v", err)
+	}
+
+	// Phase 4: Verify all data is correct
+	for key, expectedValue := range concurrentData {
+		var got []byte
+		if err := db.View(func(tx *Tx) error {
+			val, err := tx.Get(bucket, []byte(key))
+			if err != nil {
+				return err
+			}
+			got = val
+			return nil
+		}); err != nil {
+			t.Errorf("failed to get key %s: %v", key, err)
+			continue
+		}
+
+		if !bytes.Equal(got, expectedValue) {
+			t.Errorf("key %s: expected %q, got %q", key, expectedValue, got)
+		}
+	}
+
+	// Verify keys not updated should have initial values
+	for key, expectedValue := range initialData {
+		if _, updated := concurrentData[key]; updated {
+			continue // Skip keys we overwrote
+		}
+
+		var got []byte
+		if err := db.View(func(tx *Tx) error {
+			val, err := tx.Get(bucket, []byte(key))
+			if err != nil {
+				return err
+			}
+			got = val
+			return nil
+		}); err != nil {
+			t.Errorf("failed to get initial key %s: %v", key, err)
+			continue
+		}
+
+		if !bytes.Equal(got, expectedValue) {
+			t.Errorf("initial key %s: expected %q, got %q", key, expectedValue, got)
+		}
+	}
+}
+
+// TestMergeV2ReopenAfterConcurrentMerge validates the critical correctness guarantee:
+// even if merge writes stale hints (due to concurrent updates), index rebuild on reopen
+// must correctly handle this by processing files in order (merge files first, then normal files).
+func TestMergeV2ReopenAfterConcurrentMerge(t *testing.T) {
+	dir := t.TempDir()
+
+	opts := DefaultOptions
+	opts.Dir = dir
+	opts.SegmentSize = 16 * 1024
+	opts.EnableMergeV2 = true
+	opts.EnableHintFile = true // Critical: test hint file rebuild
+	opts.RWMode = FileIO
+
+	db, err := Open(opts)
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+
+	bucket := "bucket"
+	if err := db.Update(func(tx *Tx) error {
+		return tx.NewBucket(DataStructureBTree, bucket)
+	}); err != nil {
+		t.Fatalf("create bucket: %v", err)
+	}
+
+	// Populate data to trigger merge
+	valueSize := bytes.Repeat([]byte("x"), 200)
+	for i := 0; i < 300; i++ {
+		key := fmt.Sprintf("key-%03d", i)
+		value := append([]byte(fmt.Sprintf("initial-%03d-", i)), valueSize...)
+		if err := db.Update(func(tx *Tx) error {
+			return tx.Put(bucket, []byte(key), value, Persistent)
+		}); err != nil {
+			t.Fatalf("put: %v", err)
+		}
+	}
+
+	// Trigger merge
+	mergeDone := make(chan error, 1)
+	mergeStarted := make(chan struct{})
+	go func() {
+		close(mergeStarted)
+		mergeDone <- db.Merge()
+	}()
+
+	<-mergeStarted
+	time.Sleep(5 * time.Millisecond)
+
+	// Concurrent update (this creates the "stale hint" scenario)
+	staleCandidateKey := "key-050"
+	freshValue := []byte("fresh-value-after-merge-started")
+
+	if err := db.Update(func(tx *Tx) error {
+		return tx.Put(bucket, []byte(staleCandidateKey), freshValue, Persistent)
+	}); err != nil {
+		t.Fatalf("concurrent update: %v", err)
+	}
+
+	// Wait for merge
+	if err := <-mergeDone; err != nil {
+		t.Fatalf("merge: %v", err)
+	}
+
+	// Verify correctness BEFORE reopen (should have fresh value)
+	var beforeReopen []byte
+	if err := db.View(func(tx *Tx) error {
+		val, err := tx.Get(bucket, []byte(staleCandidateKey))
+		if err != nil {
+			return err
+		}
+		beforeReopen = append([]byte(nil), val...)
+		return nil
+	}); err != nil {
+		t.Fatalf("get before reopen: %v", err)
+	}
+
+	if !bytes.Equal(beforeReopen, freshValue) {
+		t.Fatalf("before reopen: expected %q, got %q", freshValue, beforeReopen)
+	}
+
+	// Close and reopen - this triggers index rebuild from hint files
+	if err := db.Close(); err != nil {
+		t.Fatalf("close: %v", err)
+	}
+	db = nil
+
+	db, err = Open(opts)
+	if err != nil {
+		t.Fatalf("reopen: %v", err)
+	}
+	defer func() {
+		if db != nil {
+			_ = db.Close()
+		}
+	}()
+
+	// THE CRITICAL TEST: After reopen, data must still be correct
+	// Even though merge may have written a stale hint for this key,
+	// the index rebuild should use the fresh value from the normal file.
+	var afterReopen []byte
+	if err := db.View(func(tx *Tx) error {
+		val, err := tx.Get(bucket, []byte(staleCandidateKey))
+		if err != nil {
+			return err
+		}
+		afterReopen = append([]byte(nil), val...)
+		return nil
+	}); err != nil {
+		t.Fatalf("get after reopen: %v", err)
+	}
+
+	if !bytes.Equal(afterReopen, freshValue) {
+		t.Fatalf("CRITICAL FAILURE: after reopen: expected %q, got %q - stale hint was not overwritten!",
+			freshValue, afterReopen)
+	}
+
+	// Verify all other keys are still correct
+	for i := 0; i < 300; i++ {
+		key := fmt.Sprintf("key-%03d", i)
+		if key == staleCandidateKey {
+			continue
+		}
+
+		expectedValue := append([]byte(fmt.Sprintf("initial-%03d-", i)), valueSize...)
+		var got []byte
+		if err := db.View(func(tx *Tx) error {
+			val, err := tx.Get(bucket, []byte(key))
+			if err != nil {
+				return err
+			}
+			got = val
+			return nil
+		}); err != nil {
+			t.Errorf("key %s: %v", key, err)
+			continue
+		}
+
+		if !bytes.Equal(got, expectedValue) {
+			t.Errorf("key %s: expected length %d, got length %d", key, len(expectedValue), len(got))
+		}
+	}
+}
+
+// TestMergeV2MultiDataStructuresConcurrent tests merge with all data structures together
+func TestMergeV2MultiDataStructuresConcurrent(t *testing.T) {
+	opts := DefaultOptions
+	dir := t.TempDir()
+	opts.Dir = dir
+	opts.SegmentSize = 256 * 1024 // 256KB
+	opts.EnableHintFile = true
+
+	db, err := Open(opts)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	defer func() {
+		if db != nil {
+			_ = db.Close()
+		}
+	}()
+
+	bucketBTree := "btree-bucket"
+	bucketList := "list-bucket"
+	bucketSet := "set-bucket"
+	bucketZSet := "zset-bucket"
+
+	if err := db.Update(func(tx *Tx) error {
+		if err := tx.NewBucket(DataStructureBTree, bucketBTree); err != nil {
+			return err
+		}
+
+		if err := tx.NewBucket(DataStructureList, bucketList); err != nil {
+			return err
+		}
+
+		if err := tx.NewBucket(DataStructureSet, bucketSet); err != nil {
+			return err
+		}
+
+		if err := tx.NewBucket(DataStructureSortedSet, bucketZSet); err != nil {
+			return err
+		}
+
+		return nil
+	}); err != nil {
+		t.Fatalf("create buckets: %v", err)
+	}
+
+	// Phase 1: Create data across all data structures to trigger multiple files
+	numKeys := 2000
+	valueSize := bytes.Repeat([]byte("x"), 200)
+
+	for i := 0; i < numKeys; i++ {
+		if err := db.Update(func(tx *Tx) error {
+			// BTree key-value
+			key := fmt.Sprintf("btree-key-%03d", i)
+			value := append([]byte(fmt.Sprintf("btree-val-%03d-", i)), valueSize...)
+			if err := tx.Put(bucketBTree, []byte(key), value, Persistent); err != nil {
+				return err
+			}
+
+			// List operations
+			listKey := fmt.Sprintf("list-%03d", i)
+			listVal := fmt.Sprintf("list-val-%03d", i)
+			if err := tx.RPush(bucketList, []byte(listKey), []byte(listVal)); err != nil {
+				return err
+			}
+
+			// Set operations
+			setKey := fmt.Sprintf("set-%03d", i)
+			setMember := fmt.Sprintf("member-%03d", i)
+			if err := tx.SAdd(bucketSet, []byte(setKey), []byte(setMember)); err != nil {
+				return err
+			}
+
+			// Sorted Set operations
+			zsetKey := fmt.Sprintf("zset-%03d", i)
+			zsetMember := fmt.Sprintf("zmember-%03d", i)
+			if err := tx.ZAdd(bucketZSet, []byte(zsetKey), float64(i), []byte(zsetMember)); err != nil {
+				return err
+			}
+
+			return nil
+		}); err != nil {
+			t.Fatalf("initial write %d: %v", i, err)
+		}
+	}
+
+	// Phase 2: Start merge in background
+	mergeStarted := make(chan struct{})
+	mergeDone := make(chan error, 1)
+
+	go func() {
+		close(mergeStarted)
+		mergeDone <- db.Merge()
+	}()
+
+	<-mergeStarted
+	time.Sleep(10 * time.Millisecond)
+
+	// Phase 3: Concurrent operations on all data structures during merge
+	var wg sync.WaitGroup
+	numOps := 50
+
+	// BTree concurrent updates
+	for i := 0; i < numOps; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			key := fmt.Sprintf("btree-key-%03d", idx)
+			value := []byte(fmt.Sprintf("concurrent-btree-%03d", idx))
+			_ = db.Update(func(tx *Tx) error {
+				return tx.Put(bucketBTree, []byte(key), value, Persistent)
+			})
+		}(i)
+	}
+
+	// List concurrent pushes
+	for i := 0; i < numOps; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			listKey := fmt.Sprintf("list-%03d", idx)
+			listVal := fmt.Sprintf("concurrent-list-%03d", idx)
+			_ = db.Update(func(tx *Tx) error {
+				return tx.RPush(bucketList, []byte(listKey), []byte(listVal))
+			})
+		}(i)
+	}
+
+	// Set concurrent adds
+	for i := 0; i < numOps; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			setKey := fmt.Sprintf("set-%03d", idx)
+			setMember := fmt.Sprintf("concurrent-member-%03d", idx)
+			_ = db.Update(func(tx *Tx) error {
+				return tx.SAdd(bucketSet, []byte(setKey), []byte(setMember))
+			})
+		}(i)
+	}
+
+	// Sorted Set concurrent adds
+	for i := 0; i < numOps; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			zsetKey := fmt.Sprintf("zset-%03d", idx)
+			zsetMember := fmt.Sprintf("concurrent-zmember-%03d", idx)
+			_ = db.Update(func(tx *Tx) error {
+				return tx.ZAdd(bucketZSet, []byte(zsetKey), float64(1000+idx), []byte(zsetMember))
+			})
+		}(i)
+	}
+
+	wg.Wait()
+
+	// Wait for merge
+	if err := <-mergeDone; err != nil {
+		t.Fatalf("merge: %v", err)
+	}
+
+	// Phase 4: Verify all data structures are correct
+	if err := db.View(func(tx *Tx) error {
+		// Check BTree
+		for i := 0; i < numOps; i++ {
+			key := fmt.Sprintf("btree-key-%03d", i)
+			val, err := tx.Get(bucketBTree, []byte(key))
+			if err != nil {
+				return fmt.Errorf("btree get %s: %w", key, err)
+			}
+			expected := []byte(fmt.Sprintf("concurrent-btree-%03d", i))
+			if !bytes.Equal(val, expected) {
+				return fmt.Errorf("btree %s: expected %q, got %q", key, expected, val)
+			}
+		}
+
+		// Check Lists
+		for i := 0; i < numOps; i++ {
+			listKey := fmt.Sprintf("list-%03d", i)
+			items, err := tx.LRange(bucketList, []byte(listKey), 0, -1)
+			if err != nil {
+				return fmt.Errorf("list range %s: %w", listKey, err)
+			}
+			if len(items) < 2 {
+				return fmt.Errorf("list %s: expected at least 2 items, got %d", listKey, len(items))
+			}
+		}
+
+		// Check Sets
+		for i := 0; i < numOps; i++ {
+			setKey := fmt.Sprintf("set-%03d", i)
+			members, err := tx.SMembers(bucketSet, []byte(setKey))
+			if err != nil {
+				return fmt.Errorf("set members %s: %w", setKey, err)
+			}
+			if len(members) < 2 {
+				return fmt.Errorf("set %s: expected at least 2 members, got %d", setKey, len(members))
+			}
+		}
+
+		// Check Sorted Sets
+		for i := 0; i < numOps; i++ {
+			zsetKey := fmt.Sprintf("zset-%03d", i)
+			nodes, err := tx.ZMembers(bucketZSet, []byte(zsetKey))
+			if err != nil {
+				return fmt.Errorf("zset members %s: %w", zsetKey, err)
+			}
+			if len(nodes) < 2 {
+				return fmt.Errorf("zset %s: expected at least 2 nodes, got %d", zsetKey, len(nodes))
+			}
+		}
+
+		return nil
+	}); err != nil {
+		t.Fatalf("verification: %v", err)
 	}
 }
 
