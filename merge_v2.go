@@ -11,21 +11,28 @@ import (
 )
 
 type mergeV2Job struct {
-	db            *DB
-	pending       []int64
-	outputs       []*mergeOutput
-	lookup        []*mergeLookupEntry
-	manifest      *mergeManifest
-	oldData       []string
-	oldHints      []string
-	outputSeqBase int
-	valueHasher   hash.Hash32
+	db             *DB
+	pending        []int64
+	outputs        []*mergeOutput
+	lookup         []*mergeLookupEntry
+	manifest       *mergeManifest
+	oldData        []string
+	oldHints       []string
+	outputSeqBase  int
+	valueHasher    hash.Hash32
+	onRewriteEntry func(*Entry)
 }
 
 type mergeLookupEntry struct {
-	hint         *HintEntry
-	valueHash    uint32
-	hasValueHash bool
+	hint          *HintEntry
+	valueHash     uint32
+	hasValueHash  bool
+	collector     *HintCollector
+	origFileID    int64
+	origTimestamp uint64
+	origTTL       uint32
+	origTxID      uint64
+	origValueSize uint32
 }
 
 type mergeOutput struct {
@@ -54,11 +61,11 @@ func (db *DB) mergeV2() error {
 		return job.abort(err)
 	}
 
-	if err := job.finalizeOutputs(); err != nil {
+	if err := job.commit(); err != nil {
 		return job.abort(err)
 	}
 
-	if err := job.commit(); err != nil {
+	if err := job.finalizeOutputs(); err != nil {
 		return job.abort(err)
 	}
 
@@ -166,32 +173,38 @@ func (job *mergeV2Job) rewrite() error {
 }
 
 func (job *mergeV2Job) finalizeOutputs() error {
-	if len(job.outputs) == 0 {
-		job.manifest.MergeSeqMax = -1
-		return writeMergeManifest(job.db.opt.Dir, job.manifest)
-	}
 	for _, out := range job.outputs {
 		if err := out.finalize(); err != nil {
 			return err
 		}
 	}
-	job.manifest.MergeSeqMax = job.outputs[len(job.outputs)-1].seq
-	return writeMergeManifest(job.db.opt.Dir, job.manifest)
+	return nil
 }
 
 func (job *mergeV2Job) commit() error {
 	job.db.mu.Lock()
 	defer job.db.mu.Unlock()
 
-	pendingSet := make(map[int64]struct{}, len(job.pending))
-	for _, fid := range job.pending {
-		pendingSet[fid] = struct{}{}
-	}
-
 	for _, entry := range job.lookup {
-		job.applyLookup(entry, pendingSet)
+		if entry == nil {
+			continue
+		}
+		applied := job.applyLookup(entry)
+		if !applied {
+			continue
+		}
+		if entry.collector != nil && entry.hint != nil {
+			if err := entry.collector.Add(entry.hint); err != nil {
+				return fmt.Errorf("failed to add hint to collector: %w", err)
+			}
+		}
 	}
 
+	if len(job.outputs) == 0 {
+		job.manifest.MergeSeqMax = -1
+	} else {
+		job.manifest.MergeSeqMax = job.outputs[len(job.outputs)-1].seq
+	}
 	job.manifest.Status = manifestStatusCommitted
 	if err := writeMergeManifest(job.db.opt.Dir, job.manifest); err != nil {
 		return err
@@ -270,9 +283,6 @@ func (job *mergeV2Job) rewriteFile(fid int64) error {
 		}
 	}()
 
-	job.db.mu.RLock()
-	defer job.db.mu.RUnlock()
-
 	off := int64(0)
 	for {
 		if off >= fr.size {
@@ -307,11 +317,19 @@ func (job *mergeV2Job) rewriteFile(fid int64) error {
 		if IsExpired(entry.Meta.TTL, entry.Meta.Timestamp) {
 			continue
 		}
-		if !job.db.isPendingMergeEntry(entry) {
+
+		job.db.mu.RLock()
+		pending := job.db.isPendingMergeEntry(entry)
+		job.db.mu.RUnlock()
+		if !pending {
 			continue
 		}
 
-		if err := job.writeEntry(entry); err != nil {
+		if job.onRewriteEntry != nil {
+			job.onRewriteEntry(entry)
+		}
+
+		if err := job.writeEntry(entry, fid); err != nil {
 			return fmt.Errorf("failed to write entry: %w", err)
 		}
 	}
@@ -319,7 +337,7 @@ func (job *mergeV2Job) rewriteFile(fid int64) error {
 	return nil
 }
 
-func (job *mergeV2Job) writeEntry(entry *Entry) error {
+func (job *mergeV2Job) writeEntry(entry *Entry, srcFileID int64) error {
 	if entry == nil {
 		return fmt.Errorf("cannot write nil entry")
 	}
@@ -345,13 +363,16 @@ func (job *mergeV2Job) writeEntry(entry *Entry) error {
 	out.writeOff += int64(len(data))
 
 	hint := newHintEntryFromEntry(entry, out.fileID, uint64(offset))
-	if out.collector != nil {
-		if err := out.collector.Add(hint); err != nil {
-			return fmt.Errorf("failed to add hint to collector: %w", err)
-		}
-	}
 
-	lookupEntry := &mergeLookupEntry{hint: hint}
+	lookupEntry := &mergeLookupEntry{
+		hint:          hint,
+		collector:     out.collector,
+		origFileID:    srcFileID,
+		origTimestamp: entry.Meta.Timestamp,
+		origTTL:       entry.Meta.TTL,
+		origTxID:      entry.Meta.TxID,
+		origValueSize: entry.Meta.ValueSize,
+	}
 	if entry.Meta.Ds == DataStructureSet || entry.Meta.Ds == DataStructureSortedSet {
 		h := job.valueHasher
 		h.Reset()
@@ -381,9 +402,6 @@ func (job *mergeV2Job) ensureOutput(size int64) (*mergeOutput, error) {
 	}
 
 	if cur.writeOff+size > job.db.opt.SegmentSize {
-		if err := cur.finalize(); err != nil {
-			return nil, fmt.Errorf("failed to finalize current output: %w", err)
-		}
 		return job.newOutput()
 	}
 	return cur, nil
@@ -463,118 +481,136 @@ func (out *mergeOutput) finalize() error {
 	return nil
 }
 
-func (job *mergeV2Job) applyLookup(entry *mergeLookupEntry, pendingSet map[int64]struct{}) {
+func (job *mergeV2Job) applyLookup(entry *mergeLookupEntry) bool {
 	if entry == nil || entry.hint == nil {
-		return
+		return false
 	}
 
 	hint := entry.hint
 	bucketID := BucketId(hint.BucketId)
+	matchRecord := func(record *Record) bool {
+		if record == nil {
+			return false
+		}
+		if record.FileID != entry.origFileID {
+			return false
+		}
+		if record.Timestamp != entry.origTimestamp {
+			return false
+		}
+		return true
+	}
 
 	switch hint.Ds {
 	case DataStructureBTree:
 		bt, exist := job.db.Index.bTree.exist(bucketID)
 		if !exist {
-			return
+			return false
 		}
 		record, ok := bt.Find(hint.Key)
 		if !ok || record == nil {
-			return
+			return false
 		}
-		if _, ok := pendingSet[record.FileID]; !ok {
-			return
+		if !matchRecord(record) {
+			return false
 		}
 		record.FileID = hint.FileID
 		record.DataPos = hint.DataPos
 		record.Timestamp = hint.Timestamp
 		record.TTL = hint.TTL
 		record.ValueSize = hint.ValueSize
+		return true
 
 	case DataStructureSet:
 		setIdx, exist := job.db.Index.set.exist(bucketID)
 		if !exist {
-			return
+			return false
 		}
 		members, ok := setIdx.M[string(hint.Key)]
 		if !ok {
-			return
+			return false
 		}
 		if !entry.hasValueHash {
-			return
+			return false
 		}
 		record, ok := members[entry.valueHash]
 		if !ok || record == nil {
-			return
+			return false
 		}
-		if _, ok := pendingSet[record.FileID]; !ok {
-			return
+		if !matchRecord(record) {
+			return false
 		}
 		record.FileID = hint.FileID
 		record.DataPos = hint.DataPos
 		record.Timestamp = hint.Timestamp
 		record.TTL = hint.TTL
 		record.ValueSize = hint.ValueSize
+		return true
 
 	case DataStructureList:
 		if hint.Flag != DataLPushFlag && hint.Flag != DataRPushFlag {
-			return
+			return false
 		}
 		listIdx, exist := job.db.Index.list.exist(bucketID)
 		if !exist {
-			return
+			return false
 		}
 		userKey, seq := decodeListKey(hint.Key)
 		if userKey == nil {
-			return
+			return false
 		}
 		items, ok := listIdx.Items[string(userKey)]
 		if !ok {
-			return
+			return false
 		}
 		record, ok := items.Find(ConvertUint64ToBigEndianBytes(seq))
 		if !ok || record == nil {
-			return
+			return false
 		}
-		if _, ok := pendingSet[record.FileID]; !ok {
-			return
+		if !matchRecord(record) {
+			return false
 		}
 		record.FileID = hint.FileID
 		record.DataPos = hint.DataPos
 		record.Timestamp = hint.Timestamp
 		record.TTL = hint.TTL
 		record.ValueSize = hint.ValueSize
+		return true
 
 	case DataStructureSortedSet:
 		sortedIdx, exist := job.db.Index.sortedSet.exist(bucketID)
 		if !exist {
-			return
+			return false
 		}
 		key, _ := splitStringFloat64Str(string(hint.Key), SeparatorForZSetKey)
 		if key == "" {
-			return
+			return false
 		}
 		sl, ok := sortedIdx.M[key]
 		if !ok {
-			return
+			return false
 		}
 		if !entry.hasValueHash {
-			return
+			return false
 		}
 		node, ok := sl.dict[entry.valueHash]
 		if !ok || node == nil {
-			return
+			return false
 		}
 		record := node.record
 		if record == nil {
-			return
+			return false
 		}
-		if _, ok := pendingSet[record.FileID]; !ok {
-			return
+		if !matchRecord(record) {
+			return false
 		}
 		record.FileID = hint.FileID
 		record.DataPos = hint.DataPos
 		record.Timestamp = hint.Timestamp
 		record.TTL = hint.TTL
 		record.ValueSize = hint.ValueSize
+		return true
 	}
+
+	return false
 }
