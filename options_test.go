@@ -142,3 +142,34 @@ func TestWithLessFunc(t *testing.T) {
 	err = db.Close()
 	assert.NoError(t, err)
 }
+
+func TestWithEnableHintFile(t *testing.T) {
+	// Test default value
+	db, err := Open(DefaultOptions,
+		WithDir("/tmp/nutsdb"),
+	)
+	assert.NoError(t, err)
+	assert.False(t, db.opt.EnableHintFile)
+	err = db.Close()
+	assert.NoError(t, err)
+
+	// Test setting to false
+	db, err = Open(DefaultOptions,
+		WithDir("/tmp/nutsdb"),
+		WithEnableHintFile(false),
+	)
+	assert.NoError(t, err)
+	assert.False(t, db.opt.EnableHintFile)
+	err = db.Close()
+	assert.NoError(t, err)
+
+	// Test setting to true explicitly
+	db, err = Open(DefaultOptions,
+		WithDir("/tmp/nutsdb"),
+		WithEnableHintFile(true),
+	)
+	assert.NoError(t, err)
+	assert.True(t, db.opt.EnableHintFile)
+	err = db.Close()
+	assert.NoError(t, err)
+}

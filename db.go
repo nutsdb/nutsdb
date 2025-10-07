@@ -21,7 +21,6 @@ import (
 	"io"
 	"log"
 	"os"
-	"path"
 	"path/filepath"
 	"runtime"
 	"sort"
@@ -105,6 +104,10 @@ func open(opt Options) (*DB, error) {
 
 	if err := db.rebuildBucketManager(); err != nil {
 		return nil, fmt.Errorf("db.rebuildBucketManager err:%s", err)
+	}
+
+	if err := db.recoverMergeManifest(); err != nil {
+		return nil, fmt.Errorf("recover merge manifest: %w", err)
 	}
 
 	if err := db.buildIndexes(); err != nil {
@@ -270,7 +273,6 @@ func (db *DB) commitTransaction(tx *Tx) error {
 			panicked = true
 		}
 		if panicked || err != nil {
-			// log.Fatal("panicked=", panicked, ", err=", err)
 			if errRollback := tx.Rollback(); errRollback != nil {
 				err = errRollback
 			}
@@ -282,7 +284,6 @@ func (db *DB) commitTransaction(tx *Tx) error {
 	tx.setStatusRunning()
 	err = tx.Commit()
 	if err != nil {
-		// log.Fatal("txCommit fail,err=", err)
 		return err
 	}
 
@@ -403,36 +404,32 @@ func (db *DB) setActiveFile() (err error) {
 }
 
 // getMaxFileIDAndFileIds returns max fileId and fileIds.
-func (db *DB) getMaxFileIDAndFileIDs() (maxFileID int64, dataFileIds []int) {
-	files, _ := os.ReadDir(db.opt.Dir)
-
-	if len(files) == 0 {
+func (db *DB) getMaxFileIDAndFileIDs() (maxFileID int64, dataFileIds []int64) {
+	userIDs, mergeIDs, err := enumerateDataFileIDs(db.opt.Dir)
+	if err != nil {
 		return 0, nil
 	}
 
-	for _, file := range files {
-		filename := file.Name()
-		fileSuffix := path.Ext(path.Base(filename))
-		if fileSuffix != DataSuffix {
-			continue
-		}
+	if len(userIDs) > 0 {
+		maxFileID = userIDs[len(userIDs)-1]
+	}
 
-		filename = strings.TrimSuffix(filename, DataSuffix)
-		id, _ := strconv2.StrToInt(filename)
-		dataFileIds = append(dataFileIds, id)
+	dataFileIds = make([]int64, 0, len(userIDs)+len(mergeIDs))
+	dataFileIds = append(dataFileIds, userIDs...)
+	dataFileIds = append(dataFileIds, mergeIDs...)
+
+	if len(dataFileIds) > 1 {
+		sort.Slice(dataFileIds, func(i, j int) bool { return dataFileIds[i] < dataFileIds[j] })
 	}
 
 	if len(dataFileIds) == 0 {
-		return 0, nil
+		return maxFileID, nil
 	}
 
-	sort.Ints(dataFileIds)
-	maxFileID = int64(dataFileIds[len(dataFileIds)-1])
-
-	return
+	return maxFileID, dataFileIds
 }
 
-func (db *DB) parseDataFiles(dataFileIds []int) (err error) {
+func (db *DB) parseDataFiles(dataFileIds []int64) (err error) {
 	var (
 		off      int64
 		f        *fileRecovery
@@ -522,13 +519,25 @@ func (db *DB) parseDataFiles(dataFileIds []int) (err error) {
 
 	for _, dataID := range dataFileIds {
 		off = 0
-		fID = int64(dataID)
+		fID = dataID
+
+		// Try to load hint file first if enabled
+		if db.opt.EnableHintFile {
+			hintLoaded, _ := db.loadHintFile(fID)
+
+			if hintLoaded {
+				// Hint file loaded successfully, skip scanning data file
+				continue
+			}
+		}
+
+		// Fall back to scanning data file
 		dataPath := getDataPath(fID, db.opt.Dir)
 		f, err = newFileRecovery(dataPath, db.opt.BufferSizeOfRecovery)
 		if err != nil {
 			return err
 		}
-		err := readEntriesFromFile()
+		err = readEntriesFromFile()
 		if err != nil {
 			return err
 		}
@@ -537,6 +546,108 @@ func (db *DB) parseDataFiles(dataFileIds []int) (err error) {
 	// compute the valid record count and save it in db.RecordCount
 	db.RecordCount, err = db.getRecordCount()
 	return
+}
+
+// loadHintFile loads a single hint file and rebuilds indexes
+func (db *DB) loadHintFile(fid int64) (bool, error) {
+	hintPath := getHintPath(fid, db.opt.Dir)
+
+	// Check if hint file exists
+	if _, err := os.Stat(hintPath); os.IsNotExist(err) {
+		return false, nil // Hint file doesn't exist, need to scan data file
+	}
+
+	reader := &HintFileReader{}
+	if err := reader.Open(hintPath); err != nil {
+		return false, nil
+	}
+	defer func() {
+		if err := reader.Close(); err != nil {
+			// Log error but don't fail the operation
+			log.Printf("Warning: failed to close hint file reader: %v", err)
+		}
+	}()
+
+	// Read all hint entries and build indexes
+	for {
+		hintEntry, err := reader.Read()
+		if err != nil {
+			if err == io.EOF {
+				break // End of file
+			}
+			return false, nil
+		}
+
+		if hintEntry == nil {
+			continue
+		}
+
+		// Check if bucket exists
+		bucketId := hintEntry.BucketId
+		if _, err := db.bm.GetBucketById(bucketId); errors.Is(err, ErrBucketNotExist) {
+			continue // Skip if bucket doesn't exist
+		}
+
+		// Create a record from hint entry
+		record := NewRecord()
+		record.WithKey(hintEntry.Key).
+			WithFileId(hintEntry.FileID).
+			WithDataPos(hintEntry.DataPos).
+			WithValueSize(hintEntry.ValueSize).
+			WithTimestamp(hintEntry.Timestamp).
+			WithTTL(hintEntry.TTL).
+			WithTxID(0) // TxID is not stored in hint file
+
+		// Create an entry from hint entry
+		entry := NewEntry()
+		entry.WithKey(hintEntry.Key)
+
+		// Create metadata
+		meta := NewMetaData()
+		meta.WithBucketId(hintEntry.BucketId).
+			WithKeySize(hintEntry.KeySize).
+			WithValueSize(hintEntry.ValueSize).
+			WithTimeStamp(hintEntry.Timestamp).
+			WithTTL(hintEntry.TTL).
+			WithFlag(hintEntry.Flag).
+			WithStatus(hintEntry.Status).
+			WithDs(hintEntry.Ds).
+			WithTxID(0) // TxID is not stored in hint file
+
+		entry.WithMeta(meta)
+
+		// In HintKeyValAndRAMIdxMode, we need to load the value from data file
+		if db.opt.EntryIdxMode == HintKeyValAndRAMIdxMode {
+			value, err := db.getValueByRecord(record)
+			if err != nil {
+				// If we can't load the value, we can't use this entry in HintKeyValAndRAMIdxMode
+				// Skip this entry and continue
+				continue
+			}
+			entry.WithValue(value)
+			record.WithValue(value)
+		} else if db.opt.EntryIdxMode == HintKeyAndRAMIdxMode {
+			// In HintKeyAndRAMIdxMode, for Set data structure, we also need to load the value
+			// because Set uses value hash as the key in its internal map structure
+			if hintEntry.Ds == DataStructureSet || hintEntry.Ds == DataStructureSortedSet {
+				value, err := db.getValueByRecord(record)
+				if err != nil {
+					continue
+				}
+				entry.WithValue(value)
+				// Don't set record.WithValue for HintKeyAndRAMIdxMode, as we only need it for index building
+			}
+		}
+
+		// Build indexes
+		if err := db.buildIdxes(record, entry); err != nil {
+			continue
+		}
+
+		db.KeyCount++
+	}
+
+	return true, nil
 }
 
 func (db *DB) getRecordCount() (int64, error) {
@@ -771,7 +882,7 @@ func (db *DB) buildListLRemIdx(value []byte, l *List, key []byte) error {
 func (db *DB) buildIndexes() (err error) {
 	var (
 		maxFileID   int64
-		dataFileIds []int
+		dataFileIds []int64
 	)
 
 	maxFileID, dataFileIds = db.getMaxFileIDAndFileIDs()
@@ -784,7 +895,7 @@ func (db *DB) buildIndexes() (err error) {
 		return
 	}
 
-	if dataFileIds == nil && maxFileID == 0 {
+	if len(dataFileIds) == 0 {
 		return
 	}
 
@@ -867,7 +978,7 @@ func (db *DB) IsClose() bool {
 
 func (db *DB) buildExpireCallback(bucket string, key []byte) func() {
 	return func() {
-		err := db.Update(func(tx *Tx) error {
+		_ = db.Update(func(tx *Tx) error {
 			b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
 			if err != nil {
 				return err
@@ -878,9 +989,6 @@ func (db *DB) buildExpireCallback(bucket string, key []byte) func() {
 			}
 			return nil
 		})
-		if err != nil {
-			log.Printf("occur error when expired deletion, error: %v", err.Error())
-		}
 	}
 }
 

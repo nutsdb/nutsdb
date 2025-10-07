@@ -26,11 +26,18 @@ import (
 	"github.com/xujiajun/utils/strconv2"
 )
 
-var ErrDontNeedMerge = errors.New("the number of files waiting to be merged is at least 2")
+var ErrDontNeedMerge = errors.New("the number of files waiting to be merged is less than 2")
 
 func (db *DB) Merge() error {
 	db.mergeStartCh <- struct{}{}
 	return <-db.mergeEndCh
+}
+
+func (db *DB) merge() error {
+	if db.opt.EnableMergeV2 {
+		return db.mergeV2()
+	}
+	return db.mergeLegacy()
 }
 
 // Merge removes dirty data and reduce data redundancy,following these steps:
@@ -45,10 +52,10 @@ func (db *DB) Merge() error {
 //
 // Caveat: merge is Called means starting multiple write transactions, and it
 // will affect the other write request. so execute it at the appropriate time.
-func (db *DB) merge() error {
+func (db *DB) mergeLegacy() error {
 	var (
 		off              int64
-		pendingMergeFIds []int
+		pendingMergeFIds []int64
 	)
 
 	// to prevent the initiation of multiple merges simultaneously.
@@ -93,14 +100,18 @@ func (db *DB) merge() error {
 	}
 
 	db.ActiveFile.fileID = db.MaxFileID
+	startFileID := db.MaxFileID
 
 	db.mu.Unlock()
 
 	mergingPath := make([]string, len(pendingMergeFIds))
 
+	// Used to collect all merged entry information for later writing to the HintFile
+	var mergedEntries []mergedEntryInfo
+
 	for i, pendingMergeFId := range pendingMergeFIds {
 		off = 0
-		path := getDataPath(int64(pendingMergeFId), db.opt.Dir)
+		path := getDataPath(pendingMergeFId, db.opt.Dir)
 		fr, err := newFileRecovery(path, db.opt.BufferSizeOfRecovery)
 		if err != nil {
 			return err
@@ -132,23 +143,35 @@ func (db *DB) merge() error {
 							return err
 						}
 						bucketName := bucket.Name
-						if entry.Meta.Flag == DataLPushFlag {
-							return tx.LPushRaw(bucketName, entry.Key, entry.Value)
+
+						switch entry.Meta.Flag {
+						case DataLPushFlag:
+							if err := tx.LPushRaw(bucketName, entry.Key, entry.Value); err != nil {
+								return err
+							}
+						case DataRPushFlag:
+							if err := tx.RPushRaw(bucketName, entry.Key, entry.Value); err != nil {
+								return err
+							}
+						default:
+							if err := tx.put(
+								bucketName,
+								entry.Key,
+								entry.Value,
+								entry.Meta.TTL,
+								entry.Meta.Flag,
+								entry.Meta.Timestamp,
+								entry.Meta.Ds,
+							); err != nil {
+								return err
+							}
 						}
 
-						if entry.Meta.Flag == DataRPushFlag {
-							return tx.RPushRaw(bucketName, entry.Key, entry.Value)
-						}
-
-						return tx.put(
-							bucketName,
-							entry.Key,
-							entry.Value,
-							entry.Meta.TTL,
-							entry.Meta.Flag,
-							entry.Meta.Timestamp,
-							entry.Meta.Ds,
-						)
+						// Record merged entry information to get actual position from index later
+						mergedEntries = append(mergedEntries, mergedEntryInfo{
+							entry:    entry,
+							bucketId: bucket.Id,
+						})
 					}
 
 					return nil
@@ -162,7 +185,6 @@ func (db *DB) merge() error {
 				if off >= db.opt.SegmentSize {
 					break
 				}
-
 			} else {
 				if errors.Is(err, io.EOF) || errors.Is(err, ErrIndexOutOfBound) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, ErrHeaderSizeOutOfBounds) {
 					break
@@ -178,12 +200,110 @@ func (db *DB) merge() error {
 		mergingPath[i] = path
 	}
 
+	// Now that all data has been written, create HintFile for all newly generated data files
+	// Only create HintFile for new files actually generated during the Merge process
+	db.mu.Lock()
+	endFileID := db.MaxFileID // Record the maximum file ID when merge ends
+	db.mu.Unlock()
+
+	// 只有当启用 HintFile 功能时才创建 HintFile
+	if db.opt.EnableHintFile {
+		if err := db.buildHintFilesAfterMerge(startFileID, endFileID); err != nil {
+			return fmt.Errorf("failed to build hint files after merge: %w", err)
+		}
+	}
+
 	db.mu.Lock()
 	defer db.mu.Unlock()
 
 	for i := 0; i < len(mergingPath); i++ {
 		if err := os.Remove(mergingPath[i]); err != nil {
 			return fmt.Errorf("when merge err: %s", err)
+		}
+
+		// Delete the HintFile corresponding to the old data file (if it exists)
+		oldHintPath := getHintPath(int64(pendingMergeFIds[i]), db.opt.Dir)
+		if _, err := os.Stat(oldHintPath); err == nil {
+			if removeErr := os.Remove(oldHintPath); removeErr != nil {
+				// Log error but don't interrupt the merge process
+				fmt.Printf("warning: failed to remove old hint file %s: %v\n", oldHintPath, removeErr)
+			}
+		}
+	}
+
+	return nil
+}
+
+// buildHintFilesAfterMerge creates HintFiles for all newly generated data files after merge
+// by traversing the index to find all records pointing to new files.
+// Only process files in the range [startFileID, endFileID]
+func (db *DB) buildHintFilesAfterMerge(startFileID, endFileID int64) error {
+	if startFileID > endFileID {
+		return nil
+	}
+
+	for fileID := startFileID; fileID <= endFileID; fileID++ {
+		dataPath := getDataPath(fileID, db.opt.Dir)
+		fr, err := newFileRecovery(dataPath, db.opt.BufferSizeOfRecovery)
+		if err != nil {
+			return fmt.Errorf("failed to open data file %s: %w", dataPath, err)
+		}
+
+		hintPath := getHintPath(fileID, db.opt.Dir)
+		hintWriter := &HintFileWriter{}
+		if err := hintWriter.Create(hintPath); err != nil {
+			_ = fr.release()
+			return fmt.Errorf("failed to create hint file %s: %w", hintPath, err)
+		}
+
+		cleanup := func(remove bool) {
+			_ = hintWriter.Close()
+			_ = fr.release()
+			if remove {
+				_ = os.Remove(hintPath)
+			}
+		}
+
+		off := int64(0)
+		for {
+			entry, err := fr.readEntry(off)
+			if err != nil {
+				if errors.Is(err, io.EOF) || errors.Is(err, ErrIndexOutOfBound) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, ErrHeaderSizeOutOfBounds) {
+					break
+				}
+				cleanup(true)
+				return fmt.Errorf("failed to read entry from %s at offset %d: %w", dataPath, off, err)
+			}
+
+			if entry == nil {
+				break
+			}
+
+			hintEntry := newHintEntryFromEntry(entry, fileID, uint64(off))
+
+			if err := hintWriter.Write(hintEntry); err != nil {
+				cleanup(true)
+				return fmt.Errorf("failed to write hint entry to %s: %w", hintPath, err)
+			}
+
+			off += entry.Size()
+			if off >= fr.size {
+				break
+			}
+		}
+
+		if err := hintWriter.Sync(); err != nil {
+			cleanup(true)
+			return fmt.Errorf("failed to sync hint file %s: %w", hintPath, err)
+		}
+
+		if err := hintWriter.Close(); err != nil {
+			_ = fr.release()
+			return fmt.Errorf("failed to close hint file %s: %w", hintPath, err)
+		}
+
+		if err := fr.release(); err != nil {
+			return fmt.Errorf("failed to close data file %s: %w", dataPath, err)
 		}
 	}
 
@@ -218,26 +338,21 @@ func (db *DB) mergeWorker() {
 }
 
 func (db *DB) isPendingMergeEntry(entry *Entry) bool {
-	bucket, err := db.bm.GetBucketById(entry.Meta.BucketId)
-	if err != nil {
-		return false
-	}
-	bucketId := bucket.Id
 	switch {
-	case entry.IsBelongsToBPlusTree():
-		return db.isPendingBtreeEntry(bucketId, entry)
+	case entry.IsBelongsToBTree():
+		return db.isPendingBtreeEntry(entry)
 	case entry.IsBelongsToList():
-		return db.isPendingListEntry(bucketId, entry)
+		return db.isPendingListEntry(entry)
 	case entry.IsBelongsToSet():
-		return db.isPendingSetEntry(bucketId, entry)
+		return db.isPendingSetEntry(entry)
 	case entry.IsBelongsToSortSet():
-		return db.isPendingZSetEntry(bucketId, entry)
+		return db.isPendingZSetEntry(entry)
 	}
 	return false
 }
 
-func (db *DB) isPendingBtreeEntry(bucketId BucketId, entry *Entry) bool {
-	idx, exist := db.Index.bTree.exist(bucketId)
+func (db *DB) isPendingBtreeEntry(entry *Entry) bool {
+	idx, exist := db.Index.bTree.exist(entry.Meta.BucketId)
 	if !exist {
 		return false
 	}
@@ -248,7 +363,7 @@ func (db *DB) isPendingBtreeEntry(bucketId BucketId, entry *Entry) bool {
 	}
 
 	if r.IsExpired() {
-		db.tm.del(bucketId, string(entry.Key))
+		db.tm.del(entry.Meta.BucketId, string(entry.Key))
 		idx.Delete(entry.Key)
 		return false
 	}
@@ -260,8 +375,8 @@ func (db *DB) isPendingBtreeEntry(bucketId BucketId, entry *Entry) bool {
 	return true
 }
 
-func (db *DB) isPendingSetEntry(bucketId BucketId, entry *Entry) bool {
-	setIdx, exist := db.Index.set.exist(bucketId)
+func (db *DB) isPendingSetEntry(entry *Entry) bool {
+	setIdx, exist := db.Index.set.exist(entry.Meta.BucketId)
 	if !exist {
 		return false
 	}
@@ -274,9 +389,9 @@ func (db *DB) isPendingSetEntry(bucketId BucketId, entry *Entry) bool {
 	return true
 }
 
-func (db *DB) isPendingZSetEntry(bucketId BucketId, entry *Entry) bool {
+func (db *DB) isPendingZSetEntry(entry *Entry) bool {
 	key, score := splitStringFloat64Str(string(entry.Key), SeparatorForZSetKey)
-	sortedSetIdx, exist := db.Index.sortedSet.exist(bucketId)
+	sortedSetIdx, exist := db.Index.sortedSet.exist(entry.Meta.BucketId)
 	if !exist {
 		return false
 	}
@@ -288,14 +403,14 @@ func (db *DB) isPendingZSetEntry(bucketId BucketId, entry *Entry) bool {
 	return true
 }
 
-func (db *DB) isPendingListEntry(bucketId BucketId, entry *Entry) bool {
+func (db *DB) isPendingListEntry(entry *Entry) bool {
 	var userKeyStr string
 	var curSeq uint64
 	var userKey []byte
 
 	if entry.Meta.Flag == DataExpireListFlag {
 		userKeyStr = string(entry.Key)
-		list, exist := db.Index.list.exist(bucketId)
+		list, exist := db.Index.list.exist(entry.Meta.BucketId)
 		if !exist {
 			return false
 		}
@@ -321,7 +436,7 @@ func (db *DB) isPendingListEntry(bucketId BucketId, entry *Entry) bool {
 		userKey, curSeq = decodeListKey(entry.Key)
 		userKeyStr = string(userKey)
 
-		list, exist := db.Index.list.exist(bucketId)
+		list, exist := db.Index.list.exist(entry.Meta.BucketId)
 		if !exist {
 			return false
 		}
@@ -343,4 +458,10 @@ func (db *DB) isPendingListEntry(bucketId BucketId, entry *Entry) bool {
 	}
 
 	return false
+}
+
+// mergedEntryInfo 用于在 merge 过程中暂存条目信息
+type mergedEntryInfo struct {
+	entry    *Entry
+	bucketId BucketId
 }

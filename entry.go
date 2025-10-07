@@ -238,8 +238,15 @@ func (e *Entry) GetTxIDBytes() []byte {
 	return []byte(strconv2.Int64ToStr(int64(e.Meta.TxID)))
 }
 
+func (e *Entry) IsBelongsToBTree() bool {
+	return e.Meta.IsBTree()
+}
+
+// IsBelongsToBPlusTree is kept for backward compatibility with legacy naming.
+// Internally nutsdb uses a B+ tree implementation for primary indexes, so both
+// helpers map to the same metadata flag.
 func (e *Entry) IsBelongsToBPlusTree() bool {
-	return e.Meta.IsBPlusTree()
+	return e.IsBelongsToBTree()
 }
 
 func (e *Entry) IsBelongsToList() bool {

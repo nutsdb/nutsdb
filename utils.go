@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -88,6 +89,10 @@ func MatchForRange(pattern, bucket string, f func(bucket string) bool) (end bool
 // getDataPath returns the data path for the given file ID.
 func getDataPath(fID int64, dir string) string {
 	separator := string(filepath.Separator)
+	if IsMergeFile(fID) {
+		seq := GetMergeSeq(fID)
+		return dir + separator + fmt.Sprintf("merge_%d%s", seq, DataSuffix)
+	}
 	return dir + separator + strconv2.Int64ToStr(fID) + DataSuffix
 }
 
@@ -178,6 +183,11 @@ func UvarintSize(x uint64) int {
 		i++
 	}
 	return i + 1
+}
+
+func VarintSize(x int64) int {
+	ux := uint64(x<<1) ^ uint64(x>>63)
+	return UvarintSize(ux)
 }
 
 // compareAndReturn use bytes.Compare(other, target), if return value is

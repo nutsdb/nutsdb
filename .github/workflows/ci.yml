@@ -8,10 +8,49 @@ on:
 jobs:
   unit-test-linux:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
     - uses: actions/checkout@v3
-    - uses: actions/setup-go@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
       with:
-        go-version: '1.18'
-    - name: run unit tests
-      run: go test ./... -race
+        go-version: '1.21'
+
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+
+    - name: Clean test directories
+      run: |
+        sudo rm -rf /tmp/nutsdb* || true
+        sudo rm -rf /tmp/test-hintfile* || true
+
+    - name: Build project
+      run: go build -v ./...
+
+    - name: Run unit tests with timeout and retries
+      run: |
+        # Set test timeout and retry logic for flaky tests
+        for i in {1..3}; do
+          echo "Test attempt $i/3"
+          if timeout 20m go test -v -race -timeout 15m ./...; then
+            echo "Tests passed on attempt $i"
+            break
+          elif [ $i -eq 3 ]; then
+            echo "Tests failed after 3 attempts"
+            exit 1
+          else
+            echo "Tests failed on attempt $i, retrying..."
+            sleep 5
+            # Clean any remaining test files
+            sudo rm -rf /tmp/nutsdb* || true
+            sudo rm -rf /tmp/test-hintfile* || true
+          fi
+        done

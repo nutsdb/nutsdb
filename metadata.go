@@ -187,7 +187,7 @@ func (meta *MetaData) WithBucketId(bucketID uint64) *MetaData {
 	return meta
 }
 
-func (meta *MetaData) IsBPlusTree() bool {
+func (meta *MetaData) IsBTree() bool {
 	return meta.Ds == DataStructureBTree
 }
 
