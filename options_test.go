@@ -149,7 +149,7 @@ func TestWithEnableHintFile(t *testing.T) {
 		WithDir("/tmp/nutsdb"),
 	)
 	assert.NoError(t, err)
-	assert.True(t, db.opt.EnableHintFile)
+	assert.False(t, db.opt.EnableHintFile)
 	err = db.Close()
 	assert.NoError(t, err)
 
