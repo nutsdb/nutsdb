@@ -159,7 +159,7 @@ var DefaultOptions = func() Options {
 		MaxBatchCount:             (15 * defaultSegmentSize / 4) / 100 / 100,
 		HintKeyAndRAMIdxCacheSize: 0,
 		ExpiredDeleteType:         TimeWheel,
-		EnableHintFile:            true,
+		EnableHintFile:            false,
 		EnableMergeV2:             false,
 	}
 }()

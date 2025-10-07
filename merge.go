@@ -338,26 +338,21 @@ func (db *DB) mergeWorker() {
 }
 
 func (db *DB) isPendingMergeEntry(entry *Entry) bool {
-	bucket, err := db.bm.GetBucketById(entry.Meta.BucketId)
-	if err != nil {
-		return false
-	}
-	bucketId := bucket.Id
 	switch {
 	case entry.IsBelongsToBTree():
-		return db.isPendingBtreeEntry(bucketId, entry)
+		return db.isPendingBtreeEntry(entry)
 	case entry.IsBelongsToList():
-		return db.isPendingListEntry(bucketId, entry)
+		return db.isPendingListEntry(entry)
 	case entry.IsBelongsToSet():
-		return db.isPendingSetEntry(bucketId, entry)
+		return db.isPendingSetEntry(entry)
 	case entry.IsBelongsToSortSet():
-		return db.isPendingZSetEntry(bucketId, entry)
+		return db.isPendingZSetEntry(entry)
 	}
 	return false
 }
 
-func (db *DB) isPendingBtreeEntry(bucketId BucketId, entry *Entry) bool {
-	idx, exist := db.Index.bTree.exist(bucketId)
+func (db *DB) isPendingBtreeEntry(entry *Entry) bool {
+	idx, exist := db.Index.bTree.exist(entry.Meta.BucketId)
 	if !exist {
 		return false
 	}
@@ -368,7 +363,7 @@ func (db *DB) isPendingBtreeEntry(bucketId BucketId, entry *Entry) bool {
 	}
 
 	if r.IsExpired() {
-		db.tm.del(bucketId, string(entry.Key))
+		db.tm.del(entry.Meta.BucketId, string(entry.Key))
 		idx.Delete(entry.Key)
 		return false
 	}
@@ -380,8 +375,8 @@ func (db *DB) isPendingBtreeEntry(bucketId BucketId, entry *Entry) bool {
 	return true
 }
 
-func (db *DB) isPendingSetEntry(bucketId BucketId, entry *Entry) bool {
-	setIdx, exist := db.Index.set.exist(bucketId)
+func (db *DB) isPendingSetEntry(entry *Entry) bool {
+	setIdx, exist := db.Index.set.exist(entry.Meta.BucketId)
 	if !exist {
 		return false
 	}
@@ -394,9 +389,9 @@ func (db *DB) isPendingSetEntry(bucketId BucketId, entry *Entry) bool {
 	return true
 }
 
-func (db *DB) isPendingZSetEntry(bucketId BucketId, entry *Entry) bool {
+func (db *DB) isPendingZSetEntry(entry *Entry) bool {
 	key, score := splitStringFloat64Str(string(entry.Key), SeparatorForZSetKey)
-	sortedSetIdx, exist := db.Index.sortedSet.exist(bucketId)
+	sortedSetIdx, exist := db.Index.sortedSet.exist(entry.Meta.BucketId)
 	if !exist {
 		return false
 	}
@@ -408,14 +403,14 @@ func (db *DB) isPendingZSetEntry(bucketId BucketId, entry *Entry) bool {
 	return true
 }
 
-func (db *DB) isPendingListEntry(bucketId BucketId, entry *Entry) bool {
+func (db *DB) isPendingListEntry(entry *Entry) bool {
 	var userKeyStr string
 	var curSeq uint64
 	var userKey []byte
 
 	if entry.Meta.Flag == DataExpireListFlag {
 		userKeyStr = string(entry.Key)
-		list, exist := db.Index.list.exist(bucketId)
+		list, exist := db.Index.list.exist(entry.Meta.BucketId)
 		if !exist {
 			return false
 		}
@@ -441,7 +436,7 @@ func (db *DB) isPendingListEntry(bucketId BucketId, entry *Entry) bool {
 		userKey, curSeq = decodeListKey(entry.Key)
 		userKeyStr = string(userKey)
 
-		list, exist := db.Index.list.exist(bucketId)
+		list, exist := db.Index.list.exist(entry.Meta.BucketId)
 		if !exist {
 			return false
 		}
