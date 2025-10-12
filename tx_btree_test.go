@@ -1510,33 +1510,76 @@ func TestTx_Has(t *testing.T) {
 }
 
 func TestTx_ReadAndWriteInSameTransaction(t *testing.T) {
-	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		r := require.New(t)
+	t.Run("test Put and Get", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			r := require.New(t)
+			bucket := `1`
+			key := []byte(`k`)
+			v1 := []byte(`v1`)
+			v2 := []byte(`v2`)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
-		bucket := `1`
-		key := []byte(`k`)
-		v1 := []byte(`v1`)
-		v2 := []byte(`v2`)
-		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			r.NoError(db.Update(func(tx *Tx) error {
+				r.NoError(tx.Put(bucket, key, v1, 0))
+				_, err := tx.Get(bucket, key)
+				r.NoError(err)
+				return nil
+			}))
 
-		r.NoError(db.Update(func(tx *Tx) error {
-			r.NoError(tx.Put(bucket, key, v1, 0))
-			_, err := tx.Get(bucket, key)
-			r.NoError(err)
-			return nil
-		}))
+			r.NoError(db.Update(func(tx *Tx) error {
+				item, err := tx.Get(bucket, key)
+				r.NoError(err)
+				r.EqualValues(v1, item)
 
-		r.NoError(db.Update(func(tx *Tx) error {
-			item, err := tx.Get(bucket, key)
-			r.NoError(err)
-			r.EqualValues(v1, item)
+				r.NoError(tx.Put(bucket, key, v2, 0))
+				item, err = tx.Get(bucket, key)
+				r.NoError(err)
+				r.EqualValues(v2, item)
+				return nil
+			}))
+		})
+	})
 
-			r.NoError(tx.Put(bucket, key, v2, 0))
-			item, err = tx.Get(bucket, key)
-			r.NoError(err)
-			r.EqualValues(v2, item)
-			return nil
-		}))
+	t.Run("test GetTTL", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			r := require.New(t)
+
+			bucket := `1`
+			key := []byte(`k`)
+			v1 := []byte(`v1`)
+
+			r.NoError(db.Update(func(tx *Tx) (err error) {
+				r.NoError(tx.NewKVBucket(bucket))
+				r.NoError(tx.Put(bucket, key, v1, 3600))
+				ttl, err := tx.GetTTL(bucket, key)
+				r.Nil(err)
+				r.NotEqual(0, ttl)
+				return
+			}))
+		})
+	})
+
+	t.Run("test Persist", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			r := require.New(t)
+			bucket := `1`
+			key := []byte("k")
+			ttl := uint32(100)
+			val := []byte("V")
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+			r.NoError(db.Update(func(tx *Tx) (err error) {
+				r.NoError(tx.Put(bucket, key, val, ttl))
+				curTTL, err := tx.GetTTL(bucket, key)
+				r.NoError(err)
+				r.Equal(int64(ttl), curTTL)
+				r.NoError(tx.Persist(bucket, key))
+				curTTL, err = tx.GetTTL(bucket, key)
+				r.NoError(err)
+				r.Equal(int64(-1), curTTL)
+				return
+			}))
+		})
 	})
 }
 
