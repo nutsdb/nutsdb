@@ -1856,22 +1856,34 @@ func TestTx_CreateBucketAndWriteInSameTransaction(t *testing.T) {
 }
 
 func TestTx_TestBucketNotExists(t *testing.T) {
-	t.Run("test Get,Has,Put", func(t *testing.T) {
-		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-			r := require.New(t)
+	t.Run("test Get,Has,Put,PutIfNotExists,PutIfExists,GetMaxKey,GetMinKey",
+		func(t *testing.T) {
+			runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+				r := require.New(t)
 
-			bucket := `1`
-			key := []byte(`k`)
-			v1 := []byte(`v1`)
+				bucket := `1`
+				key := []byte(`k`)
+				v1 := []byte(`v1`)
 
-			r.NoError(db.Update(func(tx *Tx) (err error) {
-				r.Equal(ErrBucketNotExist, tx.Put(bucket, key, v1, 0))
-				_, err = tx.Get(bucket, key)
-				r.Equal(ErrBucketNotExist, err)
-				_, err = tx.Has(bucket, key)
-				r.Equal(ErrBucketNotExist, err)
-				return nil
-			}))
+				r.NoError(db.Update(func(tx *Tx) (err error) {
+					_, err = tx.Get(bucket, key)
+					r.Equal(ErrBucketNotExist, err)
+					_, err = tx.Has(bucket, key)
+					r.Equal(ErrBucketNotExist, err)
+					_, err = tx.GetMaxKey(bucket)
+					r.Equal(ErrBucketNotExist, err)
+					_, err = tx.GetMinKey(bucket)
+					r.Equal(ErrBucketNotExist, err)
+					_, err = tx.GetTTL(bucket, key)
+					r.Equal(ErrBucketNotExist, err)
+					_, _, err = tx.RangeScanEntries(bucket, nil, nil, false, false)
+					r.Equal(ErrBucketNotExist, err)
+
+					r.Equal(ErrBucketNotExist, tx.Put(bucket, key, v1, 0))
+					r.Equal(ErrBucketNotExist, tx.PutIfNotExists(bucket, key, v1, 0))
+					r.Equal(ErrBucketNotExist, tx.PutIfExists(bucket, key, v1, 0))
+					return nil
+				}))
+			})
 		})
-	})
 }
