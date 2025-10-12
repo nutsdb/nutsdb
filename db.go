@@ -935,7 +935,6 @@ func (db *DB) managed(writable bool, fn func(tx *Tx) error) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("panic when executing tx, err is %+v", r)
-			panic(err)
 		}
 	}()
 

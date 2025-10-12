@@ -1612,6 +1612,32 @@ func TestTx_ReadAndWriteInSameTransaction(t *testing.T) {
 			}))
 		})
 	})
+
+	t.Run("test PutIfExists", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			r := require.New(t)
+			bucket := `1`
+			key := []byte("k")
+			v1 := []byte("v1")
+			v2 := []byte("v2")
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+			r.NoError(db.Update(func(tx *Tx) (err error) {
+				r.Equal(ErrKeyNotFound, tx.PutIfExists(bucket, key, v1, Persistent))
+				r.NoError(tx.Put(bucket, key, v1, Persistent))
+				value, err := tx.Get(bucket, key)
+				r.NoError(err)
+				r.Equal(v1, value)
+
+				err = tx.PutIfExists(bucket, key, v2, Persistent)
+				r.NoError(err)
+				value, err = tx.Get(bucket, key)
+				r.NoError(err)
+				r.Equal(v2, value)
+				return
+			}))
+		})
+	})
 }
 
 func TestTx_CreateBucketAndWriteInSameTransaction(t *testing.T) {
@@ -1797,6 +1823,53 @@ func TestTx_CreateBucketAndWriteInSameTransaction(t *testing.T) {
 					[]byte("v07"),
 				}, vals)
 
+				return nil
+			}))
+		})
+	})
+
+	t.Run("test PutIfExists", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			r := require.New(t)
+			bucket := `1`
+			key := []byte("k")
+			v1 := []byte("v1")
+			v2 := []byte("v2")
+
+			r.NoError(db.Update(func(tx *Tx) (err error) {
+				r.NoError(tx.NewKVBucket(bucket))
+				r.Equal(ErrKeyNotFound, tx.PutIfExists(bucket, key, v1, Persistent))
+				r.NoError(tx.Put(bucket, key, v1, Persistent))
+				value, err := tx.Get(bucket, key)
+				r.NoError(err)
+				r.Equal(v1, value)
+
+				err = tx.PutIfExists(bucket, key, v2, Persistent)
+				r.NoError(err)
+				value, err = tx.Get(bucket, key)
+				r.NoError(err)
+				r.Equal(v2, value)
+				return
+			}))
+		})
+	})
+}
+
+func TestTx_TestBucketNotExists(t *testing.T) {
+	t.Run("test Get,Has,Put", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			r := require.New(t)
+
+			bucket := `1`
+			key := []byte(`k`)
+			v1 := []byte(`v1`)
+
+			r.NoError(db.Update(func(tx *Tx) (err error) {
+				r.Equal(ErrBucketNotExist, tx.Put(bucket, key, v1, 0))
+				_, err = tx.Get(bucket, key)
+				r.Equal(ErrBucketNotExist, err)
+				_, err = tx.Has(bucket, key)
+				r.Equal(ErrBucketNotExist, err)
 				return nil
 			}))
 		})

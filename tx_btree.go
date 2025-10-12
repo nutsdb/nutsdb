@@ -472,7 +472,7 @@ func (tx *Tx) tryGet(bucket string, key []byte, solveRecord func(record *Record,
 	bucketId := b.Id
 	var (
 		record *Record = nil
-		found  bool    = false
+		found  bool
 	)
 	entry, err := tx.pendingWrites.Get(DataStructureBTree, bucket, key)
 	found = err == nil
