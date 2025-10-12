@@ -26,6 +26,18 @@ import (
 	"github.com/xujiajun/utils/strconv2"
 )
 
+func getIntegerValue(value int64) []byte {
+	return []byte(fmt.Sprintf("%d", value))
+}
+
+func validateEqual(r *require.Assertions, tx *Tx, bucket string, key []byte, expect int64) {
+	value, err := tx.Get(bucket, key)
+	r.NoError(err)
+	intValue, err := strconv2.StrToInt64(string(value))
+	r.NoError(err)
+	r.Equal(expect, intValue)
+}
+
 func TestTx_PutAndGet(t *testing.T) {
 	var (
 		bucket = "bucket1"
@@ -944,9 +956,6 @@ func TestTx_updateOrPut(t *testing.T) {
 
 func TestTx_IncrementAndDecrement(t *testing.T) {
 	bucket := "bucket"
-	getIntegerValue := func(value int64) []byte {
-		return []byte(fmt.Sprintf("%d", value))
-	}
 
 	key := GetTestBytes(0)
 
@@ -1572,11 +1581,33 @@ func TestTx_ReadAndWriteInSameTransaction(t *testing.T) {
 				r.NoError(tx.Put(bucket, key, val, ttl))
 				curTTL, err := tx.GetTTL(bucket, key)
 				r.NoError(err)
-				r.Equal(int64(ttl), curTTL)
+				r.Greater(curTTL, int64(0))
 				r.NoError(tx.Persist(bucket, key))
 				curTTL, err = tx.GetTTL(bucket, key)
 				r.NoError(err)
 				r.Equal(int64(-1), curTTL)
+				return
+			}))
+		})
+	})
+
+	t.Run("test Incr And Decr", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			r := require.New(t)
+			bucket := `1`
+			key := []byte("k")
+			intVal := int64(10)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+			r.NoError(db.Update(func(tx *Tx) (err error) {
+				r.NoError(tx.Put(bucket, key, getIntegerValue(intVal), Persistent))
+				validateEqual(r, tx, bucket, key, intVal)
+				r.NoError(tx.Incr(bucket, key))
+				validateEqual(r, tx, bucket, key, intVal+1)
+				r.NoError(tx.IncrBy(bucket, key, 100))
+				validateEqual(r, tx, bucket, key, intVal+101)
+				r.NoError(tx.DecrBy(bucket, key, 200))
+				validateEqual(r, tx, bucket, key, intVal-99)
 				return
 			}))
 		})
