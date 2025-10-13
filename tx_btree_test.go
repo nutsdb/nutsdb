@@ -911,28 +911,48 @@ func TestTx_ExpiredDeletion(t *testing.T) {
 
 func TestTx_GetMaxOrMinKey(t *testing.T) {
 	bucket := "bucket"
+	t.Run("general key test", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
-	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			for i := 0; i < 10; i++ {
+				txPut(t, db, bucket, GetTestBytes(i), GetRandomBytes(24), Persistent, nil, nil)
+			}
 
-		for i := 0; i < 10; i++ {
-			txPut(t, db, bucket, GetTestBytes(i), GetRandomBytes(24), Persistent, nil, nil)
-		}
+			txGetMaxOrMinKey(t, db, bucket, true, GetTestBytes(9), nil)
+			txGetMaxOrMinKey(t, db, bucket, false, GetTestBytes(0), nil)
 
-		txGetMaxOrMinKey(t, db, bucket, true, GetTestBytes(9), nil)
-		txGetMaxOrMinKey(t, db, bucket, false, GetTestBytes(0), nil)
+			txDel(t, db, bucket, GetTestBytes(9), nil)
+			txDel(t, db, bucket, GetTestBytes(0), nil)
 
-		txDel(t, db, bucket, GetTestBytes(9), nil)
-		txDel(t, db, bucket, GetTestBytes(0), nil)
+			txGetMaxOrMinKey(t, db, bucket, true, GetTestBytes(8), nil)
+			txGetMaxOrMinKey(t, db, bucket, false, GetTestBytes(1), nil)
 
-		txGetMaxOrMinKey(t, db, bucket, true, GetTestBytes(8), nil)
-		txGetMaxOrMinKey(t, db, bucket, false, GetTestBytes(1), nil)
+			txPut(t, db, bucket, GetTestBytes(-1), GetRandomBytes(24), Persistent, nil, nil)
+			txPut(t, db, bucket, GetTestBytes(100), GetRandomBytes(24), Persistent, nil, nil)
 
-		txPut(t, db, bucket, GetTestBytes(-1), GetRandomBytes(24), Persistent, nil, nil)
-		txPut(t, db, bucket, GetTestBytes(100), GetRandomBytes(24), Persistent, nil, nil)
+			txGetMaxOrMinKey(t, db, bucket, false, GetTestBytes(-1), nil)
+			txGetMaxOrMinKey(t, db, bucket, true, GetTestBytes(100), nil)
+		})
+	})
 
-		txGetMaxOrMinKey(t, db, bucket, false, GetTestBytes(-1), nil)
-		txGetMaxOrMinKey(t, db, bucket, true, GetTestBytes(100), nil)
+	t.Run("test expire", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			keya := []byte("A")
+			keyb := []byte("B")
+			keyc := []byte("C")
+			txPut(t, db, bucket, keya, keya, 1, nil, nil)
+			txPut(t, db, bucket, keyb, keyb, Persistent, nil, nil)
+			txPut(t, db, bucket, keyc, keyc, 3, nil, nil)
+
+			txGetMaxOrMinKey(t, db, bucket, false, keya, nil)
+			txGetMaxOrMinKey(t, db, bucket, true, keyc, nil)
+			<-time.After(1500 * time.Millisecond)
+			txGetMaxOrMinKey(t, db, bucket, false, keyb, nil)
+			<-time.After(2000 * time.Millisecond)
+			txGetMaxOrMinKey(t, db, bucket, true, keyb, nil)
+		})
 	})
 }
 
@@ -1886,4 +1906,35 @@ func TestTx_TestBucketNotExists(t *testing.T) {
 				}))
 			})
 		})
+}
+
+func TestTx_RecordExpired(t *testing.T) {
+	t.Run("test PutIfExists", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			r := require.New(t)
+			bucket := `1`
+			key := []byte("k")
+			v1 := []byte("v1")
+			v2 := []byte("v2")
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			txPut(t, db, bucket, key, v1, 1, nil, nil)
+			<-time.After(100 * time.Millisecond)
+			r.NoError(db.Update(func(tx *Tx) (err error) {
+				r.NoError(tx.PutIfExists(bucket, key, v2, 1))
+				return
+			}))
+			txGet(t, db, bucket, key, v2, nil)
+
+			// <-time.After(100 * time.Millisecond)
+			// r.NoError(db.Update(func(tx *Tx) (err error) {
+			// 	r.NoError(tx.PutIfExists(bucket, key, v2, 1))
+			// 	return
+			// }))
+			// <-time.After(1200 * time.Millisecond)
+			// r.NoError(db.Update(func(tx *Tx) (err error) {
+			// 	r.Equal(ErrNotFoundKey, tx.PutIfExists(bucket, key, v2, 1))
+			// 	return
+			// }))
+		})
+	})
 }

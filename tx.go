@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"sync/atomic"
 
@@ -634,7 +635,7 @@ func (tx *Tx) put(bucket string, key, value []byte, ttl uint32, flag uint16, tim
 	}
 	tx.submitEntry(ds, bucket, e)
 	tx.size += e.Size()
-
+	log.Printf("put finished, key: %v, val: %v, ttl: %v", string(key), string(value), ttl)
 	return nil
 }
 

@@ -16,6 +16,7 @@ package nutsdb
 
 import (
 	"errors"
+	"log"
 	"math"
 	"math/big"
 	"strconv"
@@ -487,6 +488,7 @@ func (tx *Tx) tryGet(bucket string, key []byte, solveRecord func(record *Record,
 
 func (tx *Tx) update(bucket string, key []byte, getNewValue func([]byte) ([]byte, error), getNewTTL func(uint32) (uint32, error)) error {
 	return tx.tryGet(bucket, key, func(record *Record, pendingEntry *Entry, found bool, bucketId BucketId) error {
+		log.Printf("init here, record:%v, pendingEntry:%v, found:%v", record, pendingEntry, found)
 		if !found {
 			return ErrKeyNotFound
 		}
@@ -514,7 +516,7 @@ func (tx *Tx) update(bucket string, key []byte, getNewValue func([]byte) ([]byte
 		if err != nil {
 			return err
 		}
-
+		log.Printf("put here: newvalue: %v, newttl: %v", string(newValue), newTTL)
 		return tx.put(bucket, key, newValue, newTTL, DataSetFlag, uint64(time.Now().Unix()), DataStructureBTree)
 	})
 }
