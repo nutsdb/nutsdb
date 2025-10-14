@@ -706,7 +706,6 @@ func (db *DB) buildBTreeIdx(record *Record, entry *Entry) error {
 		bTree.Delete(key)
 	} else {
 		if meta.TTL != Persistent {
-			log.Printf("new ttl entry, key=%v, value=%v", key, string(entry.Value))
 			db.tm.add(bucketId, string(key), expireTime(meta.Timestamp, meta.TTL), db.buildExpireCallback(bucket.Name, key))
 		} else {
 			db.tm.del(bucketId, string(key))
