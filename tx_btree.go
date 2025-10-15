@@ -769,15 +769,7 @@ func (tx *Tx) revertExpiredTTLRecord(
 	rec *Record,
 ) (err error) {
 	if rec.IsExpired() {
-		tx.putDeleteLog(
-			bucketId,
-			rec.Key,
-			nil,
-			Persistent,
-			DataDeleteFlag,
-			uint64(time.Now().Unix()),
-			DataStructureBTree,
-		)
+		tx.putDeleteLog(bucketId, rec.Key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureBTree)
 		return ErrNotFoundKey
 	}
 	return nil

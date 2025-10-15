@@ -1961,3 +1961,27 @@ func TestTx_RecordExpired(t *testing.T) {
 		})
 	})
 }
+
+func TestTx_NewTTLReturnError(t *testing.T) {
+	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		r := require.New(t)
+		bucket := `1`
+		key := []byte("k")
+		v := []byte("v")
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+		txPut(t, db, bucket, key, v, 1, nil, nil)
+		expectErr := errors.New("test error")
+		err = db.Update(func(tx *Tx) error {
+			return tx.update(
+				bucket,
+				key,
+				func(b []byte) ([]byte, error) {
+					return b, nil
+				},
+				func(u uint32) (uint32, error) {
+					return 0, expectErr
+				})
+		})
+		r.Equal(expectErr, err)
+	})
+}
