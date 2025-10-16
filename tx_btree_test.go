@@ -1658,6 +1658,32 @@ func TestTx_ReadAndWriteInSameTransaction(t *testing.T) {
 			}))
 		})
 	})
+
+	t.Run("test GetSet", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			r := require.New(t)
+			bucket := `1`
+			key := []byte("k")
+			v1 := []byte("v1")
+			v2 := []byte("v2")
+			v3 := []byte("v3")
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			db.Update(func(tx *Tx) error {
+				r.NoError(tx.Put(bucket, key, v1, Persistent))
+				var (
+					v   []byte
+					err error
+				)
+				v, err = tx.GetSet(bucket, key, v2)
+				r.NoError(err)
+				r.Equal(v1, v)
+				v, err = tx.GetSet(bucket, key, v3)
+				r.NoError(err)
+				r.Equal(v2, v)
+				return nil
+			})
+		})
+	})
 }
 
 func TestTx_CreateBucketAndWriteInSameTransaction(t *testing.T) {
@@ -1871,6 +1897,33 @@ func TestTx_CreateBucketAndWriteInSameTransaction(t *testing.T) {
 				r.Equal(v2, value)
 				return
 			}))
+		})
+	})
+
+	t.Run("test GetSet", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			r := require.New(t)
+			bucket := `1`
+			key := []byte("k")
+			v1 := []byte("v1")
+			v2 := []byte("v2")
+			v3 := []byte("v3")
+
+			db.Update(func(tx *Tx) error {
+				r.NoError(tx.NewKVBucket(bucket))
+				r.NoError(tx.Put(bucket, key, v1, Persistent))
+				var (
+					v   []byte
+					err error
+				)
+				v, err = tx.GetSet(bucket, key, v2)
+				r.NoError(err)
+				r.Equal(v1, v)
+				v, err = tx.GetSet(bucket, key, v3)
+				r.NoError(err)
+				r.Equal(v2, v)
+				return nil
+			})
 		})
 	})
 }
