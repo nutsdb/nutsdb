@@ -19,6 +19,8 @@ import (
 	"os"
 	"testing"
 	"time"
+
+	"github.com/nutsdb/nutsdb/internal/testutils"
 )
 
 // BenchmarkHintFileEncode benchmarks the encoding of HintEntry
@@ -223,7 +225,7 @@ func BenchmarkDBStartupWithHintFile(b *testing.B) {
 	// Add enough data to trigger merge
 	start = time.Now()
 	for i := 0; i < 5000000; i++ {
-		txPut(&testing.T{}, db, bucket, GetTestBytes(i), GetTestBytes(i), Persistent, nil, nil)
+		txPut(&testing.T{}, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), Persistent, nil, nil)
 	}
 	insertTime := time.Since(start)
 	b.Logf("插入阶段耗时: %v", insertTime)
@@ -294,7 +296,7 @@ func BenchmarkDBStartupWithoutHintFile(b *testing.B) {
 	// Add enough data to trigger merge
 	start = time.Now()
 	for i := 0; i < 5000000; i++ {
-		txPut(&testing.T{}, db, bucket, GetTestBytes(i), GetTestBytes(i), Persistent, nil, nil)
+		txPut(&testing.T{}, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), Persistent, nil, nil)
 	}
 	insertTime := time.Since(start)
 	b.Logf("插入阶段耗时: %v", insertTime)
@@ -366,11 +368,11 @@ func BenchmarkMergeWithHintFile(b *testing.B) {
 
 		// Add data and delete some to trigger merge
 		for j := 0; j < 2000; j++ {
-			txPut(&testing.T{}, db, bucket, GetTestBytes(j), GetTestBytes(j), Persistent, nil, nil)
+			txPut(&testing.T{}, db, bucket, testutils.GetTestBytes(j), testutils.GetTestBytes(j), Persistent, nil, nil)
 		}
 
 		for j := 0; j < 500; j++ {
-			txDel(&testing.T{}, db, bucket, GetTestBytes(j), nil)
+			txDel(&testing.T{}, db, bucket, testutils.GetTestBytes(j), nil)
 		}
 
 		// Perform merge with hint file creation
@@ -424,11 +426,11 @@ func BenchmarkMergeWithoutHintFile(b *testing.B) {
 
 		// Add data and delete some to trigger merge
 		for j := 0; j < 2000; j++ {
-			txPut(&testing.T{}, db, bucket, GetTestBytes(j), GetTestBytes(j), Persistent, nil, nil)
+			txPut(&testing.T{}, db, bucket, testutils.GetTestBytes(j), testutils.GetTestBytes(j), Persistent, nil, nil)
 		}
 
 		for j := 0; j < 500; j++ {
-			txDel(&testing.T{}, db, bucket, GetTestBytes(j), nil)
+			txDel(&testing.T{}, db, bucket, testutils.GetTestBytes(j), nil)
 		}
 
 		// Perform merge without hint file creation
@@ -477,7 +479,7 @@ func BenchmarkHintFileLoad(b *testing.B) {
 
 	// Add enough data to create multiple files
 	for i := 0; i < 10000; i++ {
-		txPut(&testing.T{}, db, bucket, GetTestBytes(i), GetTestBytes(i), Persistent, nil, nil)
+		txPut(&testing.T{}, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), Persistent, nil, nil)
 	}
 
 	// Perform merge to create hint files

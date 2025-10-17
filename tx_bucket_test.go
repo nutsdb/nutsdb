@@ -17,6 +17,7 @@ package nutsdb
 import (
 	"testing"
 
+	"github.com/nutsdb/nutsdb/internal/testutils"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -28,8 +29,8 @@ var (
 )
 
 func setupBucket(t *testing.T, db *DB) {
-	key := GetTestBytes(0)
-	val := GetTestBytes(1)
+	key := testutils.GetTestBytes(0)
+	val := testutils.GetTestBytes(1)
 	txCreateBucket(t, db, DataStructureBTree, stringBucketName, nil)
 	txCreateBucket(t, db, DataStructureSet, setBucketName, nil)
 	txCreateBucket(t, db, DataStructureSortedSet, zSetBucketName, nil)

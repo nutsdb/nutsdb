@@ -28,6 +28,7 @@ import (
 	"sync"
 
 	"github.com/gofrs/flock"
+	"github.com/nutsdb/nutsdb/internal/utils"
 	"github.com/xujiajun/utils/filesystem"
 	"github.com/xujiajun/utils/strconv2"
 )
@@ -58,7 +59,7 @@ type (
 		tm                      *ttlManager
 		RecordCount             int64 // current valid record count, exclude deleted, repeated
 		bm                      *BucketManager
-		hintKeyAndRAMIdxModeLru *LRUCache // lru cache for HintKeyAndRAMIdxMode
+		hintKeyAndRAMIdxModeLru *utils.LRUCache // lru cache for HintKeyAndRAMIdxMode
 	}
 )
 
@@ -76,7 +77,7 @@ func open(opt Options) (*DB, error) {
 		mergeWorkCloseCh:        make(chan struct{}),
 		writeCh:                 make(chan *request, KvWriteChCapacity),
 		tm:                      newTTLManager(opt.ExpiredDeleteType),
-		hintKeyAndRAMIdxModeLru: NewLruCache(opt.HintKeyAndRAMIdxCacheSize),
+		hintKeyAndRAMIdxModeLru: utils.NewLruCache(opt.HintKeyAndRAMIdxCacheSize),
 	}
 
 	db.commitBuffer = createNewBufferWithSize(int(db.opt.CommitBufferSize))
@@ -158,7 +159,7 @@ func (db *DB) Backup(dir string) error {
 // BackupTarGZ Backup copy the database to writer.
 func (db *DB) BackupTarGZ(w io.Writer) error {
 	return db.View(func(tx *Tx) error {
-		return tarGZCompress(w, db.opt.Dir)
+		return utils.TarGZCompress(w, db.opt.Dir)
 	})
 }
 

@@ -17,6 +17,7 @@ package nutsdb
 import (
 	"testing"
 
+	"github.com/nutsdb/nutsdb/internal/testutils"
 	"github.com/stretchr/testify/require"
 )
 
@@ -27,7 +28,7 @@ func TestIterator(t *testing.T) {
 		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 		for i := 0; i < 100; i++ {
-			txPut(t, db, bucket, GetTestBytes(i), GetTestBytes(i), Persistent, nil, nil)
+			txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), Persistent, nil, nil)
 		}
 
 		_ = db.View(func(tx *Tx) error {
@@ -39,7 +40,7 @@ func TestIterator(t *testing.T) {
 			for {
 				value, err := iterator.Value()
 				require.NoError(t, err)
-				require.Equal(t, GetTestBytes(i), value)
+				require.Equal(t, testutils.GetTestBytes(i), value)
 				if !iterator.Next() {
 					break
 				}
@@ -58,7 +59,7 @@ func TestIterator_Reverse(t *testing.T) {
 		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 		for i := 0; i < 100; i++ {
-			txPut(t, db, bucket, GetTestBytes(i), GetTestBytes(i), Persistent, nil, nil)
+			txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), Persistent, nil, nil)
 		}
 
 		_ = db.View(func(tx *Tx) error {
@@ -69,7 +70,7 @@ func TestIterator_Reverse(t *testing.T) {
 			for {
 				value, err := iterator.Value()
 				require.NoError(t, err)
-				require.Equal(t, GetTestBytes(i), value)
+				require.Equal(t, testutils.GetTestBytes(i), value)
 				if !iterator.Next() {
 					break
 				}
@@ -88,18 +89,18 @@ func TestIterator_Seek(t *testing.T) {
 		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 		for i := 0; i < 100; i++ {
-			txPut(t, db, bucket, GetTestBytes(i), GetTestBytes(i), Persistent, nil, nil)
+			txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), Persistent, nil, nil)
 		}
 
 		_ = db.View(func(tx *Tx) error {
 			iterator := NewIterator(tx, bucket, IteratorOptions{Reverse: true})
 			defer iterator.Release()
 
-			iterator.Seek(GetTestBytes(40))
+			iterator.Seek(testutils.GetTestBytes(40))
 
 			value, err := iterator.Value()
 			require.NoError(t, err)
-			require.Equal(t, GetTestBytes(40), value)
+			require.Equal(t, testutils.GetTestBytes(40), value)
 
 			return nil
 		})
@@ -113,7 +114,7 @@ func TestIterator_Release(t *testing.T) {
 		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 		for i := 0; i < 100; i++ {
-			txPut(t, db, bucket, GetTestBytes(i), GetTestBytes(i), Persistent, nil, nil)
+			txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), Persistent, nil, nil)
 		}
 
 		_ = db.View(func(tx *Tx) error {
@@ -123,7 +124,7 @@ func TestIterator_Release(t *testing.T) {
 		})
 
 		for i := 0; i < 100; i++ {
-			txDel(t, db, bucket, GetTestBytes(i), nil)
+			txDel(t, db, bucket, testutils.GetTestBytes(i), nil)
 		}
 	})
 }

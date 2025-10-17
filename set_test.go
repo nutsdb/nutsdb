@@ -15,8 +15,10 @@
 package nutsdb
 
 import (
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/nutsdb/nutsdb/internal/testutils"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSet_SAdd(t *testing.T) {
@@ -341,8 +343,8 @@ func TestSet_SIsMember(t *testing.T) {
 		expectErr error
 	}{
 		{key, values[0], true, nil},
-		{key, GetRandomBytes(24), false, nil},
-		{"fake key", GetRandomBytes(24), false, ErrSetNotExist},
+		{key, testutils.GetRandomBytes(24), false, nil},
+		{"fake key", testutils.GetRandomBytes(24), false, ErrSetNotExist},
 	}
 	for _, tt := range tests {
 		ok, err := set.SIsMember(tt.key, tt.val)
@@ -375,7 +377,7 @@ func TestSet_SAreMembers(t *testing.T) {
 		{key, values[0:2], true, nil},
 		{key, values[2:], true, nil},
 		{key, values, true, nil},
-		{key, [][]byte{GetRandomBytes(24)}, false, nil},
+		{key, [][]byte{testutils.GetRandomBytes(24)}, false, nil},
 		{"fake key", values, true, ErrSetNotExist},
 	}
 	for _, tt := range tests {

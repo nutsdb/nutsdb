@@ -21,6 +21,8 @@ import (
 	"sync"
 
 	"github.com/edsrzf/mmap-go"
+	"github.com/nutsdb/nutsdb/internal/fileio"
+	"github.com/nutsdb/nutsdb/internal/utils"
 )
 
 var (
@@ -38,7 +40,7 @@ var (
 	ErrIndexOutOfBound = errors.New("offset out of mapped region")
 )
 
-func getMMapRWManager(fd *os.File, path string, fdm *fdManager, segmentSize int64) *MMapRWManager {
+func getMMapRWManager(fd *os.File, path string, fdm *fileio.FdManager, segmentSize int64) *MMapRWManager {
 	mmapRWManagerInstancesLock.Lock()
 	defer mmapRWManagerInstancesLock.Unlock()
 	mm, ok := mmapRWManagerInstances[path]
@@ -50,8 +52,8 @@ func getMMapRWManager(fd *os.File, path string, fdm *fdManager, segmentSize int6
 		path:        path,
 		fdm:         fdm,
 		segmentSize: segmentSize,
-		readCache:   NewLruCache(mmapLRUCacheCapacity),
-		writeCache:  NewLruCache(mmapLRUCacheCapacity),
+		readCache:   utils.NewLruCache(mmapLRUCacheCapacity),
+		writeCache:  utils.NewLruCache(mmapLRUCacheCapacity),
 	}
 
 	mmapRWManagerInstances[path] = mm
@@ -65,11 +67,11 @@ func getMMapRWManager(fd *os.File, path string, fdm *fdManager, segmentSize int6
 type MMapRWManager struct {
 	fd          *os.File
 	path        string
-	fdm         *fdManager
+	fdm         *fileio.FdManager
 	segmentSize int64
 
-	readCache  *LRUCache
-	writeCache *LRUCache
+	readCache  *utils.LRUCache
+	writeCache *utils.LRUCache
 }
 
 // WriteAt copies data to mapped region from the b slice starting at
@@ -123,7 +125,7 @@ func (mm *MMapRWManager) Sync() (err error) {
 
 // Release deletes the memory mapped region, flushes any remaining changes
 func (mm *MMapRWManager) Release() (err error) {
-	mm.fdm.reduceUsing(mm.path)
+	mm.fdm.ReduceUsing(mm.path)
 	return nil
 }
 
@@ -133,7 +135,7 @@ func (mm *MMapRWManager) Size() int64 {
 
 // Close will remove the cache in the fdm of the specified path, and call the close method of the os of the file
 func (mm *MMapRWManager) Close() (err error) {
-	return mm.fdm.closeByPath(mm.path)
+	return mm.fdm.CloseByPath(mm.path)
 }
 
 func (mm *MMapRWManager) alignedOffset(offset int64) int64 {
@@ -142,7 +144,7 @@ func (mm *MMapRWManager) alignedOffset(offset int64) int64 {
 
 // accessMMap access the MMap data. If for this block the mmap data is not mmapped, will add
 // it into cache.
-func (mm *MMapRWManager) accessMMap(cache *LRUCache, offset int64, prot int) (data *mmapData, err error) {
+func (mm *MMapRWManager) accessMMap(cache *utils.LRUCache, offset int64, prot int) (data *mmapData, err error) {
 	item := cache.Get(offset)
 	if item == nil {
 		newItem, err := newMMapData(mm.fd, offset, prot)

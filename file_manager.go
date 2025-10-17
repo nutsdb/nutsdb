@@ -1,9 +1,11 @@
 package nutsdb
 
+import "github.com/nutsdb/nutsdb/internal/fileio"
+
 // fileManager holds the fd cache and file-related operations go through the manager to obtain the file processing object
 type fileManager struct {
 	rwMode      RWMode
-	fdm         *fdManager
+	fdm         *fileio.FdManager
 	segmentSize int64
 }
 
@@ -11,7 +13,7 @@ type fileManager struct {
 func newFileManager(rwMode RWMode, maxFdNums int, cleanThreshold float64, segmentSize int64) (fm *fileManager) {
 	fm = &fileManager{
 		rwMode:      rwMode,
-		fdm:         newFdm(maxFdNums, cleanThreshold),
+		fdm:         fileio.NewFdm(maxFdNums, cleanThreshold),
 		segmentSize: segmentSize,
 	}
 	return fm
@@ -49,7 +51,7 @@ func (fm *fileManager) getDataFileByID(dir string, fileID int64, capacity int64)
 
 // getFileRWManager will return a FileIORWManager Object
 func (fm *fileManager) getFileRWManager(path string, capacity int64, segmentSize int64) (*FileIORWManager, error) {
-	fd, err := fm.fdm.getFd(path)
+	fd, err := fm.fdm.GetFd(path)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +65,7 @@ func (fm *fileManager) getFileRWManager(path string, capacity int64, segmentSize
 
 // getMMapRWManager will return a MMapRWManager Object
 func (fm *fileManager) getMMapRWManager(path string, capacity int64, segmentSize int64) (*MMapRWManager, error) {
-	fd, err := fm.fdm.getFd(path)
+	fd, err := fm.fdm.GetFd(path)
 	if err != nil {
 		return nil, err
 	}
@@ -78,6 +80,6 @@ func (fm *fileManager) getMMapRWManager(path string, capacity int64, segmentSize
 
 // close will close fdm resource
 func (fm *fileManager) close() error {
-	err := fm.fdm.close()
+	err := fm.fdm.Close()
 	return err
 }

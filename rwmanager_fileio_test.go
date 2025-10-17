@@ -3,6 +3,7 @@ package nutsdb
 import (
 	"testing"
 
+	"github.com/nutsdb/nutsdb/internal/fileio"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -12,11 +13,11 @@ func TestRWManager_FileIO_All(t *testing.T) {
 	filePath := "/tmp/foo_rw_fileio"
 	maxFdNums := 20
 	cleanThreshold := 0.5
-	var fdm *fdManager
+	var fdm *fileio.FdManager
 
 	t.Run("test write read", func(t *testing.T) {
-		fdm = newFdm(maxFdNums, cleanThreshold)
-		fd, err := fdm.getFd(filePath)
+		fdm = fileio.NewFdm(maxFdNums, cleanThreshold)
+		fd, err := fdm.GetFd(filePath)
 		if err != nil {
 			require.NoError(t, err)
 		}

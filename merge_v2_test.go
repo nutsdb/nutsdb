@@ -1968,8 +1968,7 @@ func TestMergeV2RewriteFileSkipsCorruptedEntries(t *testing.T) {
 		createTestEntry(bucketID, []byte("nonpending"), []byte("v4"), DataSetFlag, Committed, Persistent, now, 4, DataStructureBTree),
 	}
 
-	var goodEntry *Entry
-	goodEntry = createTestEntry(bucketID, []byte("good"), []byte("keep"), DataSetFlag, Committed, Persistent, now, 5, DataStructureBTree)
+	goodEntry := createTestEntry(bucketID, []byte("good"), []byte("keep"), DataSetFlag, Committed, Persistent, now, 5, DataStructureBTree)
 
 	for _, e := range append(entries, goodEntry) {
 		if _, err := f.Write(e.Encode()); err != nil {

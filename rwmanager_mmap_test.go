@@ -20,6 +20,7 @@ import (
 	"path"
 	"testing"
 
+	"github.com/nutsdb/nutsdb/internal/fileio"
 	"github.com/stretchr/testify/require"
 
 	"github.com/edsrzf/mmap-go"
@@ -55,16 +56,16 @@ func TestRWManager_MMap_Release(t *testing.T) {
 }
 
 func (rwmanager *MMapRWManager) IsActive() bool {
-	return rwmanager.fdm.cache[rwmanager.path].using != 0
+	return rwmanager.fdm.Cache[rwmanager.path].Using() != 0
 }
 
 func TestRWManager_MMap_WriteAt(t *testing.T) {
 	filePath := "/tmp/foo_rw_filemmap"
 	maxFdNums := 1024
 	cleanThreshold := 0.5
-	var fdm = newFdm(maxFdNums, cleanThreshold)
+	var fdm = fileio.NewFdm(maxFdNums, cleanThreshold)
 
-	fd, err := fdm.getFd(filePath)
+	fd, err := fdm.GetFd(filePath)
 	if err != nil {
 		require.NoError(t, err)
 	}
@@ -95,9 +96,9 @@ func TestRWManager_MMap_WriteAt_NotEnoughData(t *testing.T) {
 	filePath := path.Join(t.TempDir(), "rw_mmap")
 	maxFdNums := 1024
 	cleanThreshold := 0.5
-	var fdm = newFdm(maxFdNums, cleanThreshold)
+	var fdm = fileio.NewFdm(maxFdNums, cleanThreshold)
 
-	fd, err := fdm.getFd(filePath)
+	fd, err := fdm.GetFd(filePath)
 	require.NoError(t, err)
 
 	defer os.Remove(fd.Name())
@@ -127,9 +128,9 @@ func TestRWManager_MMap_ReadAt_CrossBlock(t *testing.T) {
 	filePath := path.Join(t.TempDir(), "rw_mmap")
 	maxFdNums := 1024
 	cleanThreshold := 0.5
-	var fdm = newFdm(maxFdNums, cleanThreshold)
+	var fdm = fileio.NewFdm(maxFdNums, cleanThreshold)
 
-	fd, err := fdm.getFd(filePath)
+	fd, err := fdm.GetFd(filePath)
 	require.NoError(t, err)
 
 	defer os.Remove(fd.Name())
@@ -157,9 +158,9 @@ func TestRWManager_MMap_ReadAt_NotEnoughBytes(t *testing.T) {
 	filePath := path.Join(t.TempDir(), "rw_mmap")
 	maxFdNums := 1024
 	cleanThreshold := 0.5
-	var fdm = newFdm(maxFdNums, cleanThreshold)
+	var fdm = fileio.NewFdm(maxFdNums, cleanThreshold)
 
-	fd, err := fdm.getFd(filePath)
+	fd, err := fdm.GetFd(filePath)
 	require.NoError(t, err)
 
 	defer os.Remove(fd.Name())
@@ -187,9 +188,9 @@ func TestRWManager_MMap_ReadAt_ErrIndexOutOfBound(t *testing.T) {
 	filePath := path.Join(t.TempDir(), "rw_mmap")
 	maxFdNums := 1024
 	cleanThreshold := 0.5
-	var fdm = newFdm(maxFdNums, cleanThreshold)
+	var fdm = fileio.NewFdm(maxFdNums, cleanThreshold)
 
-	fd, err := fdm.getFd(filePath)
+	fd, err := fdm.GetFd(filePath)
 	require.NoError(t, err)
 
 	defer os.Remove(fd.Name())
@@ -209,9 +210,9 @@ func TestRWManager_MMap_Sync(t *testing.T) {
 	filePath := path.Join(t.TempDir(), t.Name())
 	maxFdNums := 1024
 	cleanThreshold := 0.5
-	var fdm = newFdm(maxFdNums, cleanThreshold)
+	var fdm = fileio.NewFdm(maxFdNums, cleanThreshold)
 
-	fd, err := fdm.getFd(filePath)
+	fd, err := fdm.GetFd(filePath)
 	if err != nil {
 		require.NoError(t, err)
 	}
@@ -240,9 +241,9 @@ func TestRWManager_MMap_Close(t *testing.T) {
 	filePath := path.Join(t.TempDir(), t.Name())
 	maxFdNums := 1024
 	cleanThreshold := 0.5
-	var fdm = newFdm(maxFdNums, cleanThreshold)
+	var fdm = fileio.NewFdm(maxFdNums, cleanThreshold)
 
-	fd, err := fdm.getFd(filePath)
+	fd, err := fdm.GetFd(filePath)
 	if err != nil {
 		require.NoError(t, err)
 	}

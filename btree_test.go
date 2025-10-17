@@ -16,9 +16,11 @@ package nutsdb
 
 import (
 	"fmt"
+	"testing"
+
+	"github.com/nutsdb/nutsdb/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 var (
@@ -87,7 +89,7 @@ func TestBTree_PrefixSearchScan(t *testing.T) {
 		runBTreeTest(t, func(t *testing.T, btree *BTree) {
 
 			key := []byte("nutsdb-123456789@outlook.com")
-			val := GetRandomBytes(24)
+			val := testutils.GetRandomBytes(24)
 
 			_ = btree.Insert(NewRecord().WithKey(key).WithValue(val))
 
@@ -105,7 +107,7 @@ func TestBTree_PrefixSearchScan(t *testing.T) {
 		runBTreeTest(t, func(t *testing.T, btree *BTree) {
 
 			key := []byte("nutsdb-123456789@outlook")
-			val := GetRandomBytes(24)
+			val := testutils.GetRandomBytes(24)
 
 			_ = btree.Insert(NewRecord().WithKey(key).WithValue(val))
 

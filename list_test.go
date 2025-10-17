@@ -19,6 +19,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nutsdb/nutsdb/internal/testutils"
 	"github.com/stretchr/testify/require"
 )
 
@@ -69,7 +70,7 @@ func ListCmp(t *testing.T, list *List, key string, expectRecords []*Record, isRe
 func TestList_LPush(t *testing.T) {
 	list := NewList()
 	// 测试 LPush
-	key := string(GetTestBytes(0))
+	key := string(testutils.GetTestBytes(0))
 	expectRecords := generateRecords(5)
 	seqInfo := HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
 
@@ -86,7 +87,7 @@ func TestList_LPush(t *testing.T) {
 func TestList_RPush(t *testing.T) {
 	list := NewList()
 	expectRecords := generateRecords(5)
-	key := string(GetTestBytes(0))
+	key := string(testutils.GetTestBytes(0))
 	seqInfo := HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
 
 	for i := 0; i < len(expectRecords); i++ {
@@ -102,7 +103,7 @@ func TestList_RPush(t *testing.T) {
 func TestList_Pop(t *testing.T) {
 	list := NewList()
 	expectRecords := generateRecords(5)
-	key := string(GetTestBytes(0))
+	key := string(testutils.GetTestBytes(0))
 
 	ListPop(t, list, key, true, nil, ErrListNotFound)
 	seqInfo := HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
@@ -126,7 +127,7 @@ func TestList_Pop(t *testing.T) {
 func TestList_LRem(t *testing.T) {
 	list := NewList()
 	records := generateRecords(2)
-	key := string(GetTestBytes(0))
+	key := string(testutils.GetTestBytes(0))
 	seqInfo := HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
 
 	for i := 0; i < 3; i++ {
@@ -184,7 +185,7 @@ func TestList_LRem(t *testing.T) {
 func TestList_LTrim(t *testing.T) {
 	list := NewList()
 	expectRecords := generateRecords(5)
-	key := string(GetTestBytes(0))
+	key := string(testutils.GetTestBytes(0))
 	seqInfo := HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
 
 	for i := 0; i < len(expectRecords); i++ {
@@ -203,7 +204,7 @@ func TestList_LTrim(t *testing.T) {
 func TestList_LRemByIndex(t *testing.T) {
 	list := NewList()
 	expectRecords := generateRecords(8)
-	key := string(GetTestBytes(0))
+	key := string(testutils.GetTestBytes(0))
 	seqInfo := HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
 
 	// r1 r2 r3 r4 r5 r6 r7 r8
@@ -237,8 +238,8 @@ func generateRecords(count int) []*Record {
 	rand.Seed(time.Now().UnixNano())
 	records := make([]*Record, count)
 	for i := 0; i < count; i++ {
-		key := GetTestBytes(i)
-		val := GetRandomBytes(24)
+		key := testutils.GetTestBytes(i)
+		val := testutils.GetRandomBytes(24)
 
 		record := &Record{
 			Key:       key,

@@ -16,13 +16,15 @@ package nutsdb
 
 import (
 	"os"
+
+	"github.com/nutsdb/nutsdb/internal/fileio"
 )
 
 // FileIORWManager represents the RWManager which using standard I/O.
 type FileIORWManager struct {
 	fd          *os.File
 	path        string
-	fdm         *fdManager
+	fdm         *fileio.FdManager
 	segmentSize int64
 }
 
@@ -48,7 +50,7 @@ func (fm *FileIORWManager) Sync() (err error) {
 
 // Release is a wrapper around the reduceUsing method
 func (fm *FileIORWManager) Release() (err error) {
-	fm.fdm.reduceUsing(fm.path)
+	fm.fdm.ReduceUsing(fm.path)
 	return nil
 }
 
@@ -58,5 +60,5 @@ func (fm *FileIORWManager) Size() int64 {
 
 // Close will remove the cache in the fdm of the specified path, and call the close method of the os of the file
 func (fm *FileIORWManager) Close() (err error) {
-	return fm.fdm.closeByPath(fm.path)
+	return fm.fdm.CloseByPath(fm.path)
 }
