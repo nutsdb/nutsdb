@@ -491,10 +491,8 @@ func (tx *Tx) update(bucket string, key []byte, getNewValue func([]byte) ([]byte
 			return ErrKeyNotFound
 		}
 
-		if pendingEntry == nil && record != nil {
-			// I think in project we can ignore a pendingEntry is
-			// expired. so in this situation I only handle record
-			// TTL.
+		if record != nil {
+			// If record is timeout, this entry should not be update to table.
 			if err := tx.revertExpiredTTLRecord(bucketId, record); err != nil {
 				return err
 			}
@@ -524,7 +522,7 @@ func (tx *Tx) updateOrPut(bucket string, key, value []byte, getUpdatedValue func
 			return tx.put(bucket, key, value, Persistent, DataSetFlag, uint64(time.Now().Unix()), DataStructureBTree)
 		}
 
-		if pendingEntry == nil && record != nil {
+		if record != nil {
 			if err := tx.revertExpiredTTLRecord(bucketId, record); err != nil {
 				return err
 			}
