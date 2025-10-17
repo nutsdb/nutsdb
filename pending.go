@@ -64,9 +64,9 @@ func (pending *pendingEntryList) submitEntry(ds Ds, bucket string, e *Entry) {
 			pending.entriesInBTree[bucket] = map[string]*Entry{}
 		}
 		if _, exist := pending.entriesInBTree[bucket][string(e.Key)]; !exist {
-			pending.entriesInBTree[bucket][string(e.Key)] = e
 			pending.size++
 		}
+		pending.entriesInBTree[bucket][string(e.Key)] = e
 	default:
 		if _, exist := pending.entries[ds]; !exist {
 			pending.entries[ds] = map[BucketName][]*Entry{}

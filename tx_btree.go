@@ -461,7 +461,7 @@ func (tx *Tx) getHintIdxDataItemsWrapper(records []*Record, limitNum int, bucket
 	return keys, values, nil
 }
 
-func (tx *Tx) tryGet(bucket string, key []byte, solveRecord func(record *Record, found bool, bucketId BucketId) error) error {
+func (tx *Tx) tryGet(bucket string, key []byte, solveRecord func(record *Record, entry *Entry, found bool, bucketId BucketId) error) error {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return err
 	}
@@ -470,51 +470,64 @@ func (tx *Tx) tryGet(bucket string, key []byte, solveRecord func(record *Record,
 		return ErrNotFoundBucket
 	}
 	bucketId := b.Id
-
+	var (
+		record *Record = nil
+		found  bool
+	)
+	entry, err := tx.pendingWrites.Get(DataStructureBTree, bucket, key)
+	found = err == nil
 	if idx, ok := tx.db.Index.bTree.exist(bucketId); ok {
-		record, found := idx.Find(key)
-		return solveRecord(record, found, bucketId)
-	} else {
-		return solveRecord(nil, false, bucketId)
+		record, ok = idx.Find(key)
+		if ok {
+			found = true
+		}
 	}
+	return solveRecord(record, entry, found, bucketId)
 }
 
 func (tx *Tx) update(bucket string, key []byte, getNewValue func([]byte) ([]byte, error), getNewTTL func(uint32) (uint32, error)) error {
-	return tx.tryGet(bucket, key, func(record *Record, found bool, bucketId BucketId) error {
+	return tx.tryGet(bucket, key, func(record *Record, pendingEntry *Entry, found bool, bucketId BucketId) error {
 		if !found {
 			return ErrKeyNotFound
 		}
 
-		if record.IsExpired() {
-			tx.putDeleteLog(bucketId, key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureBTree)
-			return ErrNotFoundKey
+		if record != nil {
+			// If record is timeout, this entry should not be update to table.
+			if err := tx.revertExpiredTTLRecord(bucketId, record); err != nil {
+				return err
+			}
 		}
 
-		value, err := tx.db.getValueByRecord(record)
+		value, ttl, err := tx.loadValue(record, pendingEntry)
 		if err != nil {
 			return err
 		}
+
 		newValue, err := getNewValue(value)
 		if err != nil {
 			return err
 		}
 
-		newTTL, err := getNewTTL(record.TTL)
+		newTTL, err := getNewTTL(ttl)
 		if err != nil {
 			return err
 		}
-
-		return tx.put(bucket, key, newValue, newTTL, DataSetFlag, uint64(time.Now().Unix()), DataStructureBTree)
+		return tx.put(bucket, key, newValue, newTTL, DataSetFlag, uint64(time.Now().UnixMilli()), DataStructureBTree)
 	})
 }
 
 func (tx *Tx) updateOrPut(bucket string, key, value []byte, getUpdatedValue func([]byte) ([]byte, error)) error {
-	return tx.tryGet(bucket, key, func(record *Record, found bool, bucketId BucketId) error {
+	return tx.tryGet(bucket, key, func(record *Record, pendingEntry *Entry, found bool, bucketId BucketId) error {
 		if !found {
 			return tx.put(bucket, key, value, Persistent, DataSetFlag, uint64(time.Now().Unix()), DataStructureBTree)
 		}
 
-		value, err := tx.db.getValueByRecord(record)
+		if record != nil {
+			if err := tx.revertExpiredTTLRecord(bucketId, record); err != nil {
+				return err
+			}
+		}
+		value, ttl, err := tx.loadValue(record, pendingEntry)
 		if err != nil {
 			return err
 		}
@@ -523,7 +536,7 @@ func (tx *Tx) updateOrPut(bucket string, key, value []byte, getUpdatedValue func
 			return err
 		}
 
-		return tx.put(bucket, key, newValue, record.TTL, DataSetFlag, uint64(time.Now().Unix()), DataStructureBTree)
+		return tx.put(bucket, key, newValue, ttl, DataSetFlag, uint64(time.Now().Unix()), DataStructureBTree)
 	})
 }
 
@@ -630,13 +643,16 @@ func (tx *Tx) GetTTL(bucket string, key []byte) (int64, error) {
 
 	idx, bucketExists := tx.db.Index.bTree.exist(bucketId)
 
-	if !bucketExists {
-		// get from pendingWrites
-		return tx.pendingWrites.GetTTL(DataStructureBTree, bucket, key)
+	var (
+		record      *Record = nil
+		recordFound bool    = false
+	)
+	if pendingTTL, err := tx.pendingWrites.GetTTL(DataStructureBTree, bucket, key); err == nil {
+		return pendingTTL, nil
 	}
-
-	record, recordFound := idx.Find(key)
-
+	if bucketExists {
+		record, recordFound = idx.Find(key)
+	}
 	if !recordFound || record.IsExpired() {
 		return 0, ErrKeyNotFound
 	}
@@ -653,7 +669,7 @@ func (tx *Tx) GetTTL(bucket string, key []byte) (int64, error) {
 	}
 }
 
-// Persist updates record's TTL as Persistent if the record exits.
+// Persist updates record's TTL as Persistent if the record exists.
 func (tx *Tx) Persist(bucket string, key []byte) error {
 	return tx.update(bucket, key, func(oldValue []byte) ([]byte, error) {
 		return oldValue, nil
@@ -726,4 +742,33 @@ func (tx *Tx) GetRange(bucket string, key []byte, start, end int) ([]byte, error
 	}
 
 	return value[start : end+1], nil
+}
+
+// loadValue in order to load value during pending and
+// stored items, we need this function to load value and
+// TTL.
+func (tx *Tx) loadValue(
+	rec *Record,
+	pendingEntry *Entry,
+) (value []byte, ttl uint32, err error) {
+
+	if rec == nil && pendingEntry == nil {
+		return nil, 0, ErrNotFoundKey
+	}
+	if pendingEntry != nil {
+		return pendingEntry.Value, pendingEntry.Meta.TTL, nil
+	}
+	return rec.Value, rec.TTL, nil
+}
+
+// revertExpiredTTLRecord revert record if it is expired.
+func (tx *Tx) revertExpiredTTLRecord(
+	bucketId BucketId,
+	rec *Record,
+) (err error) {
+	if rec.IsExpired() {
+		tx.putDeleteLog(bucketId, rec.Key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureBTree)
+		return ErrNotFoundKey
+	}
+	return nil
 }

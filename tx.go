@@ -634,7 +634,6 @@ func (tx *Tx) put(bucket string, key, value []byte, ttl uint32, flag uint16, tim
 	}
 	tx.submitEntry(ds, bucket, e)
 	tx.size += e.Size()
-
 	return nil
 }
 
