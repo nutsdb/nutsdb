@@ -47,7 +47,9 @@ func benchmarkListPush(b *testing.B, impl ListImplementationType, isLeft bool) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		list.push(string(testData[i].newKey), testData[i].record, isLeft)
+		if err := list.push(string(testData[i].newKey), testData[i].record, isLeft); err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
@@ -91,15 +93,21 @@ func benchmarkListPop(b *testing.B, impl ListImplementationType, isLeft bool) {
 
 	// Pre-populate with pre-generated data
 	for i := 0; i < b.N; i++ {
-		list.push(string(testData[i].newKey), testData[i].record, false)
+		if err := list.push(string(testData[i].newKey), testData[i].record, false); err != nil {
+			b.Fatal(err)
+		}
 	}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		if isLeft {
-			list.LPop(keyStr)
+			if _, err := list.LPop(keyStr); err != nil {
+				b.Fatal(err)
+			}
 		} else {
-			list.RPop(keyStr)
+			if _, err := list.RPop(keyStr); err != nil {
+				b.Fatal(err)
+			}
 		}
 	}
 }
@@ -144,12 +152,16 @@ func benchmarkListRange(b *testing.B, impl ListImplementationType, size int) {
 
 	// Pre-populate with pre-generated data
 	for i := 0; i < size; i++ {
-		list.push(string(testData[i].newKey), testData[i].record, false)
+		if err := list.push(string(testData[i].newKey), testData[i].record, false); err != nil {
+			b.Fatal(err)
+		}
 	}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		list.LRange(keyStr, 0, size-1)
+		if _, err := list.LRange(keyStr, 0, size-1); err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
@@ -193,15 +205,21 @@ func benchmarkListPeek(b *testing.B, impl ListImplementationType, isLeft bool) {
 
 	// Pre-populate with pre-generated data
 	for i := 0; i < b.N; i++ {
-		list.push(string(testData[i].newKey), testData[i].record, false)
+		if err := list.push(string(testData[i].newKey), testData[i].record, false); err != nil {
+			b.Fatal(err)
+		}
 	}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		if isLeft {
-			list.LPeek(keyStr)
+			if _, err := list.LPeek(keyStr); err != nil {
+				b.Fatal(err)
+			}
 		} else {
-			list.RPeek(keyStr)
+			if _, err := list.RPeek(keyStr); err != nil {
+				b.Fatal(err)
+			}
 		}
 	}
 }
@@ -246,7 +264,9 @@ func benchmarkListTrim(b *testing.B, impl ListImplementationType, size int, keep
 
 	// Pre-populate with pre-generated data
 	for i := 0; i < size; i++ {
-		list.push(string(testData[i].newKey), testData[i].record, false)
+		if err := list.push(string(testData[i].newKey), testData[i].record, false); err != nil {
+			b.Fatal(err)
+		}
 	}
 
 	b.ResetTimer()
@@ -259,11 +279,15 @@ func benchmarkListTrim(b *testing.B, impl ListImplementationType, size int, keep
 
 		// Populate fresh list
 		for j := 0; j < size; j++ {
-			freshList.push(string(testData[j].newKey), testData[j].record, false)
+			if err := freshList.push(string(testData[j].newKey), testData[j].record, false); err != nil {
+				b.Fatal(err)
+			}
 		}
 
 		// Perform trim operation
-		freshList.LTrim(keyStr, keepStart, keepEnd)
+		if err := freshList.LTrim(keyStr, keepStart, keepEnd); err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
@@ -307,7 +331,9 @@ func benchmarkListRem(b *testing.B, impl ListImplementationType, size int, count
 
 	// Pre-populate with pre-generated data
 	for i := 0; i < size; i++ {
-		list.push(string(testData[i].newKey), testData[i].record, false)
+		if err := list.push(string(testData[i].newKey), testData[i].record, false); err != nil {
+			b.Fatal(err)
+		}
 	}
 
 	// Create a comparison function that matches every nth element
@@ -327,11 +353,15 @@ func benchmarkListRem(b *testing.B, impl ListImplementationType, size int, count
 
 		// Populate fresh list
 		for j := 0; j < size; j++ {
-			freshList.push(string(testData[j].newKey), testData[j].record, false)
+			if err := freshList.push(string(testData[j].newKey), testData[j].record, false); err != nil {
+				b.Fatal(err)
+			}
 		}
 
 		// Perform remove operation
-		freshList.LRem(keyStr, count, cmpFunc)
+		if err := freshList.LRem(keyStr, count, cmpFunc); err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
@@ -375,7 +405,9 @@ func benchmarkListRemByIndex(b *testing.B, impl ListImplementationType, size int
 
 	// Pre-populate with pre-generated data
 	for i := 0; i < size; i++ {
-		list.push(string(testData[i].newKey), testData[i].record, false)
+		if err := list.push(string(testData[i].newKey), testData[i].record, false); err != nil {
+			b.Fatal(err)
+		}
 	}
 
 	// Generate indexes to remove (spread across the list)
@@ -395,11 +427,15 @@ func benchmarkListRemByIndex(b *testing.B, impl ListImplementationType, size int
 
 		// Populate fresh list
 		for j := 0; j < size; j++ {
-			freshList.push(string(testData[j].newKey), testData[j].record, false)
+			if err := freshList.push(string(testData[j].newKey), testData[j].record, false); err != nil {
+				b.Fatal(err)
+			}
 		}
 
 		// Perform remove by index operation
-		freshList.LRemByIndex(keyStr, indexes)
+		if err := freshList.LRemByIndex(keyStr, indexes); err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
@@ -443,12 +479,16 @@ func benchmarkListSize(b *testing.B, impl ListImplementationType, size int) {
 
 	// Pre-populate with pre-generated data
 	for i := 0; i < size; i++ {
-		list.push(string(testData[i].newKey), testData[i].record, false)
+		if err := list.push(string(testData[i].newKey), testData[i].record, false); err != nil {
+			b.Fatal(err)
+		}
 	}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		list.Size(keyStr)
+		if _, err := list.Size(keyStr); err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
