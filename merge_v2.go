@@ -8,6 +8,9 @@ import (
 	"io"
 	"os"
 	"sort"
+
+	"github.com/nutsdb/nutsdb/internal/data"
+	"github.com/nutsdb/nutsdb/internal/utils"
 )
 
 // mergeV2Job manages the entire merge operation lifecycle.
@@ -412,7 +415,7 @@ func (job *mergeV2Job) rewriteFile(fid int64) error {
 			continue
 		}
 		// Skip expired entries
-		if IsExpired(entry.Meta.TTL, entry.Meta.Timestamp) {
+		if utils.IsExpired(entry.Meta.TTL, entry.Meta.Timestamp) {
 			continue
 		}
 
@@ -605,7 +608,7 @@ func (out *mergeOutput) finalize() error {
 
 // updateRecordWithHintIfNewer updates a record with hint data only if the hint is newer or same timestamp.
 // This prevents overwriting newer entries that were written after merge started.
-func updateRecordWithHintIfNewer(record *Record, hint *HintEntry) bool {
+func updateRecordWithHintIfNewer(record *data.Record, hint *HintEntry) bool {
 	// Only update if our hint is newer or same timestamp (don't overwrite newer data)
 	if record.Timestamp <= hint.Timestamp {
 		record.FileID = hint.FileID

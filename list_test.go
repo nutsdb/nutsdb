@@ -19,11 +19,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nutsdb/nutsdb/internal/data"
 	"github.com/nutsdb/nutsdb/internal/testutils"
 	"github.com/stretchr/testify/require"
 )
 
-func ListPush(t *testing.T, list *List, key string, r *Record, isLeft bool, expectError error) {
+func ListPush(t *testing.T, list *List, key string, r *data.Record, isLeft bool, expectError error) {
 	var e error
 	if isLeft {
 		e = list.LPush(key, r)
@@ -33,10 +34,10 @@ func ListPush(t *testing.T, list *List, key string, r *Record, isLeft bool, expe
 	assertErr(t, e, expectError)
 }
 
-func ListPop(t *testing.T, list *List, key string, isLeft bool, expectVal *Record, expectError error) {
+func ListPop(t *testing.T, list *List, key string, isLeft bool, expectVal *data.Record, expectError error) {
 	var (
 		e error
-		r *Record
+		r *data.Record
 	)
 
 	if isLeft {
@@ -52,7 +53,7 @@ func ListPop(t *testing.T, list *List, key string, isLeft bool, expectVal *Recor
 	}
 }
 
-func ListCmp(t *testing.T, list *List, key string, expectRecords []*Record, isReverse bool) {
+func ListCmp(t *testing.T, list *List, key string, expectRecords []*data.Record, isReverse bool) {
 	records, err := list.LRange(key, 0, -1)
 	require.NoError(t, err)
 
@@ -153,9 +154,9 @@ func TestList_LRem(t *testing.T) {
 	ListPush(t, list, string(newKey), records[1], false, nil)
 
 	// r1 r1 r1 r2 r1 r2
-	expectRecords := []*Record{records[0], records[0], records[0], records[1], records[0], records[1]}
+	expectRecords := []*data.Record{records[0], records[0], records[0], records[1], records[0], records[1]}
 
-	cmp := func(r *Record) (bool, error) {
+	cmp := func(r *data.Record) (bool, error) {
 		return bytes.Equal(r.Value, records[0].Value), nil
 	}
 
@@ -171,7 +172,7 @@ func TestList_LRem(t *testing.T) {
 	expectRecords = expectRecords[2:]
 	ListCmp(t, list, key, expectRecords, false)
 
-	cmp = func(r *Record) (bool, error) {
+	cmp = func(r *data.Record) (bool, error) {
 		return bytes.Equal(r.Value, records[1].Value), nil
 	}
 
@@ -234,14 +235,14 @@ func TestList_LRemByIndex(t *testing.T) {
 	ListCmp(t, list, key, expectRecords, false)
 }
 
-func generateRecords(count int) []*Record {
+func generateRecords(count int) []*data.Record {
 	rand.Seed(time.Now().UnixNano())
-	records := make([]*Record, count)
+	records := make([]*data.Record, count)
 	for i := 0; i < count; i++ {
 		key := testutils.GetTestBytes(i)
 		val := testutils.GetRandomBytes(24)
 
-		record := &Record{
+		record := &data.Record{
 			Key:       key,
 			Value:     val,
 			FileID:    int64(i),

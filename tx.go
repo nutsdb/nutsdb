@@ -22,6 +22,7 @@ import (
 	"sync/atomic"
 
 	"github.com/bwmarrin/snowflake"
+	"github.com/nutsdb/nutsdb/internal/data"
 	"github.com/xujiajun/utils/strconv2"
 )
 
@@ -225,7 +226,7 @@ func (tx *Tx) Commit() (err error) {
 	buff := tx.allocCommitBuffer()
 	defer tx.db.commitBuffer.Reset()
 
-	var records []*Record
+	var records []*data.Record
 
 	pendingWriteList := tx.pendingWrites.toList()
 	lastIndex := len(pendingWriteList) - 1
@@ -348,7 +349,7 @@ func (tx *Tx) getListEntryNewAddRecordCount(bucketId BucketId, entry *Entry) (in
 		res -= int64(len(l.getValidIndexes(key, indexes)))
 	case DataLRemFlag:
 		count, newValue := splitIntStringStr(value, SeparatorForListKey)
-		removeIndices, err := l.getRemoveIndexes(key, count, func(r *Record) (bool, error) {
+		removeIndices, err := l.getRemoveIndexes(key, count, func(r *data.Record) (bool, error) {
 			v, err := tx.db.getValueByRecord(r)
 			if err != nil {
 				return false, err
@@ -686,7 +687,7 @@ func (tx *Tx) isClosed() bool {
 	return status == txStatusClosed
 }
 
-func (tx *Tx) buildIdxes(records []*Record, entries []*Entry) error {
+func (tx *Tx) buildIdxes(records []*data.Record, entries []*Entry) error {
 	for i, entry := range entries {
 		meta := entry.Meta
 		var err error

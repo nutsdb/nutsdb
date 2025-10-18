@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"regexp"
 
+	"github.com/nutsdb/nutsdb/internal/data"
 	"github.com/tidwall/btree"
 )
 
@@ -26,7 +27,7 @@ var ErrKeyNotFound = ErrNotFoundKey
 
 type Item struct {
 	key    []byte
-	record *Record
+	record *data.Record
 }
 
 type BTree struct {
@@ -41,7 +42,7 @@ func NewBTree() *BTree {
 	}
 }
 
-func (bt *BTree) Find(key []byte) (*Record, bool) {
+func (bt *BTree) Find(key []byte) (*data.Record, bool) {
 	item, ok := bt.btree.Get(&Item{key: key})
 	if ok {
 		return item.record, ok
@@ -49,12 +50,12 @@ func (bt *BTree) Find(key []byte) (*Record, bool) {
 	return nil, ok
 }
 
-func (bt *BTree) Insert(record *Record) bool {
+func (bt *BTree) Insert(record *data.Record) bool {
 	_, replaced := bt.btree.Set(&Item{key: record.Key, record: record})
 	return replaced
 }
 
-func (bt *BTree) InsertRecord(key []byte, record *Record) bool {
+func (bt *BTree) InsertRecord(key []byte, record *data.Record) bool {
 	_, replaced := bt.btree.Set(&Item{key: key, record: record})
 	return replaced
 }
@@ -64,10 +65,10 @@ func (bt *BTree) Delete(key []byte) bool {
 	return deleted
 }
 
-func (bt *BTree) All() []*Record {
+func (bt *BTree) All() []*data.Record {
 	items := bt.btree.Items()
 
-	records := make([]*Record, len(items))
+	records := make([]*data.Record, len(items))
 	for i, item := range items {
 		records[i] = item.record
 	}
@@ -80,8 +81,8 @@ func (bt *BTree) AllItems() []*Item {
 	return items
 }
 
-func (bt *BTree) Range(start, end []byte) []*Record {
-	records := make([]*Record, 0)
+func (bt *BTree) Range(start, end []byte) []*data.Record {
+	records := make([]*data.Record, 0)
 
 	bt.btree.Ascend(&Item{key: start}, func(item *Item) bool {
 		if bytes.Compare(item.key, end) > 0 {
@@ -94,8 +95,8 @@ func (bt *BTree) Range(start, end []byte) []*Record {
 	return records
 }
 
-func (bt *BTree) PrefixScan(prefix []byte, offset, limitNum int) []*Record {
-	records := make([]*Record, 0)
+func (bt *BTree) PrefixScan(prefix []byte, offset, limitNum int) []*data.Record {
+	records := make([]*data.Record, 0)
 
 	bt.btree.Ascend(&Item{key: prefix}, func(item *Item) bool {
 		if !bytes.HasPrefix(item.key, prefix) {
@@ -116,8 +117,8 @@ func (bt *BTree) PrefixScan(prefix []byte, offset, limitNum int) []*Record {
 	return records
 }
 
-func (bt *BTree) PrefixSearchScan(prefix []byte, reg string, offset, limitNum int) []*Record {
-	records := make([]*Record, 0)
+func (bt *BTree) PrefixSearchScan(prefix []byte, reg string, offset, limitNum int) []*data.Record {
+	records := make([]*data.Record, 0)
 
 	rgx := regexp.MustCompile(reg)
 

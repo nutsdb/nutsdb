@@ -22,6 +22,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/nutsdb/nutsdb/internal/data"
 	"github.com/xujiajun/utils/strconv2"
 )
 
@@ -374,7 +375,7 @@ func (tx *Tx) PrefixScanEntries(bucket string, prefix []byte, reg string, offset
 	}
 
 	if idx, ok := tx.db.Index.bTree.exist(bucketId); ok {
-		var records []*Record
+		var records []*data.Record
 		if reg == "" {
 			records = idx.PrefixScan(prefix, offsetNum, limitNum)
 		} else {
@@ -436,7 +437,7 @@ func (tx *Tx) Delete(bucket string, key []byte) error {
 }
 
 // getHintIdxDataItemsWrapper returns keys and values when prefix scanning or range scanning.
-func (tx *Tx) getHintIdxDataItemsWrapper(records []*Record, limitNum int, bucketId BucketId, needKeys bool, needValues bool) (keys [][]byte, values [][]byte, err error) {
+func (tx *Tx) getHintIdxDataItemsWrapper(records []*data.Record, limitNum int, bucketId BucketId, needKeys bool, needValues bool) (keys [][]byte, values [][]byte, err error) {
 	for _, record := range records {
 		if record.IsExpired() {
 			tx.putDeleteLog(bucketId, record.Key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureBTree)
@@ -461,7 +462,7 @@ func (tx *Tx) getHintIdxDataItemsWrapper(records []*Record, limitNum int, bucket
 	return keys, values, nil
 }
 
-func (tx *Tx) tryGet(bucket string, key []byte, solveRecord func(record *Record, entry *Entry, found bool, bucketId BucketId) error) error {
+func (tx *Tx) tryGet(bucket string, key []byte, solveRecord func(record *data.Record, entry *Entry, found bool, bucketId BucketId) error) error {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return err
 	}
@@ -471,7 +472,7 @@ func (tx *Tx) tryGet(bucket string, key []byte, solveRecord func(record *Record,
 	}
 	bucketId := b.Id
 	var (
-		record *Record = nil
+		record *data.Record = nil
 		found  bool
 	)
 	entry, err := tx.pendingWrites.Get(DataStructureBTree, bucket, key)
@@ -486,7 +487,7 @@ func (tx *Tx) tryGet(bucket string, key []byte, solveRecord func(record *Record,
 }
 
 func (tx *Tx) update(bucket string, key []byte, getNewValue func([]byte) ([]byte, error), getNewTTL func(uint32) (uint32, error)) error {
-	return tx.tryGet(bucket, key, func(record *Record, pendingEntry *Entry, found bool, bucketId BucketId) error {
+	return tx.tryGet(bucket, key, func(record *data.Record, pendingEntry *Entry, found bool, bucketId BucketId) error {
 		if !found {
 			return ErrKeyNotFound
 		}
@@ -517,7 +518,7 @@ func (tx *Tx) update(bucket string, key []byte, getNewValue func([]byte) ([]byte
 }
 
 func (tx *Tx) updateOrPut(bucket string, key, value []byte, getUpdatedValue func([]byte) ([]byte, error)) error {
-	return tx.tryGet(bucket, key, func(record *Record, pendingEntry *Entry, found bool, bucketId BucketId) error {
+	return tx.tryGet(bucket, key, func(record *data.Record, pendingEntry *Entry, found bool, bucketId BucketId) error {
 		if !found {
 			return tx.put(bucket, key, value, Persistent, DataSetFlag, uint64(time.Now().Unix()), DataStructureBTree)
 		}
@@ -644,8 +645,8 @@ func (tx *Tx) GetTTL(bucket string, key []byte) (int64, error) {
 	idx, bucketExists := tx.db.Index.bTree.exist(bucketId)
 
 	var (
-		record      *Record = nil
-		recordFound bool    = false
+		record      *data.Record = nil
+		recordFound bool         = false
 	)
 	if pendingTTL, err := tx.pendingWrites.GetTTL(DataStructureBTree, bucket, key); err == nil {
 		return pendingTTL, nil
@@ -748,7 +749,7 @@ func (tx *Tx) GetRange(bucket string, key []byte, start, end int) ([]byte, error
 // stored items, we need this function to load value and
 // TTL.
 func (tx *Tx) loadValue(
-	rec *Record,
+	rec *data.Record,
 	pendingEntry *Entry,
 ) (value []byte, ttl uint32, err error) {
 
@@ -764,7 +765,7 @@ func (tx *Tx) loadValue(
 // revertExpiredTTLRecord revert record if it is expired.
 func (tx *Tx) revertExpiredTTLRecord(
 	bucketId BucketId,
-	rec *Record,
+	rec *data.Record,
 ) (err error) {
 	if rec.IsExpired() {
 		tx.putDeleteLog(bucketId, rec.Key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureBTree)

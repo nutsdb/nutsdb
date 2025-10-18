@@ -71,7 +71,7 @@ func TestRWManager_MMap_WriteAt(t *testing.T) {
 	}
 	defer os.Remove(fd.Name())
 
-	err = Truncate(filePath, 8*MB, fd)
+	err = fileio.Truncate(filePath, 8*MB, fd)
 	if err != nil {
 		require.NoError(t, err)
 
@@ -103,7 +103,7 @@ func TestRWManager_MMap_WriteAt_NotEnoughData(t *testing.T) {
 
 	defer os.Remove(fd.Name())
 
-	err = Truncate(filePath, 8*MB, fd)
+	err = fileio.Truncate(filePath, 8*MB, fd)
 	require.NoError(t, err)
 
 	m, err := mmap.Map(fd, mmap.RDWR, 0)
@@ -135,7 +135,7 @@ func TestRWManager_MMap_ReadAt_CrossBlock(t *testing.T) {
 
 	defer os.Remove(fd.Name())
 
-	err = Truncate(filePath, 8*MB, fd)
+	err = fileio.Truncate(filePath, 8*MB, fd)
 	require.NoError(t, err)
 
 	m, err := mmap.Map(fd, mmap.RDWR, 0)
@@ -165,7 +165,7 @@ func TestRWManager_MMap_ReadAt_NotEnoughBytes(t *testing.T) {
 
 	defer os.Remove(fd.Name())
 
-	err = Truncate(filePath, 8*MB, fd)
+	err = fileio.Truncate(filePath, 8*MB, fd)
 	require.NoError(t, err)
 
 	m, err := mmap.Map(fd, mmap.RDWR, 0)
@@ -195,7 +195,7 @@ func TestRWManager_MMap_ReadAt_ErrIndexOutOfBound(t *testing.T) {
 
 	defer os.Remove(fd.Name())
 
-	err = Truncate(filePath, 8*MB, fd)
+	err = fileio.Truncate(filePath, 8*MB, fd)
 	require.NoError(t, err)
 
 	b := make([]byte, 16)
@@ -218,7 +218,7 @@ func TestRWManager_MMap_Sync(t *testing.T) {
 	}
 	defer os.Remove(fd.Name())
 
-	err = Truncate(filePath, 8*MB, fd)
+	err = fileio.Truncate(filePath, 8*MB, fd)
 	if err != nil {
 		require.NoError(t, err)
 
@@ -249,7 +249,7 @@ func TestRWManager_MMap_Close(t *testing.T) {
 	}
 	defer os.Remove(fd.Name())
 
-	err = Truncate(filePath, 8*MB, fd)
+	err = fileio.Truncate(filePath, 8*MB, fd)
 	if err != nil {
 		require.NoError(t, err)
 

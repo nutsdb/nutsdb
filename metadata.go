@@ -1,5 +1,7 @@
 package nutsdb
 
+import "github.com/nutsdb/nutsdb/internal/data"
+
 // DataStructure represents the data structure we have already supported
 type DataStructure = uint16
 
@@ -91,7 +93,7 @@ const (
 )
 
 // Persistent represents the data persistent flag
-const Persistent uint32 = 0
+const Persistent uint32 = data.Persistent
 
 type MetaData struct {
 	KeySize    uint32

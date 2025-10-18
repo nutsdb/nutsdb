@@ -11,7 +11,7 @@ func IsDBClosed(err error) bool {
 
 // IsKeyNotFound is true if the error indicates the key is not found.
 func IsKeyNotFound(err error) bool {
-	return errors.Is(err, ErrKeyNotFound)
+	return errors.Is(err, ErrNotFoundKey)
 }
 
 // IsBucketNotFound is true if the error indicates the bucket is not exists.

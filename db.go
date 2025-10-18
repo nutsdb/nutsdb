@@ -28,6 +28,7 @@ import (
 	"sync"
 
 	"github.com/gofrs/flock"
+	"github.com/nutsdb/nutsdb/internal/data"
 	"github.com/nutsdb/nutsdb/internal/utils"
 	"github.com/xujiajun/utils/filesystem"
 	"github.com/xujiajun/utils/strconv2"
@@ -223,7 +224,7 @@ func (db *DB) release() error {
 	return nil
 }
 
-func (db *DB) getValueByRecord(record *Record) ([]byte, error) {
+func (db *DB) getValueByRecord(record *data.Record) ([]byte, error) {
 	if record == nil {
 		return nil, ErrRecordIsNil
 	}
@@ -590,7 +591,7 @@ func (db *DB) loadHintFile(fid int64) (bool, error) {
 		}
 
 		// Create a record from hint entry
-		record := NewRecord()
+		record := data.NewRecord()
 		record.WithKey(hintEntry.Key).
 			WithFileId(hintEntry.FileID).
 			WithDataPos(hintEntry.DataPos).
@@ -691,7 +692,7 @@ func (db *DB) getRecordCount() (int64, error) {
 	return res, nil
 }
 
-func (db *DB) buildBTreeIdx(record *Record, entry *Entry) error {
+func (db *DB) buildBTreeIdx(record *data.Record, entry *Entry) error {
 	key, meta := entry.Key, entry.Meta
 
 	bucket, err := db.bm.GetBucketById(meta.BucketId)
@@ -716,7 +717,7 @@ func (db *DB) buildBTreeIdx(record *Record, entry *Entry) error {
 	return nil
 }
 
-func (db *DB) buildIdxes(record *Record, entry *Entry) error {
+func (db *DB) buildIdxes(record *data.Record, entry *Entry) error {
 	meta := entry.Meta
 	switch meta.Ds {
 	case DataStructureBTree:
@@ -755,7 +756,7 @@ func (db *DB) deleteBucket(ds uint16, bucket BucketId) {
 }
 
 // buildSetIdx builds set index when opening the DB.
-func (db *DB) buildSetIdx(record *Record, entry *Entry) error {
+func (db *DB) buildSetIdx(record *data.Record, entry *Entry) error {
 	key, val, meta := entry.Key, entry.Value, entry.Meta
 
 	bucket, err := db.bm.GetBucketById(entry.Meta.BucketId)
@@ -768,7 +769,7 @@ func (db *DB) buildSetIdx(record *Record, entry *Entry) error {
 
 	switch meta.Flag {
 	case DataSetFlag:
-		if err := s.SAdd(string(key), [][]byte{val}, []*Record{record}); err != nil {
+		if err := s.SAdd(string(key), [][]byte{val}, []*data.Record{record}); err != nil {
 			return fmt.Errorf("when build SetIdx SAdd index err: %s", err)
 		}
 	case DataDeleteFlag:
@@ -781,7 +782,7 @@ func (db *DB) buildSetIdx(record *Record, entry *Entry) error {
 }
 
 // buildSortedSetIdx builds sorted set index when opening the DB.
-func (db *DB) buildSortedSetIdx(record *Record, entry *Entry) error {
+func (db *DB) buildSortedSetIdx(record *data.Record, entry *Entry) error {
 	key, val, meta := entry.Key, entry.Value, entry.Meta
 
 	bucket, err := db.bm.GetBucketById(entry.Meta.BucketId)
@@ -820,7 +821,7 @@ func (db *DB) buildSortedSetIdx(record *Record, entry *Entry) error {
 }
 
 // buildListIdx builds List index when opening the DB.
-func (db *DB) buildListIdx(record *Record, entry *Entry) error {
+func (db *DB) buildListIdx(record *data.Record, entry *Entry) error {
 	key, val, meta := entry.Key, entry.Value, entry.Meta
 
 	bucket, err := db.bm.GetBucketById(entry.Meta.BucketId)
@@ -831,7 +832,7 @@ func (db *DB) buildListIdx(record *Record, entry *Entry) error {
 
 	l := db.Index.list.getWithDefault(bucketId)
 
-	if IsExpired(meta.TTL, meta.Timestamp) {
+	if utils.IsExpired(meta.TTL, meta.Timestamp) {
 		return nil
 	}
 
@@ -870,7 +871,7 @@ func (db *DB) buildListIdx(record *Record, entry *Entry) error {
 func (db *DB) buildListLRemIdx(value []byte, l *List, key []byte) error {
 	count, newValue := splitIntStringStr(string(value), SeparatorForListKey)
 
-	return l.LRem(string(key), count, func(r *Record) (bool, error) {
+	return l.LRem(string(key), count, func(r *data.Record) (bool, error) {
 		v, err := db.getValueByRecord(r)
 		if err != nil {
 			return false, err
@@ -904,8 +905,8 @@ func (db *DB) buildIndexes() (err error) {
 	return db.parseDataFiles(dataFileIds)
 }
 
-func (db *DB) createRecordByModeWithFidAndOff(fid int64, off uint64, entry *Entry) *Record {
-	record := NewRecord()
+func (db *DB) createRecordByModeWithFidAndOff(fid int64, off uint64, entry *Entry) *data.Record {
+	record := data.NewRecord()
 
 	record.WithKey(entry.Key).
 		WithTimestamp(entry.Meta.Timestamp).

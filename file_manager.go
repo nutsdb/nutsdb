@@ -55,7 +55,7 @@ func (fm *fileManager) getFileRWManager(path string, capacity int64, segmentSize
 	if err != nil {
 		return nil, err
 	}
-	err = Truncate(path, capacity, fd)
+	err = fileio.Truncate(path, capacity, fd)
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +70,7 @@ func (fm *fileManager) getMMapRWManager(path string, capacity int64, segmentSize
 		return nil, err
 	}
 
-	err = Truncate(path, capacity, fd)
+	err = fileio.Truncate(path, capacity, fd)
 	if err != nil {
 		return nil, err
 	}

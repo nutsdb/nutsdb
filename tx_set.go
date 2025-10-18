@@ -17,6 +17,7 @@ package nutsdb
 import (
 	"time"
 
+	"github.com/nutsdb/nutsdb/internal/data"
 	"github.com/pkg/errors"
 )
 
@@ -374,7 +375,7 @@ func (tx *Tx) SMoveByTwoBuckets(bucket1 string, key1 []byte, bucket2 string, key
 	}
 
 	if r, ok := set2.M[string(key2)][hash]; !ok {
-		err := set2.SAdd(string(key2), [][]byte{item}, []*Record{r})
+		err := set2.SAdd(string(key2), [][]byte{item}, []*data.Record{r})
 		if err != nil {
 			return false, err
 		}

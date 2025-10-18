@@ -18,6 +18,8 @@ import (
 	"bytes"
 	"errors"
 	"math/rand"
+
+	"github.com/nutsdb/nutsdb/internal/data"
 )
 
 var (
@@ -48,7 +50,7 @@ func NewSortedSet(db *DB) *SortedSet {
 	}
 }
 
-func (z *SortedSet) ZAdd(key string, score SCORE, value []byte, record *Record) error {
+func (z *SortedSet) ZAdd(key string, score SCORE, value []byte, record *data.Record) error {
 	sortedSet, ok := z.M[key]
 	if !ok {
 		z.M[key] = newSkipList(z.db)
@@ -58,7 +60,7 @@ func (z *SortedSet) ZAdd(key string, score SCORE, value []byte, record *Record) 
 	return sortedSet.Put(score, value, record)
 }
 
-func (z *SortedSet) ZMembers(key string) (map[*Record]SCORE, error) {
+func (z *SortedSet) ZMembers(key string) (map[*data.Record]SCORE, error) {
 	sortedSet, ok := z.M[key]
 
 	if !ok {
@@ -67,7 +69,7 @@ func (z *SortedSet) ZMembers(key string) (map[*Record]SCORE, error) {
 
 	nodes := sortedSet.dict
 
-	members := make(map[*Record]SCORE, len(nodes))
+	members := make(map[*data.Record]SCORE, len(nodes))
 	for _, node := range nodes {
 		members[node.record] = node.score
 	}
@@ -90,7 +92,7 @@ func (z *SortedSet) ZCount(key string, start SCORE, end SCORE, opts *GetByScoreR
 	return 0, ErrSortedSetNotFound
 }
 
-func (z *SortedSet) ZPeekMax(key string) (*Record, SCORE, error) {
+func (z *SortedSet) ZPeekMax(key string) (*data.Record, SCORE, error) {
 	if sortedSet, ok := z.M[key]; ok {
 		node := sortedSet.PeekMax()
 		if node != nil {
@@ -102,7 +104,7 @@ func (z *SortedSet) ZPeekMax(key string) (*Record, SCORE, error) {
 	return nil, 0, ErrSortedSetNotFound
 }
 
-func (z *SortedSet) ZPopMax(key string) (*Record, SCORE, error) {
+func (z *SortedSet) ZPopMax(key string) (*data.Record, SCORE, error) {
 	if sortedSet, ok := z.M[key]; ok {
 		node := sortedSet.PopMax()
 		if node != nil {
@@ -114,7 +116,7 @@ func (z *SortedSet) ZPopMax(key string) (*Record, SCORE, error) {
 	return nil, 0, ErrSortedSetNotFound
 }
 
-func (z *SortedSet) ZPeekMin(key string) (*Record, SCORE, error) {
+func (z *SortedSet) ZPeekMin(key string) (*data.Record, SCORE, error) {
 	if sortedSet, ok := z.M[key]; ok {
 		node := sortedSet.PeekMin()
 		if node != nil {
@@ -126,7 +128,7 @@ func (z *SortedSet) ZPeekMin(key string) (*Record, SCORE, error) {
 	return nil, 0, ErrSortedSetNotFound
 }
 
-func (z *SortedSet) ZPopMin(key string) (*Record, SCORE, error) {
+func (z *SortedSet) ZPopMin(key string) (*data.Record, SCORE, error) {
 	if sortedSet, ok := z.M[key]; ok {
 		node := sortedSet.PopMin()
 		if node != nil {
@@ -138,12 +140,12 @@ func (z *SortedSet) ZPopMin(key string) (*Record, SCORE, error) {
 	return nil, 0, ErrSortedSetNotFound
 }
 
-func (z *SortedSet) ZRangeByScore(key string, start SCORE, end SCORE, opts *GetByScoreRangeOptions) ([]*Record, []float64, error) {
+func (z *SortedSet) ZRangeByScore(key string, start SCORE, end SCORE, opts *GetByScoreRangeOptions) ([]*data.Record, []float64, error) {
 	if sortedSet, ok := z.M[key]; ok {
 
 		nodes := sortedSet.GetByScoreRange(start, end, opts)
 
-		records := make([]*Record, len(nodes))
+		records := make([]*data.Record, len(nodes))
 		scores := make([]float64, len(nodes))
 
 		for i, node := range nodes {
@@ -157,12 +159,12 @@ func (z *SortedSet) ZRangeByScore(key string, start SCORE, end SCORE, opts *GetB
 	return nil, nil, ErrSortedSetNotFound
 }
 
-func (z *SortedSet) ZRangeByRank(key string, start int, end int) ([]*Record, []float64, error) {
+func (z *SortedSet) ZRangeByRank(key string, start int, end int) ([]*data.Record, []float64, error) {
 	if sortedSet, ok := z.M[key]; ok {
 
 		nodes := sortedSet.GetByRankRange(start, end, false)
 
-		records := make([]*Record, len(nodes))
+		records := make([]*data.Record, len(nodes))
 		scores := make([]float64, len(nodes))
 
 		for i, node := range nodes {
@@ -176,7 +178,7 @@ func (z *SortedSet) ZRangeByRank(key string, start int, end int) ([]*Record, []f
 	return nil, nil, ErrSortedSetNotFound
 }
 
-func (z *SortedSet) ZRem(key string, value []byte) (*Record, error) {
+func (z *SortedSet) ZRem(key string, value []byte) (*data.Record, error) {
 	if sortedSet, ok := z.M[key]; ok {
 		hash, err := getFnv32(value)
 		if err != nil {
@@ -284,9 +286,9 @@ type SkipList struct {
 
 // SkipListNode represents a node in the SkipList.
 type SkipListNode struct {
-	hash     uint32  // unique key of this node
-	record   *Record // associated data
-	score    SCORE   // score to determine the order of this node in the set
+	hash     uint32       // unique key of this node
+	record   *data.Record // associated data
+	score    SCORE        // score to determine the order of this node in the set
 	backward *SkipListNode
 	level    []SkipListLevel
 }
@@ -302,7 +304,7 @@ func (sln *SkipListNode) Score() SCORE {
 }
 
 // createNode returns a newly initialized SkipListNode Object that implements the SkipListNode.
-func createNode(level int, score SCORE, hash uint32, record *Record) *SkipListNode {
+func createNode(level int, score SCORE, hash uint32, record *data.Record) *SkipListNode {
 	node := SkipListNode{
 		hash:   hash,
 		record: record,
@@ -340,13 +342,13 @@ func newSkipList(db *DB) *SkipList {
 	return skipList
 }
 
-func (sl *SkipList) cmp(r1 *Record, r2 *Record) int {
+func (sl *SkipList) cmp(r1 *data.Record, r2 *data.Record) int {
 	val1, _ := sl.db.getValueByRecord(r1)
 	val2, _ := sl.db.getValueByRecord(r2)
 	return bytes.Compare(val1, val2)
 }
 
-func (sl *SkipList) insertNode(score SCORE, hash uint32, record *Record) *SkipListNode {
+func (sl *SkipList) insertNode(score SCORE, hash uint32, record *data.Record) *SkipListNode {
 	var update [SkipListMaxLevel]*SkipListNode
 	var rank [SkipListMaxLevel]int64
 
@@ -511,7 +513,7 @@ func (sl *SkipList) PopMax() *SkipListNode {
 // Put puts an element into the sorted set with specific key / value / score.
 //
 // Time complexity of this method is : O(log(N)).
-func (sl *SkipList) Put(score SCORE, value []byte, record *Record) error {
+func (sl *SkipList) Put(score SCORE, value []byte, record *data.Record) error {
 	var newNode *SkipListNode
 
 	hash, _ := getFnv32(value)

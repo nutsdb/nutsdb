@@ -1,6 +1,8 @@
 package nutsdb
 
-import "errors"
+import (
+	"errors"
+)
 
 var (
 	// ErrDataSizeExceed is returned when given key and value size is too big.

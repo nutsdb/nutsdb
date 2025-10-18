@@ -20,24 +20,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/xujiajun/utils/strconv2"
 )
-
-// Truncate changes the size of the file.
-func Truncate(path string, capacity int64, f *os.File) error {
-	fileInfo, _ := os.Stat(path)
-	if fileInfo.Size() < capacity {
-		if err := f.Truncate(capacity); err != nil {
-			return err
-		}
-	}
-	return nil
-}
 
 func ConvertBigEndianBytesToUint64(data []byte) uint64 {
 	return binary.BigEndian.Uint64(data)
