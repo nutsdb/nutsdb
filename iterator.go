@@ -15,13 +15,14 @@
 package nutsdb
 
 import (
+	"github.com/nutsdb/nutsdb/internal/data"
 	"github.com/tidwall/btree"
 )
 
 type Iterator struct {
 	tx      *Tx
 	options IteratorOptions
-	iter    btree.IterG[*Item]
+	iter    btree.IterG[*Item[*data.Record]]
 }
 
 type IteratorOptions struct {
@@ -59,7 +60,7 @@ func (it *Iterator) Rewind() bool {
 }
 
 func (it *Iterator) Seek(key []byte) bool {
-	return it.iter.Seek(&Item{key: key})
+	return it.iter.Seek(&Item[*data.Record]{Key: key})
 }
 
 func (it *Iterator) Next() bool {
@@ -75,11 +76,11 @@ func (it *Iterator) Valid() bool {
 }
 
 func (it *Iterator) Key() []byte {
-	return it.iter.Item().key
+	return it.iter.Item().Key
 }
 
 func (it *Iterator) Value() ([]byte, error) {
-	return it.tx.db.getValueByRecord(it.iter.Item().record)
+	return it.tx.db.getValueByRecord(it.iter.Item().Record)
 }
 
 func (it *Iterator) Release() {

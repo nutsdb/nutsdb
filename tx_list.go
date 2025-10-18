@@ -69,7 +69,7 @@ func (tx *Tx) RPeek(bucket string, key []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	v, err := tx.db.getValueByRecord(item.record)
+	v, err := tx.db.getValueByRecord(item.Record)
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +110,7 @@ func (tx *Tx) getListNewKey(bucket string, key []byte, isLeft bool) []byte {
 			if !okMinSeq || !okMaxSeq {
 				seq = &HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
 			} else {
-				seq = &HeadTailSeq{Head: ConvertBigEndianBytesToUint64(minSeq.key) - 1, Tail: ConvertBigEndianBytesToUint64(maxSeq.key) + 1}
+				seq = &HeadTailSeq{Head: ConvertBigEndianBytesToUint64(minSeq.Key) - 1, Tail: ConvertBigEndianBytesToUint64(maxSeq.Key) + 1}
 			}
 		} else {
 			seq = &HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
@@ -229,7 +229,7 @@ func (tx *Tx) LPeek(bucket string, key []byte) (item []byte, err error) {
 		return nil, err
 	}
 
-	v, err := tx.db.getValueByRecord(r.record)
+	v, err := tx.db.getValueByRecord(r.Record)
 	if err != nil {
 		return nil, err
 	}

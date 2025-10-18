@@ -162,7 +162,7 @@ func (tx *Tx) getMaxOrMinKey(bucket string, isMax bool) ([]byte, error) {
 
 	if idx, ok := tx.db.Index.bTree.exist(bucketId); ok {
 		var (
-			item  *Item
+			item  *Item[*data.Record]
 			found bool
 		)
 
@@ -181,17 +181,17 @@ func (tx *Tx) getMaxOrMinKey(bucket string, isMax bool) ([]byte, error) {
 			actuallyFound = found
 		}
 
-		if item.record.IsExpired() {
-			tx.putDeleteLog(bucketId, item.key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureBTree)
+		if item.Record.IsExpired() {
+			tx.putDeleteLog(bucketId, item.Key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureBTree)
 			if actuallyFound {
 				return key, nil
 			}
 			return nil, ErrKeyNotFound
 		}
 		if isMax {
-			key = compareAndReturn(key, item.key, 1)
+			key = compareAndReturn(key, item.Key, 1)
 		} else {
-			key = compareAndReturn(key, item.key, -1)
+			key = compareAndReturn(key, item.Key, -1)
 		}
 	}
 	if actuallyFound {

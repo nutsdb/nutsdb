@@ -60,17 +60,17 @@ type ListStructure interface {
 
 	// Min returns the item with the smallest key (head of the list).
 	// Returns the item and true if the list is not empty, nil and false otherwise.
-	Min() (*Item, bool)
+	Min() (*Item[*data.Record], bool)
 
 	// Max returns the item with the largest key (tail of the list).
 	// Returns the item and true if the list is not empty, nil and false otherwise.
-	Max() (*Item, bool)
+	Max() (*Item[*data.Record], bool)
 
 	// All returns all records in ascending key order.
 	All() []*data.Record
 
 	// AllItems returns all items (key + record pairs) in ascending key order.
-	AllItems() []*Item
+	AllItems() []*Item[*data.Record]
 
 	// Count returns the number of elements in the list.
 	Count() int
@@ -91,11 +91,11 @@ type ListStructure interface {
 
 	// PopMin removes and returns the item with the smallest key.
 	// Returns the item and true if the list is not empty, nil and false otherwise.
-	PopMin() (*Item, bool)
+	PopMin() (*Item[*data.Record], bool)
 
 	// PopMax removes and returns the item with the largest key.
 	// Returns the item and true if the list is not empty, nil and false otherwise.
-	PopMax() (*Item, bool)
+	PopMax() (*Item[*data.Record], bool)
 }
 
 // Compile-time interface implementation checks
@@ -213,7 +213,7 @@ func (l *List) LPop(key string) (*data.Record, error) {
 	// After LPop, Head should point to the next element's position
 	// Note: We don't update Head here because it represents "next push position"
 	// The popped element's sequence is already consumed
-	return item.record, nil
+	return item.Record, nil
 }
 
 // RPop removes and returns the last element of the list stored at key.
@@ -236,18 +236,18 @@ func (l *List) RPop(key string) (*data.Record, error) {
 	// After RPop, Tail should point to the next element's position
 	// Note: We don't update Tail here because it represents "next push position"
 	// The popped element's sequence is already consumed
-	return item.record, nil
+	return item.Record, nil
 }
 
-func (l *List) LPeek(key string) (*Item, error) {
+func (l *List) LPeek(key string) (*Item[*data.Record], error) {
 	return l.peek(key, true)
 }
 
-func (l *List) RPeek(key string) (*Item, error) {
+func (l *List) RPeek(key string) (*Item[*data.Record], error) {
 	return l.peek(key, false)
 }
 
-func (l *List) peek(key string, isLeft bool) (*Item, error) {
+func (l *List) peek(key string, isLeft bool) (*Item[*data.Record], error) {
 	if l.IsExpire(key) {
 		return nil, ErrListNotFound
 	}
@@ -307,7 +307,7 @@ func (l *List) getRemoveIndexes(key string, count int, cmp func(r *data.Record) 
 	}
 
 	var res [][]byte
-	var allItems []*Item
+	var allItems []*Item[*data.Record]
 	if count == 0 {
 		count = list.Count()
 	}
@@ -318,13 +318,13 @@ func (l *List) getRemoveIndexes(key string, count int, cmp func(r *data.Record) 
 			if count <= 0 {
 				break
 			}
-			r := item.record
+			r := item.Record
 			ok, err := cmp(r)
 			if err != nil {
 				return nil, err
 			}
 			if ok {
-				res = append(res, item.key)
+				res = append(res, item.Key)
 				count--
 			}
 		}
@@ -333,13 +333,13 @@ func (l *List) getRemoveIndexes(key string, count int, cmp func(r *data.Record) 
 			if count >= 0 {
 				break
 			}
-			r := allItems[i].record
+			r := allItems[i].Record
 			ok, err := cmp(r)
 			if err != nil {
 				return nil, err
 			}
 			if ok {
-				res = append(res, allItems[i].key)
+				res = append(res, allItems[i].Key)
 				count++
 			}
 		}
@@ -380,7 +380,7 @@ func (l *List) LTrim(key string, start, end int) error {
 	allItems := list.AllItems()
 	for i, item := range allItems {
 		if i < start || i > end {
-			list.Delete(item.key)
+			list.Delete(item.Key)
 		}
 	}
 
@@ -402,7 +402,7 @@ func (l *List) LRemByIndex(key string, indexes []int) error {
 	allItems := list.AllItems()
 	for i, item := range allItems {
 		if _, ok := idxes[i]; ok {
-			list.Delete(item.key)
+			list.Delete(item.Key)
 		}
 	}
 

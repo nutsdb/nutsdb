@@ -71,11 +71,11 @@ func TestDoublyLinkedList_OrderedInsertion(t *testing.T) {
 	assert.Equal(t, 5, len(items))
 
 	// Should be: 50, 100, 150, 175, 200
-	assert.Equal(t, uint64(50), ConvertBigEndianBytesToUint64(items[0].key))
-	assert.Equal(t, uint64(100), ConvertBigEndianBytesToUint64(items[1].key))
-	assert.Equal(t, uint64(150), ConvertBigEndianBytesToUint64(items[2].key))
-	assert.Equal(t, uint64(175), ConvertBigEndianBytesToUint64(items[3].key))
-	assert.Equal(t, uint64(200), ConvertBigEndianBytesToUint64(items[4].key))
+	assert.Equal(t, uint64(50), ConvertBigEndianBytesToUint64(items[0].Key))
+	assert.Equal(t, uint64(100), ConvertBigEndianBytesToUint64(items[1].Key))
+	assert.Equal(t, uint64(150), ConvertBigEndianBytesToUint64(items[2].Key))
+	assert.Equal(t, uint64(175), ConvertBigEndianBytesToUint64(items[3].Key))
+	assert.Equal(t, uint64(200), ConvertBigEndianBytesToUint64(items[4].Key))
 }
 
 func TestDoublyLinkedList_MinMax(t *testing.T) {
@@ -99,14 +99,14 @@ func TestDoublyLinkedList_MinMax(t *testing.T) {
 	// Check min
 	minItem, ok := dll.Min()
 	require.True(t, ok)
-	assert.Equal(t, r1, minItem.record)
-	assert.Equal(t, uint64(100), ConvertBigEndianBytesToUint64(minItem.key))
+	assert.Equal(t, r1, minItem.Record)
+	assert.Equal(t, uint64(100), ConvertBigEndianBytesToUint64(minItem.Key))
 
 	// Check max
 	maxItem, ok := dll.Max()
 	require.True(t, ok)
-	assert.Equal(t, r2, maxItem.record)
-	assert.Equal(t, uint64(200), ConvertBigEndianBytesToUint64(maxItem.key))
+	assert.Equal(t, r2, maxItem.Record)
+	assert.Equal(t, uint64(200), ConvertBigEndianBytesToUint64(maxItem.Key))
 }
 
 func TestDoublyLinkedList_Delete(t *testing.T) {
@@ -134,8 +134,8 @@ func TestDoublyLinkedList_Delete(t *testing.T) {
 	// Verify order is maintained
 	items := dll.AllItems()
 	assert.Equal(t, 2, len(items))
-	assert.Equal(t, uint64(100), ConvertBigEndianBytesToUint64(items[0].key))
-	assert.Equal(t, uint64(200), ConvertBigEndianBytesToUint64(items[1].key))
+	assert.Equal(t, uint64(100), ConvertBigEndianBytesToUint64(items[0].Key))
+	assert.Equal(t, uint64(200), ConvertBigEndianBytesToUint64(items[1].Key))
 
 	// Delete head
 	deleted = dll.Delete(seq1)
@@ -144,7 +144,7 @@ func TestDoublyLinkedList_Delete(t *testing.T) {
 
 	minItem, ok := dll.Min()
 	require.True(t, ok)
-	assert.Equal(t, r2, minItem.record)
+	assert.Equal(t, r2, minItem.Record)
 
 	// Delete tail
 	deleted = dll.Delete(seq2)
@@ -171,19 +171,19 @@ func TestDoublyLinkedList_PopMinMax(t *testing.T) {
 	// Pop min
 	minItem, ok := dll.PopMin()
 	require.True(t, ok)
-	assert.Equal(t, r1, minItem.record)
+	assert.Equal(t, r1, minItem.Record)
 	assert.Equal(t, 2, dll.Count())
 
 	// Pop max
 	maxItem, ok := dll.PopMax()
 	require.True(t, ok)
-	assert.Equal(t, r2, maxItem.record)
+	assert.Equal(t, r2, maxItem.Record)
 	assert.Equal(t, 1, dll.Count())
 
 	// Only one element left
 	lastItem, ok := dll.PopMin()
 	require.True(t, ok)
-	assert.Equal(t, r3, lastItem.record)
+	assert.Equal(t, r3, lastItem.Record)
 	assert.Equal(t, 0, dll.Count())
 
 	// Empty now
