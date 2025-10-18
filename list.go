@@ -199,7 +199,7 @@ func (l *List) getRemoveIndexes(key string, count int, cmp func(r *data.Record) 
 
 	var res [][]byte
 	var allItems []*Item
-	if 0 == count {
+	if count == 0 {
 		count = list.Count()
 	}
 
@@ -303,7 +303,7 @@ func (l *List) LRemByIndex(key string, indexes []int) error {
 func (l *List) getValidIndexes(key string, indexes []int) map[int]struct{} {
 	idxes := make(map[int]struct{})
 	listLen, err := l.Size(key)
-	if err != nil || 0 == listLen {
+	if err != nil || listLen == 0 {
 		return idxes
 	}
 

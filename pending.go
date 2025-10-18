@@ -163,9 +163,7 @@ func (pending *pendingEntryList) toList() []*Entry {
 	}
 	for _, entriesInDS := range pending.entries {
 		for _, entries := range entriesInDS {
-			for _, entry := range entries {
-				list = append(list, entry)
-			}
+			list = append(list, entries...)
 		}
 	}
 	return list

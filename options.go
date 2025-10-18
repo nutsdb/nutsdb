@@ -14,7 +14,11 @@
 
 package nutsdb
 
-import "time"
+import (
+	"time"
+
+	"github.com/nutsdb/nutsdb/internal/fileio"
+)
 
 // EntryIdxMode represents entry index mode.
 type EntryIdxMode int
@@ -133,13 +137,10 @@ type Options struct {
 }
 
 const (
-	B = 1
-
-	KB = 1024 * B
-
-	MB = 1024 * KB
-
-	GB = 1024 * MB
+	B  = fileio.B
+	KB = fileio.KB
+	MB = fileio.MB
+	GB = fileio.GB
 )
 
 // defaultSegmentSize is default data file size.
