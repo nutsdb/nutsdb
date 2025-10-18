@@ -211,10 +211,7 @@ func TestDB_Basic(t *testing.T) {
 }
 
 func TestDB_ReopenWithDelete(t *testing.T) {
-	var opts *Options
-	if opts == nil {
-		opts = &DefaultOptions
-	}
+	opts := &DefaultOptions
 	if opts.Dir == "" {
 		opts.Dir = NutsDBTestDirPath
 	}

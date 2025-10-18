@@ -52,11 +52,12 @@ func (op *defaultOp[T]) rangeIdx(f func(elem *T)) {
 
 type ListIdx struct {
 	*defaultOp[List]
+	opts Options
 }
 
 func (idx ListIdx) getWithDefault(id BucketId) *List {
 	return idx.defaultOp.computeIfAbsent(id, func() *List {
-		return NewList()
+		return NewList(idx.opts)
 	})
 }
 
@@ -95,11 +96,17 @@ type index struct {
 	bTree     BTreeIdx
 	set       SetIdx
 	sortedSet SortedSetIdx
+	opts      Options // Store options for creating new data structures
 }
 
 func newIndex() *index {
+	return newIndexWithOptions(DefaultOptions)
+}
+
+func newIndexWithOptions(opts Options) *index {
 	i := new(index)
-	i.list = ListIdx{&defaultOp[List]{idx: map[BucketId]*List{}}}
+	i.opts = opts
+	i.list = ListIdx{defaultOp: &defaultOp[List]{idx: map[BucketId]*List{}}, opts: opts}
 	i.bTree = BTreeIdx{&defaultOp[BTree]{idx: map[BucketId]*BTree{}}}
 	i.set = SetIdx{&defaultOp[Set]{idx: map[BucketId]*Set{}}}
 	i.sortedSet = SortedSetIdx{&defaultOp[SortedSet]{idx: map[BucketId]*SortedSet{}}}
