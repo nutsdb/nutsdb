@@ -37,6 +37,21 @@ const (
 	TimeHeap
 )
 
+// ListImplementationType defines the implementation type for List data structure.
+type ListImplementationType int
+
+const (
+	// ListImplDoublyLinkedList uses doubly linked list implementation (default).
+	// Advantages: O(1) head/tail operations, lower memory overhead
+	// Best for: High-frequency LPush/RPush/LPop/RPop operations
+	ListImplDoublyLinkedList ListImplementationType = iota
+
+	// ListImplBTree uses BTree implementation.
+	// Advantages: O(log n + k) range queries, efficient random access
+	// Best for: Frequent range queries or indexed access patterns
+	ListImplBTree
+)
+
 // An ErrorHandler handles an error occurred during transaction.
 type ErrorHandler interface {
 	HandleError(err error)
@@ -130,6 +145,10 @@ type Options struct {
 	// EnableMergeV2 toggles the redesigned merge pipeline with deterministic merge files and manifest support.
 	// When disabled, NutsDB falls back to the legacy merge logic.
 	EnableMergeV2 bool
+
+	// ListImpl specifies the implementation type for List data structure.
+	// Default: ListImplDoublyLinkedList (maintains backward compatibility)
+	ListImpl ListImplementationType
 }
 
 const (
@@ -161,6 +180,7 @@ var DefaultOptions = func() Options {
 		ExpiredDeleteType:         TimeWheel,
 		EnableHintFile:            false,
 		EnableMergeV2:             false,
+		ListImpl:                  ListImplBTree,
 	}
 }()
 
@@ -277,5 +297,11 @@ func WithEnableHintFile(enable bool) Option {
 func WithEnableMergeV2(enable bool) Option {
 	return func(opt *Options) {
 		opt.EnableMergeV2 = enable
+	}
+}
+
+func WithListImpl(implType ListImplementationType) Option {
+	return func(opt *Options) {
+		opt.ListImpl = implType
 	}
 }

@@ -69,7 +69,7 @@ func open(opt Options) (*DB, error) {
 		opt:                     opt,
 		KeyCount:                0,
 		closed:                  false,
-		Index:                   newIndex(),
+		Index:                   newIndexWithOptions(opt),
 		fm:                      newFileManager(opt.RWMode, opt.MaxFdNumsInCache, opt.CleanFdsCacheThreshold, opt.SegmentSize),
 		mergeStartCh:            make(chan struct{}),
 		mergeEndCh:              make(chan error),
