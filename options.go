@@ -180,7 +180,7 @@ var DefaultOptions = func() Options {
 		ExpiredDeleteType:         TimeWheel,
 		EnableHintFile:            false,
 		EnableMergeV2:             false,
-		ListImpl:                  ListImplDoublyLinkedList,
+		ListImpl:                  ListImplBTree,
 	}
 }()
 
