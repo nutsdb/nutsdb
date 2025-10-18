@@ -95,8 +95,6 @@ func (db *DB) Begin(writable bool) (tx *Tx, err error) {
 
 // newTx returns a newly initialized Tx object at given writable.
 func newTx(db *DB, writable bool) (tx *Tx, err error) {
-	var txID uint64
-
 	tx = &Tx{
 		db:                db,
 		writable:          writable,
@@ -104,12 +102,7 @@ func newTx(db *DB, writable bool) (tx *Tx, err error) {
 		pendingBucketList: make(map[Ds]map[BucketName]*Bucket),
 	}
 
-	txID, err = tx.getTxID()
-	if err != nil {
-		return nil, err
-	}
-
-	tx.id = txID
+	tx.id = tx.getTxID()
 
 	return
 }
@@ -160,15 +153,9 @@ func (tx *Tx) checkSize() error {
 
 // getTxID returns the tx id.
 // Uses cached snowflake node to avoid recreating for every transaction.
-func (tx *Tx) getTxID() (id uint64, err error) {
-	node, err := tx.db.getSnowflakeNode()
-	if err != nil {
-		return 0, err
-	}
-
-	id = uint64(node.Generate().Int64())
-
-	return
+func (tx *Tx) getTxID() uint64 {
+	node := tx.db.getSnowflakeNode()
+	return uint64(node.Generate().Int64())
 }
 
 // Commit commits the transaction, following these steps:

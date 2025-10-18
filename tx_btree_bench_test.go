@@ -61,7 +61,7 @@ func cleanupBenchmarkDB(db *DB, dir string) {
 
 // Benchmark Put operations
 func BenchmarkTx_Put(b *testing.B) {
-	dir := "/tmp/nutsdb_benchmark_put"
+	dir := b.TempDir()
 	db := setupBenchmarkDB(b, dir)
 	defer cleanupBenchmarkDB(db, dir)
 
@@ -82,7 +82,7 @@ func BenchmarkTx_Put(b *testing.B) {
 
 // Benchmark Get operations
 func BenchmarkTx_Get(b *testing.B) {
-	dir := "/tmp/nutsdb_benchmark_get"
+	dir := b.TempDir()
 	db := setupBenchmarkDB(b, dir)
 	defer cleanupBenchmarkDB(db, dir)
 
@@ -116,7 +116,7 @@ func BenchmarkTx_Get(b *testing.B) {
 
 // Benchmark RangeScan operations
 func BenchmarkTx_RangeScan(b *testing.B) {
-	dir := "/tmp/nutsdb_benchmark_range_scan"
+	dir := b.TempDir()
 	db := setupBenchmarkDB(b, dir)
 	defer cleanupBenchmarkDB(db, dir)
 
@@ -154,7 +154,7 @@ func BenchmarkTx_RangeScan(b *testing.B) {
 
 // Benchmark PrefixScan operations
 func BenchmarkTx_PrefixScan(b *testing.B) {
-	dir := "/tmp/nutsdb_benchmark_prefix_scan"
+	dir := b.TempDir()
 	db := setupBenchmarkDB(b, dir)
 	defer cleanupBenchmarkDB(db, dir)
 
@@ -191,7 +191,7 @@ func BenchmarkTx_PrefixScan(b *testing.B) {
 
 // Benchmark GetAll operations
 func BenchmarkTx_GetAll(b *testing.B) {
-	dir := "/tmp/nutsdb_benchmark_get_all"
+	dir := b.TempDir()
 	db := setupBenchmarkDB(b, dir)
 	defer cleanupBenchmarkDB(db, dir)
 
@@ -227,7 +227,7 @@ func BenchmarkTx_GetAll(b *testing.B) {
 
 // Benchmark Delete operations
 func BenchmarkTx_Delete(b *testing.B) {
-	dir := "/tmp/nutsdb_benchmark_delete"
+	dir := b.TempDir()
 	db := setupBenchmarkDB(b, dir)
 	defer cleanupBenchmarkDB(db, dir)
 
@@ -248,7 +248,7 @@ func BenchmarkTx_Delete(b *testing.B) {
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
-		key := []byte(fmt.Sprintf("key_%d", i))
+		key := []byte(fmt.Sprintf("key_%d", i%numKeys))
 		err := db.Update(func(tx *Tx) error {
 			return tx.Delete("test_bucket", key)
 		})
@@ -260,7 +260,7 @@ func BenchmarkTx_Delete(b *testing.B) {
 
 // Benchmark Mixed operations (realistic workload)
 func BenchmarkTx_MixedOperations(b *testing.B) {
-	dir := "/tmp/nutsdb_benchmark_mixed"
+	dir := b.TempDir()
 	db := setupBenchmarkDB(b, dir)
 	defer cleanupBenchmarkDB(db, dir)
 
@@ -326,7 +326,7 @@ func BenchmarkTx_MixedOperations(b *testing.B) {
 
 // Benchmark concurrent operations
 func BenchmarkTx_ConcurrentOperations(b *testing.B) {
-	dir := "/tmp/nutsdb_benchmark_concurrent"
+	dir := b.TempDir()
 	db := setupBenchmarkDB(b, dir)
 	defer cleanupBenchmarkDB(db, dir)
 
@@ -335,10 +335,10 @@ func BenchmarkTx_ConcurrentOperations(b *testing.B) {
 
 	// Run concurrent goroutines
 	b.RunParallel(func(pb *testing.PB) {
-		rand.Seed(time.Now().UnixNano())
+		r := rand.New(rand.NewSource(time.Now().UnixNano()))
 		for pb.Next() {
-			key := []byte(fmt.Sprintf("key_%d", rand.Intn(1000)))
-			value := []byte(fmt.Sprintf("value_%d", rand.Intn(1000)))
+			key := []byte(fmt.Sprintf("key_%d", r.Intn(1000)))
+			value := []byte(fmt.Sprintf("value_%d", r.Intn(1000)))
 
 			err := db.Update(func(tx *Tx) error {
 				return tx.Put("test_bucket", key, value, Persistent)
@@ -352,7 +352,7 @@ func BenchmarkTx_ConcurrentOperations(b *testing.B) {
 
 // Benchmark TTL operations
 func BenchmarkTx_TTLOperations(b *testing.B) {
-	dir := "/tmp/nutsdb_benchmark_ttl"
+	dir := b.TempDir()
 	db := setupBenchmarkDB(b, dir)
 	defer cleanupBenchmarkDB(db, dir)
 
@@ -382,7 +382,7 @@ func BenchmarkTx_TTLOperations(b *testing.B) {
 
 // Benchmark large value operations
 func BenchmarkTx_LargeValues(b *testing.B) {
-	dir := "/tmp/nutsdb_benchmark_large"
+	dir := b.TempDir()
 	db := setupBenchmarkDB(b, dir)
 	defer cleanupBenchmarkDB(db, dir)
 
@@ -417,7 +417,7 @@ func BenchmarkTx_LargeValues(b *testing.B) {
 
 // Benchmark transaction commit performance
 func BenchmarkTx_TransactionCommit(b *testing.B) {
-	dir := "/tmp/nutsdb_benchmark_commit"
+	dir := b.TempDir()
 	db := setupBenchmarkDB(b, dir)
 	defer cleanupBenchmarkDB(db, dir)
 
@@ -444,7 +444,7 @@ func BenchmarkTx_TransactionCommit(b *testing.B) {
 
 // Memory stress test - allocates and releases many objects
 func BenchmarkTx_MemoryStress(b *testing.B) {
-	dir := "/tmp/nutsdb_benchmark_memory"
+	dir := b.TempDir()
 	db := setupBenchmarkDB(b, dir)
 	defer cleanupBenchmarkDB(db, dir)
 

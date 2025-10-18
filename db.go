@@ -39,6 +39,13 @@ const KvWriteChCapacity = 1000
 const FLockName = "nutsdb-flock"
 
 type (
+	// SnowflakeManager manages snowflake node initialization and caching
+	SnowflakeManager struct {
+		node    *snowflake.Node
+		once    sync.Once
+		nodeNum int64
+	}
+
 	// DB represents a collection of buckets that persist on disk.
 	DB struct {
 		opt                     Options // the database options
@@ -60,11 +67,29 @@ type (
 		RecordCount             int64 // current valid record count, exclude deleted, repeated
 		bm                      *BucketManager
 		hintKeyAndRAMIdxModeLru *LRUCache // lru cache for HintKeyAndRAMIdxMode
-		// snowflake optimization: cache snowflake node to avoid recreating per transaction
-		snowflakeNode *snowflake.Node
-		snowflakeOnce sync.Once
+		sm                      *SnowflakeManager
 	}
 )
+
+// NewSnowflakeManager creates a new SnowflakeManager with the given node number
+func NewSnowflakeManager(nodeNum int64) *SnowflakeManager {
+	return &SnowflakeManager{
+		nodeNum: nodeNum,
+	}
+}
+
+// GetNode returns the snowflake node, initializing it once.
+// If initialization fails, it will fatal the program.
+func (sm *SnowflakeManager) GetNode() *snowflake.Node {
+	sm.once.Do(func() {
+		var err error
+		sm.node, err = snowflake.NewNode(sm.nodeNum)
+		if err != nil {
+			log.Fatalf("Failed to initialize snowflake node with nodeNum=%d: %v", sm.nodeNum, err)
+		}
+	})
+	return sm.node
+}
 
 // open returns a newly initialized DB object.
 func open(opt Options) (*DB, error) {
@@ -81,6 +106,7 @@ func open(opt Options) (*DB, error) {
 		writeCh:                 make(chan *request, KvWriteChCapacity),
 		tm:                      newTTLManager(opt.ExpiredDeleteType),
 		hintKeyAndRAMIdxModeLru: NewLruCache(opt.HintKeyAndRAMIdxCacheSize),
+		sm:                      NewSnowflakeManager(opt.NodeNum),
 	}
 
 	db.commitBuffer = createNewBufferWithSize(int(db.opt.CommitBufferSize))
@@ -338,12 +364,8 @@ func (db *DB) getHintKeyAndRAMIdxCacheSize() int {
 }
 
 // getSnowflakeNode returns a cached snowflake node, creating it once if needed.
-func (db *DB) getSnowflakeNode() (*snowflake.Node, error) {
-	var err error
-	db.snowflakeOnce.Do(func() {
-		db.snowflakeNode, err = snowflake.NewNode(db.opt.NodeNum)
-	})
-	return db.snowflakeNode, err
+func (db *DB) getSnowflakeNode() *snowflake.Node {
+	return db.sm.GetNode()
 }
 
 func (db *DB) doWrites() {
