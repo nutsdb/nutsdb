@@ -171,16 +171,19 @@ func (l *List) push(key string, r *Record, isLeft bool) error {
 
 	list.InsertRecord(ConvertUint64ToBigEndianBytes(curSeq), r)
 
-	// Update seq boundaries to track the actual range of sequences in the list
+	// Update seq boundaries to track the next insertion positions
 	// This is important for recovery scenarios where we rebuild the index
+	// Head and Tail should always represent the next available positions for insertion
 	seq := l.Seq[userKeyStr]
 	if isLeft {
-		// LPush: update Head if current seq is smaller
-		if curSeq < seq.Head {
-			seq.Head = curSeq
+		// LPush: Head should be the next available position on the left
+		// If current seq is the actual head, set Head to current seq - 1
+		if curSeq <= seq.Head {
+			seq.Head = curSeq - 1
 		}
 	} else {
-		// RPush: update Tail if current seq is larger
+		// RPush: Tail should be the next available position on the right
+		// If current seq is at or beyond current tail, update Tail accordingly
 		if curSeq >= seq.Tail {
 			seq.Tail = curSeq + 1
 		}

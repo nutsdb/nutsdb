@@ -263,7 +263,10 @@ func (dll *DoublyLinkedList) PrefixScan(prefix []byte, offset, limitNum int) []*
 // PrefixSearchScan scans records with the given prefix and regex pattern
 func (dll *DoublyLinkedList) PrefixSearchScan(prefix []byte, reg string, offset, limitNum int) []*Record {
 	records := make([]*Record, 0)
-	rgx := regexp.MustCompile(reg)
+	rgx, err := regexp.Compile(reg)
+	if err != nil {
+		return records
+	}
 
 	for e := dll.list.Front(); e != nil; e = e.Next() {
 		elem := e.Value.(*ListElement)

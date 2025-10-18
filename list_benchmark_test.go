@@ -45,10 +45,6 @@ func benchmarkListPush(b *testing.B, impl ListImplementationType, isLeft bool) {
 		testData[i].record = &Record{Key: newKey, Value: GetTestBytes(i)}
 	}
 
-	// Reset seqInfo for actual benchmark
-	seqInfo.Head = initialListSeq
-	seqInfo.Tail = initialListSeq + 1
-
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		list.push(string(testData[i].newKey), testData[i].record, isLeft)
