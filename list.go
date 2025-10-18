@@ -48,7 +48,7 @@ const (
 type ListStructure interface {
 	// InsertRecord inserts a record with the given key (sequence number in big-endian format).
 	// Returns true if an existing record was replaced, false if a new record was inserted.
-	InsertRecord(key []byte, record *Record) bool
+	InsertRecord(key []byte, record *data.Record) bool
 
 	// Delete removes the record with the given key.
 	// Returns true if the record was found and deleted, false otherwise.
@@ -56,7 +56,7 @@ type ListStructure interface {
 
 	// Find retrieves the record with the given key.
 	// Returns the record and true if found, nil and false otherwise.
-	Find(key []byte) (*Record, bool)
+	Find(key []byte) (*data.Record, bool)
 
 	// Min returns the item with the smallest key (head of the list).
 	// Returns the item and true if the list is not empty, nil and false otherwise.
@@ -67,7 +67,7 @@ type ListStructure interface {
 	Max() (*Item, bool)
 
 	// All returns all records in ascending key order.
-	All() []*Record
+	All() []*data.Record
 
 	// AllItems returns all items (key + record pairs) in ascending key order.
 	AllItems() []*Item
@@ -76,18 +76,18 @@ type ListStructure interface {
 	Count() int
 
 	// Range returns records with keys in the range [start, end] (inclusive).
-	Range(start, end []byte) []*Record
+	Range(start, end []byte) []*data.Record
 
 	// PrefixScan scans records with keys matching the given prefix.
 	// offset: number of matching records to skip
 	// limitNum: maximum number of records to return
-	PrefixScan(prefix []byte, offset, limitNum int) []*Record
+	PrefixScan(prefix []byte, offset, limitNum int) []*data.Record
 
 	// PrefixSearchScan scans records with keys matching the given prefix and regex pattern.
 	// The regex is applied to the portion of the key after removing the prefix.
 	// offset: number of matching records to skip
 	// limitNum: maximum number of records to return
-	PrefixSearchScan(prefix []byte, reg string, offset, limitNum int) []*Record
+	PrefixSearchScan(prefix []byte, reg string, offset, limitNum int) []*data.Record
 
 	// PopMin removes and returns the item with the smallest key.
 	// Returns the item and true if the list is not empty, nil and false otherwise.
