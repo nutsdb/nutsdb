@@ -1,10 +1,10 @@
 package main
 
 import (
-	"github.com/nutsdb/nutsdb"
-	"io/ioutil"
 	"log"
 	"os"
+
+	"github.com/nutsdb/nutsdb"
 )
 
 var (
@@ -16,7 +16,7 @@ var (
 func init() {
 	fileDir := "/tmp/nutsdb_example"
 
-	files, _ := ioutil.ReadDir(fileDir)
+	files, _ := os.ReadDir(fileDir)
 	for _, f := range files {
 		name := f.Name()
 		if name != "" {

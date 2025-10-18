@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"time"
@@ -61,7 +60,7 @@ var (
 )
 
 func removeFileDir(fileDir string) {
-	files, _ := ioutil.ReadDir(fileDir)
+	files, _ := os.ReadDir(fileDir)
 	for _, f := range files {
 		name := f.Name()
 		if name != "" {
