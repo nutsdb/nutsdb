@@ -377,6 +377,7 @@ func TestTx_ZRemRangeByRank(t *testing.T) {
 			assert.NoError(t, err)
 			return nil
 		})
+		assert.NoError(t, err)
 
 		for i := 0; i < 2; i++ {
 			txZScore(t, db, bucket, key, testutils.GetTestBytes(0), 0, ErrSortedSetMemberNotExist)
@@ -391,6 +392,7 @@ func TestTx_ZRemRangeByRank(t *testing.T) {
 			assert.NoError(t, err)
 			return nil
 		})
+		assert.NoError(t, err)
 
 		for i := 5; i < 8; i++ {
 			txZScore(t, db, bucket, key, testutils.GetTestBytes(0), 0, ErrSortedSetMemberNotExist)

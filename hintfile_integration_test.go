@@ -411,7 +411,7 @@ func TestHintFileIntegration_CrashRecovery(t *testing.T) {
 		if err := db.ActiveFile.rwManager.Release(); err != nil {
 			t.Errorf("Failed to release rwManager: %v", err)
 		}
-		if err := db.fm.close(); err != nil {
+		if err := db.fm.Close(); err != nil {
 			t.Errorf("Failed to close file manager: %v", err)
 		}
 		if err := db.flock.Unlock(); err != nil {

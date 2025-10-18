@@ -16,6 +16,8 @@ package nutsdb
 
 import (
 	"errors"
+
+	"github.com/nutsdb/nutsdb/internal/fileio"
 )
 
 var (
@@ -39,11 +41,11 @@ type DataFile struct {
 	fileID     int64
 	writeOff   int64
 	ActualSize int64
-	rwManager  RWManager
+	rwManager  fileio.RWManager
 }
 
 // NewDataFile will return a new DataFile Object.
-func NewDataFile(path string, rwManager RWManager) *DataFile {
+func NewDataFile(path string, rwManager fileio.RWManager) *DataFile {
 	dataFile := &DataFile{
 		path:      path,
 		rwManager: rwManager,

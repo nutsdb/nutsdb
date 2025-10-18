@@ -23,6 +23,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/nutsdb/nutsdb/internal/fileio"
 	"github.com/xujiajun/utils/strconv2"
 )
 
@@ -93,7 +94,7 @@ func (db *DB) mergeLegacy() error {
 
 	var err error
 	path := getDataPath(db.MaxFileID, db.opt.Dir)
-	db.ActiveFile, err = db.fm.getDataFile(path, db.opt.SegmentSize)
+	db.ActiveFile, err = db.fm.GetDataFile(path, db.opt.SegmentSize)
 	if err != nil {
 		db.mu.Unlock()
 		return err
@@ -186,7 +187,7 @@ func (db *DB) mergeLegacy() error {
 					break
 				}
 			} else {
-				if errors.Is(err, io.EOF) || errors.Is(err, ErrIndexOutOfBound) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, ErrHeaderSizeOutOfBounds) {
+				if errors.Is(err, io.EOF) || errors.Is(err, fileio.ErrIndexOutOfBound) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, ErrHeaderSizeOutOfBounds) {
 					break
 				}
 				return fmt.Errorf("when merge operation build hintIndex readAt err: %s", err)
@@ -268,7 +269,7 @@ func (db *DB) buildHintFilesAfterMerge(startFileID, endFileID int64) error {
 		for {
 			entry, err := fr.readEntry(off)
 			if err != nil {
-				if errors.Is(err, io.EOF) || errors.Is(err, ErrIndexOutOfBound) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, ErrHeaderSizeOutOfBounds) {
+				if errors.Is(err, io.EOF) || errors.Is(err, fileio.ErrIndexOutOfBound) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, ErrHeaderSizeOutOfBounds) {
 					break
 				}
 				cleanup(true)

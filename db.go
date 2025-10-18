@@ -29,6 +29,7 @@ import (
 
 	"github.com/gofrs/flock"
 	"github.com/nutsdb/nutsdb/internal/data"
+	"github.com/nutsdb/nutsdb/internal/fileio"
 	"github.com/nutsdb/nutsdb/internal/utils"
 	"github.com/xujiajun/utils/filesystem"
 	"github.com/xujiajun/utils/strconv2"
@@ -50,7 +51,7 @@ type (
 		KeyCount                int // total key number ,include expired, deleted, repeated.
 		closed                  bool
 		isMerging               bool
-		fm                      *fileManager
+		fm                      *FileManager
 		flock                   *flock.Flock
 		commitBuffer            *bytes.Buffer
 		mergeStartCh            chan struct{}
@@ -72,7 +73,7 @@ func open(opt Options) (*DB, error) {
 		KeyCount:                0,
 		closed:                  false,
 		Index:                   newIndex(),
-		fm:                      newFileManager(opt.RWMode, opt.MaxFdNumsInCache, opt.CleanFdsCacheThreshold, opt.SegmentSize),
+		fm:                      NewFileManager(opt.RWMode, opt.MaxFdNumsInCache, opt.CleanFdsCacheThreshold, opt.SegmentSize),
 		mergeStartCh:            make(chan struct{}),
 		mergeEndCh:              make(chan error),
 		mergeWorkCloseCh:        make(chan struct{}),
@@ -196,7 +197,7 @@ func (db *DB) release() error {
 
 	db.ActiveFile = nil
 
-	err = db.fm.close()
+	err = db.fm.Close()
 
 	if err != nil {
 		return err
@@ -241,11 +242,11 @@ func (db *DB) getValueByRecord(record *data.Record) ([]byte, error) {
 	}
 
 	dirPath := getDataPath(record.FileID, db.opt.Dir)
-	df, err := db.fm.getDataFile(dirPath, db.opt.SegmentSize)
+	df, err := db.fm.GetDataFile(dirPath, db.opt.SegmentSize)
 	if err != nil {
 		return nil, err
 	}
-	defer func(rwManager RWManager) {
+	defer func(rwManager fileio.RWManager) {
 		err := rwManager.Release()
 		if err != nil {
 			return
@@ -395,7 +396,7 @@ func (db *DB) doWrites() {
 // setActiveFile sets the ActiveFile (DataFile object).
 func (db *DB) setActiveFile() (err error) {
 	activeFilePath := getDataPath(db.MaxFileID, db.opt.Dir)
-	db.ActiveFile, err = db.fm.getDataFile(activeFilePath, db.opt.SegmentSize)
+	db.ActiveFile, err = db.fm.GetDataFile(activeFilePath, db.opt.SegmentSize)
 	if err != nil {
 		return
 	}
@@ -467,7 +468,7 @@ func (db *DB) parseDataFiles(dataFileIds []int64) (err error) {
 			if err != nil {
 				// whatever which logic branch it will choose, we will release the fd.
 				_ = f.release()
-				if errors.Is(err, io.EOF) || errors.Is(err, ErrIndexOutOfBound) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, ErrEntryZero) || errors.Is(err, ErrHeaderSizeOutOfBounds) {
+				if errors.Is(err, io.EOF) || errors.Is(err, fileio.ErrIndexOutOfBound) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, ErrEntryZero) || errors.Is(err, ErrHeaderSizeOutOfBounds) {
 					break
 				}
 				if off >= db.opt.SegmentSize {

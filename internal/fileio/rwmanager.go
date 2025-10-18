@@ -12,18 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package nutsdb
-
-// RWMode represents the read and write mode.
-type RWMode int
-
-const (
-	// FileIO represents the read and write mode using standard I/O.
-	FileIO RWMode = iota
-
-	// MMap represents the read and write mode using mmap.
-	MMap
-)
+package fileio
 
 // RWManager represents an interface to a RWManager.
 type RWManager interface {

@@ -10,6 +10,7 @@ import (
 	"sort"
 
 	"github.com/nutsdb/nutsdb/internal/data"
+	"github.com/nutsdb/nutsdb/internal/fileio"
 	"github.com/nutsdb/nutsdb/internal/utils"
 )
 
@@ -187,7 +188,7 @@ func (job *mergeV2Job) prepare() error {
 	// Create new active file for writes during merge
 	job.db.MaxFileID++
 	path := getDataPath(job.db.MaxFileID, job.db.opt.Dir)
-	activeFile, err := job.db.fm.getDataFile(path, job.db.opt.SegmentSize)
+	activeFile, err := job.db.fm.GetDataFile(path, job.db.opt.SegmentSize)
 	if err != nil {
 		job.db.isMerging = false
 		job.db.mu.Unlock()
@@ -388,7 +389,7 @@ func (job *mergeV2Job) rewriteFile(fid int64) error {
 		}
 		entry, err := fr.readEntry(off)
 		if err != nil {
-			if errors.Is(err, io.EOF) || errors.Is(err, ErrIndexOutOfBound) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, ErrHeaderSizeOutOfBounds) {
+			if errors.Is(err, io.EOF) || errors.Is(err, fileio.ErrIndexOutOfBound) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, ErrHeaderSizeOutOfBounds) {
 				break
 			}
 			return fmt.Errorf("merge rewrite read entry at offset %d: %w", off, err)
@@ -537,7 +538,7 @@ func (job *mergeV2Job) newOutput() (*mergeOutput, error) {
 	}
 
 	// Create the data file with merge-specific file ID
-	dataFile, err := job.db.fm.getDataFileByID(job.db.opt.Dir, fileID, job.db.opt.SegmentSize)
+	dataFile, err := job.db.fm.GetDataFileByID(job.db.opt.Dir, fileID, job.db.opt.SegmentSize)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get data file: %w", err)
 	}

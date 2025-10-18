@@ -576,7 +576,7 @@ func TestMergeV2NewOutputOldHintRemovalFailure(t *testing.T) {
 
 	db := &DB{
 		opt: opts,
-		fm:  newFileManager(opts.RWMode, 4, 0.5, opts.SegmentSize),
+		fm:  NewFileManager(opts.RWMode, 4, 0.5, opts.SegmentSize),
 	}
 
 	job := &mergeV2Job{db: db}
@@ -596,7 +596,7 @@ func TestMergeV2EnsureOutputRolloverCreatesNewSegment(t *testing.T) {
 
 	db := &DB{
 		opt: opts,
-		fm:  newFileManager(opts.RWMode, 4, 0.5, opts.SegmentSize),
+		fm:  NewFileManager(opts.RWMode, 4, 0.5, opts.SegmentSize),
 	}
 
 	job := &mergeV2Job{db: db}
@@ -2093,7 +2093,7 @@ func TestMergeV2CleanupOldFilesPropagatesErrors(t *testing.T) {
 	}
 
 	job := &mergeV2Job{
-		db:      &DB{opt: Options{Dir: dir}, fm: newFileManager(FileIO, 1, 0.5, 1<<12)},
+		db:      &DB{opt: Options{Dir: dir}, fm: NewFileManager(FileIO, 1, 0.5, 1<<12)},
 		oldData: []string{nested},
 	}
 
