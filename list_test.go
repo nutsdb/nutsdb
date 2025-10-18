@@ -16,6 +16,7 @@ package nutsdb
 import (
 	"bytes"
 	"math/rand"
+	"os"
 	"testing"
 	"time"
 
@@ -69,7 +70,7 @@ func ListCmp(t *testing.T, list *List, key string, expectRecords []*data.Record,
 }
 
 func TestList_LPush(t *testing.T) {
-	list := NewList()
+	list := NewList(DefaultOptions)
 	// 测试 LPush
 	key := string(testutils.GetTestBytes(0))
 	expectRecords := generateRecords(5)
@@ -86,9 +87,10 @@ func TestList_LPush(t *testing.T) {
 }
 
 func TestList_RPush(t *testing.T) {
-	list := NewList()
-	expectRecords := generateRecords(5)
+	list := NewList(DefaultOptions)
+	// 测试 RPush
 	key := string(testutils.GetTestBytes(0))
+	expectRecords := generateRecords(5)
 	seqInfo := HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
 
 	for i := 0; i < len(expectRecords); i++ {
@@ -102,7 +104,7 @@ func TestList_RPush(t *testing.T) {
 }
 
 func TestList_Pop(t *testing.T) {
-	list := NewList()
+	list := NewList(DefaultOptions)
 	expectRecords := generateRecords(5)
 	key := string(testutils.GetTestBytes(0))
 
@@ -126,7 +128,7 @@ func TestList_Pop(t *testing.T) {
 }
 
 func TestList_LRem(t *testing.T) {
-	list := NewList()
+	list := NewList(DefaultOptions)
 	records := generateRecords(2)
 	key := string(testutils.GetTestBytes(0))
 	seqInfo := HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
@@ -184,7 +186,7 @@ func TestList_LRem(t *testing.T) {
 }
 
 func TestList_LTrim(t *testing.T) {
-	list := NewList()
+	list := NewList(DefaultOptions)
 	expectRecords := generateRecords(5)
 	key := string(testutils.GetTestBytes(0))
 	seqInfo := HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
@@ -203,7 +205,7 @@ func TestList_LTrim(t *testing.T) {
 }
 
 func TestList_LRemByIndex(t *testing.T) {
-	list := NewList()
+	list := NewList(DefaultOptions)
 	expectRecords := generateRecords(8)
 	key := string(testutils.GetTestBytes(0))
 	seqInfo := HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
@@ -255,4 +257,295 @@ func generateRecords(count int) []*data.Record {
 		records[i] = record
 	}
 	return records
+}
+
+// TestList_SequenceConsistency tests sequence number consistency
+func TestList_SequenceConsistency(t *testing.T) {
+	list := NewList(DefaultOptions)
+	key := string(testutils.GetTestBytes(0))
+	seqInfo := HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
+
+	// Push 5 elements
+	for i := 0; i < 5; i++ {
+		seq := generateSeq(&seqInfo, false)
+		newKey := encodeListKey([]byte(key), seq)
+		record := &data.Record{Key: newKey, Value: testutils.GetTestBytes(i)}
+		ListPush(t, list, string(newKey), record, false, nil)
+	}
+
+	// Verify Head and Tail
+	require.Equal(t, uint64(initialListSeq), seqInfo.Head, "Head should not change for RPush")
+	require.Equal(t, uint64(initialListSeq+6), seqInfo.Tail, "Tail should increment")
+
+	// Pop from left
+	ListPop(t, list, key, true, &data.Record{
+		Key:   encodeListKey([]byte(key), initialListSeq+1),
+		Value: testutils.GetTestBytes(0),
+	}, nil)
+
+	// Push again - should not reuse old sequence
+	seq := generateSeq(&seqInfo, false)
+	newKey := encodeListKey([]byte(key), seq)
+	record := &data.Record{Key: newKey, Value: testutils.GetTestBytes(99)}
+	ListPush(t, list, string(newKey), record, false, nil)
+
+	// Verify final state
+	size, err := list.Size(key)
+	require.NoError(t, err)
+	require.Equal(t, 5, size)
+}
+
+// TestTx_PushPopPushSequence tests Push->Pop->Push sequence numbers
+func TestTx_PushPopPushSequence(t *testing.T) {
+	bucket := "bucket"
+	key := testutils.GetTestBytes(0)
+
+	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureList, bucket, nil)
+
+		// Push 3 elements
+		txPush(t, db, bucket, key, testutils.GetTestBytes(0), false, nil, nil)
+		txPush(t, db, bucket, key, testutils.GetTestBytes(1), false, nil, nil)
+		txPush(t, db, bucket, key, testutils.GetTestBytes(2), false, nil, nil)
+
+		// Pop one from left
+		txPop(t, db, bucket, key, testutils.GetTestBytes(0), nil, true)
+
+		// Push another to right
+		txPush(t, db, bucket, key, testutils.GetTestBytes(3), false, nil, nil)
+
+		// Pop from right
+		txPop(t, db, bucket, key, testutils.GetTestBytes(3), nil, false)
+
+		// Push to left
+		txPush(t, db, bucket, key, testutils.GetTestBytes(99), true, nil, nil)
+
+		// Verify final order: [99, 1, 2]
+		txLRange(t, db, bucket, key, 0, -1, 3, [][]byte{
+			testutils.GetTestBytes(99), testutils.GetTestBytes(1), testutils.GetTestBytes(2),
+		}, nil)
+	})
+}
+
+// TestList_MixedPushPop tests mixed LPush/RPush/LPop/RPop operations
+func TestList_MixedPushPop(t *testing.T) {
+	list := NewList(DefaultOptions)
+	key := string(testutils.GetTestBytes(0))
+	seqInfo := HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
+
+	operations := []struct {
+		op    string
+		value int
+	}{
+		{"RPush", 1},
+		{"RPush", 2},
+		{"LPush", 0},
+		{"RPush", 3},
+		{"LPop", -1}, // Should remove 0
+		{"LPush", -1},
+		{"RPop", -1}, // Should remove 3
+		{"RPush", 4},
+	}
+
+	for _, operation := range operations {
+		switch operation.op {
+		case "RPush":
+			seq := generateSeq(&seqInfo, false)
+			newKey := encodeListKey([]byte(key), seq)
+			record := &data.Record{Key: newKey, Value: testutils.GetTestBytes(operation.value)}
+			ListPush(t, list, string(newKey), record, false, nil)
+		case "LPush":
+			seq := generateSeq(&seqInfo, true)
+			newKey := encodeListKey([]byte(key), seq)
+			record := &data.Record{Key: newKey, Value: testutils.GetTestBytes(operation.value)}
+			ListPush(t, list, string(newKey), record, true, nil)
+		case "LPop":
+			_, err := list.LPop(key)
+			require.NoError(t, err)
+		case "RPop":
+			_, err := list.RPop(key)
+			require.NoError(t, err)
+		}
+	}
+
+	// Expected: [-1, 1, 2, 4]
+	records, err := list.LRange(key, 0, -1)
+	require.NoError(t, err)
+	require.Equal(t, 4, len(records))
+
+	expected := []int{-1, 1, 2, 4}
+	for i, exp := range expected {
+		require.Equal(t, testutils.GetTestBytes(exp), records[i].Value)
+	}
+}
+
+// TestList_HeadTailBoundary tests Head and Tail boundary updates
+func TestList_HeadTailBoundary(t *testing.T) {
+	list := NewList(DefaultOptions)
+	key := string(testutils.GetTestBytes(0))
+	seqInfo := HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
+
+	// Only RPush
+	for i := 0; i < 3; i++ {
+		seq := generateSeq(&seqInfo, false)
+		newKey := encodeListKey([]byte(key), seq)
+		record := &data.Record{Key: newKey, Value: testutils.GetTestBytes(i)}
+		ListPush(t, list, string(newKey), record, false, nil)
+	}
+
+	// Verify Tail moved, Head didn't
+	require.Equal(t, uint64(initialListSeq), seqInfo.Head)
+	require.Equal(t, uint64(initialListSeq+4), seqInfo.Tail)
+
+	// Now LPush
+	for i := 0; i < 3; i++ {
+		seq := generateSeq(&seqInfo, true)
+		newKey := encodeListKey([]byte(key), seq)
+		record := &data.Record{Key: newKey, Value: testutils.GetTestBytes(100 + i)}
+		ListPush(t, list, string(newKey), record, true, nil)
+	}
+
+	// Verify Head moved, Tail didn't
+	require.Equal(t, uint64(initialListSeq-3), seqInfo.Head)
+	require.Equal(t, uint64(initialListSeq+4), seqInfo.Tail)
+}
+
+// TestTx_ListRecoveryAfterRestart tests that list data is correctly recovered after DB restart
+func TestTx_ListRecoveryAfterRestart(t *testing.T) {
+	bucket := "list_bucket"
+	key := testutils.GetTestBytes(0)
+
+	dir := "/tmp/test_nutsdb_list_recovery"
+	defer os.RemoveAll(dir)
+
+	// Step 1: Create DB and insert data
+	opts := DefaultOptions
+	opts.Dir = dir
+	db, err := Open(opts)
+	require.NoError(t, err)
+
+	// Create bucket and insert data
+	txCreateBucket(t, db, DataStructureList, bucket, nil)
+
+	// Insert 10 elements using RPush
+	for i := 0; i < 10; i++ {
+		txPush(t, db, bucket, key, testutils.GetTestBytes(i), false, nil, nil)
+	}
+
+	// Verify data before closing
+	txLSize(t, db, bucket, key, 10, nil)
+	txLRange(t, db, bucket, key, 0, -1, 10, [][]byte{
+		testutils.GetTestBytes(0), testutils.GetTestBytes(1), testutils.GetTestBytes(2), testutils.GetTestBytes(3), testutils.GetTestBytes(4),
+		testutils.GetTestBytes(5), testutils.GetTestBytes(6), testutils.GetTestBytes(7), testutils.GetTestBytes(8), testutils.GetTestBytes(9),
+	}, nil)
+
+	// Step 2: Close DB
+	err = db.Close()
+	require.NoError(t, err)
+
+	// Step 3: Reopen DB
+	db, err = Open(opts)
+	require.NoError(t, err)
+	defer db.Close()
+
+	// Step 4: Verify data after recovery
+	txLSize(t, db, bucket, key, 10, nil)
+	txLRange(t, db, bucket, key, 0, -1, 10, [][]byte{
+		testutils.GetTestBytes(0), testutils.GetTestBytes(1), testutils.GetTestBytes(2), testutils.GetTestBytes(3), testutils.GetTestBytes(4),
+		testutils.GetTestBytes(5), testutils.GetTestBytes(6), testutils.GetTestBytes(7), testutils.GetTestBytes(8), testutils.GetTestBytes(9),
+	}, nil)
+
+	// Step 5: Test continued operations after recovery
+	txPush(t, db, bucket, key, testutils.GetTestBytes(10), false, nil, nil)
+	txPush(t, db, bucket, key, testutils.GetTestBytes(99), true, nil, nil)
+
+	// Verify final state
+	txLSize(t, db, bucket, key, 12, nil)
+	txLRange(t, db, bucket, key, 0, 0, 1, [][]byte{testutils.GetTestBytes(99)}, nil)
+	txLRange(t, db, bucket, key, 11, 11, 1, [][]byte{testutils.GetTestBytes(10)}, nil)
+}
+
+// TestTx_ListRecoveryWithMixedOperations tests recovery after complex operations
+func TestTx_ListRecoveryWithMixedOperations(t *testing.T) {
+	bucket := "list_bucket"
+	key := testutils.GetTestBytes(0)
+
+	dir := "/tmp/test_nutsdb_list_recovery_mixed"
+	defer os.RemoveAll(dir)
+
+	opts := DefaultOptions
+	opts.Dir = dir
+	db, err := Open(opts)
+	require.NoError(t, err)
+
+	// Create bucket
+	txCreateBucket(t, db, DataStructureList, bucket, nil)
+
+	// RPush 5 elements: [0,1,2,3,4]
+	for i := 0; i < 5; i++ {
+		txPush(t, db, bucket, key, testutils.GetTestBytes(i), false, nil, nil)
+	}
+
+	// LPush 2 elements: [98,99,0,1,2,3,4]
+	txPush(t, db, bucket, key, testutils.GetTestBytes(99), true, nil, nil)
+	txPush(t, db, bucket, key, testutils.GetTestBytes(98), true, nil, nil)
+
+	// Close and reopen
+	err = db.Close()
+	require.NoError(t, err)
+
+	db, err = Open(opts)
+	require.NoError(t, err)
+	defer db.Close()
+
+	// Verify recovered state - should have 7 elements
+	txLSize(t, db, bucket, key, 7, nil)
+	txLRange(t, db, bucket, key, 0, -1, 7, [][]byte{
+		testutils.GetTestBytes(98), testutils.GetTestBytes(99), testutils.GetTestBytes(0), testutils.GetTestBytes(1),
+		testutils.GetTestBytes(2), testutils.GetTestBytes(3), testutils.GetTestBytes(4),
+	}, nil)
+}
+
+// TestTx_ListRecoveryMultipleLists tests recovery of multiple lists
+func TestTx_ListRecoveryMultipleLists(t *testing.T) {
+	bucket := "list_bucket"
+
+	dir := "/tmp/test_nutsdb_list_recovery_multiple"
+	defer os.RemoveAll(dir)
+
+	opts := DefaultOptions
+	opts.Dir = dir
+	db, err := Open(opts)
+	require.NoError(t, err)
+
+	// Create bucket
+	txCreateBucket(t, db, DataStructureList, bucket, nil)
+
+	// Create multiple lists
+	for listIdx := 0; listIdx < 3; listIdx++ {
+		key := testutils.GetTestBytes(listIdx)
+		for i := 0; i < 5; i++ {
+			txPush(t, db, bucket, key, testutils.GetTestBytes(listIdx*100+i), false, nil, nil)
+		}
+	}
+
+	// Close and reopen
+	err = db.Close()
+	require.NoError(t, err)
+
+	db, err = Open(opts)
+	require.NoError(t, err)
+	defer db.Close()
+
+	// Verify all lists recovered correctly
+	for listIdx := 0; listIdx < 3; listIdx++ {
+		key := testutils.GetTestBytes(listIdx)
+		txLSize(t, db, bucket, key, 5, nil)
+
+		expected := make([][]byte, 5)
+		for i := 0; i < 5; i++ {
+			expected[i] = testutils.GetTestBytes(listIdx*100 + i)
+		}
+		txLRange(t, db, bucket, key, 0, -1, 5, expected, nil)
+	}
 }

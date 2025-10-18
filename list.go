@@ -40,6 +40,70 @@ const (
 	initialListSeq = math.MaxUint64 / 2
 )
 
+// ListStructure defines the interface for List storage implementations.
+// It supports multiple implementations: BTree, DoublyLinkedList, SkipList, etc.
+// This interface enables users to choose the most suitable implementation based on their use case:
+// - DoublyLinkedList: O(1) head/tail operations, optimal for LPush/RPush/LPop/RPop
+// - BTree: O(log n) operations, better for range queries and random access
+type ListStructure interface {
+	// InsertRecord inserts a record with the given key (sequence number in big-endian format).
+	// Returns true if an existing record was replaced, false if a new record was inserted.
+	InsertRecord(key []byte, record *Record) bool
+
+	// Delete removes the record with the given key.
+	// Returns true if the record was found and deleted, false otherwise.
+	Delete(key []byte) bool
+
+	// Find retrieves the record with the given key.
+	// Returns the record and true if found, nil and false otherwise.
+	Find(key []byte) (*Record, bool)
+
+	// Min returns the item with the smallest key (head of the list).
+	// Returns the item and true if the list is not empty, nil and false otherwise.
+	Min() (*Item, bool)
+
+	// Max returns the item with the largest key (tail of the list).
+	// Returns the item and true if the list is not empty, nil and false otherwise.
+	Max() (*Item, bool)
+
+	// All returns all records in ascending key order.
+	All() []*Record
+
+	// AllItems returns all items (key + record pairs) in ascending key order.
+	AllItems() []*Item
+
+	// Count returns the number of elements in the list.
+	Count() int
+
+	// Range returns records with keys in the range [start, end] (inclusive).
+	Range(start, end []byte) []*Record
+
+	// PrefixScan scans records with keys matching the given prefix.
+	// offset: number of matching records to skip
+	// limitNum: maximum number of records to return
+	PrefixScan(prefix []byte, offset, limitNum int) []*Record
+
+	// PrefixSearchScan scans records with keys matching the given prefix and regex pattern.
+	// The regex is applied to the portion of the key after removing the prefix.
+	// offset: number of matching records to skip
+	// limitNum: maximum number of records to return
+	PrefixSearchScan(prefix []byte, reg string, offset, limitNum int) []*Record
+
+	// PopMin removes and returns the item with the smallest key.
+	// Returns the item and true if the list is not empty, nil and false otherwise.
+	PopMin() (*Item, bool)
+
+	// PopMax removes and returns the item with the largest key.
+	// Returns the item and true if the list is not empty, nil and false otherwise.
+	PopMax() (*Item, bool)
+}
+
+// Compile-time interface implementation checks
+var (
+	_ ListStructure = (*BTree)(nil)
+	_ ListStructure = (*DoublyLinkedList)(nil)
+)
+
 // BTree represents the btree.
 
 // HeadTailSeq list head and tail seq num
@@ -50,18 +114,33 @@ type HeadTailSeq struct {
 
 // List represents the list.
 type List struct {
-	Items     map[string]*BTree
+	Items     map[string]ListStructure
 	TTL       map[string]uint32
 	TimeStamp map[string]uint64
 	Seq       map[string]*HeadTailSeq
+	opts      Options // Configuration options
 }
 
-func NewList() *List {
+func NewList(opts Options) *List {
 	return &List{
-		Items:     make(map[string]*BTree),
+		Items:     make(map[string]ListStructure),
 		TTL:       make(map[string]uint32),
 		TimeStamp: make(map[string]uint64),
 		Seq:       make(map[string]*HeadTailSeq),
+		opts:      opts,
+	}
+}
+
+// createListStructure creates a new list storage structure based on configuration.
+func (l *List) createListStructure() ListStructure {
+	switch l.opts.ListImpl {
+	case ListImplBTree:
+		return NewBTree()
+	case ListImplDoublyLinkedList:
+		return NewDoublyLinkedList()
+	default:
+		// Default to DoublyLinkedList for safety
+		return NewDoublyLinkedList()
 	}
 }
 
@@ -83,23 +162,31 @@ func (l *List) push(key string, r *data.Record, isLeft bool) error {
 
 	list, ok := l.Items[userKeyStr]
 	if !ok {
-		l.Items[userKeyStr] = NewBTree()
+		l.Items[userKeyStr] = l.createListStructure()
 		list = l.Items[userKeyStr]
 	}
 
-	seq, ok := l.Seq[userKeyStr]
-	if !ok {
+	// Initialize seq if not exists
+	if _, ok := l.Seq[userKeyStr]; !ok {
 		l.Seq[userKeyStr] = &HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
-		seq = l.Seq[userKeyStr]
 	}
 
 	list.InsertRecord(ConvertUint64ToBigEndianBytes(curSeq), r)
+
+	// Update seq boundaries to track the next insertion positions
+	// This is important for recovery scenarios where we rebuild the index
+	// Head and Tail should always represent the next available positions for insertion
+	seq := l.Seq[userKeyStr]
 	if isLeft {
-		if seq.Head > curSeq-1 {
+		// LPush: Head should be the next available position on the left
+		// If current seq is the actual head, set Head to current seq - 1
+		if curSeq <= seq.Head {
 			seq.Head = curSeq - 1
 		}
 	} else {
-		if seq.Tail < curSeq+1 {
+		// RPush: Tail should be the next available position on the right
+		// If current seq is at or beyond current tail, update Tail accordingly
+		if curSeq >= seq.Tail {
 			seq.Tail = curSeq + 1
 		}
 	}
@@ -108,25 +195,47 @@ func (l *List) push(key string, r *data.Record, isLeft bool) error {
 }
 
 func (l *List) LPop(key string) (*data.Record, error) {
-	item, err := l.LPeek(key)
-	if err != nil {
-		return nil, err
+	if l.IsExpire(key) {
+		return nil, ErrListNotFound
 	}
 
-	l.Items[key].Delete(item.key)
-	l.Seq[key].Head = ConvertBigEndianBytesToUint64(item.key)
+	list, ok := l.Items[key]
+	if !ok {
+		return nil, ErrListNotFound
+	}
+
+	// Use PopMin for efficient O(1) head removal
+	item, ok := list.PopMin()
+	if !ok {
+		return nil, ErrEmptyList
+	}
+
+	// After LPop, Head should point to the next element's position
+	// Note: We don't update Head here because it represents "next push position"
+	// The popped element's sequence is already consumed
 	return item.record, nil
 }
 
 // RPop removes and returns the last element of the list stored at key.
 func (l *List) RPop(key string) (*data.Record, error) {
-	item, err := l.RPeek(key)
-	if err != nil {
-		return nil, err
+	if l.IsExpire(key) {
+		return nil, ErrListNotFound
 	}
 
-	l.Items[key].Delete(item.key)
-	l.Seq[key].Tail = ConvertBigEndianBytesToUint64(item.key)
+	list, ok := l.Items[key]
+	if !ok {
+		return nil, ErrListNotFound
+	}
+
+	// Use PopMax for efficient O(1) tail removal
+	item, ok := list.PopMax()
+	if !ok {
+		return nil, ErrEmptyList
+	}
+
+	// After RPop, Tail should point to the next element's position
+	// Note: We don't update Tail here because it represents "next push position"
+	// The popped element's sequence is already consumed
 	return item.record, nil
 }
 
