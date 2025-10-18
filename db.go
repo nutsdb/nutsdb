@@ -27,6 +27,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/bwmarrin/snowflake"
 	"github.com/gofrs/flock"
 	"github.com/xujiajun/utils/filesystem"
 	"github.com/xujiajun/utils/strconv2"
@@ -59,6 +60,9 @@ type (
 		RecordCount             int64 // current valid record count, exclude deleted, repeated
 		bm                      *BucketManager
 		hintKeyAndRAMIdxModeLru *LRUCache // lru cache for HintKeyAndRAMIdxMode
+		// snowflake optimization: cache snowflake node to avoid recreating per transaction
+		snowflakeNode *snowflake.Node
+		snowflakeOnce sync.Once
 	}
 )
 
@@ -331,6 +335,15 @@ func (db *DB) getMaxWriteRecordCount() int64 {
 
 func (db *DB) getHintKeyAndRAMIdxCacheSize() int {
 	return db.opt.HintKeyAndRAMIdxCacheSize
+}
+
+// getSnowflakeNode returns a cached snowflake node, creating it once if needed.
+func (db *DB) getSnowflakeNode() (*snowflake.Node, error) {
+	var err error
+	db.snowflakeOnce.Do(func() {
+		db.snowflakeNode, err = snowflake.NewNode(db.opt.NodeNum)
+	})
+	return db.snowflakeNode, err
 }
 
 func (db *DB) doWrites() {
