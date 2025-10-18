@@ -22,7 +22,7 @@ import (
 type Iterator struct {
 	tx      *Tx
 	options IteratorOptions
-	iter    btree.IterG[*Item[*data.Record]]
+	iter    btree.IterG[*data.Item[data.Record]]
 }
 
 type IteratorOptions struct {
@@ -60,7 +60,7 @@ func (it *Iterator) Rewind() bool {
 }
 
 func (it *Iterator) Seek(key []byte) bool {
-	return it.iter.Seek(&Item[*data.Record]{Key: key})
+	return it.iter.Seek(&data.Item[data.Record]{Key: key})
 }
 
 func (it *Iterator) Next() bool {

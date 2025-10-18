@@ -162,7 +162,7 @@ func (tx *Tx) getMaxOrMinKey(bucket string, isMax bool) ([]byte, error) {
 
 	if idx, ok := tx.db.Index.bTree.exist(bucketId); ok {
 		var (
-			item  *Item[*data.Record]
+			item  *data.Item[data.Record]
 			found bool
 		)
 

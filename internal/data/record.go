@@ -32,6 +32,16 @@ type Record struct {
 	TxID      uint64
 }
 
+// GetKey return the record's key.
+func (r *Record) GetKey() []byte {
+	return r.Key
+}
+
+// GetValue return the record's value.
+func (r *Record) GetValue() []byte {
+	return r.Value
+}
+
 // IsExpired returns the record if expired or not.
 func (r *Record) IsExpired() bool {
 	return IsExpired(r.TTL, r.Timestamp)
