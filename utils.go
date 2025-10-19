@@ -215,8 +215,10 @@ func mergeKeyValues(
 ) (keys, values [][]byte) {
 	l0 := len(k0)
 	l1 := len(k1)
-	keys = make([][]byte, 0)
-	values = make([][]byte, 0)
+	// Pre-allocate capacity with estimated maximum size to reduce slice re-growth
+	estimatedSize := l0 + l1
+	keys = make([][]byte, 0, estimatedSize)
+	values = make([][]byte, 0, estimatedSize)
 	cur0 := 0
 	cur1 := 0
 	for cur0 < l0 && cur1 < l1 {

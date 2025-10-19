@@ -314,7 +314,14 @@ func (tx *Tx) RangeScanEntries(bucket string, start, end []byte, includeKeys, in
 	pendingKeys, pendingValues := tx.pendingWrites.getDataByRange(start, end, b.Name)
 	if index, ok := tx.db.Index.bTree.exist(bucketId); ok {
 		records := index.Range(start, end)
-		keys, values, err = tx.getHintIdxDataItemsWrapper(records, ScanNoLimit, bucketId, true, true)
+
+		// 如果需要合并 pending，则必须拿到 keys 进行有序 merge；
+		// 否则可以按需提取，避免不必要的 keys 分配。
+		needKeysForMerge := includeKeys || len(pendingKeys) > 0
+
+		keys, values, err = tx.getHintIdxDataItemsWrapper(
+			records, ScanNoLimit, bucketId, needKeysForMerge, includeValues,
+		)
 		if err != nil && len(pendingKeys) == 0 && len(pendingValues) == 0 {
 			// If there is no item in pending and persist db,
 			// return error itself.
@@ -322,19 +329,24 @@ func (tx *Tx) RangeScanEntries(bucket string, start, end []byte, includeKeys, in
 		}
 	}
 
-	keys, values = mergeKeyValues(pendingKeys, pendingValues, keys, values)
-	if !includeKeys {
-		keys = nil
-	}
-	if !includeValues {
-		values = nil
+	// 仅当存在 pending 时才进行 merge，避免 values-only 且无 pending 的场景强制构建 keys。
+	if len(pendingKeys) > 0 || len(pendingValues) > 0 {
+		keys, values = mergeKeyValues(pendingKeys, pendingValues, keys, values)
 	}
 
+	// Check for empty results before setting to nil
 	if includeKeys && len(keys) == 0 {
 		return nil, nil, ErrRangeScan
 	}
 	if includeValues && len(values) == 0 {
 		return nil, nil, ErrRangeScan
+	}
+
+	if !includeKeys {
+		keys = nil
+	}
+	if !includeValues {
+		values = nil
 	}
 
 	return
@@ -437,24 +449,46 @@ func (tx *Tx) Delete(bucket string, key []byte) error {
 
 // getHintIdxDataItemsWrapper returns keys and values when prefix scanning or range scanning.
 func (tx *Tx) getHintIdxDataItemsWrapper(records []*Record, limitNum int, bucketId BucketId, needKeys bool, needValues bool) (keys [][]byte, values [][]byte, err error) {
+	// Pre-allocate capacity to reduce slice re-growth
+	estimatedSize := len(records)
+	if limitNum > 0 && limitNum < estimatedSize {
+		estimatedSize = limitNum
+	}
+
+	if needKeys {
+		keys = make([][]byte, 0, estimatedSize)
+	}
+	if needValues {
+		values = make([][]byte, 0, estimatedSize)
+	}
+
+	processedCount := 0
+	needAny := needKeys || needValues
+
 	for _, record := range records {
 		if record.IsExpired() {
 			tx.putDeleteLog(bucketId, record.Key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureBTree)
 			continue
 		}
 
-		if limitNum > 0 && len(values) < limitNum || limitNum == ScanNoLimit {
-			if needKeys {
-				keys = append(keys, record.Key)
-			}
+		// 正确的 limit 控制：与是否需要 keys/values 无关
+		if limitNum > 0 && needAny && processedCount >= limitNum {
+			break
+		}
 
-			if needValues {
-				value, err := tx.db.getValueByRecord(record)
-				if err != nil {
-					return nil, nil, err
-				}
-				values = append(values, value)
+		if needKeys {
+			keys = append(keys, record.Key)
+		}
+		if needValues {
+			value, err := tx.db.getValueByRecord(record)
+			if err != nil {
+				return nil, nil, err
 			}
+			values = append(values, value)
+		}
+
+		if needAny {
+			processedCount++
 		}
 	}
 
