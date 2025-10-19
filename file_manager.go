@@ -19,6 +19,17 @@ func newFileManager(rwMode RWMode, maxFdNums int, cleanThreshold float64, segmen
 
 // getDataFile will return a DataFile Object
 func (fm *fileManager) getDataFile(path string, capacity int64) (datafile *DataFile, err error) {
+	return fm.getDataFileWithMode(path, capacity, false)
+}
+
+// getDataFileReadOnly will return a DataFile Object for read-only operations
+// This method skips file truncation to improve read performance
+func (fm *fileManager) getDataFileReadOnly(path string, capacity int64) (datafile *DataFile, err error) {
+	return fm.getDataFileWithMode(path, capacity, true)
+}
+
+// getDataFileWithMode will return a DataFile Object with specified read-only mode
+func (fm *fileManager) getDataFileWithMode(path string, capacity int64, readOnly bool) (datafile *DataFile, err error) {
 	if capacity <= 0 {
 		return nil, ErrCapacity
 	}
@@ -26,14 +37,14 @@ func (fm *fileManager) getDataFile(path string, capacity int64) (datafile *DataF
 	var rwManager RWManager
 
 	if fm.rwMode == FileIO {
-		rwManager, err = fm.getFileRWManager(path, capacity, fm.segmentSize)
+		rwManager, err = fm.getFileRWManager(path, capacity, fm.segmentSize, readOnly)
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	if fm.rwMode == MMap {
-		rwManager, err = fm.getMMapRWManager(path, capacity, fm.segmentSize)
+		rwManager, err = fm.getMMapRWManager(path, capacity, fm.segmentSize, readOnly)
 		if err != nil {
 			return nil, err
 		}
@@ -48,12 +59,12 @@ func (fm *fileManager) getDataFileByID(dir string, fileID int64, capacity int64)
 }
 
 // getFileRWManager will return a FileIORWManager Object
-func (fm *fileManager) getFileRWManager(path string, capacity int64, segmentSize int64) (*FileIORWManager, error) {
+func (fm *fileManager) getFileRWManager(path string, capacity int64, segmentSize int64, readOnly bool) (*FileIORWManager, error) {
 	fd, err := fm.fdm.getFd(path)
 	if err != nil {
 		return nil, err
 	}
-	err = Truncate(path, capacity, fd)
+	err = Truncate(path, capacity, fd, readOnly)
 	if err != nil {
 		return nil, err
 	}
@@ -62,13 +73,13 @@ func (fm *fileManager) getFileRWManager(path string, capacity int64, segmentSize
 }
 
 // getMMapRWManager will return a MMapRWManager Object
-func (fm *fileManager) getMMapRWManager(path string, capacity int64, segmentSize int64) (*MMapRWManager, error) {
+func (fm *fileManager) getMMapRWManager(path string, capacity int64, segmentSize int64, readOnly bool) (*MMapRWManager, error) {
 	fd, err := fm.fdm.getFd(path)
 	if err != nil {
 		return nil, err
 	}
 
-	err = Truncate(path, capacity, fd)
+	err = Truncate(path, capacity, fd, readOnly)
 	if err != nil {
 		return nil, err
 	}
