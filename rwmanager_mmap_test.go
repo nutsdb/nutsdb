@@ -28,7 +28,7 @@ import (
 func TestRWManager_MMap_Release(t *testing.T) {
 	filePath := "/tmp/foo_rw_MMap"
 	fdm := newFileManager(MMap, 8*MB, 0.5, 8*MB)
-	rwmanager, err := fdm.getMMapRWManager(filePath, 8*MB, 8*MB)
+	rwmanager, err := fdm.getMMapRWManager(filePath, 8*MB, 8*MB, false)
 	if err != nil {
 		t.Error("err TestRWManager_MMap_Release getMMapRWManager")
 	}
@@ -70,7 +70,7 @@ func TestRWManager_MMap_WriteAt(t *testing.T) {
 	}
 	defer os.Remove(fd.Name())
 
-	err = Truncate(filePath, 8*MB, fd)
+	err = Truncate(filePath, 8*MB, fd, false)
 	if err != nil {
 		require.NoError(t, err)
 
@@ -102,7 +102,7 @@ func TestRWManager_MMap_WriteAt_NotEnoughData(t *testing.T) {
 
 	defer os.Remove(fd.Name())
 
-	err = Truncate(filePath, 8*MB, fd)
+	err = Truncate(filePath, 8*MB, fd, false)
 	require.NoError(t, err)
 
 	m, err := mmap.Map(fd, mmap.RDWR, 0)
@@ -134,7 +134,7 @@ func TestRWManager_MMap_ReadAt_CrossBlock(t *testing.T) {
 
 	defer os.Remove(fd.Name())
 
-	err = Truncate(filePath, 8*MB, fd)
+	err = Truncate(filePath, 8*MB, fd, false)
 	require.NoError(t, err)
 
 	m, err := mmap.Map(fd, mmap.RDWR, 0)
@@ -164,7 +164,7 @@ func TestRWManager_MMap_ReadAt_NotEnoughBytes(t *testing.T) {
 
 	defer os.Remove(fd.Name())
 
-	err = Truncate(filePath, 8*MB, fd)
+	err = Truncate(filePath, 8*MB, fd, false)
 	require.NoError(t, err)
 
 	m, err := mmap.Map(fd, mmap.RDWR, 0)
@@ -194,7 +194,7 @@ func TestRWManager_MMap_ReadAt_ErrIndexOutOfBound(t *testing.T) {
 
 	defer os.Remove(fd.Name())
 
-	err = Truncate(filePath, 8*MB, fd)
+	err = Truncate(filePath, 8*MB, fd, false)
 	require.NoError(t, err)
 
 	b := make([]byte, 16)
@@ -217,7 +217,7 @@ func TestRWManager_MMap_Sync(t *testing.T) {
 	}
 	defer os.Remove(fd.Name())
 
-	err = Truncate(filePath, 8*MB, fd)
+	err = Truncate(filePath, 8*MB, fd, false)
 	if err != nil {
 		require.NoError(t, err)
 
@@ -248,7 +248,7 @@ func TestRWManager_MMap_Close(t *testing.T) {
 	}
 	defer os.Remove(fd.Name())
 
-	err = Truncate(filePath, 8*MB, fd)
+	err = Truncate(filePath, 8*MB, fd, false)
 	if err != nil {
 		require.NoError(t, err)
 
