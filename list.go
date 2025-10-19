@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/nutsdb/nutsdb/internal/data"
+	"github.com/nutsdb/nutsdb/internal/utils"
 )
 
 var (
@@ -100,7 +101,7 @@ type ListStructure interface {
 
 // Compile-time interface implementation checks
 var (
-	_ ListStructure = (*BTree)(nil)
+	_ ListStructure = (*data.BTree)(nil)
 	_ ListStructure = (*DoublyLinkedList)(nil)
 )
 
@@ -135,7 +136,7 @@ func NewList(opts Options) *List {
 func (l *List) createListStructure() ListStructure {
 	switch l.opts.ListImpl {
 	case ListImplBTree:
-		return NewBTree()
+		return data.NewBTree()
 	case ListImplDoublyLinkedList:
 		return NewDoublyLinkedList()
 	default:
@@ -171,7 +172,7 @@ func (l *List) push(key string, r *data.Record, isLeft bool) error {
 		l.Seq[userKeyStr] = &HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
 	}
 
-	list.InsertRecord(ConvertUint64ToBigEndianBytes(curSeq), r)
+	list.InsertRecord(utils.ConvertUint64ToBigEndianBytes(curSeq), r)
 
 	// Update seq boundaries to track the next insertion positions
 	// This is important for recovery scenarios where we rebuild the index

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/nutsdb/nutsdb/internal/data"
+	"github.com/nutsdb/nutsdb/internal/utils"
 )
 
 func TestMergeV2Utils(t *testing.T) {
@@ -656,7 +657,7 @@ func TestMergeV2CommitCollectorFailure(t *testing.T) {
 	timestamp := uint64(time.Now().Unix())
 	oldFileID := int64(5)
 
-	bt := NewBTree()
+	bt := data.NewBTree()
 	record := (&data.Record{}).
 		WithKey(key).
 		WithFileId(oldFileID).
@@ -1344,8 +1345,8 @@ func TestMergeV2ApplyLookupUpdatesSecondaryIndexes(t *testing.T) {
 	listKey := []byte("list-key")
 	seq := uint64(42)
 	listRecord := &data.Record{FileID: 11, Timestamp: 2, TTL: Persistent, TxID: 1}
-	listIdx.Items[string(listKey)] = NewBTree()
-	listIdx.Items[string(listKey)].InsertRecord(ConvertUint64ToBigEndianBytes(seq), listRecord)
+	listIdx.Items[string(listKey)] = data.NewBTree()
+	listIdx.Items[string(listKey)].InsertRecord(utils.ConvertUint64ToBigEndianBytes(seq), listRecord)
 
 	// Sorted set bucket
 	sortedIdx := db.Index.sortedSet.getWithDefault(buckets[2].id, db)
@@ -1985,7 +1986,7 @@ func TestMergeV2RewriteFileSkipsCorruptedEntries(t *testing.T) {
 		t.Fatalf("close test data file: %v", err)
 	}
 
-	bt := NewBTree()
+	bt := data.NewBTree()
 	bt.InsertRecord(goodEntry.Key, (&data.Record{}).
 		WithFileId(fid).
 		WithDataPos(0).

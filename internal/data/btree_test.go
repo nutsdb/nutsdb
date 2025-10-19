@@ -12,13 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package nutsdb
+package data
 
 import (
 	"fmt"
 	"testing"
 
-	"github.com/nutsdb/nutsdb/internal/data"
 	"github.com/nutsdb/nutsdb/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -36,7 +35,7 @@ func runBTreeTest(t *testing.T, test func(t *testing.T, btree *BTree)) {
 		key := []byte(fmt.Sprintf(keyFormat, i))
 		val := []byte(fmt.Sprintf(valFormat, i))
 
-		rec := data.NewRecord().WithKey(key).WithValue(val)
+		rec := NewRecord().WithKey(key).WithValue(val)
 		_ = btree.InsertRecord(key, rec)
 	}
 
@@ -93,7 +92,7 @@ func TestBTree_PrefixSearchScan(t *testing.T) {
 			key := []byte("nutsdb-123456789@outlook.com")
 			val := testutils.GetRandomBytes(24)
 
-			rec := data.NewRecord().WithKey(key).WithValue(val)
+			rec := NewRecord().WithKey(key).WithValue(val)
 			_ = btree.InsertRecord(rec.Key, rec)
 
 			record, ok := btree.Find(key)
@@ -112,7 +111,7 @@ func TestBTree_PrefixSearchScan(t *testing.T) {
 			key := []byte("nutsdb-123456789@outlook")
 			val := testutils.GetRandomBytes(24)
 
-			rec := data.NewRecord().WithKey(key).WithValue(val)
+			rec := NewRecord().WithKey(key).WithValue(val)
 			_ = btree.InsertRecord(rec.Key, rec)
 
 			record, ok := btree.Find(key)
@@ -128,13 +127,13 @@ func TestBTree_PrefixSearchScan(t *testing.T) {
 
 func TestBTree_All(t *testing.T) {
 	runBTreeTest(t, func(t *testing.T, btree *BTree) {
-		expectRecords := make([]*data.Record, 100)
+		expectRecords := make([]*Record, 100)
 
 		for i := 0; i < 100; i++ {
 			key := []byte(fmt.Sprintf(keyFormat, i))
 			val := []byte(fmt.Sprintf(valFormat, i))
 
-			expectRecords[i] = data.NewRecord().WithKey(key).WithValue(val)
+			expectRecords[i] = NewRecord().WithKey(key).WithValue(val)
 		}
 
 		require.ElementsMatch(t, expectRecords, btree.All())
@@ -144,13 +143,13 @@ func TestBTree_All(t *testing.T) {
 func TestBTree_Range(t *testing.T) {
 	t.Run("btree range at begin", func(t *testing.T) {
 		runBTreeTest(t, func(t *testing.T, btree *BTree) {
-			expectRecords := make([]*data.Record, 10)
+			expectRecords := make([]*Record, 10)
 
 			for i := 0; i < 10; i++ {
 				key := []byte(fmt.Sprintf(keyFormat, i))
 				val := []byte(fmt.Sprintf(valFormat, i))
 
-				expectRecords[i] = data.NewRecord().WithKey(key).WithValue(val)
+				expectRecords[i] = NewRecord().WithKey(key).WithValue(val)
 			}
 
 			records := btree.Range([]byte(fmt.Sprintf(keyFormat, 0)), []byte(fmt.Sprintf(keyFormat, 9)))
@@ -161,13 +160,13 @@ func TestBTree_Range(t *testing.T) {
 
 	t.Run("btree range at middle", func(t *testing.T) {
 		runBTreeTest(t, func(t *testing.T, btree *BTree) {
-			expectRecords := make([]*data.Record, 10)
+			expectRecords := make([]*Record, 10)
 
 			for i := 40; i < 50; i++ {
 				key := []byte(fmt.Sprintf(keyFormat, i))
 				val := []byte(fmt.Sprintf(valFormat, i))
 
-				expectRecords[i-40] = data.NewRecord().WithKey(key).WithValue(val)
+				expectRecords[i-40] = NewRecord().WithKey(key).WithValue(val)
 			}
 
 			records := btree.Range([]byte(fmt.Sprintf(keyFormat, 40)), []byte(fmt.Sprintf(keyFormat, 49)))
@@ -178,13 +177,13 @@ func TestBTree_Range(t *testing.T) {
 
 	t.Run("btree range at end", func(t *testing.T) {
 		runBTreeTest(t, func(t *testing.T, btree *BTree) {
-			expectRecords := make([]*data.Record, 10)
+			expectRecords := make([]*Record, 10)
 
 			for i := 90; i < 100; i++ {
 				key := []byte(fmt.Sprintf(keyFormat, i))
 				val := []byte(fmt.Sprintf(valFormat, i))
 
-				expectRecords[i-90] = data.NewRecord().WithKey(key).WithValue(val)
+				expectRecords[i-90] = NewRecord().WithKey(key).WithValue(val)
 			}
 
 			records := btree.Range([]byte(fmt.Sprintf(keyFormat, 90)), []byte(fmt.Sprintf(keyFormat, 99)))
@@ -200,7 +199,7 @@ func TestBTree_Update(t *testing.T) {
 			key := []byte(fmt.Sprintf(keyFormat, i))
 			val := []byte(fmt.Sprintf("val_%03d_modify", i))
 
-			rec := data.NewRecord().WithKey(key).WithValue(val)
+			rec := NewRecord().WithKey(key).WithValue(val)
 			_ = btree.InsertRecord(rec.Key, rec)
 		}
 

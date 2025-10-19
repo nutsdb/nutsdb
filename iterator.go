@@ -39,7 +39,7 @@ func NewIterator(tx *Tx, bucket string, options IteratorOptions) *Iterator {
 	iterator := &Iterator{
 		tx:      tx,
 		options: options,
-		iter:    tx.db.Index.bTree.getWithDefault(b.Id).btree.Iter(),
+		iter:    tx.db.Index.bTree.getWithDefault(b.Id).Iter(),
 	}
 
 	if options.Reverse {

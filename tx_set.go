@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/nutsdb/nutsdb/internal/data"
+	"github.com/nutsdb/nutsdb/internal/utils"
 	"github.com/pkg/errors"
 )
 
@@ -496,7 +497,7 @@ func (tx *Tx) SKeys(bucket, pattern string, f func(key string) bool) error {
 		return ErrBucket
 	} else {
 		for key := range set.M {
-			if end, err := MatchForRange(pattern, key, f); end || err != nil {
+			if end, err := utils.MatchForRange(pattern, key, f); end || err != nil {
 				return err
 			}
 		}

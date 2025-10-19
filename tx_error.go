@@ -33,6 +33,7 @@ var (
 
 	// ErrNotFoundKey is returned when key not found int the bucket on an view function.
 	ErrNotFoundKey = errors.New("key not found in the bucket")
+	ErrKeyNotFound = ErrNotFoundKey
 
 	// ErrCannotCommitAClosedTx is returned when the tx committing a closed tx
 	ErrCannotCommitAClosedTx = errors.New("can not commit a closed tx")

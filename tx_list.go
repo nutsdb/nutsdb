@@ -20,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nutsdb/nutsdb/internal/utils"
 	"github.com/pkg/errors"
 	"github.com/xujiajun/utils/strconv2"
 )
@@ -110,7 +111,10 @@ func (tx *Tx) getListNewKey(bucket string, key []byte, isLeft bool) []byte {
 			if !okMinSeq || !okMaxSeq {
 				seq = &HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
 			} else {
-				seq = &HeadTailSeq{Head: ConvertBigEndianBytesToUint64(minSeq.Key) - 1, Tail: ConvertBigEndianBytesToUint64(maxSeq.Key) + 1}
+				seq = &HeadTailSeq{
+					Head: utils.ConvertBigEndianBytesToUint64(minSeq.Key) - 1,
+					Tail: utils.ConvertBigEndianBytesToUint64(maxSeq.Key) + 1,
+				}
 			}
 		} else {
 			seq = &HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
@@ -413,7 +417,7 @@ func (tx *Tx) LRemByIndex(bucket string, key []byte, indexes ...int) error {
 	}
 
 	sort.Ints(indexes)
-	data, err := MarshalInts(indexes)
+	data, err := utils.MarshalInts(indexes)
 	if err != nil {
 		return err
 	}
@@ -448,7 +452,7 @@ func (tx *Tx) LKeys(bucket, pattern string, f func(key string) bool) error {
 		if tx.CheckExpire(bucket, []byte(key)) {
 			continue
 		}
-		if end, err := MatchForRange(pattern, key, f); end || err != nil {
+		if end, err := utils.MatchForRange(pattern, key, f); end || err != nil {
 			return err
 		}
 	}

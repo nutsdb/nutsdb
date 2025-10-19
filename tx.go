@@ -23,6 +23,7 @@ import (
 
 	"github.com/bwmarrin/snowflake"
 	"github.com/nutsdb/nutsdb/internal/data"
+	"github.com/nutsdb/nutsdb/internal/utils"
 	"github.com/xujiajun/utils/strconv2"
 )
 
@@ -315,7 +316,7 @@ func (tx *Tx) getListEntryNewAddRecordCount(bucketId BucketId, entry *Entry) (in
 	case DataLPopFlag, DataRPopFlag:
 		res--
 	case DataLRemByIndex:
-		indexes, _ := UnmarshalInts([]byte(value))
+		indexes, _ := utils.UnmarshalInts([]byte(value))
 		res -= int64(len(l.getValidIndexes(key, indexes)))
 	case DataLRemFlag:
 		count, newValue := splitIntStringStr(value, SeparatorForListKey)

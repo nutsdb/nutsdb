@@ -689,7 +689,7 @@ func (job *mergeV2Job) applyLookup(entry *mergeLookupEntry) {
 			return
 		}
 		// Find the specific list item by sequence number
-		record, ok := items.Find(ConvertUint64ToBigEndianBytes(seq))
+		record, ok := items.Find(utils.ConvertUint64ToBigEndianBytes(seq))
 		if !ok || record == nil {
 			return
 		}

@@ -14,8 +14,10 @@
 
 package nutsdb
 
+import "github.com/nutsdb/nutsdb/internal/data"
+
 type IdxType interface {
-	BTree | Set | SortedSet | List
+	data.BTree | Set | SortedSet | List
 }
 
 type defaultOp[T IdxType] struct {
@@ -62,12 +64,12 @@ func (idx ListIdx) getWithDefault(id BucketId) *List {
 }
 
 type BTreeIdx struct {
-	*defaultOp[BTree]
+	*defaultOp[data.BTree]
 }
 
-func (idx BTreeIdx) getWithDefault(id BucketId) *BTree {
-	return idx.defaultOp.computeIfAbsent(id, func() *BTree {
-		return NewBTree()
+func (idx BTreeIdx) getWithDefault(id BucketId) *data.BTree {
+	return idx.defaultOp.computeIfAbsent(id, func() *data.BTree {
+		return data.NewBTree()
 	})
 }
 
@@ -107,7 +109,7 @@ func newIndexWithOptions(opts Options) *index {
 	i := new(index)
 	i.opts = opts
 	i.list = ListIdx{defaultOp: &defaultOp[List]{idx: map[BucketId]*List{}}, opts: opts}
-	i.bTree = BTreeIdx{&defaultOp[BTree]{idx: map[BucketId]*BTree{}}}
+	i.bTree = BTreeIdx{&defaultOp[data.BTree]{idx: map[BucketId]*data.BTree{}}}
 	i.set = SetIdx{&defaultOp[Set]{idx: map[BucketId]*Set{}}}
 	i.sortedSet = SortedSetIdx{&defaultOp[SortedSet]{idx: map[BucketId]*SortedSet{}}}
 	return i

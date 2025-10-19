@@ -741,21 +741,6 @@ func (db *DB) buildIdxes(record *data.Record, entry *Entry) error {
 	return nil
 }
 
-func (db *DB) deleteBucket(ds uint16, bucket BucketId) {
-	if ds == DataStructureSet {
-		db.Index.set.delete(bucket)
-	}
-	if ds == DataStructureSortedSet {
-		db.Index.sortedSet.delete(bucket)
-	}
-	if ds == DataStructureBTree {
-		db.Index.bTree.delete(bucket)
-	}
-	if ds == DataStructureList {
-		db.Index.list.delete(bucket)
-	}
-}
-
 // buildSetIdx builds set index when opening the DB.
 func (db *DB) buildSetIdx(record *data.Record, entry *Entry) error {
 	key, val, meta := entry.Key, entry.Value, entry.Meta
@@ -858,7 +843,7 @@ func (db *DB) buildListIdx(record *data.Record, entry *Entry) error {
 		end, _ := strconv2.StrToInt(string(val))
 		err = l.LTrim(newKey, start, end)
 	case DataLRemByIndex:
-		indexes, _ := UnmarshalInts(val)
+		indexes, _ := utils.UnmarshalInts(val)
 		err = l.LRemByIndex(string(key), indexes)
 	}
 

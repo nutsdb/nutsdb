@@ -24,6 +24,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/nutsdb/nutsdb/internal/utils"
 	"github.com/xujiajun/utils/strconv2"
 )
 
@@ -86,16 +87,16 @@ func (h *HintEntry) Size() int64 {
 	keySize := len(h.Key)
 
 	size := 0
-	size += UvarintSize(h.BucketId)
-	size += UvarintSize(uint64(keySize))
-	size += UvarintSize(uint64(h.ValueSize))
-	size += UvarintSize(h.Timestamp)
-	size += UvarintSize(uint64(h.TTL))
-	size += UvarintSize(uint64(h.Flag))
-	size += UvarintSize(uint64(h.Status))
-	size += UvarintSize(uint64(h.Ds))
-	size += UvarintSize(h.DataPos)
-	size += VarintSize(h.FileID)
+	size += utils.UvarintSize(h.BucketId)
+	size += utils.UvarintSize(uint64(keySize))
+	size += utils.UvarintSize(uint64(h.ValueSize))
+	size += utils.UvarintSize(h.Timestamp)
+	size += utils.UvarintSize(uint64(h.TTL))
+	size += utils.UvarintSize(uint64(h.Flag))
+	size += utils.UvarintSize(uint64(h.Status))
+	size += utils.UvarintSize(uint64(h.Ds))
+	size += utils.UvarintSize(h.DataPos)
+	size += utils.VarintSize(h.FileID)
 	size += keySize
 
 	return int64(size)

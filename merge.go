@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/nutsdb/nutsdb/internal/fileio"
+	"github.com/nutsdb/nutsdb/internal/utils"
 	"github.com/xujiajun/utils/strconv2"
 )
 
@@ -446,7 +447,7 @@ func (db *DB) isPendingListEntry(entry *Entry) bool {
 			return false
 		}
 
-		r, ok := list.Items[userKeyStr].Find(ConvertUint64ToBigEndianBytes(curSeq))
+		r, ok := list.Items[userKeyStr].Find(utils.ConvertUint64ToBigEndianBytes(curSeq))
 		if !ok {
 			return false
 		}
