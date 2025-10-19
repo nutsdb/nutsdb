@@ -21,7 +21,6 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/bwmarrin/snowflake"
 	"github.com/xujiajun/utils/strconv2"
 )
 
@@ -96,8 +95,6 @@ func (db *DB) Begin(writable bool) (tx *Tx, err error) {
 
 // newTx returns a newly initialized Tx object at given writable.
 func newTx(db *DB, writable bool) (tx *Tx, err error) {
-	var txID uint64
-
 	tx = &Tx{
 		db:                db,
 		writable:          writable,
@@ -105,12 +102,7 @@ func newTx(db *DB, writable bool) (tx *Tx, err error) {
 		pendingBucketList: make(map[Ds]map[BucketName]*Bucket),
 	}
 
-	txID, err = tx.getTxID()
-	if err != nil {
-		return nil, err
-	}
-
-	tx.id = txID
+	tx.id = tx.getTxID()
 
 	return
 }
@@ -160,15 +152,10 @@ func (tx *Tx) checkSize() error {
 }
 
 // getTxID returns the tx id.
-func (tx *Tx) getTxID() (id uint64, err error) {
-	node, err := snowflake.NewNode(tx.db.opt.NodeNum)
-	if err != nil {
-		return 0, err
-	}
-
-	id = uint64(node.Generate().Int64())
-
-	return
+// Uses cached snowflake node to avoid recreating for every transaction.
+func (tx *Tx) getTxID() uint64 {
+	node := tx.db.getSnowflakeNode()
+	return uint64(node.Generate().Int64())
 }
 
 // Commit commits the transaction, following these steps:
@@ -298,36 +285,6 @@ func (tx *Tx) getNewAddRecordCount() (int64, error) {
 	return res, err
 }
 
-func (tx *Tx) getListHeadTailSeq(bucketId BucketId, key string) *HeadTailSeq {
-	res := HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
-
-	// 首先尝试从索引中获取已存在的序列号
-	if _, ok := tx.db.Index.list.idx[bucketId]; ok {
-		if seq, ok := tx.db.Index.list.idx[bucketId].Seq[key]; ok {
-			res = *seq
-			return &res
-		}
-
-		// 如果索引中没有序列号，但存在列表项，则从现有项推断序列号
-		if l, ok := tx.db.Index.list.idx[bucketId]; ok {
-			if items, ok := l.Items[key]; ok && items.Count() > 0 {
-				// 获取现有列表中的最小和最大序列号
-				allItems := items.AllItems()
-				if len(allItems) > 0 {
-					minSeq := ConvertBigEndianBytesToUint64(allItems[0].key)
-					maxSeq := ConvertBigEndianBytesToUint64(allItems[len(allItems)-1].key)
-					res = HeadTailSeq{Head: minSeq - 1, Tail: maxSeq + 1}
-
-					// 更新索引中的序列号
-					l.Seq[key] = &res
-				}
-			}
-		}
-	}
-
-	return &res
-}
-
 func (tx *Tx) getListEntryNewAddRecordCount(bucketId BucketId, entry *Entry) (int64, error) {
 	if entry.Meta.Flag == DataExpireListFlag {
 		return 0, nil
@@ -403,7 +360,7 @@ func (tx *Tx) getKvEntryNewAddRecordCount(bucketId BucketId, entry *Entry) (int6
 	return res, nil
 }
 
-func (tx *Tx) getSetEntryNewAddRecordCount(bucketId BucketId, entry *Entry) (int64, error) {
+func (tx *Tx) getSetEntryNewAddRecordCount(_ BucketId, entry *Entry) (int64, error) {
 	var res int64
 
 	if entry.Meta.Flag == DataDeleteFlag {
@@ -738,7 +695,8 @@ func (tx *Tx) SubmitBucket() error {
 func (tx *Tx) buildBucketInIndex() error {
 	for _, mapper := range tx.pendingBucketList {
 		for _, bucket := range mapper {
-			if bucket.Meta.Op == BucketInsertOperation {
+			switch bucket.Meta.Op {
+			case BucketInsertOperation:
 				switch bucket.Ds {
 				case DataStructureBTree:
 					tx.db.Index.bTree.getWithDefault(bucket.Id)
@@ -751,7 +709,7 @@ func (tx *Tx) buildBucketInIndex() error {
 				default:
 					return ErrDataStructureNotSupported
 				}
-			} else if bucket.Meta.Op == BucketDeleteOperation {
+			case BucketDeleteOperation:
 				switch bucket.Ds {
 				case DataStructureBTree:
 					tx.db.Index.bTree.delete(bucket.Id)
