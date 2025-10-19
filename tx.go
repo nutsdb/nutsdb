@@ -21,7 +21,6 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/bwmarrin/snowflake"
 	"github.com/nutsdb/nutsdb/internal/data"
 	"github.com/nutsdb/nutsdb/internal/utils"
 	"github.com/xujiajun/utils/strconv2"
@@ -98,8 +97,6 @@ func (db *DB) Begin(writable bool) (tx *Tx, err error) {
 
 // newTx returns a newly initialized Tx object at given writable.
 func newTx(db *DB, writable bool) (tx *Tx, err error) {
-	var txID uint64
-
 	tx = &Tx{
 		db:                db,
 		writable:          writable,
@@ -107,12 +104,7 @@ func newTx(db *DB, writable bool) (tx *Tx, err error) {
 		pendingBucketList: make(map[Ds]map[BucketName]*Bucket),
 	}
 
-	txID, err = tx.getTxID()
-	if err != nil {
-		return nil, err
-	}
-
-	tx.id = txID
+	tx.id = tx.getTxID()
 
 	return
 }
@@ -162,15 +154,10 @@ func (tx *Tx) checkSize() error {
 }
 
 // getTxID returns the tx id.
-func (tx *Tx) getTxID() (id uint64, err error) {
-	node, err := snowflake.NewNode(tx.db.opt.NodeNum)
-	if err != nil {
-		return 0, err
-	}
-
-	id = uint64(node.Generate().Int64())
-
-	return
+// Uses cached snowflake node to avoid recreating for every transaction.
+func (tx *Tx) getTxID() uint64 {
+	node := tx.db.getSnowflakeNode()
+	return uint64(node.Generate().Int64())
 }
 
 // Commit commits the transaction, following these steps:
@@ -375,7 +362,7 @@ func (tx *Tx) getKvEntryNewAddRecordCount(bucketId BucketId, entry *Entry) (int6
 	return res, nil
 }
 
-func (tx *Tx) getSetEntryNewAddRecordCount(bucketId BucketId, entry *Entry) (int64, error) {
+func (tx *Tx) getSetEntryNewAddRecordCount(_ BucketId, entry *Entry) (int64, error) {
 	var res int64
 
 	if entry.Meta.Flag == DataDeleteFlag {
@@ -710,7 +697,8 @@ func (tx *Tx) SubmitBucket() error {
 func (tx *Tx) buildBucketInIndex() error {
 	for _, mapper := range tx.pendingBucketList {
 		for _, bucket := range mapper {
-			if bucket.Meta.Op == BucketInsertOperation {
+			switch bucket.Meta.Op {
+			case BucketInsertOperation:
 				switch bucket.Ds {
 				case DataStructureBTree:
 					tx.db.Index.bTree.getWithDefault(bucket.Id)
@@ -723,7 +711,7 @@ func (tx *Tx) buildBucketInIndex() error {
 				default:
 					return ErrDataStructureNotSupported
 				}
-			} else if bucket.Meta.Op == BucketDeleteOperation {
+			case BucketDeleteOperation:
 				switch bucket.Ds {
 				case DataStructureBTree:
 					tx.db.Index.bTree.delete(bucket.Id)

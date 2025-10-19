@@ -27,6 +27,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/bwmarrin/snowflake"
 	"github.com/gofrs/flock"
 	"github.com/nutsdb/nutsdb/internal/data"
 	"github.com/nutsdb/nutsdb/internal/fileio"
@@ -41,6 +42,13 @@ const KvWriteChCapacity = 1000
 const FLockName = "nutsdb-flock"
 
 type (
+	// SnowflakeManager manages snowflake node initialization and caching
+	SnowflakeManager struct {
+		node    *snowflake.Node
+		once    sync.Once
+		nodeNum int64
+	}
+
 	// DB represents a collection of buckets that persist on disk.
 	DB struct {
 		opt                     Options // the database options
@@ -62,8 +70,29 @@ type (
 		RecordCount             int64 // current valid record count, exclude deleted, repeated
 		bm                      *BucketManager
 		hintKeyAndRAMIdxModeLru *utils.LRUCache // lru cache for HintKeyAndRAMIdxMode
+		sm                      *SnowflakeManager
 	}
 )
+
+// NewSnowflakeManager creates a new SnowflakeManager with the given node number
+func NewSnowflakeManager(nodeNum int64) *SnowflakeManager {
+	return &SnowflakeManager{
+		nodeNum: nodeNum,
+	}
+}
+
+// GetNode returns the snowflake node, initializing it once.
+// If initialization fails, it will fatal the program.
+func (sm *SnowflakeManager) GetNode() *snowflake.Node {
+	sm.once.Do(func() {
+		var err error
+		sm.node, err = snowflake.NewNode(sm.nodeNum)
+		if err != nil {
+			log.Fatalf("Failed to initialize snowflake node with nodeNum=%d: %v", sm.nodeNum, err)
+		}
+	})
+	return sm.node
+}
 
 // open returns a newly initialized DB object.
 func open(opt Options) (*DB, error) {
@@ -80,6 +109,7 @@ func open(opt Options) (*DB, error) {
 		writeCh:                 make(chan *request, KvWriteChCapacity),
 		tm:                      newTTLManager(opt.ExpiredDeleteType),
 		hintKeyAndRAMIdxModeLru: utils.NewLruCache(opt.HintKeyAndRAMIdxCacheSize),
+		sm:                      NewSnowflakeManager(opt.NodeNum),
 	}
 
 	db.commitBuffer = createNewBufferWithSize(int(db.opt.CommitBufferSize))
@@ -334,6 +364,11 @@ func (db *DB) getMaxWriteRecordCount() int64 {
 
 func (db *DB) getHintKeyAndRAMIdxCacheSize() int {
 	return db.opt.HintKeyAndRAMIdxCacheSize
+}
+
+// getSnowflakeNode returns a cached snowflake node, creating it once if needed.
+func (db *DB) getSnowflakeNode() *snowflake.Node {
+	return db.sm.GetNode()
 }
 
 func (db *DB) doWrites() {
