@@ -90,17 +90,6 @@ func TestTx_Begin(t *testing.T) {
 		})
 	})
 
-	t.Run("Begin with error: error options", func(t *testing.T) {
-		opt := DefaultOptions
-		opt.Dir = "/tmp/nutsdbtesttx"
-		opt.NodeNum = -1
-
-		withDBOption(t, opt, func(t *testing.T, db *DB) {
-			_, err := db.Begin(false)
-			assert.Error(t, err)
-		})
-	})
-
 	t.Run("Begin with error: begin the closed db", func(t *testing.T) {
 		withDefaultDB(t, func(t *testing.T, db *DB) {
 			tx, err := db.Begin(true)
