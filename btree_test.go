@@ -36,7 +36,8 @@ func runBTreeTest(t *testing.T, test func(t *testing.T, btree *BTree)) {
 		key := []byte(fmt.Sprintf(keyFormat, i))
 		val := []byte(fmt.Sprintf(valFormat, i))
 
-		_ = btree.Insert(data.NewRecord().WithKey(key).WithValue(val))
+		rec := data.NewRecord().WithKey(key).WithValue(val)
+		_ = btree.InsertRecord(key, rec)
 	}
 
 	test(t, btree)
@@ -92,7 +93,8 @@ func TestBTree_PrefixSearchScan(t *testing.T) {
 			key := []byte("nutsdb-123456789@outlook.com")
 			val := testutils.GetRandomBytes(24)
 
-			_ = btree.Insert(data.NewRecord().WithKey(key).WithValue(val))
+			rec := data.NewRecord().WithKey(key).WithValue(val)
+			_ = btree.InsertRecord(rec.Key, rec)
 
 			record, ok := btree.Find(key)
 			require.True(t, ok)
@@ -110,7 +112,8 @@ func TestBTree_PrefixSearchScan(t *testing.T) {
 			key := []byte("nutsdb-123456789@outlook")
 			val := testutils.GetRandomBytes(24)
 
-			_ = btree.Insert(data.NewRecord().WithKey(key).WithValue(val))
+			rec := data.NewRecord().WithKey(key).WithValue(val)
+			_ = btree.InsertRecord(rec.Key, rec)
 
 			record, ok := btree.Find(key)
 			require.True(t, ok)
@@ -197,7 +200,8 @@ func TestBTree_Update(t *testing.T) {
 			key := []byte(fmt.Sprintf(keyFormat, i))
 			val := []byte(fmt.Sprintf("val_%03d_modify", i))
 
-			btree.Insert(data.NewRecord().WithKey(key).WithValue(val))
+			rec := data.NewRecord().WithKey(key).WithValue(val)
+			_ = btree.InsertRecord(rec.Key, rec)
 		}
 
 		records := btree.Range([]byte(fmt.Sprintf(keyFormat, 40)), []byte(fmt.Sprintf(keyFormat, 49)))

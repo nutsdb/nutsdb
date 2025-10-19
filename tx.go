@@ -299,36 +299,6 @@ func (tx *Tx) getNewAddRecordCount() (int64, error) {
 	return res, err
 }
 
-func (tx *Tx) getListHeadTailSeq(bucketId BucketId, key string) *HeadTailSeq {
-	res := HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
-
-	// 首先尝试从索引中获取已存在的序列号
-	if _, ok := tx.db.Index.list.idx[bucketId]; ok {
-		if seq, ok := tx.db.Index.list.idx[bucketId].Seq[key]; ok {
-			res = *seq
-			return &res
-		}
-
-		// 如果索引中没有序列号，但存在列表项，则从现有项推断序列号
-		if l, ok := tx.db.Index.list.idx[bucketId]; ok {
-			if items, ok := l.Items[key]; ok && items.Count() > 0 {
-				// 获取现有列表中的最小和最大序列号
-				allItems := items.AllItems()
-				if len(allItems) > 0 {
-					minSeq := ConvertBigEndianBytesToUint64(allItems[0].Key)
-					maxSeq := ConvertBigEndianBytesToUint64(allItems[len(allItems)-1].Key)
-					res = HeadTailSeq{Head: minSeq - 1, Tail: maxSeq + 1}
-
-					// 更新索引中的序列号
-					l.Seq[key] = &res
-				}
-			}
-		}
-	}
-
-	return &res
-}
-
 func (tx *Tx) getListEntryNewAddRecordCount(bucketId BucketId, entry *Entry) (int64, error) {
 	if entry.Meta.Flag == DataExpireListFlag {
 		return 0, nil

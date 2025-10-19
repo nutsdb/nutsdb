@@ -713,7 +713,7 @@ func (db *DB) buildBTreeIdx(record *data.Record, entry *Entry) error {
 		} else {
 			db.tm.del(bucketId, string(key))
 		}
-		bTree.Insert(record)
+		bTree.InsertRecord(record.Key, record)
 	}
 	return nil
 }

@@ -38,25 +38,20 @@ func NewBTree() *BTree {
 }
 
 func (bt *BTree) Find(key []byte) (*data.Record, bool) {
-	item, ok := bt.btree.Get(&data.Item[data.Record]{Key: key})
+	item, ok := bt.btree.Get(data.NewItem[data.Record](key, nil))
 	if ok {
 		return item.Record, ok
 	}
 	return nil, ok
 }
 
-func (bt *BTree) Insert(record *data.Record) bool {
-	_, replaced := bt.btree.Set(&data.Item[data.Record]{Key: record.GetKey(), Record: record})
-	return replaced
-}
-
 func (bt *BTree) InsertRecord(key []byte, record *data.Record) bool {
-	_, replaced := bt.btree.Set(&data.Item[data.Record]{Key: key, Record: record})
+	_, replaced := bt.btree.Set(data.NewItem(key, record))
 	return replaced
 }
 
 func (bt *BTree) Delete(key []byte) bool {
-	_, deleted := bt.btree.Delete(&data.Item[data.Record]{Key: key})
+	_, deleted := bt.btree.Delete(data.NewItem[data.Record](key, nil))
 	return deleted
 }
 
