@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package nutsdb
+package data_test
 
 import (
 	"testing"
@@ -24,7 +24,7 @@ import (
 )
 
 func TestDoublyLinkedList_InsertAndFind(t *testing.T) {
-	dll := NewDoublyLinkedList()
+	dll := data.NewDoublyLinkedList()
 
 	// Insert records with sequence numbers
 	r1 := &data.Record{Key: []byte("key1"), Value: []byte("value1")}
@@ -53,7 +53,7 @@ func TestDoublyLinkedList_InsertAndFind(t *testing.T) {
 }
 
 func TestDoublyLinkedList_OrderedInsertion(t *testing.T) {
-	dll := NewDoublyLinkedList()
+	dll := data.NewDoublyLinkedList()
 
 	// Insert in non-sorted order
 	sequences := []uint64{150, 100, 200, 50, 175}
@@ -80,7 +80,7 @@ func TestDoublyLinkedList_OrderedInsertion(t *testing.T) {
 }
 
 func TestDoublyLinkedList_MinMax(t *testing.T) {
-	dll := NewDoublyLinkedList()
+	dll := data.NewDoublyLinkedList()
 
 	// Empty list
 	_, ok := dll.Min()
@@ -111,7 +111,7 @@ func TestDoublyLinkedList_MinMax(t *testing.T) {
 }
 
 func TestDoublyLinkedList_Delete(t *testing.T) {
-	dll := NewDoublyLinkedList()
+	dll := data.NewDoublyLinkedList()
 
 	r1 := &data.Record{Value: []byte("value1")}
 	r2 := &data.Record{Value: []byte("value2")}
@@ -159,7 +159,7 @@ func TestDoublyLinkedList_Delete(t *testing.T) {
 }
 
 func TestDoublyLinkedList_PopMinMax(t *testing.T) {
-	dll := NewDoublyLinkedList()
+	dll := data.NewDoublyLinkedList()
 
 	r1 := &data.Record{Value: []byte("value1")}
 	r2 := &data.Record{Value: []byte("value2")}
@@ -195,7 +195,7 @@ func TestDoublyLinkedList_PopMinMax(t *testing.T) {
 }
 
 func TestDoublyLinkedList_All(t *testing.T) {
-	dll := NewDoublyLinkedList()
+	dll := data.NewDoublyLinkedList()
 
 	records := []*data.Record{
 		{Value: []byte("value1")},
@@ -217,7 +217,7 @@ func TestDoublyLinkedList_All(t *testing.T) {
 }
 
 func TestDoublyLinkedList_Range(t *testing.T) {
-	dll := NewDoublyLinkedList()
+	dll := data.NewDoublyLinkedList()
 
 	for i := uint64(0); i < 10; i++ {
 		r := &data.Record{Value: []byte{byte(i * 10)}}
@@ -237,29 +237,29 @@ func TestDoublyLinkedList_Range(t *testing.T) {
 }
 
 func BenchmarkDoublyLinkedList_InsertHead(b *testing.B) {
-	dll := NewDoublyLinkedList()
+	dll := data.NewDoublyLinkedList()
 	r := &data.Record{Key: []byte("key"), Value: []byte("value")}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		seq := initialListSeq - uint64(i)
+		seq := data.InitialListSeq - uint64(i)
 		dll.InsertRecord(utils.ConvertUint64ToBigEndianBytes(seq), r)
 	}
 }
 
 func BenchmarkDoublyLinkedList_InsertTail(b *testing.B) {
-	dll := NewDoublyLinkedList()
+	dll := data.NewDoublyLinkedList()
 	r := &data.Record{Key: []byte("key"), Value: []byte("value")}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		seq := initialListSeq + uint64(i)
+		seq := data.InitialListSeq + uint64(i)
 		dll.InsertRecord(utils.ConvertUint64ToBigEndianBytes(seq), r)
 	}
 }
 
 func BenchmarkDoublyLinkedList_PopMin(b *testing.B) {
-	dll := NewDoublyLinkedList()
+	dll := data.NewDoublyLinkedList()
 	r := &data.Record{Key: []byte("key"), Value: []byte("value")}
 
 	// Pre-populate
@@ -274,7 +274,7 @@ func BenchmarkDoublyLinkedList_PopMin(b *testing.B) {
 }
 
 func BenchmarkDoublyLinkedList_PopMax(b *testing.B) {
-	dll := NewDoublyLinkedList()
+	dll := data.NewDoublyLinkedList()
 	r := &data.Record{Key: []byte("key"), Value: []byte("value")}
 
 	// Pre-populate

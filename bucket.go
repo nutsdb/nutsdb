@@ -4,6 +4,8 @@ import (
 	"encoding/binary"
 	"errors"
 	"hash/crc32"
+
+	"github.com/nutsdb/nutsdb/internal/utils"
 )
 
 var BucketMetaSize int64
@@ -24,7 +26,7 @@ const (
 var ErrBucketCrcInvalid = errors.New("bucket crc invalid")
 
 func init() {
-	BucketMetaSize = GetDiskSizeFromSingleObject(BucketMeta{})
+	BucketMetaSize = utils.GetDiskSizeFromSingleObject(BucketMeta{})
 }
 
 // BucketMeta stores the Meta info of a Bucket. E.g. the size of bucket it store in disk.

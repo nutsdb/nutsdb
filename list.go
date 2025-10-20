@@ -16,7 +16,6 @@ package nutsdb
 
 import (
 	"errors"
-	"math"
 	"time"
 
 	"github.com/nutsdb/nutsdb/internal/data"
@@ -38,7 +37,7 @@ var (
 )
 
 const (
-	initialListSeq = math.MaxUint64 / 2
+	initialListSeq = data.InitialListSeq
 )
 
 // ListStructure defines the interface for List storage implementations.
@@ -102,7 +101,7 @@ type ListStructure interface {
 // Compile-time interface implementation checks
 var (
 	_ ListStructure = (*data.BTree)(nil)
-	_ ListStructure = (*DoublyLinkedList)(nil)
+	_ ListStructure = (*data.DoublyLinkedList)(nil)
 )
 
 // BTree represents the btree.
@@ -138,10 +137,10 @@ func (l *List) createListStructure() ListStructure {
 	case ListImplBTree:
 		return data.NewBTree()
 	case ListImplDoublyLinkedList:
-		return NewDoublyLinkedList()
+		return data.NewDoublyLinkedList()
 	default:
 		// Default to DoublyLinkedList for safety
-		return NewDoublyLinkedList()
+		return data.NewDoublyLinkedList()
 	}
 }
 
