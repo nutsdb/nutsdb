@@ -272,7 +272,7 @@ func (db *DB) getValueByRecord(record *data.Record) ([]byte, error) {
 	}
 
 	dirPath := getDataPath(record.FileID, db.opt.Dir)
-	df, err := db.fm.GetDataFile(dirPath, db.opt.SegmentSize)
+	df, err := db.fm.GetDataFileReadOnly(dirPath, db.opt.SegmentSize)
 	if err != nil {
 		return nil, err
 	}

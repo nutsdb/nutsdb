@@ -197,7 +197,7 @@ func (e *Entry) isFilter() bool {
 		DataZPopMinFlag,
 		DataLRemByIndex,
 	}
-	return OneOfUint16Array(meta.Flag, filterDataSet)
+	return utils.OneOfUint16Array(meta.Flag, filterDataSet)
 }
 
 // valid check the entry fields valid or not

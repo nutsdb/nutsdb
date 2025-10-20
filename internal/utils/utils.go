@@ -98,3 +98,12 @@ func GetDiskSizeFromSingleObject(obj interface{}) int64 {
 	}
 	return size
 }
+
+func OneOfUint16Array(value uint16, array []uint16) bool {
+	for _, v := range array {
+		if v == value {
+			return true
+		}
+	}
+	return false
+}

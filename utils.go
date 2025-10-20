@@ -35,15 +35,6 @@ func getDataPath(fID int64, dir string) string {
 	return dir + separator + strconv2.Int64ToStr(fID) + DataSuffix
 }
 
-func OneOfUint16Array(value uint16, array []uint16) bool {
-	for _, v := range array {
-		if v == value {
-			return true
-		}
-	}
-	return false
-}
-
 func splitIntStringStr(str, separator string) (int, string) {
 	strList := strings.Split(str, separator)
 	firstItem, _ := strconv2.StrToInt(strList[0])
