@@ -1,12 +1,15 @@
 package fileio
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFdManager_All(t *testing.T) {
@@ -105,6 +108,37 @@ func TestFdManager_All(t *testing.T) {
 		assert.NotNil(t, fd)
 		positiveFdsSeq := []int{11, 5, 1, 10, 9}
 		assertChainFromTailAndHead(t, fdm, testBasePath, positiveFdsSeq)
+	})
+
+	t.Run("too many open files, test openFile failed twice", func(t *testing.T) {
+		path := testBasePath + "notExists"
+		openFile = func(name string, flag int, perm os.FileMode) (*os.File, error) {
+			return nil, errors.New("xxxx " + TooManyFileOpenErrSuffix)
+		}
+		defer func() {
+			openFile = os.OpenFile
+		}()
+		_, err = fdm.GetFd(path)
+		require.True(t, strings.HasSuffix(err.Error(), TooManyFileOpenErrSuffix))
+	})
+
+	t.Run("too many open files, test openFile failed first, successful secondly", func(t *testing.T) {
+		filename := "notExists"
+		path := testBasePath + filename
+		call_count := 0
+		openFile = func(name string, flag int, perm os.FileMode) (*os.File, error) {
+			call_count++
+			if call_count >= 2 {
+				return os.OpenFile(name, flag, perm)
+			}
+			return nil, errors.New("xxxx " + TooManyFileOpenErrSuffix)
+		}
+		defer func() {
+			openFile = os.OpenFile
+		}()
+		fd, err := fdm.GetFd(path)
+		require.NoError(t, err)
+		require.Equal(t, path, fd.Name())
 	})
 
 	t.Run("test close fdm", func(t *testing.T) {
