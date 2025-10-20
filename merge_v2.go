@@ -10,7 +10,6 @@ import (
 	"sort"
 
 	"github.com/nutsdb/nutsdb/internal/data"
-	"github.com/nutsdb/nutsdb/internal/fileio"
 	"github.com/nutsdb/nutsdb/internal/utils"
 )
 
@@ -389,7 +388,7 @@ func (job *mergeV2Job) rewriteFile(fid int64) error {
 		}
 		entry, err := fr.readEntry(off)
 		if err != nil {
-			if errors.Is(err, io.EOF) || errors.Is(err, fileio.ErrIndexOutOfBound) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, ErrHeaderSizeOutOfBounds) {
+			if errors.Is(err, io.EOF) || errors.Is(err, ErrIndexOutOfBound) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, ErrHeaderSizeOutOfBounds) {
 				break
 			}
 			return fmt.Errorf("merge rewrite read entry at offset %d: %w", off, err)
