@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -804,6 +805,8 @@ func TestDB_Backup(t *testing.T) {
 func TestDB_BackupTarGZ(t *testing.T) {
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		backUpFile := "/tmp/nutsdb-backup/backup.tar.gz"
+
+		os.MkdirAll(filepath.Dir(backUpFile), os.ModePerm)
 		f, err := os.Create(backUpFile)
 		require.NoError(t, err)
 		require.NoError(t, db.BackupTarGZ(f))
