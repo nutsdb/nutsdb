@@ -112,14 +112,14 @@ func (it *Iterator) Valid() bool {
 }
 
 func (it *Iterator) Key() []byte {
-	if !it.valid || it.currentItem == nil {
+	if !it.valid {
 		return nil
 	}
 	return it.currentItem.key
 }
 
 func (it *Iterator) Value() ([]byte, error) {
-	if !it.valid || it.currentItem == nil {
+	if !it.valid {
 		return nil, ErrKeyNotFound
 	}
 	return it.tx.db.getValueByRecord(it.currentItem.record)
