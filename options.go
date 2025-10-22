@@ -185,6 +185,25 @@ var DefaultOptions = func() Options {
 	}
 }()
 
+var doublyLinkedListOptions = func() Options {
+	return Options{
+		EntryIdxMode:              HintKeyValAndRAMIdxMode,
+		SegmentSize:               defaultSegmentSize,
+		NodeNum:                   1,
+		RWMode:                    FileIO,
+		SyncEnable:                true,
+		CommitBufferSize:          4 * MB,
+		MergeInterval:             2 * time.Hour,
+		MaxBatchSize:              (15 * defaultSegmentSize / 4) / 100,
+		MaxBatchCount:             (15 * defaultSegmentSize / 4) / 100 / 100,
+		HintKeyAndRAMIdxCacheSize: 0,
+		ExpiredDeleteType:         TimeWheel,
+		EnableHintFile:            false,
+		EnableMergeV2:             false,
+		ListImpl:                  ListImplDoublyLinkedList,
+	}
+}()
+
 type Option func(*Options)
 
 func WithDir(dir string) Option {
