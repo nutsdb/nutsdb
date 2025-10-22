@@ -23,6 +23,10 @@ type Iterator struct {
 	tx      *Tx
 	options IteratorOptions
 	iter    btree.IterG[*data.Item[data.Record]]
+	// Cached current item to avoid repeated iter.Item() calls
+	currentItem *data.Item[data.Record]
+	// Track validity state to avoid unnecessary checks
+	valid bool
 }
 
 type IteratorOptions struct {
@@ -42,10 +46,15 @@ func NewIterator(tx *Tx, bucket string, options IteratorOptions) *Iterator {
 		iter:    tx.db.Index.bTree.getWithDefault(b.Id).Iter(),
 	}
 
+	// Initialize position and cache the first item
 	if options.Reverse {
-		iterator.iter.Last()
+		iterator.valid = iterator.iter.Last()
 	} else {
-		iterator.iter.First()
+		iterator.valid = iterator.iter.First()
+	}
+
+	if iterator.valid {
+		iterator.currentItem = iterator.iter.Item()
 	}
 
 	return iterator
@@ -53,36 +62,81 @@ func NewIterator(tx *Tx, bucket string, options IteratorOptions) *Iterator {
 
 func (it *Iterator) Rewind() bool {
 	if it.options.Reverse {
-		return it.iter.Last()
+		it.valid = it.iter.Last()
 	} else {
-		return it.iter.First()
+		it.valid = it.iter.First()
 	}
+
+	if it.valid {
+		it.currentItem = it.iter.Item()
+	} else {
+		it.currentItem = nil
+	}
+
+	return it.valid
 }
 
 func (it *Iterator) Seek(key []byte) bool {
-	return it.iter.Seek(&data.Item[data.Record]{Key: key})
+	it.valid = it.iter.Seek(&data.Item[data.Record]{Key: key})
+
+	if it.valid {
+		it.currentItem = it.iter.Item()
+	} else {
+		it.currentItem = nil
+	}
+
+	return it.valid
 }
 
 func (it *Iterator) Next() bool {
-	if it.options.Reverse {
-		return it.iter.Prev()
-	} else {
-		return it.iter.Next()
+	if !it.valid {
+		return false
 	}
+
+	if it.options.Reverse {
+		it.valid = it.iter.Prev()
+	} else {
+		it.valid = it.iter.Next()
+	}
+
+	if it.valid {
+		it.currentItem = it.iter.Item()
+	} else {
+		it.currentItem = nil
+	}
+
+	return it.valid
 }
 
 func (it *Iterator) Valid() bool {
-	return it.iter.Item() != nil
+	return it.valid
 }
 
 func (it *Iterator) Key() []byte {
-	return it.iter.Item().Key
+	if !it.valid {
+		return nil
+	}
+	return it.currentItem.Key
 }
 
 func (it *Iterator) Value() ([]byte, error) {
-	return it.tx.db.getValueByRecord(it.iter.Item().Record)
+	if !it.valid {
+		return nil, ErrKeyNotFound
+	}
+	return it.tx.db.getValueByRecord(it.currentItem.Record)
+}
+
+// Item returns the current item (key + record) if valid
+// This is useful for advanced use cases that need direct access to the record
+func (it *Iterator) Item() *data.Item[data.Record] {
+	if !it.valid {
+		return nil
+	}
+	return it.currentItem
 }
 
 func (it *Iterator) Release() {
 	it.iter.Release()
+	it.currentItem = nil
+	it.valid = false
 }
