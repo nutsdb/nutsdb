@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package nutsdb
+package fileio
 
 import (
 	"os"
@@ -20,22 +20,22 @@ import (
 
 // FileIORWManager represents the RWManager which using standard I/O.
 type FileIORWManager struct {
-	fd          *os.File
-	path        string
-	fdm         *fdManager
-	segmentSize int64
+	Fd          *os.File
+	Path        string
+	Fdm         *FdManager
+	SegmentSize int64
 }
 
 // WriteAt writes len(b) bytes to the File starting at byte offset off.
 // `WriteAt` is a wrapper of the *File.WriteAt.
 func (fm *FileIORWManager) WriteAt(b []byte, off int64) (n int, err error) {
-	return fm.fd.WriteAt(b, off)
+	return fm.Fd.WriteAt(b, off)
 }
 
 // ReadAt reads len(b) bytes from the File starting at byte offset off.
 // `ReadAt` is a wrapper of the *File.ReadAt.
 func (fm *FileIORWManager) ReadAt(b []byte, off int64) (n int, err error) {
-	return fm.fd.ReadAt(b, off)
+	return fm.Fd.ReadAt(b, off)
 }
 
 // Sync commits the current contents of the file to stable storage.
@@ -43,20 +43,20 @@ func (fm *FileIORWManager) ReadAt(b []byte, off int64) (n int, err error) {
 // of recently written data to disk.
 // `Sync` is a wrapper of the *File.Sync.
 func (fm *FileIORWManager) Sync() (err error) {
-	return fm.fd.Sync()
+	return fm.Fd.Sync()
 }
 
 // Release is a wrapper around the reduceUsing method
 func (fm *FileIORWManager) Release() (err error) {
-	fm.fdm.reduceUsing(fm.path)
+	fm.Fdm.ReduceUsing(fm.Path)
 	return nil
 }
 
 func (fm *FileIORWManager) Size() int64 {
-	return fm.segmentSize
+	return fm.SegmentSize
 }
 
 // Close will remove the cache in the fdm of the specified path, and call the close method of the os of the file
 func (fm *FileIORWManager) Close() (err error) {
-	return fm.fdm.closeByPath(fm.path)
+	return fm.Fdm.CloseByPath(fm.Path)
 }

@@ -23,6 +23,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/nutsdb/nutsdb/internal/utils"
 	"github.com/xujiajun/utils/strconv2"
 )
 
@@ -93,7 +94,7 @@ func (db *DB) mergeLegacy() error {
 
 	var err error
 	path := getDataPath(db.MaxFileID, db.opt.Dir)
-	db.ActiveFile, err = db.fm.getDataFile(path, db.opt.SegmentSize)
+	db.ActiveFile, err = db.fm.GetDataFile(path, db.opt.SegmentSize)
 	if err != nil {
 		db.mu.Unlock()
 		return err
@@ -445,7 +446,7 @@ func (db *DB) isPendingListEntry(entry *Entry) bool {
 			return false
 		}
 
-		r, ok := list.Items[userKeyStr].Find(ConvertUint64ToBigEndianBytes(curSeq))
+		r, ok := list.Items[userKeyStr].Find(utils.ConvertUint64ToBigEndianBytes(curSeq))
 		if !ok {
 			return false
 		}

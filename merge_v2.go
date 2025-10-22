@@ -8,6 +8,9 @@ import (
 	"io"
 	"os"
 	"sort"
+
+	"github.com/nutsdb/nutsdb/internal/data"
+	"github.com/nutsdb/nutsdb/internal/utils"
 )
 
 // mergeV2Job manages the entire merge operation lifecycle.
@@ -184,7 +187,7 @@ func (job *mergeV2Job) prepare() error {
 	// Create new active file for writes during merge
 	job.db.MaxFileID++
 	path := getDataPath(job.db.MaxFileID, job.db.opt.Dir)
-	activeFile, err := job.db.fm.getDataFile(path, job.db.opt.SegmentSize)
+	activeFile, err := job.db.fm.GetDataFile(path, job.db.opt.SegmentSize)
 	if err != nil {
 		job.db.isMerging = false
 		job.db.mu.Unlock()
@@ -311,7 +314,7 @@ func (job *mergeV2Job) commit() error {
 func (job *mergeV2Job) cleanupOldFiles() error {
 	// Close and remove old data files
 	for _, path := range job.oldData {
-		_ = job.db.fm.fdm.closeByPath(path)
+		_ = job.db.fm.fdm.CloseByPath(path)
 		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return err
 		}
@@ -412,7 +415,7 @@ func (job *mergeV2Job) rewriteFile(fid int64) error {
 			continue
 		}
 		// Skip expired entries
-		if IsExpired(entry.Meta.TTL, entry.Meta.Timestamp) {
+		if utils.IsExpired(entry.Meta.TTL, entry.Meta.Timestamp) {
 			continue
 		}
 
@@ -534,7 +537,7 @@ func (job *mergeV2Job) newOutput() (*mergeOutput, error) {
 	}
 
 	// Create the data file with merge-specific file ID
-	dataFile, err := job.db.fm.getDataFileByID(job.db.opt.Dir, fileID, job.db.opt.SegmentSize)
+	dataFile, err := job.db.fm.GetDataFileByID(job.db.opt.Dir, fileID, job.db.opt.SegmentSize)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get data file: %w", err)
 	}
@@ -605,7 +608,7 @@ func (out *mergeOutput) finalize() error {
 
 // updateRecordWithHintIfNewer updates a record with hint data only if the hint is newer or same timestamp.
 // This prevents overwriting newer entries that were written after merge started.
-func updateRecordWithHintIfNewer(record *Record, hint *HintEntry) bool {
+func updateRecordWithHintIfNewer(record *data.Record, hint *HintEntry) bool {
 	// Only update if our hint is newer or same timestamp (don't overwrite newer data)
 	if record.Timestamp <= hint.Timestamp {
 		record.FileID = hint.FileID
@@ -685,7 +688,7 @@ func (job *mergeV2Job) applyLookup(entry *mergeLookupEntry) {
 			return
 		}
 		// Find the specific list item by sequence number
-		record, ok := items.Find(ConvertUint64ToBigEndianBytes(seq))
+		record, ok := items.Find(utils.ConvertUint64ToBigEndianBytes(seq))
 		if !ok || record == nil {
 			return
 		}

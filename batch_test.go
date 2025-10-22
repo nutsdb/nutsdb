@@ -2,7 +2,6 @@ package nutsdb
 
 import (
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"testing"
@@ -29,7 +28,7 @@ const (
 
 func init() {
 	bucket = "bucketForBatchWrite"
-	files, err := ioutil.ReadDir(fileDir)
+	files, err := os.ReadDir(fileDir)
 	if err != nil {
 		return
 	}

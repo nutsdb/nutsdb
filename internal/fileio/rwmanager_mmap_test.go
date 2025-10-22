@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package nutsdb
+package fileio_test
 
 import (
 	"errors"
@@ -20,6 +20,8 @@ import (
 	"path"
 	"testing"
 
+	"github.com/nutsdb/nutsdb"
+	"github.com/nutsdb/nutsdb/internal/fileio"
 	"github.com/stretchr/testify/require"
 
 	"github.com/edsrzf/mmap-go"
@@ -27,10 +29,10 @@ import (
 
 func TestRWManager_MMap_Release(t *testing.T) {
 	filePath := "/tmp/foo_rw_MMap"
-	fdm := newFileManager(MMap, 8*MB, 0.5, 8*MB)
-	rwmanager, err := fdm.getMMapRWManager(filePath, 8*MB, 8*MB, false)
+	fdm := nutsdb.NewFileManager(nutsdb.MMap, 8*nutsdb.MB, 0.5, 8*nutsdb.MB)
+	rwmanager, err := fdm.GetMMapRWManager(filePath, 8*nutsdb.MB, 8*nutsdb.MB, false)
 	if err != nil {
-		t.Error("err TestRWManager_MMap_Release getMMapRWManager")
+		t.Error("err TestRWManager_MMap_Release GetMMapRWManager")
 	}
 
 	b := []byte("hello")
@@ -40,7 +42,7 @@ func TestRWManager_MMap_Release(t *testing.T) {
 		t.Error("err TestRWManager_MMap_Release WriteAt")
 	}
 
-	if !rwmanager.IsActive() {
+	if !isActive(rwmanager) {
 		t.Error("err TestRWManager_MMap_Release FdInfo:using not correct")
 	}
 
@@ -49,34 +51,34 @@ func TestRWManager_MMap_Release(t *testing.T) {
 		t.Error("err TestRWManager_MMap_Release Release")
 	}
 
-	if rwmanager.IsActive() {
+	if isActive(rwmanager) {
 		t.Error("err TestRWManager_MMap_Release Release Failed")
 	}
 }
 
-func (rwmanager *MMapRWManager) IsActive() bool {
-	return rwmanager.fdm.cache[rwmanager.path].using != 0
+func isActive(rwmanager *fileio.MMapRWManager) bool {
+	return rwmanager.Fdm.Cache[rwmanager.Path].Using() != 0
 }
 
 func TestRWManager_MMap_WriteAt(t *testing.T) {
 	filePath := "/tmp/foo_rw_filemmap"
 	maxFdNums := 1024
 	cleanThreshold := 0.5
-	var fdm = newFdm(maxFdNums, cleanThreshold)
+	var fdm = fileio.NewFdm(maxFdNums, cleanThreshold)
 
-	fd, err := fdm.getFd(filePath)
+	fd, err := fdm.GetFd(filePath)
 	if err != nil {
 		require.NoError(t, err)
 	}
 	defer os.Remove(fd.Name())
 
-	err = Truncate(filePath, 8*MB, fd, false)
+	err = fileio.Truncate(filePath, 8*nutsdb.MB, fd, false)
 	if err != nil {
 		require.NoError(t, err)
 
 	}
 
-	mmManager := getMMapRWManager(fd, filePath, fdm, 8*MB)
+	mmManager := fileio.GetMMapRWManager(fd, filePath, fdm, 8*fileio.MB)
 	b := []byte("test write at")
 	off := int64(3)
 	n, err := mmManager.WriteAt(b, off)
@@ -95,24 +97,24 @@ func TestRWManager_MMap_WriteAt_NotEnoughData(t *testing.T) {
 	filePath := path.Join(t.TempDir(), "rw_mmap")
 	maxFdNums := 1024
 	cleanThreshold := 0.5
-	var fdm = newFdm(maxFdNums, cleanThreshold)
+	var fdm = fileio.NewFdm(maxFdNums, cleanThreshold)
 
-	fd, err := fdm.getFd(filePath)
+	fd, err := fdm.GetFd(filePath)
 	require.NoError(t, err)
 
 	defer os.Remove(fd.Name())
 
-	err = Truncate(filePath, 8*MB, fd, false)
+	err = fileio.Truncate(filePath, 8*nutsdb.MB, fd, false)
 	require.NoError(t, err)
 
 	m, err := mmap.Map(fd, mmap.RDWR, 0)
 	require.NoError(t, err)
 
 	b := []byte("test-data-message")
-	off := int64(8*MB - 4)
+	off := int64(8*fileio.MB - 4)
 	copy(m[off:], b)
 
-	mmManager := getMMapRWManager(fd, filePath, fdm, 8*MB)
+	mmManager := fileio.GetMMapRWManager(fd, filePath, fdm, 8*fileio.MB)
 
 	n, err := mmManager.WriteAt(b, off)
 	require.NoError(t, err)
@@ -127,24 +129,24 @@ func TestRWManager_MMap_ReadAt_CrossBlock(t *testing.T) {
 	filePath := path.Join(t.TempDir(), "rw_mmap")
 	maxFdNums := 1024
 	cleanThreshold := 0.5
-	var fdm = newFdm(maxFdNums, cleanThreshold)
+	var fdm = fileio.NewFdm(maxFdNums, cleanThreshold)
 
-	fd, err := fdm.getFd(filePath)
+	fd, err := fdm.GetFd(filePath)
 	require.NoError(t, err)
 
 	defer os.Remove(fd.Name())
 
-	err = Truncate(filePath, 8*MB, fd, false)
+	err = fileio.Truncate(filePath, 8*nutsdb.MB, fd, false)
 	require.NoError(t, err)
 
 	m, err := mmap.Map(fd, mmap.RDWR, 0)
 	require.NoError(t, err)
 
 	b := []byte("test-data-message")
-	off := int64(mmapBlockSize - 5)
+	off := int64(fileio.MmapBlockSize - 5)
 	copy(m[off:], b)
 
-	mmManager := getMMapRWManager(fd, filePath, fdm, 8*MB)
+	mmManager := fileio.GetMMapRWManager(fd, filePath, fdm, 8*fileio.MB)
 
 	data := make([]byte, len(b))
 	n, err := mmManager.ReadAt(data, off)
@@ -157,24 +159,24 @@ func TestRWManager_MMap_ReadAt_NotEnoughBytes(t *testing.T) {
 	filePath := path.Join(t.TempDir(), "rw_mmap")
 	maxFdNums := 1024
 	cleanThreshold := 0.5
-	var fdm = newFdm(maxFdNums, cleanThreshold)
+	var fdm = fileio.NewFdm(maxFdNums, cleanThreshold)
 
-	fd, err := fdm.getFd(filePath)
+	fd, err := fdm.GetFd(filePath)
 	require.NoError(t, err)
 
 	defer os.Remove(fd.Name())
 
-	err = Truncate(filePath, 8*MB, fd, false)
+	err = fileio.Truncate(filePath, 8*nutsdb.MB, fd, false)
 	require.NoError(t, err)
 
 	m, err := mmap.Map(fd, mmap.RDWR, 0)
 	require.NoError(t, err)
 
 	b := []byte("test")
-	off := int64(8*MB - 4)
+	off := int64(8*fileio.MB - 4)
 	copy(m[off:], b)
 
-	mmManager := getMMapRWManager(fd, filePath, fdm, 8*MB)
+	mmManager := fileio.GetMMapRWManager(fd, filePath, fdm, 8*fileio.MB)
 
 	data := make([]byte, 10)
 	n, err := mmManager.ReadAt(data, off)
@@ -187,43 +189,43 @@ func TestRWManager_MMap_ReadAt_ErrIndexOutOfBound(t *testing.T) {
 	filePath := path.Join(t.TempDir(), "rw_mmap")
 	maxFdNums := 1024
 	cleanThreshold := 0.5
-	var fdm = newFdm(maxFdNums, cleanThreshold)
+	var fdm = fileio.NewFdm(maxFdNums, cleanThreshold)
 
-	fd, err := fdm.getFd(filePath)
+	fd, err := fdm.GetFd(filePath)
 	require.NoError(t, err)
 
 	defer os.Remove(fd.Name())
 
-	err = Truncate(filePath, 8*MB, fd, false)
+	err = fileio.Truncate(filePath, 8*nutsdb.MB, fd, false)
 	require.NoError(t, err)
 
 	b := make([]byte, 16)
-	mmManager := getMMapRWManager(fd, filePath, fdm, 8*MB)
-	_, err = mmManager.ReadAt(b, 9*MB)
-	require.True(t, errors.Is(err, ErrIndexOutOfBound))
+	mmManager := fileio.GetMMapRWManager(fd, filePath, fdm, 8*fileio.MB)
+	_, err = mmManager.ReadAt(b, 9*fileio.MB)
+	require.True(t, errors.Is(err, fileio.ErrIndexOutOfBound))
 	_, err = mmManager.ReadAt(b, -1)
-	require.True(t, errors.Is(err, ErrIndexOutOfBound))
+	require.True(t, errors.Is(err, fileio.ErrIndexOutOfBound))
 }
 
 func TestRWManager_MMap_Sync(t *testing.T) {
 	filePath := path.Join(t.TempDir(), t.Name())
 	maxFdNums := 1024
 	cleanThreshold := 0.5
-	var fdm = newFdm(maxFdNums, cleanThreshold)
+	var fdm = fileio.NewFdm(maxFdNums, cleanThreshold)
 
-	fd, err := fdm.getFd(filePath)
+	fd, err := fdm.GetFd(filePath)
 	if err != nil {
 		require.NoError(t, err)
 	}
 	defer os.Remove(fd.Name())
 
-	err = Truncate(filePath, 8*MB, fd, false)
+	err = fileio.Truncate(filePath, 8*nutsdb.MB, fd, false)
 	if err != nil {
 		require.NoError(t, err)
 
 	}
 
-	mmManager := getMMapRWManager(fd, filePath, fdm, 8*MB)
+	mmManager := fileio.GetMMapRWManager(fd, filePath, fdm, 8*fileio.MB)
 	m, err := mmap.Map(fd, mmap.RDWR, 0)
 	if err != nil {
 		require.NoError(t, err)
@@ -240,22 +242,22 @@ func TestRWManager_MMap_Close(t *testing.T) {
 	filePath := path.Join(t.TempDir(), t.Name())
 	maxFdNums := 1024
 	cleanThreshold := 0.5
-	var fdm = newFdm(maxFdNums, cleanThreshold)
+	var fdm = fileio.NewFdm(maxFdNums, cleanThreshold)
 
-	fd, err := fdm.getFd(filePath)
+	fd, err := fdm.GetFd(filePath)
 	if err != nil {
 		require.NoError(t, err)
 	}
 	defer os.Remove(fd.Name())
 
-	err = Truncate(filePath, 8*MB, fd, false)
+	err = fileio.Truncate(filePath, 8*fileio.MB, fd, false)
 	if err != nil {
 		require.NoError(t, err)
 
 	}
 
-	mmManager := getMMapRWManager(fd, filePath, fdm, 8*MB)
-	err = mmManager.Close()
+	mmManager := fileio.GetMMapRWManager(fd, filePath, fdm, 8*fileio.MB)
+	require.NoError(t, mmManager.Close())
 	err = isFileDescriptorClosed(fd.Fd())
 	if err == nil {
 		t.Error("expected file descriptor to be closed, but it's still open")

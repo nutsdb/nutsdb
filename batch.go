@@ -8,7 +8,7 @@ import (
 )
 
 // ErrCommitAfterFinish indicates that write batch commit was called after
-var ErrCommitAfterFinish = errors.New("Batch commit not permitted after finish")
+var ErrCommitAfterFinish = errors.New("batch commit not permitted after finish")
 
 const (
 	DefaultThrottleSize = 16

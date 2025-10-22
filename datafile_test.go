@@ -38,9 +38,9 @@ func init() {
 }
 
 func TestDataFile_Err(t *testing.T) {
-	fm := newFileManager(MMap, 1024, 0.5, 256*MB)
-	defer fm.close()
-	_, err := fm.getDataFile(filePath, -1)
+	fm := NewFileManager(MMap, 1024, 0.5, 256*MB)
+	defer fm.Close()
+	_, err := fm.GetDataFile(filePath, -1)
 	defer func() {
 		os.Remove(filePath)
 	}()
@@ -49,9 +49,9 @@ func TestDataFile_Err(t *testing.T) {
 }
 
 func TestDataFile1(t *testing.T) {
-	fm := newFileManager(MMap, 1024, 0.5, 256*MB)
-	defer fm.close()
-	df, err := fm.getDataFile(filePath, 1024)
+	fm := NewFileManager(MMap, 1024, 0.5, 256*MB)
+	defer fm.Close()
+	df, err := fm.GetDataFile(filePath, 1024)
 	defer os.Remove(filePath)
 	if err != nil {
 		t.Fatal(err)
@@ -79,10 +79,10 @@ func TestDataFile1(t *testing.T) {
 }
 
 func TestDataFile2(t *testing.T) {
-	fm := newFileManager(FileIO, 1024, 0.5, 256*MB)
+	fm := NewFileManager(FileIO, 1024, 0.5, 256*MB)
 
 	filePath2 := "/tmp/foo2"
-	df, err := fm.getDataFile(filePath2, 64)
+	df, err := fm.GetDataFile(filePath2, 64)
 	assert.Nil(t, err)
 	defer os.Remove(filePath2)
 	headerSize := entry.Meta.Size()
@@ -100,7 +100,7 @@ func TestDataFile2(t *testing.T) {
 
 	filePath3 := "/tmp/foo3"
 
-	df2, err := fm.getDataFile(filePath3, 64)
+	df2, err := fm.GetDataFile(filePath3, 64)
 	defer os.Remove(filePath3)
 	assert.Nil(t, err)
 
@@ -118,18 +118,18 @@ func TestDataFile2(t *testing.T) {
 	assert.Nil(t, err)
 	err = df2.Release()
 	assert.Nil(t, err)
-	err = fm.close()
+	err = fm.Close()
 	assert.Nil(t, err)
 }
 
 func TestDataFile_ReadRecord(t *testing.T) {
-	fm := newFileManager(FileIO, 1024, 0.5, 256*MB)
+	fm := NewFileManager(FileIO, 1024, 0.5, 256*MB)
 	filePath4 := "/tmp/foo4"
-	df, err := fm.getDataFile(filePath4, 1024)
+	df, err := fm.GetDataFile(filePath4, 1024)
 	defer func() {
 		err = df.Release()
 		assert.Nil(t, err)
-		err = fm.close()
+		err = fm.Close()
 		assert.Nil(t, err)
 	}()
 	assert.Nil(t, err)
@@ -150,26 +150,26 @@ func TestDataFile_ReadRecord(t *testing.T) {
 }
 
 func TestDataFile_Err_Path(t *testing.T) {
-	fm := newFileManager(FileIO, 1024, 0.5, 256*MB)
-	defer fm.close()
+	fm := NewFileManager(FileIO, 1024, 0.5, 256*MB)
+	defer fm.Close()
 	filePath5 := ":/tmp/foo5"
-	df, err := fm.getDataFile(filePath5, entry.Size())
+	df, err := fm.GetDataFile(filePath5, entry.Size())
 	if err == nil && df != nil {
 		t.Error("err TestDataFile_All open")
 	}
 }
 
 func TestDataFile_Crc_Err(t *testing.T) {
-	fm := newFileManager(FileIO, 1024, 0.5, 256*MB)
+	fm := NewFileManager(FileIO, 1024, 0.5, 256*MB)
 	filePath4 := "/tmp/foo6"
 
-	df, err := fm.getDataFile(filePath4, entry.Size())
+	df, err := fm.GetDataFile(filePath4, entry.Size())
 	assert.Nil(t, err)
 	assert.NotNil(t, df)
 	defer func() {
 		err = df.Release()
 		assert.Nil(t, err)
-		err = fm.close()
+		err = fm.Close()
 		assert.Nil(t, err)
 		err = os.Remove(filePath4)
 		assert.Nil(t, err)
@@ -190,14 +190,14 @@ func TestDataFile_Crc_Err(t *testing.T) {
 }
 
 func TestFileManager1(t *testing.T) {
-	fm := newFileManager(FileIO, 1024, 0.5, 256*MB)
+	fm := NewFileManager(FileIO, 1024, 0.5, 256*MB)
 	filePath4 := "/tmp/foo6"
-	df, err := fm.getDataFile(filePath4, entry.Size())
+	df, err := fm.GetDataFile(filePath4, entry.Size())
 	assert.Nil(t, err)
 	defer func() {
 		err = df.Release()
 		assert.Nil(t, err)
-		err = fm.close()
+		err = fm.Close()
 		assert.Nil(t, err)
 		os.Remove(filePath)
 	}()

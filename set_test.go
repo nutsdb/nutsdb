@@ -15,8 +15,11 @@
 package nutsdb
 
 import (
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/nutsdb/nutsdb/internal/data"
+	"github.com/nutsdb/nutsdb/internal/testutils"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSet_SAdd(t *testing.T) {
@@ -86,7 +89,7 @@ func TestSet_SDiff(t *testing.T) {
 		name    string
 		args    args
 		set     *Set
-		want    []*Record
+		want    []*data.Record
 		wantErr bool
 	}{
 		{"normal set diff1", args{key1, key2}, set, expectRecords[:2], false},
@@ -177,11 +180,11 @@ func TestSet_SInter(t *testing.T) {
 		name    string
 		args    args
 		set     *Set
-		want    []*Record
+		want    []*data.Record
 		wantErr bool
 	}{
-		{"normal set inter1", args{key1, key2}, set, []*Record{expectRecords[2], expectRecords[3], expectRecords[4]}, false},
-		{"normal set inter1", args{key2, key3}, set, []*Record{expectRecords[2], expectRecords[3], expectRecords[4], expectRecords[5]}, false},
+		{"normal set inter1", args{key1, key2}, set, []*data.Record{expectRecords[2], expectRecords[3], expectRecords[4]}, false},
+		{"normal set inter1", args{key2, key3}, set, []*data.Record{expectRecords[2], expectRecords[3], expectRecords[4], expectRecords[5]}, false},
 		{"normal set inter2", args{key1, key4}, set, nil, false},
 		{"first fake set", args{"fake_key1", key2}, set, nil, true},
 		{"second fake set", args{key1, "fake_key2"}, set, nil, true},
@@ -217,7 +220,7 @@ func TestSet_SMembers(t *testing.T) {
 		name    string
 		key     string
 		set     *Set
-		want    []*Record
+		want    []*data.Record
 		wantErr bool
 	}{
 		{"normal SMembers", key, set, expectRecords[0:1], false},
@@ -262,8 +265,8 @@ func TestSet_SMove(t *testing.T) {
 		name      string
 		args      args
 		set       *Set
-		want1     []*Record
-		want2     []*Record
+		want1     []*data.Record
+		want2     []*data.Record
 		expectErr error
 	}{
 		{"normal SMove", args{key1, key2, values[1]}, set, expectRecords[0:1], expectRecords[1:], nil},
@@ -298,7 +301,7 @@ func TestSet_SPop(t *testing.T) {
 	for i := range expectRecords {
 		values[i] = expectRecords[i].Value
 	}
-	m := map[*Record]struct{}{}
+	m := map[*data.Record]struct{}{}
 	for _, expectRecord := range expectRecords {
 		m[expectRecord] = struct{}{}
 	}
@@ -341,8 +344,8 @@ func TestSet_SIsMember(t *testing.T) {
 		expectErr error
 	}{
 		{key, values[0], true, nil},
-		{key, GetRandomBytes(24), false, nil},
-		{"fake key", GetRandomBytes(24), false, ErrSetNotExist},
+		{key, testutils.GetRandomBytes(24), false, nil},
+		{"fake key", testutils.GetRandomBytes(24), false, ErrSetNotExist},
 	}
 	for _, tt := range tests {
 		ok, err := set.SIsMember(tt.key, tt.val)
@@ -375,7 +378,7 @@ func TestSet_SAreMembers(t *testing.T) {
 		{key, values[0:2], true, nil},
 		{key, values[2:], true, nil},
 		{key, values, true, nil},
-		{key, [][]byte{GetRandomBytes(24)}, false, nil},
+		{key, [][]byte{testutils.GetRandomBytes(24)}, false, nil},
 		{"fake key", values, true, ErrSetNotExist},
 	}
 	for _, tt := range tests {
@@ -417,15 +420,15 @@ func TestSet_SUnion(t *testing.T) {
 		name    string
 		args    args
 		set     *Set
-		want    []*Record
+		want    []*data.Record
 		wantErr bool
 	}{
 		{"normal set Union1", args{key1, key4}, set,
-			[]*Record{expectRecords[0], expectRecords[1], expectRecords[2], expectRecords[3], expectRecords[4], expectRecords[7], expectRecords[8], expectRecords[9]},
+			[]*data.Record{expectRecords[0], expectRecords[1], expectRecords[2], expectRecords[3], expectRecords[4], expectRecords[7], expectRecords[8], expectRecords[9]},
 			false},
 		{
 			"normal set Union2", args{key2, key3}, set,
-			[]*Record{expectRecords[2], expectRecords[3], expectRecords[4], expectRecords[5], expectRecords[6]},
+			[]*data.Record{expectRecords[2], expectRecords[3], expectRecords[4], expectRecords[5], expectRecords[6]},
 			false,
 		},
 		{"first fake set", args{"fake_key1", key2}, set, nil, true},

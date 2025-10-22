@@ -1,4 +1,4 @@
-package nutsdb
+package utils
 
 import (
 	"testing"

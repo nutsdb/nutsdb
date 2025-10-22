@@ -14,7 +14,11 @@
 
 package nutsdb
 
-import "time"
+import (
+	"time"
+
+	"github.com/nutsdb/nutsdb/internal/fileio"
+)
 
 // EntryIdxMode represents entry index mode.
 type EntryIdxMode int
@@ -152,13 +156,10 @@ type Options struct {
 }
 
 const (
-	B = 1
-
-	KB = 1024 * B
-
-	MB = 1024 * KB
-
-	GB = 1024 * MB
+	B  = fileio.B
+	KB = fileio.KB
+	MB = fileio.MB
+	GB = fileio.GB
 )
 
 // defaultSegmentSize is default data file size.
@@ -181,6 +182,25 @@ var DefaultOptions = func() Options {
 		EnableHintFile:            false,
 		EnableMergeV2:             false,
 		ListImpl:                  ListImplBTree,
+	}
+}()
+
+var doublyLinkedListOptions = func() Options {
+	return Options{
+		EntryIdxMode:              HintKeyValAndRAMIdxMode,
+		SegmentSize:               defaultSegmentSize,
+		NodeNum:                   1,
+		RWMode:                    FileIO,
+		SyncEnable:                true,
+		CommitBufferSize:          4 * MB,
+		MergeInterval:             2 * time.Hour,
+		MaxBatchSize:              (15 * defaultSegmentSize / 4) / 100,
+		MaxBatchCount:             (15 * defaultSegmentSize / 4) / 100 / 100,
+		HintKeyAndRAMIdxCacheSize: 0,
+		ExpiredDeleteType:         TimeWheel,
+		EnableHintFile:            false,
+		EnableMergeV2:             false,
+		ListImpl:                  ListImplDoublyLinkedList,
 	}
 }()
 

@@ -21,6 +21,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nutsdb/nutsdb/internal/utils"
 	"github.com/xujiajun/utils/strconv2"
 )
 
@@ -495,7 +496,7 @@ func (tx *Tx) ZKeys(bucket, pattern string, f func(key string) bool) error {
 	}
 
 	for key := range sortedSet.M {
-		if end, err := MatchForRange(pattern, key, f); end || err != nil {
+		if end, err := utils.MatchForRange(pattern, key, f); end || err != nil {
 			return err
 		}
 	}

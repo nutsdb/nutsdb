@@ -1,6 +1,8 @@
 package nutsdb
 
-import "errors"
+import (
+	"errors"
+)
 
 var (
 	// ErrDataSizeExceed is returned when given key and value size is too big.
@@ -31,6 +33,7 @@ var (
 
 	// ErrNotFoundKey is returned when key not found int the bucket on an view function.
 	ErrNotFoundKey = errors.New("key not found in the bucket")
+	ErrKeyNotFound = ErrNotFoundKey
 
 	// ErrCannotCommitAClosedTx is returned when the tx committing a closed tx
 	ErrCannotCommitAClosedTx = errors.New("can not commit a closed tx")
@@ -44,7 +47,7 @@ var (
 	ErrNotFoundBucket = errors.New("bucket not found")
 
 	// ErrTxnTooBig is returned if too many writes are fit into a single transaction.
-	ErrTxnTooBig = errors.New("Txn is too big to fit into one request")
+	ErrTxnTooBig = errors.New("txn is too big to fit into one request")
 
 	// ErrTxnExceedWriteLimit is returned when this tx's write is exceed max write record
 	ErrTxnExceedWriteLimit = errors.New("txn is exceed max write record count")

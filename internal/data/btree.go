@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package nutsdb
+package data
 
 import (
 	"bytes"
@@ -21,46 +21,33 @@ import (
 	"github.com/tidwall/btree"
 )
 
-// ErrKeyNotFound is returned when the key is not in the b tree.
-var ErrKeyNotFound = ErrNotFoundKey
-
-type Item struct {
-	key    []byte
-	record *Record
-}
-
 type BTree struct {
-	btree *btree.BTreeG[*Item]
+	btree *btree.BTreeG[*Item[Record]]
 }
 
 func NewBTree() *BTree {
 	return &BTree{
-		btree: btree.NewBTreeG[*Item](func(a, b *Item) bool {
-			return bytes.Compare(a.key, b.key) == -1
+		btree: btree.NewBTreeG(func(a, b *Item[Record]) bool {
+			return bytes.Compare(a.Key, b.Key) == -1
 		}),
 	}
 }
 
 func (bt *BTree) Find(key []byte) (*Record, bool) {
-	item, ok := bt.btree.Get(&Item{key: key})
+	item, ok := bt.btree.Get(NewItem[Record](key, nil))
 	if ok {
-		return item.record, ok
+		return item.Record, ok
 	}
 	return nil, ok
 }
 
-func (bt *BTree) Insert(record *Record) bool {
-	_, replaced := bt.btree.Set(&Item{key: record.Key, record: record})
-	return replaced
-}
-
 func (bt *BTree) InsertRecord(key []byte, record *Record) bool {
-	_, replaced := bt.btree.Set(&Item{key: key, record: record})
+	_, replaced := bt.btree.Set(NewItem(key, record))
 	return replaced
 }
 
 func (bt *BTree) Delete(key []byte) bool {
-	_, deleted := bt.btree.Delete(&Item{key: key})
+	_, deleted := bt.btree.Delete(NewItem[Record](key, nil))
 	return deleted
 }
 
@@ -69,13 +56,13 @@ func (bt *BTree) All() []*Record {
 
 	records := make([]*Record, len(items))
 	for i, item := range items {
-		records[i] = item.record
+		records[i] = item.Record
 	}
 
 	return records
 }
 
-func (bt *BTree) AllItems() []*Item {
+func (bt *BTree) AllItems() []*Item[Record] {
 	items := bt.btree.Items()
 	return items
 }
@@ -83,11 +70,11 @@ func (bt *BTree) AllItems() []*Item {
 func (bt *BTree) Range(start, end []byte) []*Record {
 	records := make([]*Record, 0)
 
-	bt.btree.Ascend(&Item{key: start}, func(item *Item) bool {
-		if bytes.Compare(item.key, end) > 0 {
+	bt.btree.Ascend(&Item[Record]{Key: start}, func(item *Item[Record]) bool {
+		if bytes.Compare(item.Key, end) > 0 {
 			return false
 		}
-		records = append(records, item.record)
+		records = append(records, item.Record)
 		return true
 	})
 
@@ -97,8 +84,8 @@ func (bt *BTree) Range(start, end []byte) []*Record {
 func (bt *BTree) PrefixScan(prefix []byte, offset, limitNum int) []*Record {
 	records := make([]*Record, 0)
 
-	bt.btree.Ascend(&Item{key: prefix}, func(item *Item) bool {
-		if !bytes.HasPrefix(item.key, prefix) {
+	bt.btree.Ascend(&Item[Record]{Key: prefix}, func(item *Item[Record]) bool {
+		if !bytes.HasPrefix(item.Key, prefix) {
 			return false
 		}
 
@@ -107,7 +94,7 @@ func (bt *BTree) PrefixScan(prefix []byte, offset, limitNum int) []*Record {
 			return true
 		}
 
-		records = append(records, item.record)
+		records = append(records, item.Record)
 
 		limitNum--
 		return limitNum != 0
@@ -121,8 +108,8 @@ func (bt *BTree) PrefixSearchScan(prefix []byte, reg string, offset, limitNum in
 
 	rgx := regexp.MustCompile(reg)
 
-	bt.btree.Ascend(&Item{key: prefix}, func(item *Item) bool {
-		if !bytes.HasPrefix(item.key, prefix) {
+	bt.btree.Ascend(&Item[Record]{Key: prefix}, func(item *Item[Record]) bool {
+		if !bytes.HasPrefix(item.Key, prefix) {
 			return false
 		}
 
@@ -131,11 +118,11 @@ func (bt *BTree) PrefixSearchScan(prefix []byte, reg string, offset, limitNum in
 			return true
 		}
 
-		if !rgx.Match(bytes.TrimPrefix(item.key, prefix)) {
+		if !rgx.Match(bytes.TrimPrefix(item.Key, prefix)) {
 			return true
 		}
 
-		records = append(records, item.record)
+		records = append(records, item.Record)
 
 		limitNum--
 		return limitNum != 0
@@ -148,18 +135,22 @@ func (bt *BTree) Count() int {
 	return bt.btree.Len()
 }
 
-func (bt *BTree) PopMin() (*Item, bool) {
+func (bt *BTree) PopMin() (*Item[Record], bool) {
 	return bt.btree.PopMin()
 }
 
-func (bt *BTree) PopMax() (*Item, bool) {
+func (bt *BTree) PopMax() (*Item[Record], bool) {
 	return bt.btree.PopMax()
 }
 
-func (bt *BTree) Min() (*Item, bool) {
+func (bt *BTree) Min() (*Item[Record], bool) {
 	return bt.btree.Min()
 }
 
-func (bt *BTree) Max() (*Item, bool) {
+func (bt *BTree) Max() (*Item[Record], bool) {
 	return bt.btree.Max()
+}
+
+func (bt *BTree) Iter() btree.IterG[*Item[Record]] {
+	return bt.btree.Iter()
 }

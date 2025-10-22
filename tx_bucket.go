@@ -14,6 +14,8 @@
 
 package nutsdb
 
+import "github.com/nutsdb/nutsdb/internal/utils"
+
 // IterateBuckets iterate over all the bucket depends on ds (represents the data structure)
 func (tx *Tx) IterateBuckets(ds uint16, pattern string, f func(bucket string) bool) error {
 	if err := tx.checkTxIsClosed(); err != nil {
@@ -26,7 +28,7 @@ func (tx *Tx) IterateBuckets(ds uint16, pattern string, f func(bucket string) bo
 			if err != nil {
 				return err
 			}
-			if end, err := MatchForRange(pattern, bucket.Name, f); end || err != nil {
+			if end, err := utils.MatchForRange(pattern, bucket.Name, f); end || err != nil {
 				return err
 			}
 		}
@@ -37,7 +39,7 @@ func (tx *Tx) IterateBuckets(ds uint16, pattern string, f func(bucket string) bo
 			if err != nil {
 				return err
 			}
-			if end, err := MatchForRange(pattern, bucket.Name, f); end || err != nil {
+			if end, err := utils.MatchForRange(pattern, bucket.Name, f); end || err != nil {
 				return err
 			}
 		}
@@ -48,7 +50,7 @@ func (tx *Tx) IterateBuckets(ds uint16, pattern string, f func(bucket string) bo
 			if err != nil {
 				return err
 			}
-			if end, err := MatchForRange(pattern, bucket.Name, f); end || err != nil {
+			if end, err := utils.MatchForRange(pattern, bucket.Name, f); end || err != nil {
 				return err
 			}
 		}
@@ -59,7 +61,7 @@ func (tx *Tx) IterateBuckets(ds uint16, pattern string, f func(bucket string) bo
 			if err != nil {
 				return err
 			}
-			if end, err := MatchForRange(pattern, bucket.Name, f); end || err != nil {
+			if end, err := utils.MatchForRange(pattern, bucket.Name, f); end || err != nil {
 				return err
 			}
 		}

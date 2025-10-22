@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package nutsdb
+package fileio
 
 import (
 	"errors"
@@ -21,10 +21,12 @@ import (
 	"sync"
 
 	"github.com/edsrzf/mmap-go"
+	"github.com/nutsdb/nutsdb/internal/utils"
 )
 
 var (
-	mmapBlockSize              = int64(os.Getpagesize()) * 4
+	MmapBlockSize = int64(os.Getpagesize()) * 4
+
 	mmapRWManagerInstancesLock = sync.Mutex{}
 	mmapRWManagerInstances     = make(map[string]*MMapRWManager)
 	mmapLRUCacheCapacity       = 1024
@@ -38,7 +40,7 @@ var (
 	ErrIndexOutOfBound = errors.New("offset out of mapped region")
 )
 
-func getMMapRWManager(fd *os.File, path string, fdm *fdManager, segmentSize int64) *MMapRWManager {
+func GetMMapRWManager(fd *os.File, path string, fdm *FdManager, segmentSize int64) *MMapRWManager {
 	mmapRWManagerInstancesLock.Lock()
 	defer mmapRWManagerInstancesLock.Unlock()
 	mm, ok := mmapRWManagerInstances[path]
@@ -46,12 +48,12 @@ func getMMapRWManager(fd *os.File, path string, fdm *fdManager, segmentSize int6
 		return mm
 	}
 	mm = &MMapRWManager{
-		fd:          fd,
-		path:        path,
-		fdm:         fdm,
-		segmentSize: segmentSize,
-		readCache:   NewLruCache(mmapLRUCacheCapacity),
-		writeCache:  NewLruCache(mmapLRUCacheCapacity),
+		Fd:          fd,
+		Path:        path,
+		Fdm:         fdm,
+		SegmentSize: segmentSize,
+		ReadCache:   utils.NewLruCache(mmapLRUCacheCapacity),
+		WriteCache:  utils.NewLruCache(mmapLRUCacheCapacity),
 	}
 
 	mmapRWManagerInstances[path] = mm
@@ -63,31 +65,31 @@ func getMMapRWManager(fd *os.File, path string, fdm *fdManager, segmentSize int6
 // different with FileIORWManager, we can only allow one MMapRWManager
 // for one datafile, so we need to do some concurrency safety control.
 type MMapRWManager struct {
-	fd          *os.File
-	path        string
-	fdm         *fdManager
-	segmentSize int64
+	Fd          *os.File
+	Path        string
+	Fdm         *FdManager
+	SegmentSize int64
 
-	readCache  *LRUCache
-	writeCache *LRUCache
+	ReadCache  *utils.LRUCache
+	WriteCache *utils.LRUCache
 }
 
 // WriteAt copies data to mapped region from the b slice starting at
 // given off and returns number of bytes copied to the mapped region.
 func (mm *MMapRWManager) WriteAt(b []byte, off int64) (n int, err error) {
-	if off >= int64(mm.segmentSize) || off < 0 {
+	if off >= int64(mm.SegmentSize) || off < 0 {
 		return 0, ErrIndexOutOfBound
 	}
 	lb := len(b)
 	curOffset := mm.alignedOffset(off)
 	diff := off - curOffset
-	for ; n < lb && curOffset < mm.segmentSize; curOffset += mmapBlockSize {
-		data, err := mm.accessMMap(mm.writeCache, curOffset, mmap.RDWR)
+	for ; n < lb && curOffset < mm.SegmentSize; curOffset += MmapBlockSize {
+		data, err := mm.accessMMap(mm.WriteCache, curOffset, mmap.RDWR)
 		if err != nil {
 			return n, err
 		}
 		data.mut.Lock()
-		n += copy(data.data[diff:mmapBlockSize], b[n:])
+		n += copy(data.data[diff:MmapBlockSize], b[n:])
 		data.mut.Unlock()
 		diff = 0
 	}
@@ -97,19 +99,19 @@ func (mm *MMapRWManager) WriteAt(b []byte, off int64) (n int, err error) {
 // ReadAt copies data to b slice from mapped region starting at
 // given off and returns number of bytes copied to the b slice.
 func (mm *MMapRWManager) ReadAt(b []byte, off int64) (n int, err error) {
-	if off >= int64(mm.segmentSize) || off < 0 {
+	if off >= int64(mm.SegmentSize) || off < 0 {
 		return 0, ErrIndexOutOfBound
 	}
 	lb := len(b)
 	curOffset := mm.alignedOffset(off)
 	diff := off - curOffset
-	for ; n < lb && curOffset < mm.segmentSize; curOffset += mmapBlockSize {
-		data, err := mm.accessMMap(mm.readCache, curOffset, mmap.RDONLY)
+	for ; n < lb && curOffset < mm.SegmentSize; curOffset += MmapBlockSize {
+		data, err := mm.accessMMap(mm.ReadCache, curOffset, mmap.RDONLY)
 		if err != nil {
 			return n, err
 		}
 		data.mut.RLock()
-		n += copy(b[n:], data.data[diff:mmapBlockSize])
+		n += copy(b[n:], data.data[diff:MmapBlockSize])
 		data.mut.RUnlock()
 		diff = 0
 	}
@@ -123,29 +125,29 @@ func (mm *MMapRWManager) Sync() (err error) {
 
 // Release deletes the memory mapped region, flushes any remaining changes
 func (mm *MMapRWManager) Release() (err error) {
-	mm.fdm.reduceUsing(mm.path)
+	mm.Fdm.ReduceUsing(mm.Path)
 	return nil
 }
 
 func (mm *MMapRWManager) Size() int64 {
-	return mm.segmentSize
+	return mm.SegmentSize
 }
 
 // Close will remove the cache in the fdm of the specified path, and call the close method of the os of the file
 func (mm *MMapRWManager) Close() (err error) {
-	return mm.fdm.closeByPath(mm.path)
+	return mm.Fdm.CloseByPath(mm.Path)
 }
 
 func (mm *MMapRWManager) alignedOffset(offset int64) int64 {
-	return offset - (offset & (mmapBlockSize - 1))
+	return offset - (offset & (MmapBlockSize - 1))
 }
 
 // accessMMap access the MMap data. If for this block the mmap data is not mmapped, will add
 // it into cache.
-func (mm *MMapRWManager) accessMMap(cache *LRUCache, offset int64, prot int) (data *mmapData, err error) {
+func (mm *MMapRWManager) accessMMap(cache *utils.LRUCache, offset int64, prot int) (data *mmapData, err error) {
 	item := cache.Get(offset)
 	if item == nil {
-		newItem, err := newMMapData(mm.fd, offset, prot)
+		newItem, err := newMMapData(mm.Fd, offset, prot)
 		if err != nil {
 			return nil, err
 		}
@@ -167,7 +169,7 @@ func newMMapData(fd *os.File, offset int64, prot int) (md *mmapData, err error) 
 	md = &mmapData{
 		offset: offset,
 	}
-	md.data, err = mmap.MapRegion(fd, int(mmapBlockSize), prot, 0, offset)
+	md.data, err = mmap.MapRegion(fd, int(MmapBlockSize), prot, 0, offset)
 	if err != nil {
 		return nil, err
 	}

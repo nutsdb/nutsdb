@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nutsdb/nutsdb/internal/testutils"
 	"github.com/stretchr/testify/require"
 )
 
@@ -46,20 +47,20 @@ func TestHintFileIntegration_WriteMergeRestartVerify(t *testing.T) {
 			// Write a significant amount of data to trigger merge
 			n := 2000
 			for i := 0; i < n; i++ {
-				txPut(t, db, bucket, GetTestBytes(i), GetTestBytes(i), Persistent, nil, nil)
+				txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), Persistent, nil, nil)
 			}
 
 			// Delete some data to create dirty entries
 			for i := 0; i < n/4; i++ {
-				txDel(t, db, bucket, GetTestBytes(i), nil)
+				txDel(t, db, bucket, testutils.GetTestBytes(i), nil)
 			}
 
 			// Verify data before merge
 			for i := n / 4; i < n; i++ {
-				txGet(t, db, bucket, GetTestBytes(i), GetTestBytes(i), nil)
+				txGet(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), nil)
 			}
 			for i := 0; i < n/4; i++ {
-				txGet(t, db, bucket, GetTestBytes(i), GetTestBytes(i), ErrKeyNotFound)
+				txGet(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), ErrKeyNotFound)
 			}
 
 			// Step 2: Perform merge to create hint files
@@ -85,10 +86,10 @@ func TestHintFileIntegration_WriteMergeRestartVerify(t *testing.T) {
 
 			// Step 5: Verify all data is correctly recovered
 			for i := n / 4; i < n; i++ {
-				txGet(t, db, bucket, GetTestBytes(i), GetTestBytes(i), nil)
+				txGet(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), nil)
 			}
 			for i := 0; i < n/4; i++ {
-				txGet(t, db, bucket, GetTestBytes(i), GetTestBytes(i), ErrKeyNotFound)
+				txGet(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), ErrKeyNotFound)
 			}
 
 			// Verify record count
@@ -123,7 +124,7 @@ func TestHintFileIntegration_EnableDisableToggle(t *testing.T) {
 		// Write enough data to generate at least 2 data files (for merge to work)
 		n := 2000
 		for i := 0; i < n; i++ {
-			txPut(t, db, bucket, GetTestBytes(i), GetTestBytes(i), Persistent, nil, nil)
+			txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), Persistent, nil, nil)
 		}
 
 		// Perform merge
@@ -150,7 +151,7 @@ func TestHintFileIntegration_EnableDisableToggle(t *testing.T) {
 
 		// Write more data to generate additional files for the second merge
 		for i := n; i < n+1500; i++ {
-			txPut(t, db, bucket, GetTestBytes(i), GetTestBytes(i), Persistent, nil, nil)
+			txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), Persistent, nil, nil)
 		}
 
 		// Perform merge (should not create hint files)
@@ -203,12 +204,12 @@ func TestHintFileIntegration_MultipleMerges(t *testing.T) {
 			start := round * 500
 			end := (round + 1) * 500
 			for i := start; i < end; i++ {
-				txPut(t, db, bucket, GetTestBytes(i), GetTestBytes(i), Persistent, nil, nil)
+				txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), Persistent, nil, nil)
 			}
 
 			// Delete some data
 			for i := start; i < start+100; i++ {
-				txDel(t, db, bucket, GetTestBytes(i), nil)
+				txDel(t, db, bucket, testutils.GetTestBytes(i), nil)
 			}
 
 			// Perform merge
@@ -234,12 +235,12 @@ func TestHintFileIntegration_MultipleMerges(t *testing.T) {
 
 			// Check deleted data
 			for i := start; i < start+100; i++ {
-				txGet(t, db, bucket, GetTestBytes(i), GetTestBytes(i), ErrKeyNotFound)
+				txGet(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), ErrKeyNotFound)
 			}
 
 			// Check remaining data
 			for i := start + 100; i < end; i++ {
-				txGet(t, db, bucket, GetTestBytes(i), GetTestBytes(i), nil)
+				txGet(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), nil)
 			}
 		}
 
@@ -255,12 +256,12 @@ func TestHintFileIntegration_MultipleMerges(t *testing.T) {
 
 			// Check deleted data
 			for i := start; i < start+100; i++ {
-				txGet(t, db, bucket, GetTestBytes(i), GetTestBytes(i), ErrKeyNotFound)
+				txGet(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), ErrKeyNotFound)
 			}
 
 			// Check remaining data
 			for i := start + 100; i < end; i++ {
-				txGet(t, db, bucket, GetTestBytes(i), GetTestBytes(i), nil)
+				txGet(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), nil)
 			}
 		}
 
@@ -296,36 +297,36 @@ func TestHintFileIntegration_MixedDataStructures(t *testing.T) {
 
 		// Add data to each structure - increase data size to ensure 2 files are created
 		for i := 0; i < 2000; i++ {
-			txPut(t, db, bucketBTree, GetTestBytes(i), GetTestBytes(i), Persistent, nil, nil)
+			txPut(t, db, bucketBTree, testutils.GetTestBytes(i), testutils.GetTestBytes(i), Persistent, nil, nil)
 		}
 
-		setKey := GetTestBytes(0)
+		setKey := testutils.GetTestBytes(0)
 		for i := 0; i < 1000; i++ {
-			txSAdd(t, db, bucketSet, setKey, GetTestBytes(i), nil, nil)
+			txSAdd(t, db, bucketSet, setKey, testutils.GetTestBytes(i), nil, nil)
 		}
 
-		listKey := GetTestBytes(0)
+		listKey := testutils.GetTestBytes(0)
 		for i := 0; i < 500; i++ {
-			txPush(t, db, bucketList, listKey, GetTestBytes(i), true, nil, nil)
+			txPush(t, db, bucketList, listKey, testutils.GetTestBytes(i), true, nil, nil)
 		}
 
-		zsetKey := GetTestBytes(0)
+		zsetKey := testutils.GetTestBytes(0)
 		for i := 0; i < 300; i++ {
-			txZAdd(t, db, bucketZSet, zsetKey, GetTestBytes(i), float64(i), nil, nil)
+			txZAdd(t, db, bucketZSet, zsetKey, testutils.GetTestBytes(i), float64(i), nil, nil)
 		}
 
 		// Delete some data from each structure
 		for i := 0; i < 500; i++ {
-			txDel(t, db, bucketBTree, GetTestBytes(i), nil)
+			txDel(t, db, bucketBTree, testutils.GetTestBytes(i), nil)
 		}
 		for i := 0; i < 250; i++ {
-			txSRem(t, db, bucketSet, setKey, GetTestBytes(i), nil)
+			txSRem(t, db, bucketSet, setKey, testutils.GetTestBytes(i), nil)
 		}
 		for i := 0; i < 100; i++ {
-			txPop(t, db, bucketList, listKey, GetTestBytes(i), nil, false)
+			txPop(t, db, bucketList, listKey, testutils.GetTestBytes(i), nil, false)
 		}
 		for i := 0; i < 50; i++ {
-			txZRem(t, db, bucketZSet, zsetKey, GetTestBytes(i), nil)
+			txZRem(t, db, bucketZSet, zsetKey, testutils.GetTestBytes(i), nil)
 		}
 
 		// Perform merge
@@ -350,18 +351,18 @@ func TestHintFileIntegration_MixedDataStructures(t *testing.T) {
 
 		// Verify BTree data
 		for i := 500; i < 2000; i++ {
-			txGet(t, db, bucketBTree, GetTestBytes(i), GetTestBytes(i), nil)
+			txGet(t, db, bucketBTree, testutils.GetTestBytes(i), testutils.GetTestBytes(i), nil)
 		}
 		for i := 0; i < 500; i++ {
-			txGet(t, db, bucketBTree, GetTestBytes(i), GetTestBytes(i), ErrKeyNotFound)
+			txGet(t, db, bucketBTree, testutils.GetTestBytes(i), testutils.GetTestBytes(i), ErrKeyNotFound)
 		}
 
 		// Verify Set data
 		for i := 250; i < 1000; i++ {
-			txSIsMember(t, db, bucketSet, setKey, GetTestBytes(i), true)
+			txSIsMember(t, db, bucketSet, setKey, testutils.GetTestBytes(i), true)
 		}
 		for i := 0; i < 250; i++ {
-			txSIsMember(t, db, bucketSet, setKey, GetTestBytes(i), false)
+			txSIsMember(t, db, bucketSet, setKey, testutils.GetTestBytes(i), false)
 		}
 
 		// Verify List data
@@ -369,10 +370,10 @@ func TestHintFileIntegration_MixedDataStructures(t *testing.T) {
 
 		// Verify SortedSet data
 		for i := 50; i < 300; i++ {
-			txZScore(t, db, bucketZSet, zsetKey, GetTestBytes(i), float64(i), nil)
+			txZScore(t, db, bucketZSet, zsetKey, testutils.GetTestBytes(i), float64(i), nil)
 		}
 		for i := 0; i < 50; i++ {
-			txZScore(t, db, bucketZSet, zsetKey, GetTestBytes(i), 0, ErrSortedSetMemberNotExist)
+			txZScore(t, db, bucketZSet, zsetKey, testutils.GetTestBytes(i), 0, ErrSortedSetMemberNotExist)
 		}
 
 		require.NoError(t, db.Close())
@@ -399,7 +400,7 @@ func TestHintFileIntegration_CrashRecovery(t *testing.T) {
 
 		n := 2000
 		for i := 0; i < n; i++ {
-			txPut(t, db, bucket, GetTestBytes(i), GetTestBytes(i), Persistent, nil, nil)
+			txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), Persistent, nil, nil)
 		}
 
 		// Perform merge to create hint files
@@ -410,7 +411,7 @@ func TestHintFileIntegration_CrashRecovery(t *testing.T) {
 		if err := db.ActiveFile.rwManager.Release(); err != nil {
 			t.Errorf("Failed to release rwManager: %v", err)
 		}
-		if err := db.fm.close(); err != nil {
+		if err := db.fm.Close(); err != nil {
 			t.Errorf("Failed to close file manager: %v", err)
 		}
 		if err := db.flock.Unlock(); err != nil {
@@ -423,7 +424,7 @@ func TestHintFileIntegration_CrashRecovery(t *testing.T) {
 
 		// Verify all data is correctly recovered
 		for i := 0; i < n; i++ {
-			txGet(t, db, bucket, GetTestBytes(i), GetTestBytes(i), nil)
+			txGet(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), nil)
 		}
 
 		// Verify record count
@@ -462,8 +463,8 @@ func TestHintFileIntegration_ConcurrentOperations(t *testing.T) {
 		for i := 0; i < 20; i++ {
 			go func(id int) {
 				for j := 0; j < 100; j++ {
-					key := GetTestBytes(id*100 + j)
-					value := GetTestBytes(id*100 + j)
+					key := testutils.GetTestBytes(id*100 + j)
+					value := testutils.GetTestBytes(id*100 + j)
 					txPut(t, db, bucket, key, value, Persistent, nil, nil)
 				}
 				done <- true
@@ -498,8 +499,8 @@ func TestHintFileIntegration_ConcurrentOperations(t *testing.T) {
 		// Verify all data is correctly recovered
 		for i := 0; i < 10; i++ {
 			for j := 0; j < 100; j++ {
-				key := GetTestBytes(i*100 + j)
-				value := GetTestBytes(i*100 + j)
+				key := testutils.GetTestBytes(i*100 + j)
+				value := testutils.GetTestBytes(i*100 + j)
 				txGet(t, db, bucket, key, value, nil)
 			}
 		}
@@ -533,12 +534,12 @@ func TestHintFileIntegration_LargeDataset(t *testing.T) {
 		// Write a large amount of data
 		n := 10000
 		for i := 0; i < n; i++ {
-			txPut(t, db, bucket, GetTestBytes(i), GetTestBytes(i), Persistent, nil, nil)
+			txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), Persistent, nil, nil)
 		}
 
 		// Delete some data
 		for i := 0; i < n/4; i++ {
-			txDel(t, db, bucket, GetTestBytes(i), nil)
+			txDel(t, db, bucket, testutils.GetTestBytes(i), nil)
 		}
 
 		// Perform merge
@@ -566,10 +567,10 @@ func TestHintFileIntegration_LargeDataset(t *testing.T) {
 
 		// Verify sample data
 		for i := n / 4; i < n/4+100; i++ {
-			txGet(t, db, bucket, GetTestBytes(i), GetTestBytes(i), nil)
+			txGet(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), nil)
 		}
 		for i := 0; i < 100; i++ {
-			txGet(t, db, bucket, GetTestBytes(i), GetTestBytes(i), ErrKeyNotFound)
+			txGet(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), ErrKeyNotFound)
 		}
 
 		// Verify record count

@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -19,7 +18,7 @@ var (
 func init() {
 	fileDir := "/tmp/nutsdb_http_example"
 
-	files, _ := ioutil.ReadDir(fileDir)
+	files, _ := os.ReadDir(fileDir)
 	for _, f := range files {
 		name := f.Name()
 		if name != "" {

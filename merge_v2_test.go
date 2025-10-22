@@ -11,6 +11,9 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/nutsdb/nutsdb/internal/data"
+	"github.com/nutsdb/nutsdb/internal/utils"
 )
 
 func TestMergeV2Utils(t *testing.T) {
@@ -574,7 +577,7 @@ func TestMergeV2NewOutputOldHintRemovalFailure(t *testing.T) {
 
 	db := &DB{
 		opt: opts,
-		fm:  newFileManager(opts.RWMode, 4, 0.5, opts.SegmentSize),
+		fm:  NewFileManager(opts.RWMode, 4, 0.5, opts.SegmentSize),
 	}
 
 	job := &mergeV2Job{db: db}
@@ -594,7 +597,7 @@ func TestMergeV2EnsureOutputRolloverCreatesNewSegment(t *testing.T) {
 
 	db := &DB{
 		opt: opts,
-		fm:  newFileManager(opts.RWMode, 4, 0.5, opts.SegmentSize),
+		fm:  NewFileManager(opts.RWMode, 4, 0.5, opts.SegmentSize),
 	}
 
 	job := &mergeV2Job{db: db}
@@ -654,8 +657,8 @@ func TestMergeV2CommitCollectorFailure(t *testing.T) {
 	timestamp := uint64(time.Now().Unix())
 	oldFileID := int64(5)
 
-	bt := NewBTree()
-	record := (&Record{}).
+	bt := data.NewBTree()
+	record := (&data.Record{}).
 		WithKey(key).
 		WithFileId(oldFileID).
 		WithDataPos(123).
@@ -1329,9 +1332,9 @@ func TestMergeV2ApplyLookupUpdatesSecondaryIndexes(t *testing.T) {
 	}
 
 	// Set bucket
-	setRecord := &Record{Value: []byte("member"), FileID: 10, Timestamp: 1, TTL: Persistent}
+	setRecord := &data.Record{Value: []byte("member"), FileID: 10, Timestamp: 1, TTL: Persistent}
 	setIdx := db.Index.set.getWithDefault(buckets[0].id)
-	if err := setIdx.SAdd("set-key", [][]byte{setRecord.Value}, []*Record{setRecord}); err != nil {
+	if err := setIdx.SAdd("set-key", [][]byte{setRecord.Value}, []*data.Record{setRecord}); err != nil {
 		t.Fatalf("SAdd: %v", err)
 	}
 	setHash := fnv.New32a()
@@ -1341,14 +1344,14 @@ func TestMergeV2ApplyLookupUpdatesSecondaryIndexes(t *testing.T) {
 	listIdx := db.Index.list.getWithDefault(buckets[1].id)
 	listKey := []byte("list-key")
 	seq := uint64(42)
-	listRecord := &Record{FileID: 11, Timestamp: 2, TTL: Persistent, TxID: 1}
-	listIdx.Items[string(listKey)] = NewBTree()
-	listIdx.Items[string(listKey)].InsertRecord(ConvertUint64ToBigEndianBytes(seq), listRecord)
+	listRecord := &data.Record{FileID: 11, Timestamp: 2, TTL: Persistent, TxID: 1}
+	listIdx.Items[string(listKey)] = data.NewBTree()
+	listIdx.Items[string(listKey)].InsertRecord(utils.ConvertUint64ToBigEndianBytes(seq), listRecord)
 
 	// Sorted set bucket
 	sortedIdx := db.Index.sortedSet.getWithDefault(buckets[2].id, db)
 	sortedValue := []byte("sorted-member")
-	sortedRecord := &Record{Value: sortedValue, FileID: 12, Timestamp: 3, TTL: Persistent}
+	sortedRecord := &data.Record{Value: sortedValue, FileID: 12, Timestamp: 3, TTL: Persistent}
 	if err := sortedIdx.ZAdd("zset-key", SCORE(1.5), sortedValue, sortedRecord); err != nil {
 		t.Fatalf("ZAdd: %v", err)
 	}
@@ -1968,8 +1971,7 @@ func TestMergeV2RewriteFileSkipsCorruptedEntries(t *testing.T) {
 		createTestEntry(bucketID, []byte("nonpending"), []byte("v4"), DataSetFlag, Committed, Persistent, now, 4, DataStructureBTree),
 	}
 
-	var goodEntry *Entry
-	goodEntry = createTestEntry(bucketID, []byte("good"), []byte("keep"), DataSetFlag, Committed, Persistent, now, 5, DataStructureBTree)
+	goodEntry := createTestEntry(bucketID, []byte("good"), []byte("keep"), DataSetFlag, Committed, Persistent, now, 5, DataStructureBTree)
 
 	for _, e := range append(entries, goodEntry) {
 		if _, err := f.Write(e.Encode()); err != nil {
@@ -1984,8 +1986,8 @@ func TestMergeV2RewriteFileSkipsCorruptedEntries(t *testing.T) {
 		t.Fatalf("close test data file: %v", err)
 	}
 
-	bt := NewBTree()
-	bt.InsertRecord(goodEntry.Key, (&Record{}).
+	bt := data.NewBTree()
+	bt.InsertRecord(goodEntry.Key, (&data.Record{}).
 		WithFileId(fid).
 		WithDataPos(0).
 		WithTimestamp(goodEntry.Meta.Timestamp).
@@ -2092,7 +2094,7 @@ func TestMergeV2CleanupOldFilesPropagatesErrors(t *testing.T) {
 	}
 
 	job := &mergeV2Job{
-		db:      &DB{opt: Options{Dir: dir}, fm: newFileManager(FileIO, 1, 0.5, 1<<12)},
+		db:      &DB{opt: Options{Dir: dir}, fm: NewFileManager(FileIO, 1, 0.5, 1<<12)},
 		oldData: []string{nested},
 	}
 

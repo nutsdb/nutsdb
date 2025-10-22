@@ -12,13 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package nutsdb
+package data
 
 import (
 	"fmt"
+	"testing"
+
+	"github.com/nutsdb/nutsdb/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 var (
@@ -33,7 +35,8 @@ func runBTreeTest(t *testing.T, test func(t *testing.T, btree *BTree)) {
 		key := []byte(fmt.Sprintf(keyFormat, i))
 		val := []byte(fmt.Sprintf(valFormat, i))
 
-		_ = btree.Insert(NewRecord().WithKey(key).WithValue(val))
+		rec := NewRecord().WithKey(key).WithValue(val)
+		_ = btree.InsertRecord(key, rec)
 	}
 
 	test(t, btree)
@@ -87,9 +90,10 @@ func TestBTree_PrefixSearchScan(t *testing.T) {
 		runBTreeTest(t, func(t *testing.T, btree *BTree) {
 
 			key := []byte("nutsdb-123456789@outlook.com")
-			val := GetRandomBytes(24)
+			val := testutils.GetRandomBytes(24)
 
-			_ = btree.Insert(NewRecord().WithKey(key).WithValue(val))
+			rec := NewRecord().WithKey(key).WithValue(val)
+			_ = btree.InsertRecord(rec.Key, rec)
 
 			record, ok := btree.Find(key)
 			require.True(t, ok)
@@ -105,9 +109,10 @@ func TestBTree_PrefixSearchScan(t *testing.T) {
 		runBTreeTest(t, func(t *testing.T, btree *BTree) {
 
 			key := []byte("nutsdb-123456789@outlook")
-			val := GetRandomBytes(24)
+			val := testutils.GetRandomBytes(24)
 
-			_ = btree.Insert(NewRecord().WithKey(key).WithValue(val))
+			rec := NewRecord().WithKey(key).WithValue(val)
+			_ = btree.InsertRecord(rec.Key, rec)
 
 			record, ok := btree.Find(key)
 			require.True(t, ok)
@@ -194,7 +199,8 @@ func TestBTree_Update(t *testing.T) {
 			key := []byte(fmt.Sprintf(keyFormat, i))
 			val := []byte(fmt.Sprintf("val_%03d_modify", i))
 
-			btree.Insert(NewRecord().WithKey(key).WithValue(val))
+			rec := NewRecord().WithKey(key).WithValue(val)
+			_ = btree.InsertRecord(rec.Key, rec)
 		}
 
 		records := btree.Range([]byte(fmt.Sprintf(keyFormat, 40)), []byte(fmt.Sprintf(keyFormat, 49)))

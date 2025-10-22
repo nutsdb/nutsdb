@@ -17,81 +17,13 @@ package nutsdb
 import (
 	"bytes"
 	"encoding/binary"
-	"errors"
 	"fmt"
-	"io"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/xujiajun/utils/strconv2"
 )
-
-// Truncate changes the size of the file.
-// If readOnly is true, it skips the file stat check and truncate operation,
-// which significantly improves read performance by avoiding unnecessary syscalls.
-func Truncate(path string, capacity int64, f *os.File, readOnly bool) error {
-	// Skip truncation for read-only operations to avoid expensive os.Stat syscall
-	if readOnly {
-		return nil
-	}
-
-	fileInfo, _ := os.Stat(path)
-	if fileInfo.Size() < capacity {
-		if err := f.Truncate(capacity); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func ConvertBigEndianBytesToUint64(data []byte) uint64 {
-	return binary.BigEndian.Uint64(data)
-}
-
-func ConvertUint64ToBigEndianBytes(value uint64) []byte {
-	b := make([]byte, 8)
-	binary.BigEndian.PutUint64(b, value)
-	return b
-}
-
-func MarshalInts(ints []int) ([]byte, error) {
-	buffer := bytes.NewBuffer([]byte{})
-	for _, x := range ints {
-		if err := binary.Write(buffer, binary.LittleEndian, int64(x)); err != nil {
-			return nil, err
-		}
-	}
-	return buffer.Bytes(), nil
-}
-
-func UnmarshalInts(data []byte) ([]int, error) {
-	var ints []int
-	buffer := bytes.NewBuffer(data)
-	for {
-		var i int64
-		err := binary.Read(buffer, binary.LittleEndian, &i)
-		if errors.Is(err, io.EOF) {
-			break
-		} else if err != nil {
-			return nil, err
-		}
-		ints = append(ints, int(i))
-	}
-	return ints, nil
-}
-
-func MatchForRange(pattern, bucket string, f func(bucket string) bool) (end bool, err error) {
-	match, err := filepath.Match(pattern, bucket)
-	if err != nil {
-		return true, err
-	}
-	if match && !f(bucket) {
-		return true, nil
-	}
-	return false, nil
-}
 
 // getDataPath returns the data path for the given file ID.
 func getDataPath(fID int64, dir string) string {
@@ -101,15 +33,6 @@ func getDataPath(fID int64, dir string) string {
 		return dir + separator + fmt.Sprintf("merge_%d%s", seq, DataSuffix)
 	}
 	return dir + separator + strconv2.Int64ToStr(fID) + DataSuffix
-}
-
-func OneOfUint16Array(value uint16, array []uint16) bool {
-	for _, v := range array {
-		if v == value {
-			return true
-		}
-	}
-	return false
 }
 
 func splitIntStringStr(str, separator string) (int, string) {
@@ -181,20 +104,6 @@ func createNewBufferWithSize(size int) *bytes.Buffer {
 	buf := new(bytes.Buffer)
 	buf.Grow(int(size))
 	return buf
-}
-
-func UvarintSize(x uint64) int {
-	i := 0
-	for x >= 0x80 {
-		x >>= 7
-		i++
-	}
-	return i + 1
-}
-
-func VarintSize(x int64) int {
-	ux := uint64(x<<1) ^ uint64(x>>63)
-	return UvarintSize(ux)
 }
 
 // compareAndReturn use bytes.Compare(other, target), if return value is

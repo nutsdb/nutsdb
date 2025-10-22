@@ -1,5 +1,10 @@
 package nutsdb
 
+import (
+	"github.com/nutsdb/nutsdb/internal/data"
+	"github.com/nutsdb/nutsdb/internal/utils"
+)
+
 // DataStructure represents the data structure we have already supported
 type DataStructure = uint16
 
@@ -91,7 +96,7 @@ const (
 )
 
 // Persistent represents the data persistent flag
-const Persistent uint32 = 0
+const Persistent uint32 = data.Persistent
 
 type MetaData struct {
 	KeySize    uint32
@@ -111,15 +116,15 @@ func (meta *MetaData) Size() int64 {
 	// CRC
 	size := 4
 
-	size += UvarintSize(uint64(meta.KeySize))
-	size += UvarintSize(uint64(meta.ValueSize))
-	size += UvarintSize(meta.Timestamp)
-	size += UvarintSize(uint64(meta.TTL))
-	size += UvarintSize(uint64(meta.Flag))
-	size += UvarintSize(meta.TxID)
-	size += UvarintSize(uint64(meta.Status))
-	size += UvarintSize(uint64(meta.Ds))
-	size += UvarintSize(meta.BucketId)
+	size += utils.UvarintSize(uint64(meta.KeySize))
+	size += utils.UvarintSize(uint64(meta.ValueSize))
+	size += utils.UvarintSize(meta.Timestamp)
+	size += utils.UvarintSize(uint64(meta.TTL))
+	size += utils.UvarintSize(uint64(meta.Flag))
+	size += utils.UvarintSize(meta.TxID)
+	size += utils.UvarintSize(uint64(meta.Status))
+	size += utils.UvarintSize(uint64(meta.Ds))
+	size += utils.UvarintSize(meta.BucketId)
 
 	return int64(size)
 }

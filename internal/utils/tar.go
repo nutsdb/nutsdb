@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package nutsdb
+package utils
 
 import (
 	"archive/tar"
@@ -23,14 +23,14 @@ import (
 	"strings"
 )
 
-func tarGZCompress(dst io.Writer, src string) error {
+func TarGZCompress(dst io.Writer, src string) error {
 	gz := gzip.NewWriter(dst)
 	defer gz.Close()
-	return tarCompress(gz, src)
+	return TarCompress(gz, src)
 }
 
 // https://blog.ralch.com/articles/golang-working-with-tar-and-gzip
-func tarCompress(dst io.Writer, src string) error {
+func TarCompress(dst io.Writer, src string) error {
 	tarball := tar.NewWriter(dst)
 	defer tarball.Close()
 

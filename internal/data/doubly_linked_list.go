@@ -12,19 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package nutsdb
+package data
 
 import (
 	"bytes"
 	"container/list"
+	"math"
 	"regexp"
 )
 
-// ListElement wraps the data stored in the list
-type ListElement struct {
-	key    []byte
-	record *Record
-}
+const (
+	InitialListSeq = math.MaxUint64 / 2
+)
 
 // DoublyLinkedList represents a doubly linked list optimized for head/tail operations.
 // It uses Go's standard container/list without additional index structures.
@@ -45,9 +44,9 @@ func NewDoublyLinkedList() *DoublyLinkedList {
 // Optimized for head/tail insertions (LPush/RPush pattern).
 // Warning: Middle insertions require O(n) traversal. Check for duplicates requires O(n) scan.
 func (dll *DoublyLinkedList) InsertRecord(key []byte, record *Record) bool {
-	newElem := &ListElement{
-		key:    key,
-		record: record,
+	newElem := &Item[Record]{
+		Key:    key,
+		Record: record,
 	}
 
 	// Empty list - just insert
@@ -57,29 +56,29 @@ func (dll *DoublyLinkedList) InsertRecord(key []byte, record *Record) bool {
 	}
 
 	// Check if inserting at head or tail (common case for List operations)
-	front := dll.list.Front().Value.(*ListElement)
-	back := dll.list.Back().Value.(*ListElement)
+	front := dll.list.Front().Value.(*Item[Record])
+	back := dll.list.Back().Value.(*Item[Record])
 
 	// Check for duplicate at head
-	if bytes.Equal(key, front.key) {
-		front.record = record
+	if bytes.Equal(key, front.Key) {
+		front.Record = record
 		return true
 	}
 
 	// Insert at head if key is smaller than front
-	if bytes.Compare(key, front.key) < 0 {
+	if bytes.Compare(key, front.Key) < 0 {
 		dll.list.PushFront(newElem)
 		return false
 	}
 
 	// Check for duplicate at tail
-	if bytes.Equal(key, back.key) {
-		back.record = record
+	if bytes.Equal(key, back.Key) {
+		back.Record = record
 		return true
 	}
 
 	// Insert at tail if key is larger than back
-	if bytes.Compare(key, back.key) > 0 {
+	if bytes.Compare(key, back.Key) > 0 {
 		dll.list.PushBack(newElem)
 		return false
 	}
@@ -87,12 +86,12 @@ func (dll *DoublyLinkedList) InsertRecord(key []byte, record *Record) bool {
 	// Middle insertion: find the correct position (O(n) operation)
 	// This should be rare in typical List usage patterns
 	for e := dll.list.Front(); e != nil; e = e.Next() {
-		elem := e.Value.(*ListElement)
-		cmp := bytes.Compare(key, elem.key)
+		elem := e.Value.(*Item[Record])
+		cmp := bytes.Compare(key, elem.Key)
 
 		if cmp == 0 {
 			// Update existing element
-			elem.record = record
+			elem.Record = record
 			return true
 		}
 
@@ -113,8 +112,8 @@ func (dll *DoublyLinkedList) InsertRecord(key []byte, record *Record) bool {
 // For List use cases, prefer PopMin/PopMax for head/tail deletions.
 func (dll *DoublyLinkedList) Delete(key []byte) bool {
 	for e := dll.list.Front(); e != nil; e = e.Next() {
-		elem := e.Value.(*ListElement)
-		if bytes.Equal(elem.key, key) {
+		elem := e.Value.(*Item[Record])
+		if bytes.Equal(elem.Key, key) {
 			dll.list.Remove(e)
 			return true
 		}
@@ -126,70 +125,70 @@ func (dll *DoublyLinkedList) Delete(key []byte) bool {
 // Warning: This is an O(n) operation since we don't maintain an index.
 func (dll *DoublyLinkedList) Find(key []byte) (*Record, bool) {
 	for e := dll.list.Front(); e != nil; e = e.Next() {
-		elem := e.Value.(*ListElement)
-		if bytes.Equal(elem.key, key) {
-			return elem.record, true
+		elem := e.Value.(*Item[Record])
+		if bytes.Equal(elem.Key, key) {
+			return elem.Record, true
 		}
 	}
 	return nil, false
 }
 
 // Min returns the first element (smallest key)
-func (dll *DoublyLinkedList) Min() (*Item, bool) {
+func (dll *DoublyLinkedList) Min() (*Item[Record], bool) {
 	front := dll.list.Front()
 	if front == nil {
 		return nil, false
 	}
-	elem := front.Value.(*ListElement)
-	return &Item{
-		key:    elem.key,
-		record: elem.record,
+	elem := front.Value.(*Item[Record])
+	return &Item[Record]{
+		Key:    elem.Key,
+		Record: elem.Record,
 	}, true
 }
 
 // Max returns the last element (largest key)
-func (dll *DoublyLinkedList) Max() (*Item, bool) {
+func (dll *DoublyLinkedList) Max() (*Item[Record], bool) {
 	back := dll.list.Back()
 	if back == nil {
 		return nil, false
 	}
-	elem := back.Value.(*ListElement)
-	return &Item{
-		key:    elem.key,
-		record: elem.record,
+	elem := back.Value.(*Item[Record])
+	return &Item[Record]{
+		Key:    elem.Key,
+		Record: elem.Record,
 	}, true
 }
 
 // PopMin removes and returns the first element
-func (dll *DoublyLinkedList) PopMin() (*Item, bool) {
+func (dll *DoublyLinkedList) PopMin() (*Item[Record], bool) {
 	front := dll.list.Front()
 	if front == nil {
 		return nil, false
 	}
 
-	elem := front.Value.(*ListElement)
+	elem := front.Value.(*Item[Record])
 	dll.list.Remove(front)
 
 	// Construct result - keep fields in same order as PopMax for consistency
-	return &Item{
-		key:    elem.key,
-		record: elem.record,
+	return &Item[Record]{
+		Key:    elem.Key,
+		Record: elem.Record,
 	}, true
 }
 
 // PopMax removes and returns the last element
-func (dll *DoublyLinkedList) PopMax() (*Item, bool) {
+func (dll *DoublyLinkedList) PopMax() (*Item[Record], bool) {
 	back := dll.list.Back()
 	if back == nil {
 		return nil, false
 	}
 
-	elem := back.Value.(*ListElement)
+	elem := back.Value.(*Item[Record])
 	dll.list.Remove(back)
 
-	return &Item{
-		key:    elem.key,
-		record: elem.record,
+	return &Item[Record]{
+		Key:    elem.Key,
+		Record: elem.Record,
 	}, true
 }
 
@@ -197,20 +196,20 @@ func (dll *DoublyLinkedList) PopMax() (*Item, bool) {
 func (dll *DoublyLinkedList) All() []*Record {
 	records := make([]*Record, 0, dll.list.Len())
 	for e := dll.list.Front(); e != nil; e = e.Next() {
-		elem := e.Value.(*ListElement)
-		records = append(records, elem.record)
+		elem := e.Value.(*Item[Record])
+		records = append(records, elem.Record)
 	}
 	return records
 }
 
 // AllItems returns all items in order
-func (dll *DoublyLinkedList) AllItems() []*Item {
-	items := make([]*Item, 0, dll.list.Len())
+func (dll *DoublyLinkedList) AllItems() []*Item[Record] {
+	items := make([]*Item[Record], 0, dll.list.Len())
 	for e := dll.list.Front(); e != nil; e = e.Next() {
-		elem := e.Value.(*ListElement)
-		items = append(items, &Item{
-			key:    elem.key,
-			record: elem.record,
+		elem := e.Value.(*Item[Record])
+		items = append(items, &Item[Record]{
+			Key:    elem.Key,
+			Record: elem.Record,
 		})
 	}
 	return items
@@ -226,11 +225,11 @@ func (dll *DoublyLinkedList) Range(start, end []byte) []*Record {
 	records := make([]*Record, 0)
 
 	for e := dll.list.Front(); e != nil; e = e.Next() {
-		elem := e.Value.(*ListElement)
-		if bytes.Compare(elem.key, start) >= 0 && bytes.Compare(elem.key, end) <= 0 {
-			records = append(records, elem.record)
+		elem := e.Value.(*Item[Record])
+		if bytes.Compare(elem.Key, start) >= 0 && bytes.Compare(elem.Key, end) <= 0 {
+			records = append(records, elem.Record)
 		}
-		if bytes.Compare(elem.key, end) > 0 {
+		if bytes.Compare(elem.Key, end) > 0 {
 			break
 		}
 	}
@@ -243,12 +242,12 @@ func (dll *DoublyLinkedList) PrefixScan(prefix []byte, offset, limitNum int) []*
 	records := make([]*Record, 0)
 
 	for e := dll.list.Front(); e != nil; e = e.Next() {
-		elem := e.Value.(*ListElement)
-		if bytes.HasPrefix(elem.key, prefix) {
+		elem := e.Value.(*Item[Record])
+		if bytes.HasPrefix(elem.Key, prefix) {
 			if offset > 0 {
 				offset--
 			} else {
-				records = append(records, elem.record)
+				records = append(records, elem.Record)
 				limitNum--
 				if limitNum == 0 {
 					break
@@ -269,8 +268,8 @@ func (dll *DoublyLinkedList) PrefixSearchScan(prefix []byte, reg string, offset,
 	}
 
 	for e := dll.list.Front(); e != nil; e = e.Next() {
-		elem := e.Value.(*ListElement)
-		if !bytes.HasPrefix(elem.key, prefix) {
+		elem := e.Value.(*Item[Record])
+		if !bytes.HasPrefix(elem.Key, prefix) {
 			continue
 		}
 
@@ -279,11 +278,11 @@ func (dll *DoublyLinkedList) PrefixSearchScan(prefix []byte, reg string, offset,
 			continue
 		}
 
-		if !rgx.Match(bytes.TrimPrefix(elem.key, prefix)) {
+		if !rgx.Match(bytes.TrimPrefix(elem.Key, prefix)) {
 			continue
 		}
 
-		records = append(records, elem.record)
+		records = append(records, elem.Record)
 		limitNum--
 		if limitNum == 0 {
 			break

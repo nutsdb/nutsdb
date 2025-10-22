@@ -12,11 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package nutsdb
+package data
 
 import (
 	"time"
 )
+
+const Persistent uint32 = 0
 
 // Record means item of indexes in memory
 type Record struct {

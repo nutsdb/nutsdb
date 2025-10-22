@@ -15,15 +15,16 @@
 package nutsdb
 
 import (
+	"github.com/nutsdb/nutsdb/internal/data"
 	"github.com/tidwall/btree"
 )
 
 type Iterator struct {
 	tx      *Tx
 	options IteratorOptions
-	iter    btree.IterG[*Item]
+	iter    btree.IterG[*data.Item[data.Record]]
 	// Cached current item to avoid repeated iter.Item() calls
-	currentItem *Item
+	currentItem *data.Item[data.Record]
 	// Track validity state to avoid unnecessary checks
 	valid bool
 }
@@ -42,7 +43,7 @@ func NewIterator(tx *Tx, bucket string, options IteratorOptions) *Iterator {
 	iterator := &Iterator{
 		tx:      tx,
 		options: options,
-		iter:    tx.db.Index.bTree.getWithDefault(b.Id).btree.Iter(),
+		iter:    tx.db.Index.bTree.getWithDefault(b.Id).Iter(),
 	}
 
 	// Initialize position and cache the first item
@@ -76,7 +77,7 @@ func (it *Iterator) Rewind() bool {
 }
 
 func (it *Iterator) Seek(key []byte) bool {
-	it.valid = it.iter.Seek(&Item{key: key})
+	it.valid = it.iter.Seek(&data.Item[data.Record]{Key: key})
 
 	if it.valid {
 		it.currentItem = it.iter.Item()
@@ -115,19 +116,19 @@ func (it *Iterator) Key() []byte {
 	if !it.valid {
 		return nil
 	}
-	return it.currentItem.key
+	return it.currentItem.Key
 }
 
 func (it *Iterator) Value() ([]byte, error) {
 	if !it.valid {
 		return nil, ErrKeyNotFound
 	}
-	return it.tx.db.getValueByRecord(it.currentItem.record)
+	return it.tx.db.getValueByRecord(it.currentItem.Record)
 }
 
 // Item returns the current item (key + record) if valid
 // This is useful for advanced use cases that need direct access to the record
-func (it *Iterator) Item() *Item {
+func (it *Iterator) Item() *data.Item[data.Record] {
 	if !it.valid {
 		return nil
 	}

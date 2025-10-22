@@ -12,26 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package nutsdb
+package data_test
 
 import (
 	"testing"
 
+	"github.com/nutsdb/nutsdb/internal/data"
+	"github.com/nutsdb/nutsdb/internal/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestDoublyLinkedList_InsertAndFind(t *testing.T) {
-	dll := NewDoublyLinkedList()
+	dll := data.NewDoublyLinkedList()
 
 	// Insert records with sequence numbers
-	r1 := &Record{Key: []byte("key1"), Value: []byte("value1")}
-	r2 := &Record{Key: []byte("key2"), Value: []byte("value2")}
-	r3 := &Record{Key: []byte("key3"), Value: []byte("value3")}
+	r1 := &data.Record{Key: []byte("key1"), Value: []byte("value1")}
+	r2 := &data.Record{Key: []byte("key2"), Value: []byte("value2")}
+	r3 := &data.Record{Key: []byte("key3"), Value: []byte("value3")}
 
-	seq1 := ConvertUint64ToBigEndianBytes(100)
-	seq2 := ConvertUint64ToBigEndianBytes(200)
-	seq3 := ConvertUint64ToBigEndianBytes(150)
+	seq1 := utils.ConvertUint64ToBigEndianBytes(100)
+	seq2 := utils.ConvertUint64ToBigEndianBytes(200)
+	seq3 := utils.ConvertUint64ToBigEndianBytes(150)
 
 	dll.InsertRecord(seq1, r1)
 	dll.InsertRecord(seq2, r2)
@@ -51,18 +53,18 @@ func TestDoublyLinkedList_InsertAndFind(t *testing.T) {
 }
 
 func TestDoublyLinkedList_OrderedInsertion(t *testing.T) {
-	dll := NewDoublyLinkedList()
+	dll := data.NewDoublyLinkedList()
 
 	// Insert in non-sorted order
 	sequences := []uint64{150, 100, 200, 50, 175}
-	records := make([]*Record, len(sequences))
+	records := make([]*data.Record, len(sequences))
 
 	for i, seq := range sequences {
-		records[i] = &Record{
+		records[i] = &data.Record{
 			Key:   []byte("key"),
 			Value: []byte{byte(seq)},
 		}
-		dll.InsertRecord(ConvertUint64ToBigEndianBytes(seq), records[i])
+		dll.InsertRecord(utils.ConvertUint64ToBigEndianBytes(seq), records[i])
 	}
 
 	// Verify they are stored in sorted order
@@ -70,15 +72,15 @@ func TestDoublyLinkedList_OrderedInsertion(t *testing.T) {
 	assert.Equal(t, 5, len(items))
 
 	// Should be: 50, 100, 150, 175, 200
-	assert.Equal(t, uint64(50), ConvertBigEndianBytesToUint64(items[0].key))
-	assert.Equal(t, uint64(100), ConvertBigEndianBytesToUint64(items[1].key))
-	assert.Equal(t, uint64(150), ConvertBigEndianBytesToUint64(items[2].key))
-	assert.Equal(t, uint64(175), ConvertBigEndianBytesToUint64(items[3].key))
-	assert.Equal(t, uint64(200), ConvertBigEndianBytesToUint64(items[4].key))
+	assert.Equal(t, uint64(50), utils.ConvertBigEndianBytesToUint64(items[0].Key))
+	assert.Equal(t, uint64(100), utils.ConvertBigEndianBytesToUint64(items[1].Key))
+	assert.Equal(t, uint64(150), utils.ConvertBigEndianBytesToUint64(items[2].Key))
+	assert.Equal(t, uint64(175), utils.ConvertBigEndianBytesToUint64(items[3].Key))
+	assert.Equal(t, uint64(200), utils.ConvertBigEndianBytesToUint64(items[4].Key))
 }
 
 func TestDoublyLinkedList_MinMax(t *testing.T) {
-	dll := NewDoublyLinkedList()
+	dll := data.NewDoublyLinkedList()
 
 	// Empty list
 	_, ok := dll.Min()
@@ -87,37 +89,37 @@ func TestDoublyLinkedList_MinMax(t *testing.T) {
 	assert.False(t, ok)
 
 	// Add elements
-	r1 := &Record{Value: []byte("value1")}
-	r2 := &Record{Value: []byte("value2")}
-	r3 := &Record{Value: []byte("value3")}
+	r1 := &data.Record{Value: []byte("value1")}
+	r2 := &data.Record{Value: []byte("value2")}
+	r3 := &data.Record{Value: []byte("value3")}
 
-	dll.InsertRecord(ConvertUint64ToBigEndianBytes(100), r1)
-	dll.InsertRecord(ConvertUint64ToBigEndianBytes(200), r2)
-	dll.InsertRecord(ConvertUint64ToBigEndianBytes(150), r3)
+	dll.InsertRecord(utils.ConvertUint64ToBigEndianBytes(100), r1)
+	dll.InsertRecord(utils.ConvertUint64ToBigEndianBytes(200), r2)
+	dll.InsertRecord(utils.ConvertUint64ToBigEndianBytes(150), r3)
 
 	// Check min
 	minItem, ok := dll.Min()
 	require.True(t, ok)
-	assert.Equal(t, r1, minItem.record)
-	assert.Equal(t, uint64(100), ConvertBigEndianBytesToUint64(minItem.key))
+	assert.Equal(t, r1, minItem.Record)
+	assert.Equal(t, uint64(100), utils.ConvertBigEndianBytesToUint64(minItem.Key))
 
 	// Check max
 	maxItem, ok := dll.Max()
 	require.True(t, ok)
-	assert.Equal(t, r2, maxItem.record)
-	assert.Equal(t, uint64(200), ConvertBigEndianBytesToUint64(maxItem.key))
+	assert.Equal(t, r2, maxItem.Record)
+	assert.Equal(t, uint64(200), utils.ConvertBigEndianBytesToUint64(maxItem.Key))
 }
 
 func TestDoublyLinkedList_Delete(t *testing.T) {
-	dll := NewDoublyLinkedList()
+	dll := data.NewDoublyLinkedList()
 
-	r1 := &Record{Value: []byte("value1")}
-	r2 := &Record{Value: []byte("value2")}
-	r3 := &Record{Value: []byte("value3")}
+	r1 := &data.Record{Value: []byte("value1")}
+	r2 := &data.Record{Value: []byte("value2")}
+	r3 := &data.Record{Value: []byte("value3")}
 
-	seq1 := ConvertUint64ToBigEndianBytes(100)
-	seq2 := ConvertUint64ToBigEndianBytes(200)
-	seq3 := ConvertUint64ToBigEndianBytes(150)
+	seq1 := utils.ConvertUint64ToBigEndianBytes(100)
+	seq2 := utils.ConvertUint64ToBigEndianBytes(200)
+	seq3 := utils.ConvertUint64ToBigEndianBytes(150)
 
 	dll.InsertRecord(seq1, r1)
 	dll.InsertRecord(seq2, r2)
@@ -133,8 +135,8 @@ func TestDoublyLinkedList_Delete(t *testing.T) {
 	// Verify order is maintained
 	items := dll.AllItems()
 	assert.Equal(t, 2, len(items))
-	assert.Equal(t, uint64(100), ConvertBigEndianBytesToUint64(items[0].key))
-	assert.Equal(t, uint64(200), ConvertBigEndianBytesToUint64(items[1].key))
+	assert.Equal(t, uint64(100), utils.ConvertBigEndianBytesToUint64(items[0].Key))
+	assert.Equal(t, uint64(200), utils.ConvertBigEndianBytesToUint64(items[1].Key))
 
 	// Delete head
 	deleted = dll.Delete(seq1)
@@ -143,7 +145,7 @@ func TestDoublyLinkedList_Delete(t *testing.T) {
 
 	minItem, ok := dll.Min()
 	require.True(t, ok)
-	assert.Equal(t, r2, minItem.record)
+	assert.Equal(t, r2, minItem.Record)
 
 	// Delete tail
 	deleted = dll.Delete(seq2)
@@ -157,32 +159,32 @@ func TestDoublyLinkedList_Delete(t *testing.T) {
 }
 
 func TestDoublyLinkedList_PopMinMax(t *testing.T) {
-	dll := NewDoublyLinkedList()
+	dll := data.NewDoublyLinkedList()
 
-	r1 := &Record{Value: []byte("value1")}
-	r2 := &Record{Value: []byte("value2")}
-	r3 := &Record{Value: []byte("value3")}
+	r1 := &data.Record{Value: []byte("value1")}
+	r2 := &data.Record{Value: []byte("value2")}
+	r3 := &data.Record{Value: []byte("value3")}
 
-	dll.InsertRecord(ConvertUint64ToBigEndianBytes(100), r1)
-	dll.InsertRecord(ConvertUint64ToBigEndianBytes(200), r2)
-	dll.InsertRecord(ConvertUint64ToBigEndianBytes(150), r3)
+	dll.InsertRecord(utils.ConvertUint64ToBigEndianBytes(100), r1)
+	dll.InsertRecord(utils.ConvertUint64ToBigEndianBytes(200), r2)
+	dll.InsertRecord(utils.ConvertUint64ToBigEndianBytes(150), r3)
 
 	// Pop min
 	minItem, ok := dll.PopMin()
 	require.True(t, ok)
-	assert.Equal(t, r1, minItem.record)
+	assert.Equal(t, r1, minItem.Record)
 	assert.Equal(t, 2, dll.Count())
 
 	// Pop max
 	maxItem, ok := dll.PopMax()
 	require.True(t, ok)
-	assert.Equal(t, r2, maxItem.record)
+	assert.Equal(t, r2, maxItem.Record)
 	assert.Equal(t, 1, dll.Count())
 
 	// Only one element left
 	lastItem, ok := dll.PopMin()
 	require.True(t, ok)
-	assert.Equal(t, r3, lastItem.record)
+	assert.Equal(t, r3, lastItem.Record)
 	assert.Equal(t, 0, dll.Count())
 
 	// Empty now
@@ -193,17 +195,17 @@ func TestDoublyLinkedList_PopMinMax(t *testing.T) {
 }
 
 func TestDoublyLinkedList_All(t *testing.T) {
-	dll := NewDoublyLinkedList()
+	dll := data.NewDoublyLinkedList()
 
-	records := []*Record{
+	records := []*data.Record{
 		{Value: []byte("value1")},
 		{Value: []byte("value2")},
 		{Value: []byte("value3")},
 	}
 
-	dll.InsertRecord(ConvertUint64ToBigEndianBytes(150), records[1])
-	dll.InsertRecord(ConvertUint64ToBigEndianBytes(100), records[0])
-	dll.InsertRecord(ConvertUint64ToBigEndianBytes(200), records[2])
+	dll.InsertRecord(utils.ConvertUint64ToBigEndianBytes(150), records[1])
+	dll.InsertRecord(utils.ConvertUint64ToBigEndianBytes(100), records[0])
+	dll.InsertRecord(utils.ConvertUint64ToBigEndianBytes(200), records[2])
 
 	all := dll.All()
 	require.Equal(t, 3, len(all))
@@ -215,16 +217,16 @@ func TestDoublyLinkedList_All(t *testing.T) {
 }
 
 func TestDoublyLinkedList_Range(t *testing.T) {
-	dll := NewDoublyLinkedList()
+	dll := data.NewDoublyLinkedList()
 
 	for i := uint64(0); i < 10; i++ {
-		r := &Record{Value: []byte{byte(i * 10)}}
-		dll.InsertRecord(ConvertUint64ToBigEndianBytes(i*10), r)
+		r := &data.Record{Value: []byte{byte(i * 10)}}
+		dll.InsertRecord(utils.ConvertUint64ToBigEndianBytes(i*10), r)
 	}
 
 	// Range query
-	start := ConvertUint64ToBigEndianBytes(20)
-	end := ConvertUint64ToBigEndianBytes(60)
+	start := utils.ConvertUint64ToBigEndianBytes(20)
+	end := utils.ConvertUint64ToBigEndianBytes(60)
 
 	records := dll.Range(start, end)
 	require.Equal(t, 5, len(records)) // 20, 30, 40, 50, 60
@@ -235,34 +237,34 @@ func TestDoublyLinkedList_Range(t *testing.T) {
 }
 
 func BenchmarkDoublyLinkedList_InsertHead(b *testing.B) {
-	dll := NewDoublyLinkedList()
-	r := &Record{Key: []byte("key"), Value: []byte("value")}
+	dll := data.NewDoublyLinkedList()
+	r := &data.Record{Key: []byte("key"), Value: []byte("value")}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		seq := initialListSeq - uint64(i)
-		dll.InsertRecord(ConvertUint64ToBigEndianBytes(seq), r)
+		seq := data.InitialListSeq - uint64(i)
+		dll.InsertRecord(utils.ConvertUint64ToBigEndianBytes(seq), r)
 	}
 }
 
 func BenchmarkDoublyLinkedList_InsertTail(b *testing.B) {
-	dll := NewDoublyLinkedList()
-	r := &Record{Key: []byte("key"), Value: []byte("value")}
+	dll := data.NewDoublyLinkedList()
+	r := &data.Record{Key: []byte("key"), Value: []byte("value")}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		seq := initialListSeq + uint64(i)
-		dll.InsertRecord(ConvertUint64ToBigEndianBytes(seq), r)
+		seq := data.InitialListSeq + uint64(i)
+		dll.InsertRecord(utils.ConvertUint64ToBigEndianBytes(seq), r)
 	}
 }
 
 func BenchmarkDoublyLinkedList_PopMin(b *testing.B) {
-	dll := NewDoublyLinkedList()
-	r := &Record{Key: []byte("key"), Value: []byte("value")}
+	dll := data.NewDoublyLinkedList()
+	r := &data.Record{Key: []byte("key"), Value: []byte("value")}
 
 	// Pre-populate
 	for i := 0; i < b.N; i++ {
-		dll.InsertRecord(ConvertUint64ToBigEndianBytes(uint64(i)), r)
+		dll.InsertRecord(utils.ConvertUint64ToBigEndianBytes(uint64(i)), r)
 	}
 
 	b.ResetTimer()
@@ -272,12 +274,12 @@ func BenchmarkDoublyLinkedList_PopMin(b *testing.B) {
 }
 
 func BenchmarkDoublyLinkedList_PopMax(b *testing.B) {
-	dll := NewDoublyLinkedList()
-	r := &Record{Key: []byte("key"), Value: []byte("value")}
+	dll := data.NewDoublyLinkedList()
+	r := &data.Record{Key: []byte("key"), Value: []byte("value")}
 
 	// Pre-populate
 	for i := 0; i < b.N; i++ {
-		dll.InsertRecord(ConvertUint64ToBigEndianBytes(uint64(i)), r)
+		dll.InsertRecord(utils.ConvertUint64ToBigEndianBytes(uint64(i)), r)
 	}
 
 	b.ResetTimer()

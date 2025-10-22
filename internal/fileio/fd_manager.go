@@ -1,4 +1,4 @@
-package nutsdb
+package fileio
 
 import (
 	"math"
@@ -16,20 +16,21 @@ const (
 	TooManyFileOpenErrSuffix = "too many open files"
 )
 
-// fdManager hold a fd cache in memory, it lru based cache.
-type fdManager struct {
+// FdManager hold a fd cache in memory, it lru based cache.
+type FdManager struct {
 	lock               sync.Mutex
-	cache              map[string]*FdInfo
 	fdList             *doubleLinkedList
 	size               int
 	cleanThresholdNums int
 	maxFdNums          int
+
+	Cache map[string]*FdInfo
 }
 
-// newFdm will return a fdManager object
-func newFdm(maxFdNums int, cleanThreshold float64) (fdm *fdManager) {
-	fdm = &fdManager{
-		cache:     map[string]*FdInfo{},
+// NewFdm will return a fdManager object
+func NewFdm(maxFdNums int, cleanThreshold float64) (fdm *FdManager) {
+	fdm = &FdManager{
+		Cache:     map[string]*FdInfo{},
 		fdList:    initDoubleLinkedList(),
 		size:      0,
 		maxFdNums: DefaultMaxFileNums,
@@ -54,13 +55,17 @@ type FdInfo struct {
 	prev  *FdInfo
 }
 
-// getFd go through this method to get fd.
-func (fdm *fdManager) getFd(path string) (fd *os.File, err error) {
+func (fdInfo *FdInfo) Using() uint {
+	return fdInfo.using
+}
+
+// GetFd go through this method to get fd.
+func (fdm *FdManager) GetFd(path string) (fd *os.File, err error) {
 	fdm.lock.Lock()
 	defer fdm.lock.Unlock()
 	cleanPath := filepath.Clean(path)
-	if fdInfo := fdm.cache[cleanPath]; fdInfo == nil {
-		fd, err = os.OpenFile(cleanPath, os.O_CREATE|os.O_RDWR, 0o644)
+	if fdInfo := fdm.Cache[cleanPath]; fdInfo == nil {
+		fd, err = openFile(cleanPath, os.O_CREATE|os.O_RDWR, 0o644)
 		if err == nil {
 			// if the numbers of fd in cache larger than the cleanThreshold in config, we will clean useless fd in cache
 			if fdm.size >= fdm.cleanThresholdNums {
@@ -71,7 +76,7 @@ func (fdm *fdManager) getFd(path string) (fd *os.File, err error) {
 				return fd, nil
 			}
 			// add this fd to cache
-			fdm.addToCache(fd, cleanPath)
+			fdm.AddToCache(fd, cleanPath)
 			return fd, nil
 		} else {
 			// determine if there are too many open files, we will first clean useless fd in cache and try open this file again
@@ -82,12 +87,12 @@ func (fdm *fdManager) getFd(path string) (fd *os.File, err error) {
 					return nil, err
 				}
 				// try open this file again，if it still returns err, we will show this error to user
-				fd, err = os.OpenFile(cleanPath, os.O_CREATE|os.O_RDWR, 0o644)
+				fd, err = openFile(cleanPath, os.O_CREATE|os.O_RDWR, 0o644)
 				if err != nil {
 					return nil, err
 				}
 				// add to cache if open this file successfully
-				fdm.addToCache(fd, cleanPath)
+				fdm.AddToCache(fd, cleanPath)
 			}
 			return fd, err
 		}
@@ -99,7 +104,7 @@ func (fdm *fdManager) getFd(path string) (fd *os.File, err error) {
 }
 
 // addToCache add fd to cache
-func (fdm *fdManager) addToCache(fd *os.File, cleanPath string) {
+func (fdm *FdManager) AddToCache(fd *os.File, cleanPath string) {
 	fdInfo := &FdInfo{
 		fd:    fd,
 		using: 1,
@@ -107,15 +112,15 @@ func (fdm *fdManager) addToCache(fd *os.File, cleanPath string) {
 	}
 	fdm.fdList.addNode(fdInfo)
 	fdm.size++
-	fdm.cache[cleanPath] = fdInfo
+	fdm.Cache[cleanPath] = fdInfo
 }
 
 // reduceUsing when RWManager object close, it will go through this method let fdm know it return the fd to cache
-func (fdm *fdManager) reduceUsing(path string) {
+func (fdm *FdManager) ReduceUsing(path string) {
 	fdm.lock.Lock()
 	defer fdm.lock.Unlock()
 	cleanPath := filepath.Clean(path)
-	node, isExist := fdm.cache[cleanPath]
+	node, isExist := fdm.Cache[cleanPath]
 	if !isExist {
 		panic("unexpected the node is not in cache")
 	}
@@ -123,7 +128,7 @@ func (fdm *fdManager) reduceUsing(path string) {
 }
 
 // close means the cache.
-func (fdm *fdManager) close() error {
+func (fdm *FdManager) Close() error {
 	fdm.lock.Lock()
 	defer fdm.lock.Unlock()
 	node := fdm.fdList.tail.prev
@@ -132,7 +137,7 @@ func (fdm *fdManager) close() error {
 		if err != nil {
 			return err
 		}
-		delete(fdm.cache, node.path)
+		delete(fdm.Cache, node.path)
 		fdm.size--
 		node = node.prev
 	}
@@ -178,7 +183,7 @@ func (list *doubleLinkedList) moveNodeToFront(node *FdInfo) {
 	list.addNode(node)
 }
 
-func (fdm *fdManager) cleanUselessFd() error {
+func (fdm *FdManager) cleanUselessFd() error {
 	cleanNums := fdm.cleanThresholdNums
 	node := fdm.fdList.tail.prev
 	for node != nil && node != fdm.fdList.head && cleanNums > 0 {
@@ -190,7 +195,7 @@ func (fdm *fdManager) cleanUselessFd() error {
 				return err
 			}
 			fdm.size--
-			delete(fdm.cache, node.path)
+			delete(fdm.Cache, node.path)
 			cleanNums--
 		}
 		node = nextItem
@@ -198,14 +203,14 @@ func (fdm *fdManager) cleanUselessFd() error {
 	return nil
 }
 
-func (fdm *fdManager) closeByPath(path string) error {
+func (fdm *FdManager) CloseByPath(path string) error {
 	fdm.lock.Lock()
 	defer fdm.lock.Unlock()
-	fdInfo, ok := fdm.cache[path]
+	fdInfo, ok := fdm.Cache[path]
 	if !ok {
 		return nil
 	}
-	delete(fdm.cache, path)
+	delete(fdm.Cache, path)
 
 	fdm.fdList.removeNode(fdInfo)
 	return fdInfo.fd.Close()

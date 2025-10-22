@@ -17,6 +17,8 @@ package nutsdb
 import (
 	"fmt"
 	"testing"
+
+	"github.com/nutsdb/nutsdb/internal/testutils"
 )
 
 // setupIteratorBenchmark prepares a database with test data
@@ -39,8 +41,8 @@ func setupIteratorBenchmark(b *testing.B, numKeys int) (*DB, string) {
 		}
 		// Batch insert for faster setup
 		for i := 0; i < numKeys; i++ {
-			key := GetTestBytes(i)
-			value := GetTestBytes(i * 2)
+			key := testutils.GetTestBytes(i)
+			value := testutils.GetTestBytes(i * 2)
 			if err := tx.Put(bucket, key, value, Persistent); err != nil {
 				return err
 			}
@@ -242,7 +244,7 @@ func BenchmarkIterator_Seek(b *testing.B) {
 	// Pre-generate seek keys
 	seekKeys := make([][]byte, 1000)
 	for i := 0; i < 1000; i++ {
-		seekKeys[i] = GetTestBytes(i * 100)
+		seekKeys[i] = testutils.GetTestBytes(i * 100)
 	}
 
 	b.ResetTimer()
@@ -309,7 +311,7 @@ func BenchmarkIterator_PartialScan(b *testing.B) {
 			defer iterator.Release()
 
 			// Seek to starting position
-			startKey := GetTestBytes(10000)
+			startKey := testutils.GetTestBytes(10000)
 			if !iterator.Seek(startKey) {
 				return fmt.Errorf("seek failed")
 			}
@@ -415,7 +417,7 @@ func BenchmarkIterator_LargeValues(b *testing.B) {
 			return err
 		}
 		for i := 0; i < 1000; i++ {
-			key := GetTestBytes(i)
+			key := testutils.GetTestBytes(i)
 			if err := tx.Put(bucket, key, largeValue, Persistent); err != nil {
 				return err
 			}

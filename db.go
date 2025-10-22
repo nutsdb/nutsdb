@@ -29,6 +29,9 @@ import (
 
 	"github.com/bwmarrin/snowflake"
 	"github.com/gofrs/flock"
+	"github.com/nutsdb/nutsdb/internal/data"
+	"github.com/nutsdb/nutsdb/internal/fileio"
+	"github.com/nutsdb/nutsdb/internal/utils"
 	"github.com/xujiajun/utils/filesystem"
 	"github.com/xujiajun/utils/strconv2"
 )
@@ -56,7 +59,7 @@ type (
 		KeyCount                int // total key number ,include expired, deleted, repeated.
 		closed                  bool
 		isMerging               bool
-		fm                      *fileManager
+		fm                      *FileManager
 		flock                   *flock.Flock
 		commitBuffer            *bytes.Buffer
 		mergeStartCh            chan struct{}
@@ -66,7 +69,7 @@ type (
 		tm                      *ttlManager
 		RecordCount             int64 // current valid record count, exclude deleted, repeated
 		bm                      *BucketManager
-		hintKeyAndRAMIdxModeLru *LRUCache // lru cache for HintKeyAndRAMIdxMode
+		hintKeyAndRAMIdxModeLru *utils.LRUCache // lru cache for HintKeyAndRAMIdxMode
 		sm                      *SnowflakeManager
 	}
 )
@@ -99,13 +102,13 @@ func open(opt Options) (*DB, error) {
 		KeyCount:                0,
 		closed:                  false,
 		Index:                   newIndexWithOptions(opt),
-		fm:                      newFileManager(opt.RWMode, opt.MaxFdNumsInCache, opt.CleanFdsCacheThreshold, opt.SegmentSize),
+		fm:                      NewFileManager(opt.RWMode, opt.MaxFdNumsInCache, opt.CleanFdsCacheThreshold, opt.SegmentSize),
 		mergeStartCh:            make(chan struct{}),
 		mergeEndCh:              make(chan error),
 		mergeWorkCloseCh:        make(chan struct{}),
 		writeCh:                 make(chan *request, KvWriteChCapacity),
 		tm:                      newTTLManager(opt.ExpiredDeleteType),
-		hintKeyAndRAMIdxModeLru: NewLruCache(opt.HintKeyAndRAMIdxCacheSize),
+		hintKeyAndRAMIdxModeLru: utils.NewLruCache(opt.HintKeyAndRAMIdxCacheSize),
 		sm:                      NewSnowflakeManager(opt.NodeNum),
 	}
 
@@ -188,7 +191,7 @@ func (db *DB) Backup(dir string) error {
 // BackupTarGZ Backup copy the database to writer.
 func (db *DB) BackupTarGZ(w io.Writer) error {
 	return db.View(func(tx *Tx) error {
-		return tarGZCompress(w, db.opt.Dir)
+		return utils.TarGZCompress(w, db.opt.Dir)
 	})
 }
 
@@ -224,7 +227,7 @@ func (db *DB) release() error {
 
 	db.ActiveFile = nil
 
-	err = db.fm.close()
+	err = db.fm.Close()
 
 	if err != nil {
 		return err
@@ -252,7 +255,7 @@ func (db *DB) release() error {
 	return nil
 }
 
-func (db *DB) getValueByRecord(record *Record) ([]byte, error) {
+func (db *DB) getValueByRecord(record *data.Record) ([]byte, error) {
 	if record == nil {
 		return nil, ErrRecordIsNil
 	}
@@ -269,11 +272,11 @@ func (db *DB) getValueByRecord(record *Record) ([]byte, error) {
 	}
 
 	dirPath := getDataPath(record.FileID, db.opt.Dir)
-	df, err := db.fm.getDataFileReadOnly(dirPath, db.opt.SegmentSize)
+	df, err := db.fm.GetDataFileReadOnly(dirPath, db.opt.SegmentSize)
 	if err != nil {
 		return nil, err
 	}
-	defer func(rwManager RWManager) {
+	defer func(rwManager fileio.RWManager) {
 		err := rwManager.Release()
 		if err != nil {
 			return
@@ -428,7 +431,7 @@ func (db *DB) doWrites() {
 // setActiveFile sets the ActiveFile (DataFile object).
 func (db *DB) setActiveFile() (err error) {
 	activeFilePath := getDataPath(db.MaxFileID, db.opt.Dir)
-	db.ActiveFile, err = db.fm.getDataFile(activeFilePath, db.opt.SegmentSize)
+	db.ActiveFile, err = db.fm.GetDataFile(activeFilePath, db.opt.SegmentSize)
 	if err != nil {
 		return
 	}
@@ -624,7 +627,7 @@ func (db *DB) loadHintFile(fid int64) (bool, error) {
 		}
 
 		// Create a record from hint entry
-		record := NewRecord()
+		record := data.NewRecord()
 		record.WithKey(hintEntry.Key).
 			WithFileId(hintEntry.FileID).
 			WithDataPos(hintEntry.DataPos).
@@ -725,7 +728,7 @@ func (db *DB) getRecordCount() (int64, error) {
 	return res, nil
 }
 
-func (db *DB) buildBTreeIdx(record *Record, entry *Entry) error {
+func (db *DB) buildBTreeIdx(record *data.Record, entry *Entry) error {
 	key, meta := entry.Key, entry.Meta
 
 	bucket, err := db.bm.GetBucketById(meta.BucketId)
@@ -745,12 +748,12 @@ func (db *DB) buildBTreeIdx(record *Record, entry *Entry) error {
 		} else {
 			db.tm.del(bucketId, string(key))
 		}
-		bTree.Insert(record)
+		bTree.InsertRecord(record.Key, record)
 	}
 	return nil
 }
 
-func (db *DB) buildIdxes(record *Record, entry *Entry) error {
+func (db *DB) buildIdxes(record *data.Record, entry *Entry) error {
 	meta := entry.Meta
 	switch meta.Ds {
 	case DataStructureBTree:
@@ -773,23 +776,8 @@ func (db *DB) buildIdxes(record *Record, entry *Entry) error {
 	return nil
 }
 
-func (db *DB) deleteBucket(ds uint16, bucket BucketId) {
-	if ds == DataStructureSet {
-		db.Index.set.delete(bucket)
-	}
-	if ds == DataStructureSortedSet {
-		db.Index.sortedSet.delete(bucket)
-	}
-	if ds == DataStructureBTree {
-		db.Index.bTree.delete(bucket)
-	}
-	if ds == DataStructureList {
-		db.Index.list.delete(bucket)
-	}
-}
-
 // buildSetIdx builds set index when opening the DB.
-func (db *DB) buildSetIdx(record *Record, entry *Entry) error {
+func (db *DB) buildSetIdx(record *data.Record, entry *Entry) error {
 	key, val, meta := entry.Key, entry.Value, entry.Meta
 
 	bucket, err := db.bm.GetBucketById(entry.Meta.BucketId)
@@ -802,7 +790,7 @@ func (db *DB) buildSetIdx(record *Record, entry *Entry) error {
 
 	switch meta.Flag {
 	case DataSetFlag:
-		if err := s.SAdd(string(key), [][]byte{val}, []*Record{record}); err != nil {
+		if err := s.SAdd(string(key), [][]byte{val}, []*data.Record{record}); err != nil {
 			return fmt.Errorf("when build SetIdx SAdd index err: %s", err)
 		}
 	case DataDeleteFlag:
@@ -815,7 +803,7 @@ func (db *DB) buildSetIdx(record *Record, entry *Entry) error {
 }
 
 // buildSortedSetIdx builds sorted set index when opening the DB.
-func (db *DB) buildSortedSetIdx(record *Record, entry *Entry) error {
+func (db *DB) buildSortedSetIdx(record *data.Record, entry *Entry) error {
 	key, val, meta := entry.Key, entry.Value, entry.Meta
 
 	bucket, err := db.bm.GetBucketById(entry.Meta.BucketId)
@@ -854,7 +842,7 @@ func (db *DB) buildSortedSetIdx(record *Record, entry *Entry) error {
 }
 
 // buildListIdx builds List index when opening the DB.
-func (db *DB) buildListIdx(record *Record, entry *Entry) error {
+func (db *DB) buildListIdx(record *data.Record, entry *Entry) error {
 	key, val, meta := entry.Key, entry.Value, entry.Meta
 
 	bucket, err := db.bm.GetBucketById(entry.Meta.BucketId)
@@ -865,7 +853,7 @@ func (db *DB) buildListIdx(record *Record, entry *Entry) error {
 
 	l := db.Index.list.getWithDefault(bucketId)
 
-	if IsExpired(meta.TTL, meta.Timestamp) {
+	if utils.IsExpired(meta.TTL, meta.Timestamp) {
 		return nil
 	}
 
@@ -890,7 +878,7 @@ func (db *DB) buildListIdx(record *Record, entry *Entry) error {
 		end, _ := strconv2.StrToInt(string(val))
 		err = l.LTrim(newKey, start, end)
 	case DataLRemByIndex:
-		indexes, _ := UnmarshalInts(val)
+		indexes, _ := utils.UnmarshalInts(val)
 		err = l.LRemByIndex(string(key), indexes)
 	}
 
@@ -904,7 +892,7 @@ func (db *DB) buildListIdx(record *Record, entry *Entry) error {
 func (db *DB) buildListLRemIdx(value []byte, l *List, key []byte) error {
 	count, newValue := splitIntStringStr(string(value), SeparatorForListKey)
 
-	return l.LRem(string(key), count, func(r *Record) (bool, error) {
+	return l.LRem(string(key), count, func(r *data.Record) (bool, error) {
 		v, err := db.getValueByRecord(r)
 		if err != nil {
 			return false, err
@@ -938,8 +926,8 @@ func (db *DB) buildIndexes() (err error) {
 	return db.parseDataFiles(dataFileIds)
 }
 
-func (db *DB) createRecordByModeWithFidAndOff(fid int64, off uint64, entry *Entry) *Record {
-	record := NewRecord()
+func (db *DB) createRecordByModeWithFidAndOff(fid int64, off uint64, entry *Entry) *data.Record {
+	record := data.NewRecord()
 
 	record.WithKey(entry.Key).
 		WithTimestamp(entry.Meta.Timestamp).

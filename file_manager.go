@@ -1,50 +1,63 @@
 package nutsdb
 
-// fileManager holds the fd cache and file-related operations go through the manager to obtain the file processing object
-type fileManager struct {
+import "github.com/nutsdb/nutsdb/internal/fileio"
+
+// RWMode represents the read and write mode.
+type RWMode int
+
+const (
+	// FileIO represents the read and write mode using standard I/O.
+	FileIO RWMode = iota
+
+	// MMap represents the read and write mode using mmap.
+	MMap
+)
+
+// FileManager holds the fd cache and file-related operations go through the manager to obtain the file processing object
+type FileManager struct {
 	rwMode      RWMode
-	fdm         *fdManager
+	fdm         *fileio.FdManager
 	segmentSize int64
 }
 
-// newFileManager will create a newFileManager object
-func newFileManager(rwMode RWMode, maxFdNums int, cleanThreshold float64, segmentSize int64) (fm *fileManager) {
-	fm = &fileManager{
+// NewFileManager will create a NewFileManager object
+func NewFileManager(rwMode RWMode, maxFdNums int, cleanThreshold float64, segmentSize int64) (fm *FileManager) {
+	fm = &FileManager{
 		rwMode:      rwMode,
-		fdm:         newFdm(maxFdNums, cleanThreshold),
+		fdm:         fileio.NewFdm(maxFdNums, cleanThreshold),
 		segmentSize: segmentSize,
 	}
 	return fm
 }
 
-// getDataFile will return a DataFile Object
-func (fm *fileManager) getDataFile(path string, capacity int64) (datafile *DataFile, err error) {
+// GetDataFile will return a DataFile Object
+func (fm *FileManager) GetDataFile(path string, capacity int64) (datafile *DataFile, err error) {
 	return fm.getDataFileWithMode(path, capacity, false)
 }
 
-// getDataFileReadOnly will return a DataFile Object for read-only operations
+// GetDataFileReadOnly will return a DataFile Object for read-only operations
 // This method skips file truncation to improve read performance
-func (fm *fileManager) getDataFileReadOnly(path string, capacity int64) (datafile *DataFile, err error) {
+func (fm *FileManager) GetDataFileReadOnly(path string, capacity int64) (datafile *DataFile, err error) {
 	return fm.getDataFileWithMode(path, capacity, true)
 }
 
 // getDataFileWithMode will return a DataFile Object with specified read-only mode
-func (fm *fileManager) getDataFileWithMode(path string, capacity int64, readOnly bool) (datafile *DataFile, err error) {
+func (fm *FileManager) getDataFileWithMode(path string, capacity int64, readOnly bool) (datafile *DataFile, err error) {
 	if capacity <= 0 {
 		return nil, ErrCapacity
 	}
 
-	var rwManager RWManager
+	var rwManager fileio.RWManager
 
 	if fm.rwMode == FileIO {
-		rwManager, err = fm.getFileRWManager(path, capacity, fm.segmentSize, readOnly)
+		rwManager, err = fm.GetFileRWManager(path, capacity, fm.segmentSize, readOnly)
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	if fm.rwMode == MMap {
-		rwManager, err = fm.getMMapRWManager(path, capacity, fm.segmentSize, readOnly)
+		rwManager, err = fm.GetMMapRWManager(path, capacity, fm.segmentSize, readOnly)
 		if err != nil {
 			return nil, err
 		}
@@ -53,42 +66,42 @@ func (fm *fileManager) getDataFileWithMode(path string, capacity int64, readOnly
 	return NewDataFile(path, rwManager), nil
 }
 
-func (fm *fileManager) getDataFileByID(dir string, fileID int64, capacity int64) (*DataFile, error) {
+func (fm *FileManager) GetDataFileByID(dir string, fileID int64, capacity int64) (*DataFile, error) {
 	path := getDataPath(fileID, dir)
-	return fm.getDataFile(path, capacity)
+	return fm.GetDataFile(path, capacity)
 }
 
-// getFileRWManager will return a FileIORWManager Object
-func (fm *fileManager) getFileRWManager(path string, capacity int64, segmentSize int64, readOnly bool) (*FileIORWManager, error) {
-	fd, err := fm.fdm.getFd(path)
+// GetFileRWManager will return a FileIORWManager Object
+func (fm *FileManager) GetFileRWManager(path string, capacity int64, segmentSize int64, readOnly bool) (*fileio.FileIORWManager, error) {
+	fd, err := fm.fdm.GetFd(path)
 	if err != nil {
 		return nil, err
 	}
-	err = Truncate(path, capacity, fd, readOnly)
+	err = fileio.Truncate(path, capacity, fd, readOnly)
 	if err != nil {
 		return nil, err
 	}
 
-	return &FileIORWManager{fd: fd, path: path, fdm: fm.fdm, segmentSize: segmentSize}, nil
+	return &fileio.FileIORWManager{Fd: fd, Path: path, Fdm: fm.fdm, SegmentSize: segmentSize}, nil
 }
 
-// getMMapRWManager will return a MMapRWManager Object
-func (fm *fileManager) getMMapRWManager(path string, capacity int64, segmentSize int64, readOnly bool) (*MMapRWManager, error) {
-	fd, err := fm.fdm.getFd(path)
+// GetMMapRWManager will return a MMapRWManager Object
+func (fm *FileManager) GetMMapRWManager(path string, capacity int64, segmentSize int64, readOnly bool) (*fileio.MMapRWManager, error) {
+	fd, err := fm.fdm.GetFd(path)
 	if err != nil {
 		return nil, err
 	}
 
-	err = Truncate(path, capacity, fd, readOnly)
+	err = fileio.Truncate(path, capacity, fd, readOnly)
 	if err != nil {
 		return nil, err
 	}
 
-	return getMMapRWManager(fd, path, fm.fdm, segmentSize), nil
+	return fileio.GetMMapRWManager(fd, path, fm.fdm, segmentSize), nil
 }
 
-// close will close fdm resource
-func (fm *fileManager) close() error {
-	err := fm.fdm.close()
+// Close will Close fdm resource
+func (fm *FileManager) Close() error {
+	err := fm.fdm.Close()
 	return err
 }
