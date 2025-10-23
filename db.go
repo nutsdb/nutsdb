@@ -246,6 +246,8 @@ func (db *DB) release() error {
 
 	db.fm = nil
 
+	db.commitBuffer = nil
+
 	db.tm.close()
 
 	if GCEnable {
