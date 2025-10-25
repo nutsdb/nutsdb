@@ -437,6 +437,15 @@ func (tx *Tx) Delete(bucket string, key []byte) error {
 	}
 	bucketId := b.Id
 
+	//Find the key in the transaction-local map (entriesInBTree)
+	status, _ := tx.findEntryAndItsStatus(DataStructureBTree, bucket, string(key))
+	switch status {
+	case EntryDeleted:
+		return ErrKeyNotFound
+	case EntryUpdated:
+		return tx.put(bucket, key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureBTree)
+	}
+
 	if idx, ok := tx.db.Index.bTree.exist(bucketId); ok {
 		if _, found := idx.Find(key); !found {
 			return ErrKeyNotFound

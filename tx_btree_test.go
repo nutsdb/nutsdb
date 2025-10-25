@@ -469,6 +469,73 @@ func TestTx_DeleteFromMemory(t *testing.T) {
 	})
 }
 
+func TestTx_DeleteKeyDuringTransaction(t *testing.T) {
+	bucket := "bucket_delete_test"
+
+	t.Run("delete key after put in same transaction", func(t *testing.T) {
+		withDefaultDB(t, func(t *testing.T, db *DB) {
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			tx, err := db.Begin(true)
+			require.NoError(t, err)
+
+			key := []byte("key_test")
+			val := []byte("value to be deleted")
+
+			require.NoError(t, tx.Put(bucket, key, val, Persistent))
+
+			value, err := tx.Get(bucket, key)
+			require.NoError(t, err)
+			require.Equal(t, val, value)
+
+			require.NoError(t, tx.Delete(bucket, key))
+
+			_, err = tx.Get(bucket, key)
+			require.Equal(t, ErrKeyNotFound, err)
+
+			require.NoError(t, tx.Commit())
+		})
+	})
+
+	t.Run("delete same key twice in transaction", func(t *testing.T) {
+		withDefaultDB(t, func(t *testing.T, db *DB) {
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			tx, err := db.Begin(true)
+			require.NoError(t, err)
+
+			key := []byte("key_test")
+			val := []byte("value")
+
+			require.NoError(t, tx.Put(bucket, key, val, Persistent))
+			require.NoError(t, tx.Delete(bucket, key))
+
+			// Second delete should return ErrKeyNotFound
+			err = tx.Delete(bucket, key)
+			require.Equal(t, ErrKeyNotFound, err)
+
+			require.NoError(t, tx.Commit())
+		})
+	})
+
+	t.Run("delete persisted key in transaction", func(t *testing.T) {
+		withDefaultDB(t, func(t *testing.T, db *DB) {
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+			key := []byte("persisted_key")
+			val := []byte("persisted_value")
+
+			txPut(t, db, bucket, key, val, Persistent, nil, nil)
+			txGet(t, db, bucket, key, val, nil)
+
+			tx, err := db.Begin(true)
+			require.NoError(t, err)
+			require.NoError(t, tx.Delete(bucket, key))
+			require.NoError(t, tx.Commit())
+
+			txGet(t, db, bucket, key, nil, ErrKeyNotFound)
+		})
+	})
+}
+
 func TestTx_GetAndScansFromHintKey(t *testing.T) {
 	bucket := "bucket_get_test"
 	withRAMIdxDB(t, func(t *testing.T, db *DB) {
