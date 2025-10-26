@@ -3,3 +3,4 @@ testdata/
 bin/
 */*.DS_Store
 .gocache
+.vscode

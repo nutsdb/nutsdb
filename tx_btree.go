@@ -99,12 +99,11 @@ func (tx *Tx) get(bucket string, key []byte) (value []byte, err error) {
 	bucketId := b.Id
 
 	status, entry := tx.findEntryAndItsStatus(DataStructureBTree, bucket, string(key))
-	if status != NotFoundEntry && entry != nil {
-		if status == EntryDeleted {
-			return nil, ErrKeyNotFound
-		} else {
-			return entry.Value, nil
-		}
+	switch status {
+	case EntryDeleted:
+		return nil, ErrKeyNotFound
+	case EntryUpdated:
+		return entry.Value, nil
 	}
 
 	if idx, ok := tx.db.Index.bTree.exist(bucketId); ok {
@@ -279,13 +278,12 @@ func (tx *Tx) Has(bucket string, key []byte) (exists bool, err error) {
 	}
 	bucketId := b.Id
 
-	status, entry := tx.findEntryAndItsStatus(DataStructureBTree, bucket, string(key))
-	if status != NotFoundEntry && entry != nil {
-		if status == EntryDeleted {
-			return false, ErrKeyNotFound
-		} else {
-			return true, nil
-		}
+	status, _ = tx.findEntryAndItsStatus(DataStructureBTree, bucket, string(key))
+	switch status {
+	case EntryDeleted:
+		return false, ErrKeyNotFound
+	case EntryUpdated:
+		return true, nil
 	}
 
 	idx, bucketExists := tx.db.Index.bTree.exist(bucketId)
