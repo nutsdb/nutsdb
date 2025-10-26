@@ -122,7 +122,7 @@ func (tx *Tx) getListNewKey(bucket string, key []byte, isLeft bool) []byte {
 		l.Seq[keyStr] = seq
 	}
 
-	seqValue := generateSeq(seq, isLeft)
+	seqValue := seq.generateSeq(isLeft)
 	return encodeListKey(key, seqValue)
 }
 

@@ -41,7 +41,7 @@ func benchmarkListPush(b *testing.B, impl ListImplementationType, isLeft bool) {
 	}, b.N)
 
 	for i := 0; i < b.N; i++ {
-		seq := generateSeq(&seqInfo, isLeft)
+		seq := seqInfo.generateSeq(isLeft)
 		newKey := encodeListKey(key, seq)
 		testData[i].seq = seq
 		testData[i].newKey = newKey
@@ -88,7 +88,7 @@ func benchmarkListPop(b *testing.B, impl ListImplementationType, isLeft bool) {
 	}, b.N)
 
 	for i := 0; i < b.N; i++ {
-		seq := generateSeq(&seqInfo, false)
+		seq := seqInfo.generateSeq(false)
 		newKey := encodeListKey(key, seq)
 		testData[i].newKey = newKey
 		testData[i].record = &data.Record{Key: newKey, Value: testutils.GetTestBytes(i)}
@@ -147,7 +147,7 @@ func benchmarkListRange(b *testing.B, impl ListImplementationType, size int) {
 	}, size)
 
 	for i := 0; i < size; i++ {
-		seq := generateSeq(&seqInfo, false)
+		seq := seqInfo.generateSeq(false)
 		newKey := encodeListKey(key, seq)
 		testData[i].newKey = newKey
 		testData[i].record = &data.Record{Key: newKey, Value: testutils.GetTestBytes(i)}
@@ -200,7 +200,7 @@ func benchmarkListPeek(b *testing.B, impl ListImplementationType, isLeft bool) {
 	}, b.N)
 
 	for i := 0; i < b.N; i++ {
-		seq := generateSeq(&seqInfo, false)
+		seq := seqInfo.generateSeq(false)
 		newKey := encodeListKey(key, seq)
 		testData[i].newKey = newKey
 		testData[i].record = &data.Record{Key: newKey, Value: testutils.GetTestBytes(i)}
@@ -259,7 +259,7 @@ func benchmarkListTrim(b *testing.B, impl ListImplementationType, size int, keep
 	}, size)
 
 	for i := 0; i < size; i++ {
-		seq := generateSeq(&seqInfo, false)
+		seq := seqInfo.generateSeq(false)
 		newKey := encodeListKey(key, seq)
 		testData[i].newKey = newKey
 		testData[i].record = &data.Record{Key: newKey, Value: testutils.GetTestBytes(i)}
@@ -326,7 +326,7 @@ func benchmarkListRem(b *testing.B, impl ListImplementationType, size int, count
 	}, size)
 
 	for i := 0; i < size; i++ {
-		seq := generateSeq(&seqInfo, false)
+		seq := seqInfo.generateSeq(false)
 		newKey := encodeListKey(key, seq)
 		testData[i].newKey = newKey
 		testData[i].record = &data.Record{Key: newKey, Value: testutils.GetTestBytes(i)}
@@ -400,7 +400,7 @@ func benchmarkListRemByIndex(b *testing.B, impl ListImplementationType, size int
 	}, size)
 
 	for i := 0; i < size; i++ {
-		seq := generateSeq(&seqInfo, false)
+		seq := seqInfo.generateSeq(false)
 		newKey := encodeListKey(key, seq)
 		testData[i].newKey = newKey
 		testData[i].record = &data.Record{Key: newKey, Value: testutils.GetTestBytes(i)}
@@ -474,7 +474,7 @@ func benchmarkListSize(b *testing.B, impl ListImplementationType, size int) {
 	}, size)
 
 	for i := 0; i < size; i++ {
-		seq := generateSeq(&seqInfo, false)
+		seq := seqInfo.generateSeq(false)
 		newKey := encodeListKey(key, seq)
 		testData[i].newKey = newKey
 		testData[i].record = &data.Record{Key: newKey, Value: testutils.GetTestBytes(i)}

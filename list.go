@@ -112,6 +112,19 @@ type HeadTailSeq struct {
 	Tail uint64
 }
 
+func (seq *HeadTailSeq) generateSeq(isLeft bool) uint64 {
+	var res uint64
+	if isLeft {
+		res = seq.Head
+		seq.Head--
+	} else {
+		res = seq.Tail
+		seq.Tail++
+	}
+
+	return res
+}
+
 // List represents the list.
 type List struct {
 	Items     map[string]ListStructure

@@ -87,19 +87,6 @@ func getFnv32(value []byte) (uint32, error) {
 	return hash, nil
 }
 
-func generateSeq(seq *HeadTailSeq, isLeft bool) uint64 {
-	var res uint64
-	if isLeft {
-		res = seq.Head
-		seq.Head--
-	} else {
-		res = seq.Tail
-		seq.Tail++
-	}
-
-	return res
-}
-
 func createNewBufferWithSize(size int) *bytes.Buffer {
 	buf := new(bytes.Buffer)
 	buf.Grow(int(size))

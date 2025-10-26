@@ -78,7 +78,7 @@ func TestList_LPush(t *testing.T) {
 		seqInfo := HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
 
 		for i := 0; i < len(expectRecords); i++ {
-			seq := generateSeq(&seqInfo, true)
+			seq := seqInfo.generateSeq(true)
 			newKey := encodeListKey([]byte(key), seq)
 			expectRecords[i].Key = newKey
 			ListPush(t, list, string(newKey), expectRecords[i], true, nil)
@@ -97,7 +97,7 @@ func TestList_RPush(t *testing.T) {
 		seqInfo := HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
 
 		for i := 0; i < len(expectRecords); i++ {
-			seq := generateSeq(&seqInfo, false)
+			seq := seqInfo.generateSeq(false)
 			newKey := encodeListKey([]byte(key), seq)
 			expectRecords[i].Key = newKey
 			ListPush(t, list, string(newKey), expectRecords[i], false, nil)
@@ -117,7 +117,7 @@ func TestList_Pop(t *testing.T) {
 		seqInfo := HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
 
 		for i := 0; i < len(expectRecords); i++ {
-			seq := generateSeq(&seqInfo, false)
+			seq := seqInfo.generateSeq(false)
 			newKey := encodeListKey([]byte(key), seq)
 			expectRecords[i].Key = newKey
 			ListPush(t, list, string(newKey), expectRecords[i], false, nil)
@@ -141,23 +141,23 @@ func TestList_LRem(t *testing.T) {
 		seqInfo := HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
 
 		for i := 0; i < 3; i++ {
-			seq := generateSeq(&seqInfo, false)
+			seq := seqInfo.generateSeq(false)
 			newKey := encodeListKey([]byte(key), seq)
 			records[0].Key = newKey
 			ListPush(t, list, string(newKey), records[0], false, nil)
 		}
 
-		seq := generateSeq(&seqInfo, false)
+		seq := seqInfo.generateSeq(false)
 		newKey := encodeListKey([]byte(key), seq)
 		records[1].Key = newKey
 		ListPush(t, list, string(newKey), records[1], false, nil)
 
-		seq = generateSeq(&seqInfo, false)
+		seq = seqInfo.generateSeq(false)
 		newKey = encodeListKey([]byte(key), seq)
 		records[0].Key = newKey
 		ListPush(t, list, string(newKey), records[0], false, nil)
 
-		seq = generateSeq(&seqInfo, false)
+		seq = seqInfo.generateSeq(false)
 		newKey = encodeListKey([]byte(key), seq)
 		records[1].Key = newKey
 		ListPush(t, list, string(newKey), records[1], false, nil)
@@ -201,7 +201,7 @@ func TestList_LTrim(t *testing.T) {
 		seqInfo := HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
 
 		for i := 0; i < len(expectRecords); i++ {
-			seq := generateSeq(&seqInfo, false)
+			seq := seqInfo.generateSeq(false)
 			newKey := encodeListKey([]byte(key), seq)
 			expectRecords[i].Key = newKey
 			ListPush(t, list, string(newKey), expectRecords[i], false, nil)
@@ -223,7 +223,7 @@ func TestList_LRemByIndex(t *testing.T) {
 
 		// r1 r2 r3 r4 r5 r6 r7 r8
 		for i := 0; i < 8; i++ {
-			seq := generateSeq(&seqInfo, false)
+			seq := seqInfo.generateSeq(false)
 			newKey := encodeListKey([]byte(key), seq)
 			expectRecords[i].Key = newKey
 			ListPush(t, list, string(newKey), expectRecords[i], false, nil)
@@ -280,7 +280,7 @@ func TestList_SequenceConsistency(t *testing.T) {
 
 		// Push 5 elements
 		for i := 0; i < 5; i++ {
-			seq := generateSeq(&seqInfo, false)
+			seq := seqInfo.generateSeq(false)
 			newKey := encodeListKey([]byte(key), seq)
 			record := &data.Record{Key: newKey, Value: testutils.GetTestBytes(i)}
 			ListPush(t, list, string(newKey), record, false, nil)
@@ -297,7 +297,7 @@ func TestList_SequenceConsistency(t *testing.T) {
 		}, nil)
 
 		// Push again - should not reuse old sequence
-		seq := generateSeq(&seqInfo, false)
+		seq := seqInfo.generateSeq(false)
 		newKey := encodeListKey([]byte(key), seq)
 		record := &data.Record{Key: newKey, Value: testutils.GetTestBytes(99)}
 		ListPush(t, list, string(newKey), record, false, nil)
@@ -365,12 +365,12 @@ func TestList_MixedPushPop(t *testing.T) {
 		for _, operation := range operations {
 			switch operation.op {
 			case "RPush":
-				seq := generateSeq(&seqInfo, false)
+				seq := seqInfo.generateSeq(false)
 				newKey := encodeListKey([]byte(key), seq)
 				record := &data.Record{Key: newKey, Value: testutils.GetTestBytes(operation.value)}
 				ListPush(t, list, string(newKey), record, false, nil)
 			case "LPush":
-				seq := generateSeq(&seqInfo, true)
+				seq := seqInfo.generateSeq(true)
 				newKey := encodeListKey([]byte(key), seq)
 				record := &data.Record{Key: newKey, Value: testutils.GetTestBytes(operation.value)}
 				ListPush(t, list, string(newKey), record, true, nil)
@@ -404,7 +404,7 @@ func TestList_HeadTailBoundary(t *testing.T) {
 
 		// Only RPush
 		for i := 0; i < 3; i++ {
-			seq := generateSeq(&seqInfo, false)
+			seq := seqInfo.generateSeq(false)
 			newKey := encodeListKey([]byte(key), seq)
 			record := &data.Record{Key: newKey, Value: testutils.GetTestBytes(i)}
 			ListPush(t, list, string(newKey), record, false, nil)
@@ -416,7 +416,7 @@ func TestList_HeadTailBoundary(t *testing.T) {
 
 		// Now LPush
 		for i := 0; i < 3; i++ {
-			seq := generateSeq(&seqInfo, true)
+			seq := seqInfo.generateSeq(true)
 			newKey := encodeListKey([]byte(key), seq)
 			record := &data.Record{Key: newKey, Value: testutils.GetTestBytes(100 + i)}
 			ListPush(t, list, string(newKey), record, true, nil)
