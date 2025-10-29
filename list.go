@@ -15,7 +15,6 @@
 package nutsdb
 
 import (
-	"errors"
 	"time"
 
 	"github.com/nutsdb/nutsdb/internal/data"
@@ -24,16 +23,16 @@ import (
 
 var (
 	// ErrListNotFound is returned when the list not found.
-	ErrListNotFound = errors.New("the list not found")
+	ErrListNotFound = data.ErrListNotFound
 
 	// ErrCount is returned when count is error.
-	ErrCount = errors.New("err count")
+	ErrCount = data.ErrCount
 
 	// ErrEmptyList is returned when the list is empty.
-	ErrEmptyList = errors.New("the list is empty")
+	ErrEmptyList = data.ErrEmptyList
 
 	// ErrStartOrEnd is returned when start > end
-	ErrStartOrEnd = errors.New("start or end error")
+	ErrStartOrEnd = data.ErrStartOrEnd
 )
 
 const (
@@ -106,31 +105,12 @@ var (
 
 // BTree represents the btree.
 
-// HeadTailSeq list head and tail seq num
-type HeadTailSeq struct {
-	Head uint64
-	Tail uint64
-}
-
-func (seq *HeadTailSeq) generateSeq(isLeft bool) uint64 {
-	var res uint64
-	if isLeft {
-		res = seq.Head
-		seq.Head--
-	} else {
-		res = seq.Tail
-		seq.Tail++
-	}
-
-	return res
-}
-
 // List represents the list.
 type List struct {
 	Items     map[string]ListStructure
 	TTL       map[string]uint32
 	TimeStamp map[string]uint64
-	Seq       map[string]*HeadTailSeq
+	Seq       map[string]*data.HeadTailSeq
 	opts      Options // Configuration options
 }
 
@@ -139,7 +119,7 @@ func NewList(opts Options) *List {
 		Items:     make(map[string]ListStructure),
 		TTL:       make(map[string]uint32),
 		TimeStamp: make(map[string]uint64),
-		Seq:       make(map[string]*HeadTailSeq),
+		Seq:       make(map[string]*data.HeadTailSeq),
 		opts:      opts,
 	}
 }
@@ -181,7 +161,7 @@ func (l *List) push(key string, r *data.Record, isLeft bool) error {
 
 	// Initialize seq if not exists
 	if _, ok := l.Seq[userKeyStr]; !ok {
-		l.Seq[userKeyStr] = &HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
+		l.Seq[userKeyStr] = &data.HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
 	}
 
 	list.InsertRecord(utils.ConvertUint64ToBigEndianBytes(curSeq), r)

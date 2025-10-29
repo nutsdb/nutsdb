@@ -20,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nutsdb/nutsdb/internal/data"
 	"github.com/nutsdb/nutsdb/internal/utils"
 	"github.com/pkg/errors"
 	"github.com/xujiajun/utils/strconv2"
@@ -109,20 +110,20 @@ func (tx *Tx) getListNewKey(bucket string, key []byte, isLeft bool) []byte {
 			minSeq, okMinSeq := items.Min()
 			maxSeq, okMaxSeq := items.Max()
 			if !okMinSeq || !okMaxSeq {
-				seq = &HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
+				seq = &data.HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
 			} else {
-				seq = &HeadTailSeq{
+				seq = &data.HeadTailSeq{
 					Head: utils.ConvertBigEndianBytesToUint64(minSeq.Key) - 1,
 					Tail: utils.ConvertBigEndianBytesToUint64(maxSeq.Key) + 1,
 				}
 			}
 		} else {
-			seq = &HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
+			seq = &data.HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
 		}
 		l.Seq[keyStr] = seq
 	}
 
-	seqValue := seq.generateSeq(isLeft)
+	seqValue := seq.GenerateSeq(isLeft)
 	return encodeListKey(key, seqValue)
 }
 

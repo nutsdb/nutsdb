@@ -31,7 +31,7 @@ func benchmarkListPush(b *testing.B, impl ListImplementationType, isLeft bool) {
 	list := NewList(opts)
 
 	key := []byte("benchmark_key")
-	seqInfo := HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
+	seqInfo := data.HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
 
 	// Pre-generate test data to avoid overhead in the benchmark loop
 	testData := make([]struct {
@@ -41,7 +41,7 @@ func benchmarkListPush(b *testing.B, impl ListImplementationType, isLeft bool) {
 	}, b.N)
 
 	for i := 0; i < b.N; i++ {
-		seq := seqInfo.generateSeq(isLeft)
+		seq := seqInfo.GenerateSeq(isLeft)
 		newKey := encodeListKey(key, seq)
 		testData[i].seq = seq
 		testData[i].newKey = newKey
@@ -79,7 +79,7 @@ func benchmarkListPop(b *testing.B, impl ListImplementationType, isLeft bool) {
 
 	key := []byte("benchmark_key")
 	keyStr := string(key)
-	seqInfo := HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
+	seqInfo := data.HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
 
 	// Pre-generate test data
 	testData := make([]struct {
@@ -88,7 +88,7 @@ func benchmarkListPop(b *testing.B, impl ListImplementationType, isLeft bool) {
 	}, b.N)
 
 	for i := 0; i < b.N; i++ {
-		seq := seqInfo.generateSeq(false)
+		seq := seqInfo.GenerateSeq(false)
 		newKey := encodeListKey(key, seq)
 		testData[i].newKey = newKey
 		testData[i].record = &data.Record{Key: newKey, Value: testutils.GetTestBytes(i)}
@@ -138,7 +138,7 @@ func benchmarkListRange(b *testing.B, impl ListImplementationType, size int) {
 
 	key := []byte("benchmark_key")
 	keyStr := string(key)
-	seqInfo := HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
+	seqInfo := data.HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
 
 	// Pre-generate test data
 	testData := make([]struct {
@@ -147,7 +147,7 @@ func benchmarkListRange(b *testing.B, impl ListImplementationType, size int) {
 	}, size)
 
 	for i := 0; i < size; i++ {
-		seq := seqInfo.generateSeq(false)
+		seq := seqInfo.GenerateSeq(false)
 		newKey := encodeListKey(key, seq)
 		testData[i].newKey = newKey
 		testData[i].record = &data.Record{Key: newKey, Value: testutils.GetTestBytes(i)}
@@ -191,7 +191,7 @@ func benchmarkListPeek(b *testing.B, impl ListImplementationType, isLeft bool) {
 
 	key := []byte("benchmark_key")
 	keyStr := string(key)
-	seqInfo := HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
+	seqInfo := data.HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
 
 	// Pre-generate test data
 	testData := make([]struct {
@@ -200,7 +200,7 @@ func benchmarkListPeek(b *testing.B, impl ListImplementationType, isLeft bool) {
 	}, b.N)
 
 	for i := 0; i < b.N; i++ {
-		seq := seqInfo.generateSeq(false)
+		seq := seqInfo.GenerateSeq(false)
 		newKey := encodeListKey(key, seq)
 		testData[i].newKey = newKey
 		testData[i].record = &data.Record{Key: newKey, Value: testutils.GetTestBytes(i)}
@@ -250,7 +250,7 @@ func benchmarkListTrim(b *testing.B, impl ListImplementationType, size int, keep
 
 	key := []byte("benchmark_key")
 	keyStr := string(key)
-	seqInfo := HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
+	seqInfo := data.HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
 
 	// Pre-generate test data
 	testData := make([]struct {
@@ -259,7 +259,7 @@ func benchmarkListTrim(b *testing.B, impl ListImplementationType, size int, keep
 	}, size)
 
 	for i := 0; i < size; i++ {
-		seq := seqInfo.generateSeq(false)
+		seq := seqInfo.GenerateSeq(false)
 		newKey := encodeListKey(key, seq)
 		testData[i].newKey = newKey
 		testData[i].record = &data.Record{Key: newKey, Value: testutils.GetTestBytes(i)}
@@ -277,7 +277,7 @@ func benchmarkListTrim(b *testing.B, impl ListImplementationType, size int, keep
 		// Create a fresh list for each iteration
 		freshList := NewList(opts)
 		freshList.Items[keyStr] = list.createListStructure()
-		freshSeq := &HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
+		freshSeq := &data.HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
 		freshList.Seq[keyStr] = freshSeq
 
 		// Populate fresh list
@@ -317,7 +317,7 @@ func benchmarkListRem(b *testing.B, impl ListImplementationType, size int, count
 
 	key := []byte("benchmark_key")
 	keyStr := string(key)
-	seqInfo := HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
+	seqInfo := data.HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
 
 	// Pre-generate test data
 	testData := make([]struct {
@@ -326,7 +326,7 @@ func benchmarkListRem(b *testing.B, impl ListImplementationType, size int, count
 	}, size)
 
 	for i := 0; i < size; i++ {
-		seq := seqInfo.generateSeq(false)
+		seq := seqInfo.GenerateSeq(false)
 		newKey := encodeListKey(key, seq)
 		testData[i].newKey = newKey
 		testData[i].record = &data.Record{Key: newKey, Value: testutils.GetTestBytes(i)}
@@ -351,7 +351,7 @@ func benchmarkListRem(b *testing.B, impl ListImplementationType, size int, count
 		// Create a fresh list for each iteration
 		freshList := NewList(opts)
 		freshList.Items[keyStr] = list.createListStructure()
-		freshSeq := &HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
+		freshSeq := &data.HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
 		freshList.Seq[keyStr] = freshSeq
 
 		// Populate fresh list
@@ -391,7 +391,7 @@ func benchmarkListRemByIndex(b *testing.B, impl ListImplementationType, size int
 
 	key := []byte("benchmark_key")
 	keyStr := string(key)
-	seqInfo := HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
+	seqInfo := data.HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
 
 	// Pre-generate test data
 	testData := make([]struct {
@@ -400,7 +400,7 @@ func benchmarkListRemByIndex(b *testing.B, impl ListImplementationType, size int
 	}, size)
 
 	for i := 0; i < size; i++ {
-		seq := seqInfo.generateSeq(false)
+		seq := seqInfo.GenerateSeq(false)
 		newKey := encodeListKey(key, seq)
 		testData[i].newKey = newKey
 		testData[i].record = &data.Record{Key: newKey, Value: testutils.GetTestBytes(i)}
@@ -425,7 +425,7 @@ func benchmarkListRemByIndex(b *testing.B, impl ListImplementationType, size int
 		// Create a fresh list for each iteration
 		freshList := NewList(opts)
 		freshList.Items[keyStr] = list.createListStructure()
-		freshSeq := &HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
+		freshSeq := &data.HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
 		freshList.Seq[keyStr] = freshSeq
 
 		// Populate fresh list
@@ -465,7 +465,7 @@ func benchmarkListSize(b *testing.B, impl ListImplementationType, size int) {
 
 	key := []byte("benchmark_key")
 	keyStr := string(key)
-	seqInfo := HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
+	seqInfo := data.HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
 
 	// Pre-generate test data
 	testData := make([]struct {
@@ -474,7 +474,7 @@ func benchmarkListSize(b *testing.B, impl ListImplementationType, size int) {
 	}, size)
 
 	for i := 0; i < size; i++ {
-		seq := seqInfo.generateSeq(false)
+		seq := seqInfo.GenerateSeq(false)
 		newKey := encodeListKey(key, seq)
 		testData[i].newKey = newKey
 		testData[i].record = &data.Record{Key: newKey, Value: testutils.GetTestBytes(i)}
