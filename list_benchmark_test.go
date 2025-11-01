@@ -28,10 +28,10 @@ import (
 func benchmarkListPush(b *testing.B, impl ListImplementationType, isLeft bool) {
 	opts := DefaultOptions
 	opts.ListImpl = impl
-	list := NewList(opts)
+	list := data.NewList(opts.ListImpl.toInternal())
 
 	key := []byte("benchmark_key")
-	seqInfo := data.HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
+	seqInfo := data.HeadTailSeq{Head: data.InitialListSeq, Tail: data.InitialListSeq + 1}
 
 	// Pre-generate test data to avoid overhead in the benchmark loop
 	testData := make([]struct {
@@ -50,7 +50,7 @@ func benchmarkListPush(b *testing.B, impl ListImplementationType, isLeft bool) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if err := list.push(string(testData[i].newKey), testData[i].record, isLeft); err != nil {
+		if err := list.Push(string(testData[i].newKey), testData[i].record, isLeft); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -75,11 +75,11 @@ func BenchmarkList_RPush_BTree(b *testing.B) {
 func benchmarkListPop(b *testing.B, impl ListImplementationType, isLeft bool) {
 	opts := DefaultOptions
 	opts.ListImpl = impl
-	list := NewList(opts)
+	list := data.NewList(opts.ListImpl.toInternal())
 
 	key := []byte("benchmark_key")
 	keyStr := string(key)
-	seqInfo := data.HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
+	seqInfo := data.HeadTailSeq{Head: data.InitialListSeq, Tail: data.InitialListSeq + 1}
 
 	// Pre-generate test data
 	testData := make([]struct {
@@ -96,7 +96,7 @@ func benchmarkListPop(b *testing.B, impl ListImplementationType, isLeft bool) {
 
 	// Pre-populate with pre-generated data
 	for i := 0; i < b.N; i++ {
-		if err := list.push(string(testData[i].newKey), testData[i].record, false); err != nil {
+		if err := list.Push(string(testData[i].newKey), testData[i].record, false); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -134,11 +134,11 @@ func BenchmarkList_RPop_BTree(b *testing.B) {
 func benchmarkListRange(b *testing.B, impl ListImplementationType, size int) {
 	opts := DefaultOptions
 	opts.ListImpl = impl
-	list := NewList(opts)
+	list := data.NewList(opts.ListImpl.toInternal())
 
 	key := []byte("benchmark_key")
 	keyStr := string(key)
-	seqInfo := data.HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
+	seqInfo := data.HeadTailSeq{Head: data.InitialListSeq, Tail: data.InitialListSeq + 1}
 
 	// Pre-generate test data
 	testData := make([]struct {
@@ -155,7 +155,7 @@ func benchmarkListRange(b *testing.B, impl ListImplementationType, size int) {
 
 	// Pre-populate with pre-generated data
 	for i := 0; i < size; i++ {
-		if err := list.push(string(testData[i].newKey), testData[i].record, false); err != nil {
+		if err := list.Push(string(testData[i].newKey), testData[i].record, false); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -187,11 +187,11 @@ func BenchmarkList_LRange_BTree_10000(b *testing.B) {
 func benchmarkListPeek(b *testing.B, impl ListImplementationType, isLeft bool) {
 	opts := DefaultOptions
 	opts.ListImpl = impl
-	list := NewList(opts)
+	list := data.NewList(opts.ListImpl.toInternal())
 
 	key := []byte("benchmark_key")
 	keyStr := string(key)
-	seqInfo := data.HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
+	seqInfo := data.HeadTailSeq{Head: data.InitialListSeq, Tail: data.InitialListSeq + 1}
 
 	// Pre-generate test data
 	testData := make([]struct {
@@ -208,7 +208,7 @@ func benchmarkListPeek(b *testing.B, impl ListImplementationType, isLeft bool) {
 
 	// Pre-populate with pre-generated data
 	for i := 0; i < b.N; i++ {
-		if err := list.push(string(testData[i].newKey), testData[i].record, false); err != nil {
+		if err := list.Push(string(testData[i].newKey), testData[i].record, false); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -246,11 +246,11 @@ func BenchmarkList_RPeek_BTree(b *testing.B) {
 func benchmarkListTrim(b *testing.B, impl ListImplementationType, size int, keepStart, keepEnd int) {
 	opts := DefaultOptions
 	opts.ListImpl = impl
-	list := NewList(opts)
+	list := data.NewList(opts.ListImpl.toInternal())
 
 	key := []byte("benchmark_key")
 	keyStr := string(key)
-	seqInfo := data.HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
+	seqInfo := data.HeadTailSeq{Head: data.InitialListSeq, Tail: data.InitialListSeq + 1}
 
 	// Pre-generate test data
 	testData := make([]struct {
@@ -267,7 +267,7 @@ func benchmarkListTrim(b *testing.B, impl ListImplementationType, size int, keep
 
 	// Pre-populate with pre-generated data
 	for i := 0; i < size; i++ {
-		if err := list.push(string(testData[i].newKey), testData[i].record, false); err != nil {
+		if err := list.Push(string(testData[i].newKey), testData[i].record, false); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -275,14 +275,14 @@ func benchmarkListTrim(b *testing.B, impl ListImplementationType, size int, keep
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// Create a fresh list for each iteration
-		freshList := NewList(opts)
-		freshList.Items[keyStr] = list.createListStructure()
-		freshSeq := &data.HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
+		freshList := data.NewList(opts.ListImpl.toInternal())
+		freshList.Items[keyStr] = list.CreateListStructure()
+		freshSeq := &data.HeadTailSeq{Head: data.InitialListSeq, Tail: data.InitialListSeq + 1}
 		freshList.Seq[keyStr] = freshSeq
 
 		// Populate fresh list
 		for j := 0; j < size; j++ {
-			if err := freshList.push(string(testData[j].newKey), testData[j].record, false); err != nil {
+			if err := freshList.Push(string(testData[j].newKey), testData[j].record, false); err != nil {
 				b.Fatal(err)
 			}
 		}
@@ -313,11 +313,11 @@ func BenchmarkList_LTrim_BTree_10000(b *testing.B) {
 func benchmarkListRem(b *testing.B, impl ListImplementationType, size int, count int) {
 	opts := DefaultOptions
 	opts.ListImpl = impl
-	list := NewList(opts)
+	list := data.NewList(opts.ListImpl.toInternal())
 
 	key := []byte("benchmark_key")
 	keyStr := string(key)
-	seqInfo := data.HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
+	seqInfo := data.HeadTailSeq{Head: data.InitialListSeq, Tail: data.InitialListSeq + 1}
 
 	// Pre-generate test data
 	testData := make([]struct {
@@ -334,7 +334,7 @@ func benchmarkListRem(b *testing.B, impl ListImplementationType, size int, count
 
 	// Pre-populate with pre-generated data
 	for i := 0; i < size; i++ {
-		if err := list.push(string(testData[i].newKey), testData[i].record, false); err != nil {
+		if err := list.Push(string(testData[i].newKey), testData[i].record, false); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -349,14 +349,14 @@ func benchmarkListRem(b *testing.B, impl ListImplementationType, size int, count
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// Create a fresh list for each iteration
-		freshList := NewList(opts)
-		freshList.Items[keyStr] = list.createListStructure()
-		freshSeq := &data.HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
+		freshList := data.NewList(opts.ListImpl.toInternal())
+		freshList.Items[keyStr] = list.CreateListStructure()
+		freshSeq := &data.HeadTailSeq{Head: data.InitialListSeq, Tail: data.InitialListSeq + 1}
 		freshList.Seq[keyStr] = freshSeq
 
 		// Populate fresh list
 		for j := 0; j < size; j++ {
-			if err := freshList.push(string(testData[j].newKey), testData[j].record, false); err != nil {
+			if err := freshList.Push(string(testData[j].newKey), testData[j].record, false); err != nil {
 				b.Fatal(err)
 			}
 		}
@@ -387,11 +387,11 @@ func BenchmarkList_LRem_BTree_10000(b *testing.B) {
 func benchmarkListRemByIndex(b *testing.B, impl ListImplementationType, size int, numIndexes int) {
 	opts := DefaultOptions
 	opts.ListImpl = impl
-	list := NewList(opts)
+	list := data.NewList(opts.ListImpl.toInternal())
 
 	key := []byte("benchmark_key")
 	keyStr := string(key)
-	seqInfo := data.HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
+	seqInfo := data.HeadTailSeq{Head: data.InitialListSeq, Tail: data.InitialListSeq + 1}
 
 	// Pre-generate test data
 	testData := make([]struct {
@@ -408,7 +408,7 @@ func benchmarkListRemByIndex(b *testing.B, impl ListImplementationType, size int
 
 	// Pre-populate with pre-generated data
 	for i := 0; i < size; i++ {
-		if err := list.push(string(testData[i].newKey), testData[i].record, false); err != nil {
+		if err := list.Push(string(testData[i].newKey), testData[i].record, false); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -423,14 +423,14 @@ func benchmarkListRemByIndex(b *testing.B, impl ListImplementationType, size int
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// Create a fresh list for each iteration
-		freshList := NewList(opts)
-		freshList.Items[keyStr] = list.createListStructure()
-		freshSeq := &data.HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
+		freshList := data.NewList(opts.ListImpl.toInternal())
+		freshList.Items[keyStr] = list.CreateListStructure()
+		freshSeq := &data.HeadTailSeq{Head: data.InitialListSeq, Tail: data.InitialListSeq + 1}
 		freshList.Seq[keyStr] = freshSeq
 
 		// Populate fresh list
 		for j := 0; j < size; j++ {
-			if err := freshList.push(string(testData[j].newKey), testData[j].record, false); err != nil {
+			if err := freshList.Push(string(testData[j].newKey), testData[j].record, false); err != nil {
 				b.Fatal(err)
 			}
 		}
@@ -461,11 +461,11 @@ func BenchmarkList_LRemByIndex_BTree_10000(b *testing.B) {
 func benchmarkListSize(b *testing.B, impl ListImplementationType, size int) {
 	opts := DefaultOptions
 	opts.ListImpl = impl
-	list := NewList(opts)
+	list := data.NewList(opts.ListImpl.toInternal())
 
 	key := []byte("benchmark_key")
 	keyStr := string(key)
-	seqInfo := data.HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
+	seqInfo := data.HeadTailSeq{Head: data.InitialListSeq, Tail: data.InitialListSeq + 1}
 
 	// Pre-generate test data
 	testData := make([]struct {
@@ -482,7 +482,7 @@ func benchmarkListSize(b *testing.B, impl ListImplementationType, size int) {
 
 	// Pre-populate with pre-generated data
 	for i := 0; i < size; i++ {
-		if err := list.push(string(testData[i].newKey), testData[i].record, false); err != nil {
+		if err := list.Push(string(testData[i].newKey), testData[i].record, false); err != nil {
 			b.Fatal(err)
 		}
 	}

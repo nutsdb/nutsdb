@@ -855,7 +855,7 @@ func (db *DB) buildListIdx(record *data.Record, entry *Entry) error {
 
 	l := db.Index.list.getWithDefault(bucketId)
 
-	if utils.IsExpired(meta.TTL, meta.Timestamp) {
+	if data.IsExpired(meta.TTL, meta.Timestamp) {
 		return nil
 	}
 
@@ -891,7 +891,7 @@ func (db *DB) buildListIdx(record *data.Record, entry *Entry) error {
 	return nil
 }
 
-func (db *DB) buildListLRemIdx(value []byte, l *List, key []byte) error {
+func (db *DB) buildListLRemIdx(value []byte, l *data.List, key []byte) error {
 	count, newValue := splitIntStringStr(string(value), SeparatorForListKey)
 
 	return l.LRem(string(key), count, func(r *data.Record) (bool, error) {
@@ -989,7 +989,7 @@ func (db *DB) sendToWriteCh(tx *Tx) (*request, error) {
 }
 
 func (db *DB) checkListExpired() {
-	db.Index.list.rangeIdx(func(l *List) {
+	db.Index.list.rangeIdx(func(l *data.List) {
 		for key := range l.TTL {
 			l.IsExpire(key)
 		}

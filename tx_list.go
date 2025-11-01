@@ -54,7 +54,7 @@ func (tx *Tx) RPeek(bucket string, key []byte) ([]byte, error) {
 	}
 	var (
 		bucketId = b.Id
-		l        *List
+		l        *data.List
 		exist    bool
 	)
 
@@ -110,7 +110,7 @@ func (tx *Tx) getListNewKey(bucket string, key []byte, isLeft bool) []byte {
 			minSeq, okMinSeq := items.Min()
 			maxSeq, okMaxSeq := items.Max()
 			if !okMinSeq || !okMaxSeq {
-				seq = &data.HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
+				seq = &data.HeadTailSeq{Head: data.InitialListSeq, Tail: data.InitialListSeq + 1}
 			} else {
 				seq = &data.HeadTailSeq{
 					Head: utils.ConvertBigEndianBytesToUint64(minSeq.Key) - 1,
@@ -118,7 +118,7 @@ func (tx *Tx) getListNewKey(bucket string, key []byte, isLeft bool) []byte {
 				}
 			}
 		} else {
-			seq = &data.HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
+			seq = &data.HeadTailSeq{Head: data.InitialListSeq, Tail: data.InitialListSeq + 1}
 		}
 		l.Seq[keyStr] = seq
 	}
@@ -219,7 +219,7 @@ func (tx *Tx) LPeek(bucket string, key []byte) (item []byte, err error) {
 	}
 	var (
 		bucketId = b.Id
-		l        *List
+		l        *data.List
 		exist    bool
 	)
 
@@ -255,7 +255,7 @@ func (tx *Tx) LSize(bucket string, key []byte) (int, error) {
 
 	var (
 		bucketId = b.Id
-		l        *List
+		l        *data.List
 		exist    bool
 	)
 
@@ -284,7 +284,7 @@ func (tx *Tx) LRange(bucket string, key []byte, start, end int) ([][]byte, error
 	}
 	var (
 		bucketId = b.Id
-		l        *List
+		l        *data.List
 		exist    bool
 	)
 
@@ -367,7 +367,7 @@ func (tx *Tx) LTrim(bucket string, key []byte, start, end int) error {
 
 	var (
 		bucketId = b.Id
-		l        *List
+		l        *data.List
 		exist    bool
 	)
 
@@ -442,7 +442,7 @@ func (tx *Tx) LKeys(bucket, pattern string, f func(key string) bool) error {
 	}
 	var (
 		bucketId = b.Id
-		l        *List
+		l        *data.List
 		exist    bool
 	)
 	if l, exist = tx.db.Index.list.exist(bucketId); !exist {
@@ -471,7 +471,7 @@ func (tx *Tx) ExpireList(bucket string, key []byte, ttl uint32) error {
 
 	var (
 		bucketId = b.Id
-		l        *List
+		l        *data.List
 		exist    bool
 	)
 
@@ -497,7 +497,7 @@ func (tx *Tx) CheckExpire(bucket string, key []byte) bool {
 
 	var (
 		bucketId = b.Id
-		l        *List
+		l        *data.List
 		exist    bool
 	)
 
@@ -523,7 +523,7 @@ func (tx *Tx) GetListTTL(bucket string, key []byte) (uint32, error) {
 
 	var (
 		bucketId = b.Id
-		l        *List
+		l        *data.List
 		exist    bool
 	)
 	if l, exist = tx.db.Index.list.exist(bucketId); !exist {

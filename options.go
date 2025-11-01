@@ -17,6 +17,7 @@ package nutsdb
 import (
 	"time"
 
+	"github.com/nutsdb/nutsdb/internal/data"
 	"github.com/nutsdb/nutsdb/internal/fileio"
 )
 
@@ -42,13 +43,17 @@ const (
 )
 
 // ListImplementationType defines the implementation type for List data structure.
-type ListImplementationType int
+type ListImplementationType data.ListImplementationType
+
+func (impl ListImplementationType) toInternal() data.ListImplementationType {
+	return data.ListImplementationType(impl)
+}
 
 const (
 	// ListImplDoublyLinkedList uses doubly linked list implementation (default).
 	// Advantages: O(1) head/tail operations, lower memory overhead
 	// Best for: High-frequency LPush/RPush/LPop/RPop operations
-	ListImplDoublyLinkedList ListImplementationType = iota
+	ListImplDoublyLinkedList = iota
 
 	// ListImplBTree uses BTree implementation.
 	// Advantages: O(log n + k) range queries, efficient random access
@@ -181,7 +186,7 @@ var DefaultOptions = func() Options {
 		ExpiredDeleteType:         TimeWheel,
 		EnableHintFile:            false,
 		EnableMergeV2:             false,
-		ListImpl:                  ListImplBTree,
+		ListImpl:                  ListImplementationType(ListImplBTree),
 	}
 }()
 
@@ -200,7 +205,7 @@ var doublyLinkedListOptions = func() Options {
 		ExpiredDeleteType:         TimeWheel,
 		EnableHintFile:            false,
 		EnableMergeV2:             false,
-		ListImpl:                  ListImplDoublyLinkedList,
+		ListImpl:                  ListImplementationType(ListImplDoublyLinkedList),
 	}
 }()
 

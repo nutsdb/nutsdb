@@ -21,6 +21,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/nutsdb/nutsdb/internal/data"
 	"github.com/nutsdb/nutsdb/internal/utils"
 	"github.com/xujiajun/utils/strconv2"
 )
@@ -280,7 +281,7 @@ func (e Entries) processEntriesScanOnDisk() (result []*Entry) {
 	sort.Sort(e)
 	for _, ele := range e {
 		curE := ele
-		if !utils.IsExpired(curE.Meta.TTL, curE.Meta.Timestamp) && curE.Meta.Flag != DataDeleteFlag {
+		if !data.IsExpired(curE.Meta.TTL, curE.Meta.Timestamp) && curE.Meta.Flag != DataDeleteFlag {
 			result = append(result, curE)
 		}
 	}
@@ -318,7 +319,7 @@ func (c CEntries) processEntriesScanOnDisk() (result []*Entry) {
 	sort.Sort(c)
 	for _, ele := range c.Entries {
 		curE := ele
-		if !utils.IsExpired(curE.Meta.TTL, curE.Meta.Timestamp) && curE.Meta.Flag != DataDeleteFlag {
+		if !data.IsExpired(curE.Meta.TTL, curE.Meta.Timestamp) && curE.Meta.Flag != DataDeleteFlag {
 			result = append(result, curE)
 		}
 	}

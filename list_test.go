@@ -17,6 +17,7 @@ import (
 	"bytes"
 	"math/rand"
 	"os"
+	"path"
 	"testing"
 	"time"
 
@@ -25,7 +26,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func ListPush(t *testing.T, list *List, key string, r *data.Record, isLeft bool, expectError error) {
+func ListPush(t *testing.T, list *data.List, key string, r *data.Record, isLeft bool, expectError error) {
 	var e error
 	if isLeft {
 		e = list.LPush(key, r)
@@ -35,7 +36,7 @@ func ListPush(t *testing.T, list *List, key string, r *data.Record, isLeft bool,
 	assertErr(t, e, expectError)
 }
 
-func ListPop(t *testing.T, list *List, key string, isLeft bool, expectVal *data.Record, expectError error) {
+func ListPop(t *testing.T, list *data.List, key string, isLeft bool, expectVal *data.Record, expectError error) {
 	var (
 		e error
 		r *data.Record
@@ -54,7 +55,7 @@ func ListPop(t *testing.T, list *List, key string, isLeft bool, expectVal *data.
 	}
 }
 
-func ListCmp(t *testing.T, list *List, key string, expectRecords []*data.Record, isReverse bool) {
+func ListCmp(t *testing.T, list *data.List, key string, expectRecords []*data.Record, isReverse bool) {
 	records, err := list.LRange(key, 0, -1)
 	require.NoError(t, err)
 
@@ -71,11 +72,11 @@ func ListCmp(t *testing.T, list *List, key string, expectRecords []*data.Record,
 
 func TestList_LPush(t *testing.T) {
 	for _, options := range []Options{DefaultOptions, doublyLinkedListOptions} {
-		list := NewList(options)
+		list := data.NewList(options.ListImpl.toInternal())
 		// 测试 LPush
 		key := string(testutils.GetTestBytes(0))
 		expectRecords := generateRecords(5)
-		seqInfo := data.HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
+		seqInfo := data.HeadTailSeq{Head: data.InitialListSeq, Tail: data.InitialListSeq + 1}
 
 		for i := 0; i < len(expectRecords); i++ {
 			seq := seqInfo.GenerateSeq(true)
@@ -90,11 +91,11 @@ func TestList_LPush(t *testing.T) {
 
 func TestList_RPush(t *testing.T) {
 	for _, options := range []Options{DefaultOptions, doublyLinkedListOptions} {
-		list := NewList(options)
+		list := data.NewList(options.ListImpl.toInternal())
 		// 测试 RPush
 		key := string(testutils.GetTestBytes(0))
 		expectRecords := generateRecords(5)
-		seqInfo := data.HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
+		seqInfo := data.HeadTailSeq{Head: data.InitialListSeq, Tail: data.InitialListSeq + 1}
 
 		for i := 0; i < len(expectRecords); i++ {
 			seq := seqInfo.GenerateSeq(false)
@@ -109,12 +110,12 @@ func TestList_RPush(t *testing.T) {
 
 func TestList_Pop(t *testing.T) {
 	for _, options := range []Options{DefaultOptions, doublyLinkedListOptions} {
-		list := NewList(options)
+		list := data.NewList(options.ListImpl.toInternal())
 		expectRecords := generateRecords(5)
 		key := string(testutils.GetTestBytes(0))
 
 		ListPop(t, list, key, true, nil, ErrListNotFound)
-		seqInfo := data.HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
+		seqInfo := data.HeadTailSeq{Head: data.InitialListSeq, Tail: data.InitialListSeq + 1}
 
 		for i := 0; i < len(expectRecords); i++ {
 			seq := seqInfo.GenerateSeq(false)
@@ -135,10 +136,10 @@ func TestList_Pop(t *testing.T) {
 
 func TestList_LRem(t *testing.T) {
 	for _, options := range []Options{DefaultOptions, doublyLinkedListOptions} {
-		list := NewList(options)
+		list := data.NewList(options.ListImpl.toInternal())
 		records := generateRecords(2)
 		key := string(testutils.GetTestBytes(0))
-		seqInfo := data.HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
+		seqInfo := data.HeadTailSeq{Head: data.InitialListSeq, Tail: data.InitialListSeq + 1}
 
 		for i := 0; i < 3; i++ {
 			seq := seqInfo.GenerateSeq(false)
@@ -195,10 +196,10 @@ func TestList_LRem(t *testing.T) {
 
 func TestList_LTrim(t *testing.T) {
 	for _, options := range []Options{DefaultOptions, doublyLinkedListOptions} {
-		list := NewList(options)
+		list := data.NewList(options.ListImpl.toInternal())
 		expectRecords := generateRecords(5)
 		key := string(testutils.GetTestBytes(0))
-		seqInfo := data.HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
+		seqInfo := data.HeadTailSeq{Head: data.InitialListSeq, Tail: data.InitialListSeq + 1}
 
 		for i := 0; i < len(expectRecords); i++ {
 			seq := seqInfo.GenerateSeq(false)
@@ -216,10 +217,10 @@ func TestList_LTrim(t *testing.T) {
 
 func TestList_LRemByIndex(t *testing.T) {
 	for _, options := range []Options{DefaultOptions, doublyLinkedListOptions} {
-		list := NewList(options)
+		list := data.NewList(options.ListImpl.toInternal())
 		expectRecords := generateRecords(8)
 		key := string(testutils.GetTestBytes(0))
-		seqInfo := data.HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
+		seqInfo := data.HeadTailSeq{Head: data.InitialListSeq, Tail: data.InitialListSeq + 1}
 
 		// r1 r2 r3 r4 r5 r6 r7 r8
 		for i := 0; i < 8; i++ {
@@ -274,9 +275,9 @@ func generateRecords(count int) []*data.Record {
 // TestList_SequenceConsistency tests sequence number consistency
 func TestList_SequenceConsistency(t *testing.T) {
 	for _, options := range []Options{DefaultOptions, doublyLinkedListOptions} {
-		list := NewList(options)
+		list := data.NewList(options.ListImpl.toInternal())
 		key := string(testutils.GetTestBytes(0))
-		seqInfo := data.HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
+		seqInfo := data.HeadTailSeq{Head: data.InitialListSeq, Tail: data.InitialListSeq + 1}
 
 		// Push 5 elements
 		for i := 0; i < 5; i++ {
@@ -287,12 +288,12 @@ func TestList_SequenceConsistency(t *testing.T) {
 		}
 
 		// Verify Head and Tail
-		require.Equal(t, uint64(initialListSeq), seqInfo.Head, "Head should not change for RPush")
-		require.Equal(t, uint64(initialListSeq+6), seqInfo.Tail, "Tail should increment")
+		require.Equal(t, uint64(data.InitialListSeq), seqInfo.Head, "Head should not change for RPush")
+		require.Equal(t, uint64(data.InitialListSeq+6), seqInfo.Tail, "Tail should increment")
 
 		// Pop from left
 		ListPop(t, list, key, true, &data.Record{
-			Key:   encodeListKey([]byte(key), initialListSeq+1),
+			Key:   encodeListKey([]byte(key), data.InitialListSeq+1),
 			Value: testutils.GetTestBytes(0),
 		}, nil)
 
@@ -344,9 +345,9 @@ func TestTx_PushPopPushSequence(t *testing.T) {
 // TestList_MixedPushPop tests mixed LPush/RPush/LPop/RPop operations
 func TestList_MixedPushPop(t *testing.T) {
 	for _, options := range []Options{DefaultOptions, doublyLinkedListOptions} {
-		list := NewList(options)
+		list := data.NewList(options.ListImpl.toInternal())
 		key := string(testutils.GetTestBytes(0))
-		seqInfo := data.HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
+		seqInfo := data.HeadTailSeq{Head: data.InitialListSeq, Tail: data.InitialListSeq + 1}
 
 		operations := []struct {
 			op    string
@@ -398,9 +399,9 @@ func TestList_MixedPushPop(t *testing.T) {
 // TestList_HeadTailBoundary tests Head and Tail boundary updates
 func TestList_HeadTailBoundary(t *testing.T) {
 	for _, options := range []Options{DefaultOptions, doublyLinkedListOptions} {
-		list := NewList(options)
+		list := data.NewList(options.ListImpl.toInternal())
 		key := string(testutils.GetTestBytes(0))
-		seqInfo := data.HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
+		seqInfo := data.HeadTailSeq{Head: data.InitialListSeq, Tail: data.InitialListSeq + 1}
 
 		// Only RPush
 		for i := 0; i < 3; i++ {
@@ -411,8 +412,8 @@ func TestList_HeadTailBoundary(t *testing.T) {
 		}
 
 		// Verify Tail moved, Head didn't
-		require.Equal(t, uint64(initialListSeq), seqInfo.Head)
-		require.Equal(t, uint64(initialListSeq+4), seqInfo.Tail)
+		require.Equal(t, uint64(data.InitialListSeq), seqInfo.Head)
+		require.Equal(t, uint64(data.InitialListSeq+4), seqInfo.Tail)
 
 		// Now LPush
 		for i := 0; i < 3; i++ {
@@ -423,8 +424,8 @@ func TestList_HeadTailBoundary(t *testing.T) {
 		}
 
 		// Verify Head moved, Tail didn't
-		require.Equal(t, uint64(initialListSeq-3), seqInfo.Head)
-		require.Equal(t, uint64(initialListSeq+4), seqInfo.Tail)
+		require.Equal(t, uint64(data.InitialListSeq-3), seqInfo.Head)
+		require.Equal(t, uint64(data.InitialListSeq+4), seqInfo.Tail)
 	}
 }
 
@@ -433,7 +434,7 @@ func TestTx_ListRecoveryAfterRestart(t *testing.T) {
 	bucket := "list_bucket"
 	key := testutils.GetTestBytes(0)
 
-	dir := "/tmp/test_nutsdb_list_recovery"
+	dir := path.Join(t.TempDir(), "test_nutsdb_list_recovery")
 	defer os.RemoveAll(dir)
 
 	// Step 1: Create DB and insert data

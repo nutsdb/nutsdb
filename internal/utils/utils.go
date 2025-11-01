@@ -7,11 +7,7 @@ import (
 	"io"
 	"path/filepath"
 	"reflect"
-
-	"github.com/nutsdb/nutsdb/internal/data"
 )
-
-var IsExpired = data.IsExpired
 
 func ConvertBigEndianBytesToUint64(data []byte) uint64 {
 	return binary.BigEndian.Uint64(data)
