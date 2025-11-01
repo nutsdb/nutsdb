@@ -15,7 +15,6 @@
 package nutsdb
 
 import (
-	"errors"
 	"hash/fnv"
 
 	"github.com/nutsdb/nutsdb/internal/data"
@@ -23,13 +22,13 @@ import (
 
 var (
 	// ErrSetNotExist is returned when the key does not exist.
-	ErrSetNotExist = errors.New("set not exist")
+	ErrSetNotExist = data.ErrSetNotExist
 
 	// ErrSetMemberNotExist is returned when the member of set does not exist
-	ErrSetMemberNotExist = errors.New("set member not exist")
+	ErrSetMemberNotExist = data.ErrSetMemberNotExist
 
 	// ErrMemberEmpty is returned when the item received is nil
-	ErrMemberEmpty = errors.New("item empty")
+	ErrMemberEmpty = data.ErrMemberEmpty
 )
 
 var fnvHash = fnv.New32a()
