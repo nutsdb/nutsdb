@@ -1,9 +1,10 @@
-// Copyright 2023 The PromiseDB Authors
+// Copyright 2023 The nutsdb Author. All rights reserved.
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file expect in compliance with the License.
+// you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+//     http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -11,18 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package nutsdb
+package data_test
 
 import (
 	"bytes"
-	"math/rand"
-	"os"
-	"path"
 	"testing"
-	"time"
 
 	"github.com/nutsdb/nutsdb/internal/data"
 	"github.com/nutsdb/nutsdb/internal/testutils"
+	"github.com/nutsdb/nutsdb/internal/utils"
 	"github.com/stretchr/testify/require"
 )
 
@@ -33,7 +31,7 @@ func ListPush(t *testing.T, list *data.List, key string, r *data.Record, isLeft 
 	} else {
 		e = list.RPush(key, r)
 	}
-	assertErr(t, e, expectError)
+	testutils.AssertErr(t, e, expectError)
 }
 
 func ListPop(t *testing.T, list *data.List, key string, isLeft bool, expectVal *data.Record, expectError error) {
@@ -71,16 +69,16 @@ func ListCmp(t *testing.T, list *data.List, key string, expectRecords []*data.Re
 }
 
 func TestList_LPush(t *testing.T) {
-	for _, options := range []Options{DefaultOptions, doublyLinkedListOptions} {
-		list := data.NewList(options.ListImpl.toInternal())
+	for _, listImpl := range []data.ListImplementationType{data.ListImplDoublyLinkedList, data.ListImplBTree} {
+		list := data.NewList(listImpl)
 		// 测试 LPush
 		key := string(testutils.GetTestBytes(0))
-		expectRecords := generateRecords(5)
+		expectRecords := data.GenerateRecords(5)
 		seqInfo := data.HeadTailSeq{Head: data.InitialListSeq, Tail: data.InitialListSeq + 1}
 
 		for i := 0; i < len(expectRecords); i++ {
 			seq := seqInfo.GenerateSeq(true)
-			newKey := encodeListKey([]byte(key), seq)
+			newKey := utils.EncodeListKey([]byte(key), seq)
 			expectRecords[i].Key = newKey
 			ListPush(t, list, string(newKey), expectRecords[i], true, nil)
 		}
@@ -90,16 +88,16 @@ func TestList_LPush(t *testing.T) {
 }
 
 func TestList_RPush(t *testing.T) {
-	for _, options := range []Options{DefaultOptions, doublyLinkedListOptions} {
-		list := data.NewList(options.ListImpl.toInternal())
+	for _, listImpl := range []data.ListImplementationType{data.ListImplDoublyLinkedList, data.ListImplBTree} {
+		list := data.NewList(listImpl)
 		// 测试 RPush
 		key := string(testutils.GetTestBytes(0))
-		expectRecords := generateRecords(5)
+		expectRecords := data.GenerateRecords(5)
 		seqInfo := data.HeadTailSeq{Head: data.InitialListSeq, Tail: data.InitialListSeq + 1}
 
 		for i := 0; i < len(expectRecords); i++ {
 			seq := seqInfo.GenerateSeq(false)
-			newKey := encodeListKey([]byte(key), seq)
+			newKey := utils.EncodeListKey([]byte(key), seq)
 			expectRecords[i].Key = newKey
 			ListPush(t, list, string(newKey), expectRecords[i], false, nil)
 		}
@@ -109,17 +107,17 @@ func TestList_RPush(t *testing.T) {
 }
 
 func TestList_Pop(t *testing.T) {
-	for _, options := range []Options{DefaultOptions, doublyLinkedListOptions} {
-		list := data.NewList(options.ListImpl.toInternal())
-		expectRecords := generateRecords(5)
+	for _, listImpl := range []data.ListImplementationType{data.ListImplDoublyLinkedList, data.ListImplBTree} {
+		list := data.NewList(listImpl)
+		expectRecords := data.GenerateRecords(5)
 		key := string(testutils.GetTestBytes(0))
 
-		ListPop(t, list, key, true, nil, ErrListNotFound)
+		ListPop(t, list, key, true, nil, data.ErrListNotFound)
 		seqInfo := data.HeadTailSeq{Head: data.InitialListSeq, Tail: data.InitialListSeq + 1}
 
 		for i := 0; i < len(expectRecords); i++ {
 			seq := seqInfo.GenerateSeq(false)
-			newKey := encodeListKey([]byte(key), seq)
+			newKey := utils.EncodeListKey([]byte(key), seq)
 			expectRecords[i].Key = newKey
 			ListPush(t, list, string(newKey), expectRecords[i], false, nil)
 		}
@@ -135,31 +133,31 @@ func TestList_Pop(t *testing.T) {
 }
 
 func TestList_LRem(t *testing.T) {
-	for _, options := range []Options{DefaultOptions, doublyLinkedListOptions} {
-		list := data.NewList(options.ListImpl.toInternal())
-		records := generateRecords(2)
+	for _, listImpl := range []data.ListImplementationType{data.ListImplDoublyLinkedList, data.ListImplBTree} {
+		list := data.NewList(listImpl)
+		records := data.GenerateRecords(2)
 		key := string(testutils.GetTestBytes(0))
 		seqInfo := data.HeadTailSeq{Head: data.InitialListSeq, Tail: data.InitialListSeq + 1}
 
 		for i := 0; i < 3; i++ {
 			seq := seqInfo.GenerateSeq(false)
-			newKey := encodeListKey([]byte(key), seq)
+			newKey := utils.EncodeListKey([]byte(key), seq)
 			records[0].Key = newKey
 			ListPush(t, list, string(newKey), records[0], false, nil)
 		}
 
 		seq := seqInfo.GenerateSeq(false)
-		newKey := encodeListKey([]byte(key), seq)
+		newKey := utils.EncodeListKey([]byte(key), seq)
 		records[1].Key = newKey
 		ListPush(t, list, string(newKey), records[1], false, nil)
 
 		seq = seqInfo.GenerateSeq(false)
-		newKey = encodeListKey([]byte(key), seq)
+		newKey = utils.EncodeListKey([]byte(key), seq)
 		records[0].Key = newKey
 		ListPush(t, list, string(newKey), records[0], false, nil)
 
 		seq = seqInfo.GenerateSeq(false)
-		newKey = encodeListKey([]byte(key), seq)
+		newKey = utils.EncodeListKey([]byte(key), seq)
 		records[1].Key = newKey
 		ListPush(t, list, string(newKey), records[1], false, nil)
 
@@ -195,15 +193,15 @@ func TestList_LRem(t *testing.T) {
 }
 
 func TestList_LTrim(t *testing.T) {
-	for _, options := range []Options{DefaultOptions, doublyLinkedListOptions} {
-		list := data.NewList(options.ListImpl.toInternal())
-		expectRecords := generateRecords(5)
+	for _, listImpl := range []data.ListImplementationType{data.ListImplDoublyLinkedList, data.ListImplBTree} {
+		list := data.NewList(listImpl)
+		expectRecords := data.GenerateRecords(5)
 		key := string(testutils.GetTestBytes(0))
 		seqInfo := data.HeadTailSeq{Head: data.InitialListSeq, Tail: data.InitialListSeq + 1}
 
 		for i := 0; i < len(expectRecords); i++ {
 			seq := seqInfo.GenerateSeq(false)
-			newKey := encodeListKey([]byte(key), seq)
+			newKey := utils.EncodeListKey([]byte(key), seq)
 			expectRecords[i].Key = newKey
 			ListPush(t, list, string(newKey), expectRecords[i], false, nil)
 		}
@@ -216,16 +214,16 @@ func TestList_LTrim(t *testing.T) {
 }
 
 func TestList_LRemByIndex(t *testing.T) {
-	for _, options := range []Options{DefaultOptions, doublyLinkedListOptions} {
-		list := data.NewList(options.ListImpl.toInternal())
-		expectRecords := generateRecords(8)
+	for _, listImpl := range []data.ListImplementationType{data.ListImplDoublyLinkedList, data.ListImplBTree} {
+		list := data.NewList(listImpl)
+		expectRecords := data.GenerateRecords(8)
 		key := string(testutils.GetTestBytes(0))
 		seqInfo := data.HeadTailSeq{Head: data.InitialListSeq, Tail: data.InitialListSeq + 1}
 
 		// r1 r2 r3 r4 r5 r6 r7 r8
 		for i := 0; i < 8; i++ {
 			seq := seqInfo.GenerateSeq(false)
-			newKey := encodeListKey([]byte(key), seq)
+			newKey := utils.EncodeListKey([]byte(key), seq)
 			expectRecords[i].Key = newKey
 			ListPush(t, list, string(newKey), expectRecords[i], false, nil)
 		}
@@ -250,39 +248,17 @@ func TestList_LRemByIndex(t *testing.T) {
 	}
 }
 
-func generateRecords(count int) []*data.Record {
-	rand.Seed(time.Now().UnixNano())
-	records := make([]*data.Record, count)
-	for i := 0; i < count; i++ {
-		key := testutils.GetTestBytes(i)
-		val := testutils.GetRandomBytes(24)
-
-		record := &data.Record{
-			Key:       key,
-			Value:     val,
-			FileID:    int64(i),
-			DataPos:   uint64(rand.Uint32()),
-			ValueSize: uint32(len(val)),
-			Timestamp: uint64(time.Now().Unix()),
-			TTL:       uint32(rand.Intn(3600)),
-			TxID:      uint64(rand.Intn(1000)),
-		}
-		records[i] = record
-	}
-	return records
-}
-
 // TestList_SequenceConsistency tests sequence number consistency
 func TestList_SequenceConsistency(t *testing.T) {
-	for _, options := range []Options{DefaultOptions, doublyLinkedListOptions} {
-		list := data.NewList(options.ListImpl.toInternal())
+	for _, listImpl := range []data.ListImplementationType{data.ListImplDoublyLinkedList, data.ListImplBTree} {
+		list := data.NewList(listImpl)
 		key := string(testutils.GetTestBytes(0))
 		seqInfo := data.HeadTailSeq{Head: data.InitialListSeq, Tail: data.InitialListSeq + 1}
 
 		// Push 5 elements
 		for i := 0; i < 5; i++ {
 			seq := seqInfo.GenerateSeq(false)
-			newKey := encodeListKey([]byte(key), seq)
+			newKey := utils.EncodeListKey([]byte(key), seq)
 			record := &data.Record{Key: newKey, Value: testutils.GetTestBytes(i)}
 			ListPush(t, list, string(newKey), record, false, nil)
 		}
@@ -293,13 +269,13 @@ func TestList_SequenceConsistency(t *testing.T) {
 
 		// Pop from left
 		ListPop(t, list, key, true, &data.Record{
-			Key:   encodeListKey([]byte(key), data.InitialListSeq+1),
+			Key:   utils.EncodeListKey([]byte(key), data.InitialListSeq+1),
 			Value: testutils.GetTestBytes(0),
 		}, nil)
 
 		// Push again - should not reuse old sequence
 		seq := seqInfo.GenerateSeq(false)
-		newKey := encodeListKey([]byte(key), seq)
+		newKey := utils.EncodeListKey([]byte(key), seq)
 		record := &data.Record{Key: newKey, Value: testutils.GetTestBytes(99)}
 		ListPush(t, list, string(newKey), record, false, nil)
 
@@ -310,42 +286,10 @@ func TestList_SequenceConsistency(t *testing.T) {
 	}
 }
 
-// TestTx_PushPopPushSequence tests Push->Pop->Push sequence numbers
-func TestTx_PushPopPushSequence(t *testing.T) {
-	bucket := "bucket"
-	key := testutils.GetTestBytes(0)
-
-	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, DataStructureList, bucket, nil)
-
-		// Push 3 elements
-		txPush(t, db, bucket, key, testutils.GetTestBytes(0), false, nil, nil)
-		txPush(t, db, bucket, key, testutils.GetTestBytes(1), false, nil, nil)
-		txPush(t, db, bucket, key, testutils.GetTestBytes(2), false, nil, nil)
-
-		// Pop one from left
-		txPop(t, db, bucket, key, testutils.GetTestBytes(0), nil, true)
-
-		// Push another to right
-		txPush(t, db, bucket, key, testutils.GetTestBytes(3), false, nil, nil)
-
-		// Pop from right
-		txPop(t, db, bucket, key, testutils.GetTestBytes(3), nil, false)
-
-		// Push to left
-		txPush(t, db, bucket, key, testutils.GetTestBytes(99), true, nil, nil)
-
-		// Verify final order: [99, 1, 2]
-		txLRange(t, db, bucket, key, 0, -1, 3, [][]byte{
-			testutils.GetTestBytes(99), testutils.GetTestBytes(1), testutils.GetTestBytes(2),
-		}, nil)
-	})
-}
-
 // TestList_MixedPushPop tests mixed LPush/RPush/LPop/RPop operations
 func TestList_MixedPushPop(t *testing.T) {
-	for _, options := range []Options{DefaultOptions, doublyLinkedListOptions} {
-		list := data.NewList(options.ListImpl.toInternal())
+	for _, listImpl := range []data.ListImplementationType{data.ListImplDoublyLinkedList, data.ListImplBTree} {
+		list := data.NewList(listImpl)
 		key := string(testutils.GetTestBytes(0))
 		seqInfo := data.HeadTailSeq{Head: data.InitialListSeq, Tail: data.InitialListSeq + 1}
 
@@ -367,12 +311,12 @@ func TestList_MixedPushPop(t *testing.T) {
 			switch operation.op {
 			case "RPush":
 				seq := seqInfo.GenerateSeq(false)
-				newKey := encodeListKey([]byte(key), seq)
+				newKey := utils.EncodeListKey([]byte(key), seq)
 				record := &data.Record{Key: newKey, Value: testutils.GetTestBytes(operation.value)}
 				ListPush(t, list, string(newKey), record, false, nil)
 			case "LPush":
 				seq := seqInfo.GenerateSeq(true)
-				newKey := encodeListKey([]byte(key), seq)
+				newKey := utils.EncodeListKey([]byte(key), seq)
 				record := &data.Record{Key: newKey, Value: testutils.GetTestBytes(operation.value)}
 				ListPush(t, list, string(newKey), record, true, nil)
 			case "LPop":
@@ -398,15 +342,15 @@ func TestList_MixedPushPop(t *testing.T) {
 
 // TestList_HeadTailBoundary tests Head and Tail boundary updates
 func TestList_HeadTailBoundary(t *testing.T) {
-	for _, options := range []Options{DefaultOptions, doublyLinkedListOptions} {
-		list := data.NewList(options.ListImpl.toInternal())
+	for _, listImpl := range []data.ListImplementationType{data.ListImplDoublyLinkedList, data.ListImplBTree} {
+		list := data.NewList(listImpl)
 		key := string(testutils.GetTestBytes(0))
 		seqInfo := data.HeadTailSeq{Head: data.InitialListSeq, Tail: data.InitialListSeq + 1}
 
 		// Only RPush
 		for i := 0; i < 3; i++ {
 			seq := seqInfo.GenerateSeq(false)
-			newKey := encodeListKey([]byte(key), seq)
+			newKey := utils.EncodeListKey([]byte(key), seq)
 			record := &data.Record{Key: newKey, Value: testutils.GetTestBytes(i)}
 			ListPush(t, list, string(newKey), record, false, nil)
 		}
@@ -418,7 +362,7 @@ func TestList_HeadTailBoundary(t *testing.T) {
 		// Now LPush
 		for i := 0; i < 3; i++ {
 			seq := seqInfo.GenerateSeq(true)
-			newKey := encodeListKey([]byte(key), seq)
+			newKey := utils.EncodeListKey([]byte(key), seq)
 			record := &data.Record{Key: newKey, Value: testutils.GetTestBytes(100 + i)}
 			ListPush(t, list, string(newKey), record, true, nil)
 		}
@@ -426,145 +370,5 @@ func TestList_HeadTailBoundary(t *testing.T) {
 		// Verify Head moved, Tail didn't
 		require.Equal(t, uint64(data.InitialListSeq-3), seqInfo.Head)
 		require.Equal(t, uint64(data.InitialListSeq+4), seqInfo.Tail)
-	}
-}
-
-// TestTx_ListRecoveryAfterRestart tests that list data is correctly recovered after DB restart
-func TestTx_ListRecoveryAfterRestart(t *testing.T) {
-	bucket := "list_bucket"
-	key := testutils.GetTestBytes(0)
-
-	dir := path.Join(t.TempDir(), "test_nutsdb_list_recovery")
-	defer os.RemoveAll(dir)
-
-	// Step 1: Create DB and insert data
-	opts := DefaultOptions
-	opts.Dir = dir
-	db, err := Open(opts)
-	require.NoError(t, err)
-
-	// Create bucket and insert data
-	txCreateBucket(t, db, DataStructureList, bucket, nil)
-
-	// Insert 10 elements using RPush
-	for i := 0; i < 10; i++ {
-		txPush(t, db, bucket, key, testutils.GetTestBytes(i), false, nil, nil)
-	}
-
-	// Verify data before closing
-	txLSize(t, db, bucket, key, 10, nil)
-	txLRange(t, db, bucket, key, 0, -1, 10, [][]byte{
-		testutils.GetTestBytes(0), testutils.GetTestBytes(1), testutils.GetTestBytes(2), testutils.GetTestBytes(3), testutils.GetTestBytes(4),
-		testutils.GetTestBytes(5), testutils.GetTestBytes(6), testutils.GetTestBytes(7), testutils.GetTestBytes(8), testutils.GetTestBytes(9),
-	}, nil)
-
-	// Step 2: Close DB
-	err = db.Close()
-	require.NoError(t, err)
-
-	// Step 3: Reopen DB
-	db, err = Open(opts)
-	require.NoError(t, err)
-	defer db.Close()
-
-	// Step 4: Verify data after recovery
-	txLSize(t, db, bucket, key, 10, nil)
-	txLRange(t, db, bucket, key, 0, -1, 10, [][]byte{
-		testutils.GetTestBytes(0), testutils.GetTestBytes(1), testutils.GetTestBytes(2), testutils.GetTestBytes(3), testutils.GetTestBytes(4),
-		testutils.GetTestBytes(5), testutils.GetTestBytes(6), testutils.GetTestBytes(7), testutils.GetTestBytes(8), testutils.GetTestBytes(9),
-	}, nil)
-
-	// Step 5: Test continued operations after recovery
-	txPush(t, db, bucket, key, testutils.GetTestBytes(10), false, nil, nil)
-	txPush(t, db, bucket, key, testutils.GetTestBytes(99), true, nil, nil)
-
-	// Verify final state
-	txLSize(t, db, bucket, key, 12, nil)
-	txLRange(t, db, bucket, key, 0, 0, 1, [][]byte{testutils.GetTestBytes(99)}, nil)
-	txLRange(t, db, bucket, key, 11, 11, 1, [][]byte{testutils.GetTestBytes(10)}, nil)
-}
-
-// TestTx_ListRecoveryWithMixedOperations tests recovery after complex operations
-func TestTx_ListRecoveryWithMixedOperations(t *testing.T) {
-	bucket := "list_bucket"
-	key := testutils.GetTestBytes(0)
-
-	dir := "/tmp/test_nutsdb_list_recovery_mixed"
-	defer os.RemoveAll(dir)
-
-	opts := DefaultOptions
-	opts.Dir = dir
-	db, err := Open(opts)
-	require.NoError(t, err)
-
-	// Create bucket
-	txCreateBucket(t, db, DataStructureList, bucket, nil)
-
-	// RPush 5 elements: [0,1,2,3,4]
-	for i := 0; i < 5; i++ {
-		txPush(t, db, bucket, key, testutils.GetTestBytes(i), false, nil, nil)
-	}
-
-	// LPush 2 elements: [98,99,0,1,2,3,4]
-	txPush(t, db, bucket, key, testutils.GetTestBytes(99), true, nil, nil)
-	txPush(t, db, bucket, key, testutils.GetTestBytes(98), true, nil, nil)
-
-	// Close and reopen
-	err = db.Close()
-	require.NoError(t, err)
-
-	db, err = Open(opts)
-	require.NoError(t, err)
-	defer db.Close()
-
-	// Verify recovered state - should have 7 elements
-	txLSize(t, db, bucket, key, 7, nil)
-	txLRange(t, db, bucket, key, 0, -1, 7, [][]byte{
-		testutils.GetTestBytes(98), testutils.GetTestBytes(99), testutils.GetTestBytes(0), testutils.GetTestBytes(1),
-		testutils.GetTestBytes(2), testutils.GetTestBytes(3), testutils.GetTestBytes(4),
-	}, nil)
-}
-
-// TestTx_ListRecoveryMultipleLists tests recovery of multiple lists
-func TestTx_ListRecoveryMultipleLists(t *testing.T) {
-	bucket := "list_bucket"
-
-	dir := "/tmp/test_nutsdb_list_recovery_multiple"
-	defer os.RemoveAll(dir)
-
-	opts := DefaultOptions
-	opts.Dir = dir
-	db, err := Open(opts)
-	require.NoError(t, err)
-
-	// Create bucket
-	txCreateBucket(t, db, DataStructureList, bucket, nil)
-
-	// Create multiple lists
-	for listIdx := 0; listIdx < 3; listIdx++ {
-		key := testutils.GetTestBytes(listIdx)
-		for i := 0; i < 5; i++ {
-			txPush(t, db, bucket, key, testutils.GetTestBytes(listIdx*100+i), false, nil, nil)
-		}
-	}
-
-	// Close and reopen
-	err = db.Close()
-	require.NoError(t, err)
-
-	db, err = Open(opts)
-	require.NoError(t, err)
-	defer db.Close()
-
-	// Verify all lists recovered correctly
-	for listIdx := 0; listIdx < 3; listIdx++ {
-		key := testutils.GetTestBytes(listIdx)
-		txLSize(t, db, bucket, key, 5, nil)
-
-		expected := make([][]byte, 5)
-		for i := 0; i < 5; i++ {
-			expected[i] = testutils.GetTestBytes(listIdx*100 + i)
-		}
-		txLRange(t, db, bucket, key, 0, -1, 5, expected, nil)
 	}
 }

@@ -103,3 +103,10 @@ func OneOfUint16Array(value uint16, array []uint16) bool {
 	}
 	return false
 }
+
+func EncodeListKey(key []byte, seq uint64) []byte {
+	buf := make([]byte, len(key)+8)
+	binary.LittleEndian.PutUint64(buf[:8], seq)
+	copy(buf[8:], key[:])
+	return buf
+}

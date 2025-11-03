@@ -124,7 +124,7 @@ func (tx *Tx) getListNewKey(bucket string, key []byte, isLeft bool) []byte {
 	}
 
 	seqValue := seq.GenerateSeq(isLeft)
-	return encodeListKey(key, seqValue)
+	return utils.EncodeListKey(key, seqValue)
 }
 
 // RPush inserts the values at the tail of the list stored in the bucket at given bucket,key and values.

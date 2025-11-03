@@ -21,14 +21,14 @@ import (
 
 	"github.com/nutsdb/nutsdb/internal/data"
 	"github.com/nutsdb/nutsdb/internal/testutils"
+	"github.com/nutsdb/nutsdb/internal/utils"
 )
 
 // Benchmark comparison between BTree and DoublyLinkedList implementations
 
 func benchmarkListPush(b *testing.B, impl ListImplementationType, isLeft bool) {
-	opts := DefaultOptions
-	opts.ListImpl = impl
-	list := data.NewList(opts.ListImpl.toInternal())
+
+	list := data.NewList(impl.toInternal())
 
 	key := []byte("benchmark_key")
 	seqInfo := data.HeadTailSeq{Head: data.InitialListSeq, Tail: data.InitialListSeq + 1}
@@ -42,7 +42,7 @@ func benchmarkListPush(b *testing.B, impl ListImplementationType, isLeft bool) {
 
 	for i := 0; i < b.N; i++ {
 		seq := seqInfo.GenerateSeq(isLeft)
-		newKey := encodeListKey(key, seq)
+		newKey := utils.EncodeListKey(key, seq)
 		testData[i].seq = seq
 		testData[i].newKey = newKey
 		testData[i].record = &data.Record{Key: newKey, Value: testutils.GetTestBytes(i)}
@@ -73,9 +73,8 @@ func BenchmarkList_RPush_BTree(b *testing.B) {
 }
 
 func benchmarkListPop(b *testing.B, impl ListImplementationType, isLeft bool) {
-	opts := DefaultOptions
-	opts.ListImpl = impl
-	list := data.NewList(opts.ListImpl.toInternal())
+
+	list := data.NewList(impl.toInternal())
 
 	key := []byte("benchmark_key")
 	keyStr := string(key)
@@ -89,7 +88,7 @@ func benchmarkListPop(b *testing.B, impl ListImplementationType, isLeft bool) {
 
 	for i := 0; i < b.N; i++ {
 		seq := seqInfo.GenerateSeq(false)
-		newKey := encodeListKey(key, seq)
+		newKey := utils.EncodeListKey(key, seq)
 		testData[i].newKey = newKey
 		testData[i].record = &data.Record{Key: newKey, Value: testutils.GetTestBytes(i)}
 	}
@@ -132,9 +131,7 @@ func BenchmarkList_RPop_BTree(b *testing.B) {
 }
 
 func benchmarkListRange(b *testing.B, impl ListImplementationType, size int) {
-	opts := DefaultOptions
-	opts.ListImpl = impl
-	list := data.NewList(opts.ListImpl.toInternal())
+	list := data.NewList(impl.toInternal())
 
 	key := []byte("benchmark_key")
 	keyStr := string(key)
@@ -148,7 +145,7 @@ func benchmarkListRange(b *testing.B, impl ListImplementationType, size int) {
 
 	for i := 0; i < size; i++ {
 		seq := seqInfo.GenerateSeq(false)
-		newKey := encodeListKey(key, seq)
+		newKey := utils.EncodeListKey(key, seq)
 		testData[i].newKey = newKey
 		testData[i].record = &data.Record{Key: newKey, Value: testutils.GetTestBytes(i)}
 	}
@@ -185,9 +182,7 @@ func BenchmarkList_LRange_BTree_10000(b *testing.B) {
 }
 
 func benchmarkListPeek(b *testing.B, impl ListImplementationType, isLeft bool) {
-	opts := DefaultOptions
-	opts.ListImpl = impl
-	list := data.NewList(opts.ListImpl.toInternal())
+	list := data.NewList(impl.toInternal())
 
 	key := []byte("benchmark_key")
 	keyStr := string(key)
@@ -201,7 +196,7 @@ func benchmarkListPeek(b *testing.B, impl ListImplementationType, isLeft bool) {
 
 	for i := 0; i < b.N; i++ {
 		seq := seqInfo.GenerateSeq(false)
-		newKey := encodeListKey(key, seq)
+		newKey := utils.EncodeListKey(key, seq)
 		testData[i].newKey = newKey
 		testData[i].record = &data.Record{Key: newKey, Value: testutils.GetTestBytes(i)}
 	}
@@ -244,9 +239,7 @@ func BenchmarkList_RPeek_BTree(b *testing.B) {
 }
 
 func benchmarkListTrim(b *testing.B, impl ListImplementationType, size int, keepStart, keepEnd int) {
-	opts := DefaultOptions
-	opts.ListImpl = impl
-	list := data.NewList(opts.ListImpl.toInternal())
+	list := data.NewList(impl.toInternal())
 
 	key := []byte("benchmark_key")
 	keyStr := string(key)
@@ -260,7 +253,7 @@ func benchmarkListTrim(b *testing.B, impl ListImplementationType, size int, keep
 
 	for i := 0; i < size; i++ {
 		seq := seqInfo.GenerateSeq(false)
-		newKey := encodeListKey(key, seq)
+		newKey := utils.EncodeListKey(key, seq)
 		testData[i].newKey = newKey
 		testData[i].record = &data.Record{Key: newKey, Value: testutils.GetTestBytes(i)}
 	}
@@ -275,7 +268,7 @@ func benchmarkListTrim(b *testing.B, impl ListImplementationType, size int, keep
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// Create a fresh list for each iteration
-		freshList := data.NewList(opts.ListImpl.toInternal())
+		freshList := data.NewList(impl.toInternal())
 		freshList.Items[keyStr] = list.CreateListStructure()
 		freshSeq := &data.HeadTailSeq{Head: data.InitialListSeq, Tail: data.InitialListSeq + 1}
 		freshList.Seq[keyStr] = freshSeq
@@ -311,9 +304,7 @@ func BenchmarkList_LTrim_BTree_10000(b *testing.B) {
 }
 
 func benchmarkListRem(b *testing.B, impl ListImplementationType, size int, count int) {
-	opts := DefaultOptions
-	opts.ListImpl = impl
-	list := data.NewList(opts.ListImpl.toInternal())
+	list := data.NewList(impl.toInternal())
 
 	key := []byte("benchmark_key")
 	keyStr := string(key)
@@ -327,7 +318,7 @@ func benchmarkListRem(b *testing.B, impl ListImplementationType, size int, count
 
 	for i := 0; i < size; i++ {
 		seq := seqInfo.GenerateSeq(false)
-		newKey := encodeListKey(key, seq)
+		newKey := utils.EncodeListKey(key, seq)
 		testData[i].newKey = newKey
 		testData[i].record = &data.Record{Key: newKey, Value: testutils.GetTestBytes(i)}
 	}
@@ -349,7 +340,7 @@ func benchmarkListRem(b *testing.B, impl ListImplementationType, size int, count
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// Create a fresh list for each iteration
-		freshList := data.NewList(opts.ListImpl.toInternal())
+		freshList := data.NewList(impl.toInternal())
 		freshList.Items[keyStr] = list.CreateListStructure()
 		freshSeq := &data.HeadTailSeq{Head: data.InitialListSeq, Tail: data.InitialListSeq + 1}
 		freshList.Seq[keyStr] = freshSeq
@@ -385,9 +376,8 @@ func BenchmarkList_LRem_BTree_10000(b *testing.B) {
 }
 
 func benchmarkListRemByIndex(b *testing.B, impl ListImplementationType, size int, numIndexes int) {
-	opts := DefaultOptions
-	opts.ListImpl = impl
-	list := data.NewList(opts.ListImpl.toInternal())
+
+	list := data.NewList(impl.toInternal())
 
 	key := []byte("benchmark_key")
 	keyStr := string(key)
@@ -401,7 +391,7 @@ func benchmarkListRemByIndex(b *testing.B, impl ListImplementationType, size int
 
 	for i := 0; i < size; i++ {
 		seq := seqInfo.GenerateSeq(false)
-		newKey := encodeListKey(key, seq)
+		newKey := utils.EncodeListKey(key, seq)
 		testData[i].newKey = newKey
 		testData[i].record = &data.Record{Key: newKey, Value: testutils.GetTestBytes(i)}
 	}
@@ -423,7 +413,7 @@ func benchmarkListRemByIndex(b *testing.B, impl ListImplementationType, size int
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// Create a fresh list for each iteration
-		freshList := data.NewList(opts.ListImpl.toInternal())
+		freshList := data.NewList(impl.toInternal())
 		freshList.Items[keyStr] = list.CreateListStructure()
 		freshSeq := &data.HeadTailSeq{Head: data.InitialListSeq, Tail: data.InitialListSeq + 1}
 		freshList.Seq[keyStr] = freshSeq
@@ -459,9 +449,8 @@ func BenchmarkList_LRemByIndex_BTree_10000(b *testing.B) {
 }
 
 func benchmarkListSize(b *testing.B, impl ListImplementationType, size int) {
-	opts := DefaultOptions
-	opts.ListImpl = impl
-	list := data.NewList(opts.ListImpl.toInternal())
+
+	list := data.NewList(impl.toInternal())
 
 	key := []byte("benchmark_key")
 	keyStr := string(key)
@@ -475,7 +464,7 @@ func benchmarkListSize(b *testing.B, impl ListImplementationType, size int) {
 
 	for i := 0; i < size; i++ {
 		seq := seqInfo.GenerateSeq(false)
-		newKey := encodeListKey(key, seq)
+		newKey := utils.EncodeListKey(key, seq)
 		testData[i].newKey = newKey
 		testData[i].record = &data.Record{Key: newKey, Value: testutils.GetTestBytes(i)}
 	}

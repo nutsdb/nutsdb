@@ -37,7 +37,7 @@ var (
 
 const NutsDBTestDirPath = "/tmp/nutsdb-test"
 
-func assertErr(t *testing.T, err error, expectErr error) {
+func AssertErr(t *testing.T, err error, expectErr error) {
 	if expectErr != nil {
 		require.Equal(t, expectErr, err)
 	} else {
@@ -73,10 +73,10 @@ func runNutsDBTest(t *testing.T, opts *Options, test func(t *testing.T, db *DB))
 func txPut(t *testing.T, db *DB, bucket string, key, value []byte, ttl uint32, expectErr error, finalExpectErr error) {
 	err := db.Update(func(tx *Tx) error {
 		err = tx.Put(bucket, key, value, ttl)
-		assertErr(t, err, expectErr)
+		AssertErr(t, err, expectErr)
 		return nil
 	})
-	assertErr(t, err, finalExpectErr)
+	AssertErr(t, err, finalExpectErr)
 }
 
 func txGet(t *testing.T, db *DB, bucket string, key []byte, expectVal []byte, expectErr error) {
@@ -127,7 +127,7 @@ func txGetAll(t *testing.T, db *DB, bucket string, expectKeys [][]byte, expectVa
 func txDel(t *testing.T, db *DB, bucket string, key []byte, expectErr error) {
 	err := db.Update(func(tx *Tx) error {
 		err := tx.Delete(bucket, key)
-		assertErr(t, err, expectErr)
+		AssertErr(t, err, expectErr)
 		return nil
 	})
 	require.NoError(t, err)
@@ -150,7 +150,7 @@ func txGetMaxOrMinKey(t *testing.T, db *DB, bucket string, isMax bool, expectVal
 func txDeleteBucket(t *testing.T, db *DB, ds uint16, bucket string, expectErr error) {
 	err := db.Update(func(tx *Tx) error {
 		err := tx.DeleteBucket(ds, bucket)
-		assertErr(t, err, expectErr)
+		AssertErr(t, err, expectErr)
 		return nil
 	})
 	require.NoError(t, err)
@@ -159,7 +159,7 @@ func txDeleteBucket(t *testing.T, db *DB, ds uint16, bucket string, expectErr er
 func txCreateBucket(t *testing.T, db *DB, ds uint16, bucket string, expectErr error) {
 	err := db.Update(func(tx *Tx) error {
 		err := tx.NewBucket(ds, bucket)
-		assertErr(t, err, expectErr)
+		AssertErr(t, err, expectErr)
 		return nil
 	})
 	require.NoError(t, err)
@@ -296,7 +296,7 @@ func TestDB_CheckListExpired(t *testing.T) {
 func txLRem(t *testing.T, db *DB, bucket string, key []byte, count int, value []byte, expectErr error) {
 	err := db.Update(func(tx *Tx) error {
 		err := tx.LRem(bucket, key, count, value)
-		assertErr(t, err, expectErr)
+		AssertErr(t, err, expectErr)
 		return nil
 	})
 	require.NoError(t, err)
@@ -305,7 +305,7 @@ func txLRem(t *testing.T, db *DB, bucket string, key []byte, count int, value []
 func txLRemByIndex(t *testing.T, db *DB, bucket string, key []byte, expectErr error, indexes ...int) {
 	err := db.Update(func(tx *Tx) error {
 		err := tx.LRemByIndex(bucket, key, indexes...)
-		assertErr(t, err, expectErr)
+		AssertErr(t, err, expectErr)
 		return nil
 	})
 	require.NoError(t, err)
@@ -314,10 +314,10 @@ func txLRemByIndex(t *testing.T, db *DB, bucket string, key []byte, expectErr er
 func txSAdd(t *testing.T, db *DB, bucket string, key, value []byte, expectErr error, finalExpectErr error) {
 	err := db.Update(func(tx *Tx) error {
 		err := tx.SAdd(bucket, key, value)
-		assertErr(t, err, expectErr)
+		AssertErr(t, err, expectErr)
 		return nil
 	})
-	assertErr(t, err, finalExpectErr)
+	AssertErr(t, err, finalExpectErr)
 }
 
 func txSKeys(t *testing.T, db *DB, bucket, pattern string, f func(key string) bool, expectVal int, expectErr error) {
@@ -424,7 +424,7 @@ func txSDiffByTwoBucket(t *testing.T, db *DB, bucket1 string, key1 []byte, bucke
 func txSPop(t *testing.T, db *DB, bucket string, key []byte, expectErr error) {
 	err := db.Update(func(tx *Tx) error {
 		_, err := tx.SPop(bucket, key)
-		assertErr(t, err, expectErr)
+		AssertErr(t, err, expectErr)
 		return nil
 	})
 	require.NoError(t, err)
@@ -489,7 +489,7 @@ func txSUnionByTwoBuckets(t *testing.T, db *DB, bucket1 string, key1 []byte, buc
 func txSRem(t *testing.T, db *DB, bucket string, key, value []byte, expectErr error) {
 	err := db.Update(func(tx *Tx) error {
 		err := tx.SRem(bucket, key, value)
-		assertErr(t, err, expectErr)
+		AssertErr(t, err, expectErr)
 		return nil
 	})
 	require.NoError(t, err)
@@ -498,16 +498,16 @@ func txSRem(t *testing.T, db *DB, bucket string, key, value []byte, expectErr er
 func txZAdd(t *testing.T, db *DB, bucket string, key, value []byte, score float64, expectErr error, finalExpectErr error) {
 	err := db.Update(func(tx *Tx) error {
 		err := tx.ZAdd(bucket, key, score, value)
-		assertErr(t, err, expectErr)
+		AssertErr(t, err, expectErr)
 		return nil
 	})
-	assertErr(t, err, finalExpectErr)
+	AssertErr(t, err, finalExpectErr)
 }
 
 func txZRem(t *testing.T, db *DB, bucket string, key, value []byte, expectErr error) {
 	err := db.Update(func(tx *Tx) error {
 		err := tx.ZRem(bucket, key, value)
-		assertErr(t, err, expectErr)
+		AssertErr(t, err, expectErr)
 		return nil
 	})
 	assert.NoError(t, err)
@@ -586,7 +586,7 @@ func txZPop(t *testing.T, db *DB, bucket string, key []byte, isMax bool, expectV
 func txZPeekMin(t *testing.T, db *DB, bucket string, key, expectVal []byte, expectScore float64, expectErr, finalExpectErr error) {
 	err := db.View(func(tx *Tx) error {
 		minMem, err1 := tx.ZPeekMin(bucket, key)
-		assertErr(t, err1, finalExpectErr)
+		AssertErr(t, err1, finalExpectErr)
 
 		if expectErr == nil {
 			require.Equal(t, &SortedSetMember{
@@ -596,7 +596,7 @@ func txZPeekMin(t *testing.T, db *DB, bucket string, key, expectVal []byte, expe
 		}
 		return err1
 	})
-	assertErr(t, err, finalExpectErr)
+	AssertErr(t, err, finalExpectErr)
 }
 
 func txZKeys(t *testing.T, db *DB, bucket, pattern string, f func(key string) bool, expectVal int, expectErr error) {
@@ -649,11 +649,11 @@ func txPush(t *testing.T, db *DB, bucket string, key, val []byte, isLeft bool, e
 			err = tx.RPush(bucket, key, val)
 		}
 
-		assertErr(t, err, expectErr)
+		AssertErr(t, err, expectErr)
 
 		return nil
 	})
-	assertErr(t, err, finalExpectErr)
+	AssertErr(t, err, finalExpectErr)
 }
 
 func txMPush(t *testing.T, db *DB, bucket string, key []byte, vals [][]byte, isLeft bool, expectErr error, finalExpectErr error) {
@@ -666,11 +666,11 @@ func txMPush(t *testing.T, db *DB, bucket string, key []byte, vals [][]byte, isL
 			err = tx.RPush(bucket, key, vals...)
 		}
 
-		assertErr(t, err, expectErr)
+		AssertErr(t, err, expectErr)
 
 		return nil
 	})
-	assertErr(t, err, finalExpectErr)
+	AssertErr(t, err, finalExpectErr)
 }
 
 func txPushRaw(t *testing.T, db *DB, bucket string, key, val []byte, isLeft bool, expectErr error, finalExpectErr error) {
@@ -683,17 +683,17 @@ func txPushRaw(t *testing.T, db *DB, bucket string, key, val []byte, isLeft bool
 			err = tx.RPushRaw(bucket, key, val)
 		}
 
-		assertErr(t, err, expectErr)
+		AssertErr(t, err, expectErr)
 
 		return nil
 	})
-	assertErr(t, err, finalExpectErr)
+	AssertErr(t, err, finalExpectErr)
 }
 
 func txExpireList(t *testing.T, db *DB, bucket string, key []byte, ttl uint32, expectErr error) {
 	err := db.Update(func(tx *Tx) error {
 		err := tx.ExpireList(bucket, key, ttl)
-		assertErr(t, err, expectErr)
+		AssertErr(t, err, expectErr)
 		return nil
 	})
 	require.NoError(t, err)
@@ -702,7 +702,7 @@ func txExpireList(t *testing.T, db *DB, bucket string, key []byte, ttl uint32, e
 func txGetListTTL(t *testing.T, db *DB, bucket string, key []byte, expectVal uint32, expectErr error) {
 	err := db.View(func(tx *Tx) error {
 		ttl, err := tx.GetListTTL(bucket, key)
-		assertErr(t, err, expectErr)
+		AssertErr(t, err, expectErr)
 		require.Equal(t, ttl, expectVal)
 		return nil
 	})
@@ -716,7 +716,7 @@ func txLKeys(t *testing.T, db *DB, bucket, pattern string, expectLen int, expect
 			keys = append(keys, key)
 			return keysOperation(keys)
 		})
-		assertErr(t, err, expectErr)
+		AssertErr(t, err, expectErr)
 		require.Equal(t, expectLen, len(keys))
 		return nil
 	})
@@ -726,7 +726,7 @@ func txLKeys(t *testing.T, db *DB, bucket, pattern string, expectLen int, expect
 func txLRange(t *testing.T, db *DB, bucket string, key []byte, start, end, expectLen int, expectVal [][]byte, expectErr error) {
 	err := db.View(func(tx *Tx) error {
 		list, err := tx.LRange(bucket, key, start, end)
-		assertErr(t, err, expectErr)
+		AssertErr(t, err, expectErr)
 
 		require.Equal(t, expectLen, len(list))
 
@@ -744,7 +744,7 @@ func txLRange(t *testing.T, db *DB, bucket string, key []byte, start, end, expec
 func txLSize(t *testing.T, db *DB, bucket string, key []byte, expectVal int, expectErr error) {
 	err := db.View(func(tx *Tx) error {
 		size, err := tx.LSize(bucket, key)
-		assertErr(t, err, expectErr)
+		AssertErr(t, err, expectErr)
 
 		require.Equal(t, expectVal, size)
 
@@ -756,7 +756,7 @@ func txLSize(t *testing.T, db *DB, bucket string, key []byte, expectVal int, exp
 func txLTrim(t *testing.T, db *DB, bucket string, key []byte, start int, end int, expectErr error) {
 	err := db.Update(func(tx *Tx) error {
 		err := tx.LTrim(bucket, key, start, end)
-		assertErr(t, err, expectErr)
+		AssertErr(t, err, expectErr)
 		return nil
 	})
 	require.NoError(t, err)
@@ -1171,7 +1171,7 @@ func TestDB_DataStructureBTreeWriteRecordLimit(t *testing.T) {
 					key := []byte(strconv.Itoa(i))
 					value := []byte(strconv.Itoa(i))
 					err = tx.Put(bucket1, key, value, Persistent)
-					assertErr(t, err, nil)
+					AssertErr(t, err, nil)
 				}
 				return nil
 			})
@@ -1193,7 +1193,7 @@ func TestDB_DataStructureBTreeWriteRecordLimit(t *testing.T) {
 					key := []byte(strconv.Itoa(i))
 					value := []byte(strconv.Itoa(i))
 					err = tx.Put(bucket2, key, value, Persistent)
-					assertErr(t, err, nil)
+					AssertErr(t, err, nil)
 				}
 				return nil
 			})
@@ -1226,7 +1226,7 @@ func TestDB_DataStructureListWriteRecordLimit(t *testing.T) {
 					key := []byte("0")
 					value := []byte(strconv.Itoa(i))
 					err = tx.LPush(bucket1, key, value)
-					assertErr(t, err, nil)
+					AssertErr(t, err, nil)
 				}
 				return nil
 			})
@@ -1236,7 +1236,7 @@ func TestDB_DataStructureListWriteRecordLimit(t *testing.T) {
 			// Test LRem
 			err = db.Update(func(tx *Tx) error {
 				err := tx.LRem(bucket1, []byte("0"), 1, []byte("0"))
-				assertErr(t, err, nil)
+				AssertErr(t, err, nil)
 				return nil
 			})
 			require.NoError(t, err)
@@ -1245,7 +1245,7 @@ func TestDB_DataStructureListWriteRecordLimit(t *testing.T) {
 			// Test for DataLPopFlag
 			err = db.Update(func(tx *Tx) error {
 				_, err := tx.LPop(bucket1, []byte("0"))
-				assertErr(t, err, nil)
+				AssertErr(t, err, nil)
 				return nil
 			})
 			require.NoError(t, err)
@@ -1254,7 +1254,7 @@ func TestDB_DataStructureListWriteRecordLimit(t *testing.T) {
 			// Test for DataLTrimFlag
 			err = db.Update(func(tx *Tx) error {
 				err := tx.LTrim(bucket1, []byte("0"), 0, 0)
-				assertErr(t, err, nil)
+				AssertErr(t, err, nil)
 				return nil
 			})
 			require.NoError(t, err)
@@ -1263,7 +1263,7 @@ func TestDB_DataStructureListWriteRecordLimit(t *testing.T) {
 					key := []byte("0")
 					value := []byte(strconv.Itoa(i))
 					err = tx.RPush(bucket1, key, value)
-					assertErr(t, err, nil)
+					AssertErr(t, err, nil)
 				}
 				return nil
 			})
@@ -1273,7 +1273,7 @@ func TestDB_DataStructureListWriteRecordLimit(t *testing.T) {
 			// Test for LRemByIndex
 			err = db.Update(func(tx *Tx) error {
 				err := tx.LRemByIndex(bucket1, []byte("0"), 0, 1, 2)
-				assertErr(t, err, nil)
+				AssertErr(t, err, nil)
 				return nil
 			})
 			require.NoError(t, err)
@@ -1282,7 +1282,7 @@ func TestDB_DataStructureListWriteRecordLimit(t *testing.T) {
 					key := []byte("0")
 					value := []byte(strconv.Itoa(i))
 					err = tx.RPush(bucket1, key, value)
-					assertErr(t, err, nil)
+					AssertErr(t, err, nil)
 				}
 				return nil
 			})
@@ -1297,7 +1297,7 @@ func TestDB_DataStructureListWriteRecordLimit(t *testing.T) {
 					key := []byte(strconv.Itoa(i))
 					value := []byte(strconv.Itoa(i))
 					err = tx.RPush(bucket2, key, value)
-					assertErr(t, err, nil)
+					AssertErr(t, err, nil)
 				}
 				return nil
 			})
@@ -1328,7 +1328,7 @@ func TestDB_DataStructureSetWriteRecordLimit(t *testing.T) {
 					key := []byte("0")
 					value := []byte(strconv.Itoa(i))
 					err := tx.SAdd(bucket1, key, value)
-					assertErr(t, err, nil)
+					AssertErr(t, err, nil)
 				}
 				return nil
 			})
@@ -1344,9 +1344,9 @@ func TestDB_DataStructureSetWriteRecordLimit(t *testing.T) {
 			// Test for SPOP, SPOP two items from bucket1.
 			err = db.Update(func(tx *Tx) error {
 				_, err := tx.SPop(bucket1, []byte("0"))
-				assertErr(t, err, nil)
+				AssertErr(t, err, nil)
 				_, err = tx.SPop(bucket1, []byte("key1"))
-				assertErr(t, err, nil)
+				AssertErr(t, err, nil)
 				return nil
 			})
 			require.NoError(t, err)
@@ -1362,7 +1362,7 @@ func TestDB_DataStructureSetWriteRecordLimit(t *testing.T) {
 				for i := 0; i < int(limitCount)-1; i++ {
 					value := []byte(strconv.Itoa(i))
 					err = tx.SAdd(bucket2, []byte("2"), value)
-					assertErr(t, err, nil)
+					AssertErr(t, err, nil)
 				}
 				return nil
 			})
@@ -1393,7 +1393,7 @@ func TestDB_DataStructureSortedSetWriteRecordLimit(t *testing.T) {
 					key := []byte("0")
 					value := []byte(strconv.Itoa(i))
 					err := tx.ZAdd(bucket1, key, score+float64(i), value)
-					assertErr(t, err, nil)
+					AssertErr(t, err, nil)
 				}
 				return nil
 			})
@@ -1434,7 +1434,7 @@ func TestDB_DataStructureSortedSetWriteRecordLimit(t *testing.T) {
 					key := []byte(strconv.Itoa(i))
 					value := []byte(strconv.Itoa(i))
 					err = tx.ZAdd(bucket1, key, score, value)
-					assertErr(t, err, nil)
+					AssertErr(t, err, nil)
 				}
 				return nil
 			})
@@ -1470,7 +1470,7 @@ func TestDB_AllDsWriteRecordLimit(t *testing.T) {
 					key := []byte(strconv.Itoa(i))
 					value := []byte(strconv.Itoa(i))
 					err = tx.Put(bucket1, key, value, Persistent)
-					assertErr(t, err, nil)
+					AssertErr(t, err, nil)
 				}
 				return nil
 			})
@@ -1503,55 +1503,55 @@ func TestDB_AllDsWriteRecordLimit(t *testing.T) {
 func txIncrement(t *testing.T, db *DB, bucket string, key []byte, expectErr error, finalExpectErr error) {
 	err := db.Update(func(tx *Tx) error {
 		err := tx.Incr(bucket, key)
-		assertErr(t, err, expectErr)
+		AssertErr(t, err, expectErr)
 		return nil
 	})
-	assertErr(t, err, finalExpectErr)
+	AssertErr(t, err, finalExpectErr)
 }
 
 func txDecrement(t *testing.T, db *DB, bucket string, key []byte, expectErr error, finalExpectErr error) {
 	err := db.Update(func(tx *Tx) error {
 		err := tx.Decr(bucket, key)
-		assertErr(t, err, expectErr)
+		AssertErr(t, err, expectErr)
 		return nil
 	})
-	assertErr(t, err, finalExpectErr)
+	AssertErr(t, err, finalExpectErr)
 }
 
 func txIncrementBy(t *testing.T, db *DB, bucket string, key []byte, value int64, expectErr error, finalExpectErr error) {
 	err := db.Update(func(tx *Tx) error {
 		err := tx.IncrBy(bucket, key, value)
-		assertErr(t, err, expectErr)
+		AssertErr(t, err, expectErr)
 		return nil
 	})
-	assertErr(t, err, finalExpectErr)
+	AssertErr(t, err, finalExpectErr)
 }
 
 func txDecrementBy(t *testing.T, db *DB, bucket string, key []byte, value int64, expectErr error, finalExpectErr error) {
 	err := db.Update(func(tx *Tx) error {
 		err := tx.DecrBy(bucket, key, value)
-		assertErr(t, err, expectErr)
+		AssertErr(t, err, expectErr)
 		return nil
 	})
-	assertErr(t, err, finalExpectErr)
+	AssertErr(t, err, finalExpectErr)
 }
 
 func txPutIfNotExists(t *testing.T, db *DB, bucket string, key, value []byte, expectedErr, finalExpectErr error) {
 	err := db.Update(func(tx *Tx) error {
 		err := tx.PutIfNotExists(bucket, key, value, Persistent)
-		assertErr(t, err, expectedErr)
+		AssertErr(t, err, expectedErr)
 		return nil
 	})
-	assertErr(t, err, finalExpectErr)
+	AssertErr(t, err, finalExpectErr)
 }
 
 func txPutIfExists(t *testing.T, db *DB, bucket string, key, value []byte, expectedErr, finalExpectErr error) {
 	err := db.Update(func(tx *Tx) error {
 		err := tx.PutIfExists(bucket, key, value, Persistent)
-		assertErr(t, err, expectedErr)
+		AssertErr(t, err, expectedErr)
 		return nil
 	})
-	assertErr(t, err, finalExpectErr)
+	AssertErr(t, err, finalExpectErr)
 }
 
 func txValueLen(t *testing.T, db *DB, bucket string, key []byte, expectLength int, expectErr error) {
@@ -1571,7 +1571,7 @@ func txValueLen(t *testing.T, db *DB, bucket string, key []byte, expectLength in
 func txGetSet(t *testing.T, db *DB, bucket string, key, value []byte, expectOldValue []byte, expectErr error) {
 	err := db.Update(func(tx *Tx) error {
 		oldValue, err := tx.GetSet(bucket, key, value)
-		assertErr(t, err, expectErr)
+		AssertErr(t, err, expectErr)
 		require.EqualValuesf(t, oldValue, expectOldValue, "err Tx GetSet. got %s want %s", string(oldValue), string(expectOldValue))
 		return nil
 	})
@@ -1581,26 +1581,26 @@ func txGetSet(t *testing.T, db *DB, bucket string, key, value []byte, expectOldV
 func txGetBit(t *testing.T, db *DB, bucket string, key []byte, offset int, expectVal byte, expectErr error, finalExpectErr error) {
 	err := db.View(func(tx *Tx) error {
 		value, err := tx.GetBit(bucket, key, offset)
-		assertErr(t, err, expectErr)
+		AssertErr(t, err, expectErr)
 		require.Equal(t, expectVal, value)
 		return nil
 	})
-	assertErr(t, err, finalExpectErr)
+	AssertErr(t, err, finalExpectErr)
 }
 
 func txSetBit(t *testing.T, db *DB, bucket string, key []byte, offset int, value byte, expectErr error, finalExpectErr error) {
 	err := db.Update(func(tx *Tx) error {
 		err := tx.SetBit(bucket, key, offset, value)
-		assertErr(t, err, expectErr)
+		AssertErr(t, err, expectErr)
 		return nil
 	})
-	assertErr(t, err, finalExpectErr)
+	AssertErr(t, err, finalExpectErr)
 }
 
 func txGetTTL(t *testing.T, db *DB, bucket string, key []byte, expectedTTL int64, expectedErr error) {
 	err := db.View(func(tx *Tx) error {
 		ttl, err := tx.GetTTL(bucket, key)
-		assertErr(t, err, expectedErr)
+		AssertErr(t, err, expectedErr)
 
 		// If diff between expectedTTL and realTTL lesser than 1s, We'll consider as equal
 		diff := int(math.Abs(float64(ttl - expectedTTL)))
@@ -1613,7 +1613,7 @@ func txGetTTL(t *testing.T, db *DB, bucket string, key []byte, expectedTTL int64
 func txPersist(t *testing.T, db *DB, bucket string, key []byte, expectedErr error) {
 	err := db.Update(func(tx *Tx) error {
 		err := tx.Persist(bucket, key)
-		assertErr(t, err, expectedErr)
+		AssertErr(t, err, expectedErr)
 		return nil
 	})
 	require.NoError(t, err)
@@ -1622,39 +1622,39 @@ func txPersist(t *testing.T, db *DB, bucket string, key []byte, expectedErr erro
 func txMSet(t *testing.T, db *DB, bucket string, args [][]byte, ttl uint32, expectErr error, finalExpectErr error) {
 	err := db.Update(func(tx *Tx) error {
 		err := tx.MSet(bucket, ttl, args...)
-		assertErr(t, err, expectErr)
+		AssertErr(t, err, expectErr)
 		return nil
 	})
-	assertErr(t, err, finalExpectErr)
+	AssertErr(t, err, finalExpectErr)
 }
 
 func txMGet(t *testing.T, db *DB, bucket string, keys [][]byte, expectValues [][]byte, expectErr error, finalExpectErr error) {
 	err := db.View(func(tx *Tx) error {
 		values, err := tx.MGet(bucket, keys...)
-		assertErr(t, err, expectErr)
+		AssertErr(t, err, expectErr)
 		require.EqualValues(t, expectValues, values)
 		return nil
 	})
-	assertErr(t, err, finalExpectErr)
+	AssertErr(t, err, finalExpectErr)
 }
 
 func txAppend(t *testing.T, db *DB, bucket string, key, appendage []byte, expectErr error, expectFinalErr error) {
 	err := db.Update(func(tx *Tx) error {
 		err := tx.Append(bucket, key, appendage)
-		assertErr(t, err, expectErr)
+		AssertErr(t, err, expectErr)
 		return nil
 	})
-	assertErr(t, err, expectFinalErr)
+	AssertErr(t, err, expectFinalErr)
 }
 
 func txGetRange(t *testing.T, db *DB, bucket string, key []byte, start, end int, expectVal []byte, expectErr error, expectFinalErr error) {
 	err := db.View(func(tx *Tx) error {
 		value, err := tx.GetRange(bucket, key, start, end)
-		assertErr(t, err, expectErr)
+		AssertErr(t, err, expectErr)
 		require.EqualValues(t, expectVal, value)
 		return nil
 	})
-	assertErr(t, err, expectFinalErr)
+	AssertErr(t, err, expectFinalErr)
 }
 
 func TestDB_HintFileFastRecovery(t *testing.T) {

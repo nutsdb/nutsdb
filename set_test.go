@@ -25,7 +25,7 @@ import (
 func TestSet_SAdd(t *testing.T) {
 	set := NewSet()
 	key := "key"
-	expectRecords := generateRecords(3)
+	expectRecords := data.GenerateRecords(3)
 
 	values := make([][]byte, 3)
 	for i := range expectRecords {
@@ -42,7 +42,7 @@ func TestSet_SAdd(t *testing.T) {
 func TestSet_SRem(t *testing.T) {
 	set := NewSet()
 	key := "key"
-	expectRecords := generateRecords(4)
+	expectRecords := data.GenerateRecords(4)
 	values := make([][]byte, 4)
 	for i := range expectRecords {
 		values[i] = expectRecords[i].Value
@@ -68,7 +68,7 @@ func TestSet_SDiff(t *testing.T) {
 	key3 := "set3"
 	key4 := "set4"
 
-	expectRecords := generateRecords(10)
+	expectRecords := data.GenerateRecords(10)
 
 	values := make([][]byte, 10)
 	for i := range expectRecords {
@@ -119,7 +119,7 @@ func TestSet_SCard(t *testing.T) {
 	key3 := "set3"
 	key4 := "set4"
 
-	expectRecords := generateRecords(10)
+	expectRecords := data.GenerateRecords(10)
 
 	values := make([][]byte, 10)
 	for i := range expectRecords {
@@ -159,7 +159,7 @@ func TestSet_SInter(t *testing.T) {
 	key3 := "set3"
 	key4 := "set4"
 
-	expectRecords := generateRecords(10)
+	expectRecords := data.GenerateRecords(10)
 
 	values := make([][]byte, 10)
 	for i := range expectRecords {
@@ -207,7 +207,7 @@ func TestSet_SMembers(t *testing.T) {
 
 	key := "set"
 
-	expectRecords := generateRecords(3)
+	expectRecords := data.GenerateRecords(3)
 
 	values := make([][]byte, 3)
 	for i := range expectRecords {
@@ -246,7 +246,7 @@ func TestSet_SMove(t *testing.T) {
 	key1 := "set1"
 	key2 := "set2"
 
-	expectRecords := generateRecords(3)
+	expectRecords := data.GenerateRecords(3)
 	values := make([][]byte, 3)
 	for i := range expectRecords {
 		values[i] = expectRecords[i].Value
@@ -296,7 +296,7 @@ func TestSet_SPop(t *testing.T) {
 
 	key := "set"
 
-	expectRecords := generateRecords(2)
+	expectRecords := data.GenerateRecords(2)
 	values := make([][]byte, 2)
 	for i := range expectRecords {
 		values[i] = expectRecords[i].Value
@@ -333,7 +333,7 @@ func TestSet_SIsMember(t *testing.T) {
 
 	key := "key"
 
-	expectRecords := generateRecords(1)
+	expectRecords := data.GenerateRecords(1)
 	values := [][]byte{expectRecords[0].Value}
 
 	require.NoError(t, set.SAdd(key, values, expectRecords))
@@ -362,7 +362,7 @@ func TestSet_SAreMembers(t *testing.T) {
 
 	key := "set"
 
-	expectRecords := generateRecords(4)
+	expectRecords := data.GenerateRecords(4)
 	values := make([][]byte, 4)
 	for i := range expectRecords {
 		values[i] = expectRecords[i].Value
@@ -399,7 +399,7 @@ func TestSet_SUnion(t *testing.T) {
 	key3 := "set3"
 	key4 := "set4"
 
-	expectRecords := generateRecords(10)
+	expectRecords := data.GenerateRecords(10)
 
 	values := make([][]byte, 10)
 	for i := range expectRecords {
