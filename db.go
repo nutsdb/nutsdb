@@ -71,6 +71,7 @@ type (
 		bm                      *BucketManager
 		hintKeyAndRAMIdxModeLru *utils.LRUCache // lru cache for HintKeyAndRAMIdxMode
 		sm                      *SnowflakeManager
+		wm                      *watchManager
 	}
 )
 
@@ -147,9 +148,12 @@ func open(opt Options) (*DB, error) {
 		return nil, fmt.Errorf("db.buildIndexes error: %s", err)
 	}
 
+	db.wm = NewWatchManager()
+
 	go db.mergeWorker()
 	go db.doWrites()
 	go db.tm.run()
+	go db.wm.startDistributor()
 
 	return db, nil
 }
@@ -1050,4 +1054,35 @@ func (db *DB) rebuildBucketManager() error {
 		}
 	}
 	return nil
+}
+
+func (db *DB) Watch(bucket string, key string, cb func(message *message) error) error {
+	receiveChan, err := db.wm.subscribe(bucket, key)
+	batch := make([]*message, 0)
+	if err != nil {
+		return err
+	}
+
+	for {
+		select {
+		case message, ok := <-receiveChan:
+			if !ok {
+				goto unsubscribe
+			}
+			batch = append(batch, message)
+		default:
+			for len(batch) > 0 {
+				if err := cb(batch[0]); err != nil {
+					goto unsubscribe
+				}
+				batch = batch[1:]
+			}
+		}
+
+	unsubscribe:
+		if err := db.wm.unsubscribe(bucket, key); err != nil {
+			return err
+		}
+		return ErrWatchingCallbackFailed
+	}
 }
