@@ -1,0 +1,242 @@
+package nutsdb
+
+import (
+	"context"
+	"fmt"
+	"sync"
+)
+
+type message struct {
+	bucket string
+	key    string
+	value  []byte
+}
+
+type subscriber struct {
+	bucket       string
+	key          string
+	receiveChan  chan *message
+	deadMessages int
+	watching     int
+}
+
+type watchManager struct {
+	lookup    map[string]map[string]*subscriber
+	watchChan chan *message
+	// cancellation for in-flight tasks
+	workerCtx    context.Context
+	workerCancel context.CancelFunc
+
+	mu sync.Mutex
+}
+
+func NewWatchManager() *watchManager {
+	ctx := context.Background()
+	workerCtx, workerCancel := context.WithCancel(ctx)
+	return &watchManager{
+		lookup:       make(map[string]map[string]*subscriber),
+		watchChan:    make(chan *message, 1000),
+		mu:           sync.Mutex{},
+		workerCtx:    workerCtx,
+		workerCancel: workerCancel,
+	}
+}
+
+// send a message to the watch manager
+func (wm *watchManager) sendMessage(message *message) error {
+	if wm.workerCtx.Err() != nil {
+		return ErrWatchManagerClosed
+	}
+
+	select {
+	case wm.watchChan <- message:
+		return nil
+	case <-wm.workerCtx.Done():
+		return ErrWatchManagerClosed
+	default:
+		return ErrWatchChanCannotSend
+	}
+}
+
+// start distributing messages to the subscribers
+func (wm *watchManager) startDistributor() error {
+	defer func() {
+		wm.cleanUpSubscribers()
+	}()
+
+	fmt.Println("🧭 Starting distributor.....")
+	maxBatchSize := 1000
+
+	//Distribute the messages to the subscribers
+	for {
+		msg, ok := <-wm.watchChan
+		if !ok {
+			return nil
+		}
+		batches := make([]*message, 0, maxBatchSize)
+		batches = append(batches, msg)
+
+	distribute:
+		for {
+			if len(batches) >= maxBatchSize {
+				_ = wm.distributeAllMessages(batches)
+				break distribute
+			}
+
+			select {
+			case <-wm.workerCtx.Done():
+				fmt.Println("Watch manager context done")
+				goto drain
+			case msg, ok := <-wm.watchChan:
+				if !ok {
+					fmt.Println("Watch channel closed")
+					goto drain
+				}
+				batches = append(batches, msg)
+			default:
+				_ = wm.distributeAllMessages(batches)
+				break distribute
+			}
+		}
+
+	drain:
+		for {
+			select {
+			case msg := <-wm.watchChan:
+				batches = append(batches, msg)
+			default:
+				_ = wm.distributeAllMessages(batches)
+				return nil
+			}
+		}
+	}
+}
+
+// distribute the messages to the subscribers
+func (wm *watchManager) distributeAllMessages(messages []*message) error {
+	wm.mu.Lock()
+	defer wm.mu.Unlock()
+
+	if len(messages) == 0 {
+		return nil
+	}
+
+	for _, message := range messages {
+		bucket := (*message).bucket
+		bucketMap, ok1 := wm.lookup[bucket]
+		if !ok1 {
+			continue
+		}
+
+		key := string((*message).key)
+		subscriber, ok2 := bucketMap[key]
+		if !ok2 {
+			continue
+		}
+
+		//Avoid blocking the distributor, all messages blocked will be dropped
+		select {
+		case subscriber.receiveChan <- message:
+			subscriber.deadMessages = 0
+		default:
+			subscriber.deadMessages++
+			if subscriber.deadMessages >= 100 {
+				fmt.Printf("Force-unsubscribing slow subscriber %s/%s\n",
+					message.bucket, message.key)
+				close(subscriber.receiveChan)
+				delete(wm.lookup[message.bucket], message.key)
+				if len(wm.lookup[message.bucket]) == 0 {
+					delete(wm.lookup, message.bucket)
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// subcribe to the key and bucket
+func (wm *watchManager) subscribe(bucket string, key string) (<-chan *message, error) {
+	if wm.workerCtx.Err() != nil {
+		return nil, ErrWatchManagerClosed
+	}
+
+	wm.mu.Lock()
+	defer wm.mu.Unlock()
+	if _, ok := wm.lookup[bucket]; !ok {
+		wm.lookup[bucket] = make(map[string]*subscriber)
+	}
+
+	if subscriber, ok := wm.lookup[bucket][key]; ok {
+		subscriber.watching++
+		return subscriber.receiveChan, nil
+	}
+
+	receiveChan := make(chan *message, 1000)
+	subscriber := subscriber{
+		bucket:      bucket,
+		key:         key,
+		receiveChan: receiveChan,
+		watching:    1,
+	}
+
+	wm.lookup[bucket][key] = &subscriber
+
+	return receiveChan, nil
+}
+
+// unsubcribe from the key and bucket
+func (wm *watchManager) unsubscribe(bucket string, key string) error {
+	wm.mu.Lock()
+	defer wm.mu.Unlock()
+
+	subscriber, err := wm.findKeyAndReturnSubscriber(bucket, key)
+	if err != nil {
+		return err
+	}
+	subscriber.watching--
+	if subscriber.watching == 0 {
+		close(subscriber.receiveChan)
+		delete(wm.lookup[bucket], key)
+	}
+
+	if len(wm.lookup[bucket]) == 0 {
+		delete(wm.lookup, bucket)
+	}
+
+	return nil
+}
+
+func (wm *watchManager) cleanUpSubscribers() {
+	for bucket, bucketMap := range wm.lookup {
+		for _, subscriber := range bucketMap {
+			close(subscriber.receiveChan)
+			delete(bucketMap, subscriber.key)
+		}
+
+		delete(wm.lookup, bucket)
+	}
+}
+
+func (wm *watchManager) close() error {
+	if wm.workerCtx.Err() != nil {
+		return ErrWatchManagerClosed
+	}
+
+	wm.workerCancel()
+	return nil
+}
+
+func (wm *watchManager) findKeyAndReturnSubscriber(bucket string, key string) (*subscriber, error) {
+	wm.mu.Lock()
+	defer wm.mu.Unlock()
+
+	if _, ok := wm.lookup[bucket]; !ok {
+		return nil, ErrBucketSubcriberNotFound
+	}
+	if _, ok := wm.lookup[bucket][key]; !ok {
+		return nil, ErrKeySubcriberNotFound
+	}
+
+	return wm.lookup[bucket][key], nil
+}
