@@ -26,11 +26,25 @@ import (
 	"github.com/xujiajun/utils/strconv2"
 )
 
-// ErrSeparatorForListKey returns when list key contains the SeparatorForListKey.
-var ErrSeparatorForListKey = errors.Errorf("contain separator (%s) for List key", SeparatorForListKey)
-
 // SeparatorForListKey represents separator for listKey
 const SeparatorForListKey = "|"
+
+var (
+	// ErrListNotFound is returned when the list not found.
+	ErrListNotFound = data.ErrListNotFound
+
+	// ErrCount is returned when count is error.
+	ErrCount = data.ErrCount
+
+	// ErrEmptyList is returned when the list is empty.
+	ErrEmptyList = data.ErrEmptyList
+
+	// ErrStartOrEnd is returned when start > end
+	ErrStartOrEnd = data.ErrStartOrEnd
+
+	// ErrSeparatorForListKey returns when list key contains the SeparatorForListKey.
+	ErrSeparatorForListKey = errors.Errorf("contain separator (%s) for List key", SeparatorForListKey)
+)
 
 // RPop removes and returns the last element of the list stored in the bucket at given bucket and key.
 func (tx *Tx) RPop(bucket string, key []byte) (item []byte, err error) {

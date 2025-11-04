@@ -13,21 +13,3 @@
 // limitations under the License.
 
 package nutsdb
-
-import (
-	"github.com/nutsdb/nutsdb/internal/data"
-)
-
-var (
-	// ErrListNotFound is returned when the list not found.
-	ErrListNotFound = data.ErrListNotFound
-
-	// ErrCount is returned when count is error.
-	ErrCount = data.ErrCount
-
-	// ErrEmptyList is returned when the list is empty.
-	ErrEmptyList = data.ErrEmptyList
-
-	// ErrStartOrEnd is returned when start > end
-	ErrStartOrEnd = data.ErrStartOrEnd
-)
