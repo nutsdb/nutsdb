@@ -502,6 +502,11 @@ func (l *List) GetListTTL(key string) (uint32, error) {
 	return uint32(remain), nil
 }
 
+func (l *List) ExpireList(key []byte, ttl uint32) {
+	l.TTL[string(key)] = ttl
+	l.TimeStamp[string(key)] = uint64(time.Now().Unix())
+}
+
 func checkBounds(start, end int, size int) (int, int, error) {
 	if start >= 0 && end < 0 {
 		end = size + end

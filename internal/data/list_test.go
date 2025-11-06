@@ -372,3 +372,7 @@ func TestList_HeadTailBoundary(t *testing.T) {
 		require.Equal(t, uint64(data.InitialListSeq+4), seqInfo.Tail)
 	}
 }
+
+func TestList_PsuhTTL_ErrListNotFound(t *testing.T) {
+
+}
