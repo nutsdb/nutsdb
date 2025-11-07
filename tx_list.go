@@ -493,8 +493,7 @@ func (tx *Tx) ExpireList(bucket string, key []byte, ttl uint32) error {
 		return ErrBucket
 	}
 
-	l.TTL[string(key)] = ttl
-	l.TimeStamp[string(key)] = uint64(time.Now().Unix())
+	l.ExpireList(key, ttl)
 	ttls := strconv2.Int64ToStr(int64(ttl))
 	err = tx.push(bucket, key, DataExpireListFlag, []byte(ttls))
 	if err != nil {

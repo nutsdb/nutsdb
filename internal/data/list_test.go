@@ -17,6 +17,7 @@ package data_test
 import (
 	"bytes"
 	"testing"
+	"time"
 
 	"github.com/nutsdb/nutsdb/internal/data"
 	"github.com/nutsdb/nutsdb/internal/testutils"
@@ -373,6 +374,14 @@ func TestList_HeadTailBoundary(t *testing.T) {
 	}
 }
 
-func TestList_PsuhTTL_ErrListNotFound(t *testing.T) {
-
+func TestList_PushTTL_ErrListNotFound(t *testing.T) {
+	r := require.New(t)
+	for _, listImpl := range []data.ListImplementationType{data.ListImplDoublyLinkedList, data.ListImplBTree} {
+		l := data.NewList(listImpl)
+		key := []byte("expire_list")
+		l.ExpireList(key, 1)
+		r.False(l.IsExpire(string(key)))
+		<-time.After(1500 * time.Millisecond)
+		r.True(l.IsExpire(string(key)))
+	}
 }
