@@ -1056,6 +1056,8 @@ func (db *DB) rebuildBucketManager() error {
 	return nil
 }
 
+// Watch watches the key and bucket and calls the callback function with the message
+// The callback will be called to handle the batch of messages
 func (db *DB) Watch(bucket string, key string, cb func(message *message) error) error {
 	receiveChan, err := db.wm.subscribe(bucket, key)
 	batch := make([]*message, 0)
