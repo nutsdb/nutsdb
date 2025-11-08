@@ -6,6 +6,15 @@ import (
 	"sync"
 )
 
+// Constants for configuration
+const (
+	watchChanBufferSize      = 1000
+	receiveChanBufferSize    = 1000
+	maxBatchSize             = 1000
+	deadMessageThreshold     = 100
+	distributeChanBufferSize = 100
+)
+
 type message struct {
 	bucket string
 	key    string
@@ -21,11 +30,13 @@ type subscriber struct {
 }
 
 type watchManager struct {
-	lookup    map[string]map[string]*subscriber
-	watchChan chan *message
+	lookup         map[string]map[string]*subscriber
+	watchChan      chan *message
+	distributeChan chan []*message
 	// cancellation for in-flight tasks
 	workerCtx    context.Context
 	workerCancel context.CancelFunc
+	wg           sync.WaitGroup
 
 	mu sync.Mutex
 }
@@ -34,11 +45,13 @@ func NewWatchManager() *watchManager {
 	ctx := context.Background()
 	workerCtx, workerCancel := context.WithCancel(ctx)
 	return &watchManager{
-		lookup:       make(map[string]map[string]*subscriber),
-		watchChan:    make(chan *message, 1000),
-		mu:           sync.Mutex{},
-		workerCtx:    workerCtx,
-		workerCancel: workerCancel,
+		lookup:         make(map[string]map[string]*subscriber),
+		watchChan:      make(chan *message, watchChanBufferSize),
+		distributeChan: make(chan []*message, distributeChanBufferSize),
+		mu:             sync.Mutex{},
+		workerCtx:      workerCtx,
+		workerCancel:   workerCancel,
+		wg:             sync.WaitGroup{},
 	}
 }
 
@@ -58,65 +71,117 @@ func (wm *watchManager) sendMessage(message *message) error {
 	}
 }
 
-// start distributing messages to the subscribers
+// startDistributor starts both the collector and distributor goroutines
 func (wm *watchManager) startDistributor() error {
-	defer func() {
-		wm.cleanUpSubscribers()
+	defer wm.cleanUpSubscribers()
+
+	// Start the distributor goroutine (consumes from distributeChan)
+	wm.wg.Add(1)
+	go func() {
+		defer wm.wg.Done()
+		wm.runDistributor()
 	}()
 
-	fmt.Println("🧭 Starting distributor.....")
-	maxBatchSize := 1000
-	pendingSend := make(chan struct{}, 1)
+	// Start the collector goroutine (collects messages into batches)
+	wm.wg.Add(1)
+	go func() {
+		defer wm.wg.Done()
+		wm.runCollector()
+	}()
+
+	wm.wg.Wait()
+
+	return nil
+}
+
+// runCollector collects messages from watchChan and batches them
+func (wm *watchManager) runCollector() {
 	batches := make([]*message, 0, maxBatchSize)
 
-	//distribute and clear the batches
-	distribute := func(batches []*message) {
-		_ = wm.distributeAllMessages(batches)
-		<-pendingSend
+	defer func() {
+		// Drain and send final batch before exiting
+		if len(batches) > 0 {
+			select {
+			case wm.distributeChan <- batches:
+			default:
+				fmt.Printf("[watch_manager] Dropping final batch of %d messages\n", len(batches))
+			}
+		}
+
+		close(wm.distributeChan)
+	}()
+
+	sendBatchToDistributor := func(batch []*message) {
+		select {
+		case wm.distributeChan <- batch:
+		case <-wm.workerCtx.Done():
+		default:
+			fmt.Printf("[watch_manager] Distribution channel full, dropping batch of %d messages\n", len(batch))
+		}
 	}
 
-	//Distribute the messages to the subscribers
 	for {
-		msg, ok := <-wm.watchChan
-		if !ok {
-			return nil
+		select {
+		case msg, ok := <-wm.watchChan:
+			if !ok {
+				return
+			}
+			batches = append(batches, msg)
+		case <-wm.workerCtx.Done():
+			return
 		}
-		batches = append(batches, msg)
 
-	distribute:
+	accumulate:
 		for {
 			if len(batches) >= maxBatchSize {
-				pendingSend <- struct{}{}
-				distribute(batches)
-				batches = batches[:0]
-				break distribute
+				sendBatchToDistributor(batches)
+				batches = make([]*message, 0, maxBatchSize)
+				break accumulate
 			}
 
 			select {
-			case <-wm.workerCtx.Done():
-				fmt.Println("[watch_manager] Watch manager context done")
-				goto drain
 			case msg, ok := <-wm.watchChan:
 				if !ok {
-					fmt.Println("[watch_manager] Watch channel closed")
-					goto drain
+					return
 				}
 				batches = append(batches, msg)
-			case pendingSend <- struct{}{}:
-				distribute(batches)
-				batches = batches[:0]
-				break distribute
+
+			case <-wm.workerCtx.Done():
+				return
+
+			default:
+				if len(batches) > 0 {
+					sendBatchToDistributor(batches)
+					batches = make([]*message, 0, maxBatchSize)
+				}
+				break accumulate
 			}
 		}
+	}
+}
 
-	drain:
-		for {
-			select {
-			case msg := <-wm.watchChan:
-				batches = append(batches, msg)
-			case pendingSend <- struct{}{}:
-				distribute(batches)
-				return nil
+// runDistributor distributes batches to subscribers
+func (wm *watchManager) runDistributor() {
+	for {
+		select {
+		case batch, ok := <-wm.distributeChan:
+			if !ok {
+				return
+			}
+			wm.distributeAllMessages(batch)
+
+		case <-wm.workerCtx.Done():
+			// drain the distribute channel
+			for {
+				select {
+				case batch, ok := <-wm.distributeChan:
+					if !ok {
+						return
+					}
+					wm.distributeAllMessages(batch)
+				default:
+					return
+				}
 			}
 		}
 	}
@@ -150,7 +215,7 @@ func (wm *watchManager) distributeAllMessages(messages []*message) error {
 			subscriber.deadMessages = 0
 		default:
 			subscriber.deadMessages++
-			if subscriber.deadMessages >= 100 {
+			if subscriber.deadMessages >= deadMessageThreshold {
 				fmt.Printf("Force-unsubscribing slow subscriber %s/%s\n",
 					message.bucket, message.key)
 				close(subscriber.receiveChan)
@@ -182,7 +247,7 @@ func (wm *watchManager) subscribe(bucket string, key string) (<-chan *message, e
 		return subscriber.receiveChan, nil
 	}
 
-	receiveChan := make(chan *message, 1000)
+	receiveChan := make(chan *message, receiveChanBufferSize)
 	subscriber := subscriber{
 		bucket:      bucket,
 		key:         key,
@@ -234,6 +299,8 @@ func (wm *watchManager) close() error {
 	}
 
 	wm.workerCancel()
+
+	close(wm.watchChan)
 	return nil
 }
 
