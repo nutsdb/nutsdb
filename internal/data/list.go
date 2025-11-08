@@ -28,7 +28,7 @@ const (
 	// ListImplDoublyLinkedList uses doubly linked list implementation (default).
 	// Advantages: O(1) head/tail operations, lower memory overhead
 	// Best for: High-frequency LPush/RPush/LPop/RPop operations
-	ListImplDoublyLinkedList ListImplementationType = iota
+	ListImplDoublyLinkedList = iota
 
 	// ListImplBTree uses BTree implementation.
 	// Advantages: O(log n + k) range queries, efficient random access

@@ -72,7 +72,7 @@ func ListCmp(t *testing.T, list *data.List, key string, expectRecords []*data.Re
 func TestList_LPush(t *testing.T) {
 	for _, listImpl := range []data.ListImplementationType{data.ListImplDoublyLinkedList, data.ListImplBTree} {
 		list := data.NewList(listImpl)
-		// 测试 LPush
+		// Test LPush
 		key := string(testutils.GetTestBytes(0))
 		expectRecords := data.GenerateRecords(5)
 		seqInfo := data.HeadTailSeq{Head: data.InitialListSeq, Tail: data.InitialListSeq + 1}
@@ -91,7 +91,7 @@ func TestList_LPush(t *testing.T) {
 func TestList_RPush(t *testing.T) {
 	for _, listImpl := range []data.ListImplementationType{data.ListImplDoublyLinkedList, data.ListImplBTree} {
 		list := data.NewList(listImpl)
-		// 测试 RPush
+		// Test RPush
 		key := string(testutils.GetTestBytes(0))
 		expectRecords := data.GenerateRecords(5)
 		seqInfo := data.HeadTailSeq{Head: data.InitialListSeq, Tail: data.InitialListSeq + 1}
