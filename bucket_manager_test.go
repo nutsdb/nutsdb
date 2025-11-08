@@ -1,8 +1,9 @@
 package nutsdb
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestBucketManager_NewBucketAndDeleteBucket(t *testing.T) {
@@ -90,18 +91,18 @@ func TestBucketManager_DeleteBucketIsolation(t *testing.T) {
 func txNewBucket(t *testing.T, db *DB, bucket string, ds uint16, expectErr error, finalExpectErr error) {
 	err := db.Update(func(tx *Tx) error {
 		err2 := tx.NewBucket(ds, bucket)
-		assertErr(t, expectErr, err2)
+		AssertErr(t, err2, expectErr)
 		return nil
 	})
-	assertErr(t, err, finalExpectErr)
+	AssertErr(t, err, finalExpectErr)
 
 }
 
 func txDeleteBucketFunc(t *testing.T, db *DB, bucket string, ds uint16, expectErr error, finalExpectErr error) {
 	err := db.Update(func(tx *Tx) error {
 		err2 := tx.DeleteBucket(ds, bucket)
-		assertErr(t, expectErr, err2)
+		AssertErr(t, err2, expectErr)
 		return nil
 	})
-	assertErr(t, err, finalExpectErr)
+	AssertErr(t, err, finalExpectErr)
 }

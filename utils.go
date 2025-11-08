@@ -56,13 +56,6 @@ func splitIntIntStr(str, separator string) (int, int) {
 	return firstItem, secondItem
 }
 
-func encodeListKey(key []byte, seq uint64) []byte {
-	buf := make([]byte, len(key)+8)
-	binary.LittleEndian.PutUint64(buf[:8], seq)
-	copy(buf[8:], key[:])
-	return buf
-}
-
 func decodeListKey(buf []byte) ([]byte, uint64) {
 	seq := binary.LittleEndian.Uint64(buf[:8])
 	key := make([]byte, len(buf[8:]))
@@ -85,19 +78,6 @@ func getFnv32(value []byte) (uint32, error) {
 	hash := fnvHash.Sum32()
 	fnvHash.Reset()
 	return hash, nil
-}
-
-func generateSeq(seq *HeadTailSeq, isLeft bool) uint64 {
-	var res uint64
-	if isLeft {
-		res = seq.Head
-		seq.Head--
-	} else {
-		res = seq.Tail
-		seq.Tail++
-	}
-
-	return res
 }
 
 func createNewBufferWithSize(size int) *bytes.Buffer {

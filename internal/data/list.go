@@ -1,24 +1,10 @@
-// Copyright 2023 The nutsdb Author. All rights reserved.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
-package nutsdb
+package data
 
 import (
+	"encoding/binary"
 	"errors"
 	"time"
 
-	"github.com/nutsdb/nutsdb/internal/data"
 	"github.com/nutsdb/nutsdb/internal/utils"
 )
 
@@ -36,9 +22,38 @@ var (
 	ErrStartOrEnd = errors.New("start or end error")
 )
 
+type ListImplementationType int
+
 const (
-	initialListSeq = data.InitialListSeq
+	// ListImplDoublyLinkedList uses doubly linked list implementation (default).
+	// Advantages: O(1) head/tail operations, lower memory overhead
+	// Best for: High-frequency LPush/RPush/LPop/RPop operations
+	ListImplDoublyLinkedList = iota
+
+	// ListImplBTree uses BTree implementation.
+	// Advantages: O(log n + k) range queries, efficient random access
+	// Best for: Frequent range queries or indexed access patterns
+	ListImplBTree
 )
+
+// HeadTailSeq list head and tail seq num
+type HeadTailSeq struct {
+	Head uint64
+	Tail uint64
+}
+
+func (seq *HeadTailSeq) GenerateSeq(isLeft bool) uint64 {
+	var res uint64
+	if isLeft {
+		res = seq.Head
+		seq.Head--
+	} else {
+		res = seq.Tail
+		seq.Tail++
+	}
+
+	return res
+}
 
 // ListStructure defines the interface for List storage implementations.
 // It supports multiple implementations: BTree, DoublyLinkedList, SkipList, etc.
@@ -48,7 +63,7 @@ const (
 type ListStructure interface {
 	// InsertRecord inserts a record with the given key (sequence number in big-endian format).
 	// Returns true if an existing record was replaced, false if a new record was inserted.
-	InsertRecord(key []byte, record *data.Record) bool
+	InsertRecord(key []byte, record *Record) bool
 
 	// Delete removes the record with the given key.
 	// Returns true if the record was found and deleted, false otherwise.
@@ -56,61 +71,55 @@ type ListStructure interface {
 
 	// Find retrieves the record with the given key.
 	// Returns the record and true if found, nil and false otherwise.
-	Find(key []byte) (*data.Record, bool)
+	Find(key []byte) (*Record, bool)
 
 	// Min returns the item with the smallest key (head of the list).
 	// Returns the item and true if the list is not empty, nil and false otherwise.
-	Min() (*data.Item[data.Record], bool)
+	Min() (*Item[Record], bool)
 
 	// Max returns the item with the largest key (tail of the list).
 	// Returns the item and true if the list is not empty, nil and false otherwise.
-	Max() (*data.Item[data.Record], bool)
+	Max() (*Item[Record], bool)
 
 	// All returns all records in ascending key order.
-	All() []*data.Record
+	All() []*Record
 
 	// AllItems returns all items (key + record pairs) in ascending key order.
-	AllItems() []*data.Item[data.Record]
+	AllItems() []*Item[Record]
 
 	// Count returns the number of elements in the list.
 	Count() int
 
 	// Range returns records with keys in the range [start, end] (inclusive).
-	Range(start, end []byte) []*data.Record
+	Range(start, end []byte) []*Record
 
 	// PrefixScan scans records with keys matching the given prefix.
 	// offset: number of matching records to skip
 	// limitNum: maximum number of records to return
-	PrefixScan(prefix []byte, offset, limitNum int) []*data.Record
+	PrefixScan(prefix []byte, offset, limitNum int) []*Record
 
 	// PrefixSearchScan scans records with keys matching the given prefix and regex pattern.
 	// The regex is applied to the portion of the key after removing the prefix.
 	// offset: number of matching records to skip
 	// limitNum: maximum number of records to return
-	PrefixSearchScan(prefix []byte, reg string, offset, limitNum int) []*data.Record
+	PrefixSearchScan(prefix []byte, reg string, offset, limitNum int) []*Record
 
 	// PopMin removes and returns the item with the smallest key.
 	// Returns the item and true if the list is not empty, nil and false otherwise.
-	PopMin() (*data.Item[data.Record], bool)
+	PopMin() (*Item[Record], bool)
 
 	// PopMax removes and returns the item with the largest key.
 	// Returns the item and true if the list is not empty, nil and false otherwise.
-	PopMax() (*data.Item[data.Record], bool)
+	PopMax() (*Item[Record], bool)
 }
 
 // Compile-time interface implementation checks
 var (
-	_ ListStructure = (*data.BTree)(nil)
-	_ ListStructure = (*data.DoublyLinkedList)(nil)
+	_ ListStructure = (*BTree)(nil)
+	_ ListStructure = (*DoublyLinkedList)(nil)
 )
 
 // BTree represents the btree.
-
-// HeadTailSeq list head and tail seq num
-type HeadTailSeq struct {
-	Head uint64
-	Tail uint64
-}
 
 // List represents the list.
 type List struct {
@@ -118,41 +127,48 @@ type List struct {
 	TTL       map[string]uint32
 	TimeStamp map[string]uint64
 	Seq       map[string]*HeadTailSeq
-	opts      Options // Configuration options
+	ListImpl  ListImplementationType
 }
 
-func NewList(opts Options) *List {
+func NewList(listImpl ListImplementationType) *List {
 	return &List{
 		Items:     make(map[string]ListStructure),
 		TTL:       make(map[string]uint32),
 		TimeStamp: make(map[string]uint64),
 		Seq:       make(map[string]*HeadTailSeq),
-		opts:      opts,
+		ListImpl:  listImpl,
 	}
 }
 
-// createListStructure creates a new list storage structure based on configuration.
-func (l *List) createListStructure() ListStructure {
-	switch l.opts.ListImpl {
+func decodeListKey(buf []byte) ([]byte, uint64) {
+	seq := binary.LittleEndian.Uint64(buf[:8])
+	key := make([]byte, len(buf[8:]))
+	copy(key[:], buf[8:])
+	return key, seq
+}
+
+// CreateListStructure creates a new list storage structure based on configuration.
+func (l *List) CreateListStructure() ListStructure {
+	switch l.ListImpl {
 	case ListImplBTree:
-		return data.NewBTree()
+		return NewBTree()
 	case ListImplDoublyLinkedList:
-		return data.NewDoublyLinkedList()
+		return NewDoublyLinkedList()
 	default:
 		// Default to DoublyLinkedList for safety
-		return data.NewDoublyLinkedList()
+		return NewDoublyLinkedList()
 	}
 }
 
-func (l *List) LPush(key string, r *data.Record) error {
-	return l.push(key, r, true)
+func (l *List) LPush(key string, r *Record) error {
+	return l.Push(key, r, true)
 }
 
-func (l *List) RPush(key string, r *data.Record) error {
-	return l.push(key, r, false)
+func (l *List) RPush(key string, r *Record) error {
+	return l.Push(key, r, false)
 }
 
-func (l *List) push(key string, r *data.Record, isLeft bool) error {
+func (l *List) Push(key string, r *Record, isLeft bool) error {
 	// key is seq + user_key
 	userKey, curSeq := decodeListKey([]byte(key))
 	userKeyStr := string(userKey)
@@ -162,13 +178,13 @@ func (l *List) push(key string, r *data.Record, isLeft bool) error {
 
 	list, ok := l.Items[userKeyStr]
 	if !ok {
-		l.Items[userKeyStr] = l.createListStructure()
+		l.Items[userKeyStr] = l.CreateListStructure()
 		list = l.Items[userKeyStr]
 	}
 
 	// Initialize seq if not exists
 	if _, ok := l.Seq[userKeyStr]; !ok {
-		l.Seq[userKeyStr] = &HeadTailSeq{Head: initialListSeq, Tail: initialListSeq + 1}
+		l.Seq[userKeyStr] = &HeadTailSeq{Head: InitialListSeq, Tail: InitialListSeq + 1}
 	}
 
 	list.InsertRecord(utils.ConvertUint64ToBigEndianBytes(curSeq), r)
@@ -194,7 +210,7 @@ func (l *List) push(key string, r *data.Record, isLeft bool) error {
 	return nil
 }
 
-func (l *List) LPop(key string) (*data.Record, error) {
+func (l *List) LPop(key string) (*Record, error) {
 	if l.IsExpire(key) {
 		return nil, ErrListNotFound
 	}
@@ -217,7 +233,7 @@ func (l *List) LPop(key string) (*data.Record, error) {
 }
 
 // RPop removes and returns the last element of the list stored at key.
-func (l *List) RPop(key string) (*data.Record, error) {
+func (l *List) RPop(key string) (*Record, error) {
 	if l.IsExpire(key) {
 		return nil, ErrListNotFound
 	}
@@ -239,15 +255,15 @@ func (l *List) RPop(key string) (*data.Record, error) {
 	return item.Record, nil
 }
 
-func (l *List) LPeek(key string) (*data.Item[data.Record], error) {
+func (l *List) LPeek(key string) (*Item[Record], error) {
 	return l.peek(key, true)
 }
 
-func (l *List) RPeek(key string) (*data.Item[data.Record], error) {
+func (l *List) RPeek(key string) (*Item[Record], error) {
 	return l.peek(key, false)
 }
 
-func (l *List) peek(key string, isLeft bool) (*data.Item[data.Record], error) {
+func (l *List) peek(key string, isLeft bool) (*Item[Record], error) {
 	if l.IsExpire(key) {
 		return nil, ErrListNotFound
 	}
@@ -272,7 +288,7 @@ func (l *List) peek(key string, isLeft bool) (*data.Item[data.Record], error) {
 }
 
 // LRange returns the specified elements of the list stored at key [start,end]
-func (l *List) LRange(key string, start, end int) ([]*data.Record, error) {
+func (l *List) LRange(key string, start, end int) ([]*Record, error) {
 	size, err := l.Size(key)
 	if err != nil || size == 0 {
 		return nil, err
@@ -283,7 +299,7 @@ func (l *List) LRange(key string, start, end int) ([]*data.Record, error) {
 		return nil, err
 	}
 
-	var res []*data.Record
+	var res []*Record
 	allRecords := l.Items[key].All()
 	for i, item := range allRecords {
 		if i >= start && i <= end {
@@ -294,8 +310,8 @@ func (l *List) LRange(key string, start, end int) ([]*data.Record, error) {
 	return res, nil
 }
 
-// getRemoveIndexes returns a slice of indices to be removed from the list based on the count
-func (l *List) getRemoveIndexes(key string, count int, cmp func(r *data.Record) (bool, error)) ([][]byte, error) {
+// GetRemoveIndexes returns a slice of indices to be removed from the list based on the count
+func (l *List) GetRemoveIndexes(key string, count int, cmp func(r *Record) (bool, error)) ([][]byte, error) {
 	if l.IsExpire(key) {
 		return nil, ErrListNotFound
 	}
@@ -307,7 +323,7 @@ func (l *List) getRemoveIndexes(key string, count int, cmp func(r *data.Record) 
 	}
 
 	var res [][]byte
-	var allItems []*data.Item[data.Record]
+	var allItems []*Item[Record]
 	if count == 0 {
 		count = list.Count()
 	}
@@ -353,8 +369,8 @@ func (l *List) getRemoveIndexes(key string, count int, cmp func(r *data.Record) 
 // count > 0: Remove elements equal to value moving from head to tail.
 // count < 0: Remove elements equal to value moving from tail to head.
 // count = 0: Remove all elements equal to value.
-func (l *List) LRem(key string, count int, cmp func(r *data.Record) (bool, error)) error {
-	removeIndexes, err := l.getRemoveIndexes(key, count, cmp)
+func (l *List) LRem(key string, count int, cmp func(r *Record) (bool, error)) error {
+	removeIndexes, err := l.GetRemoveIndexes(key, count, cmp)
 	if err != nil {
 		return err
 	}
@@ -393,7 +409,7 @@ func (l *List) LRemByIndex(key string, indexes []int) error {
 		return ErrListNotFound
 	}
 
-	idxes := l.getValidIndexes(key, indexes)
+	idxes := l.GetValidIndexes(key, indexes)
 	if len(idxes) == 0 {
 		return nil
 	}
@@ -409,7 +425,7 @@ func (l *List) LRemByIndex(key string, indexes []int) error {
 	return nil
 }
 
-func (l *List) getValidIndexes(key string, indexes []int) map[int]struct{} {
+func (l *List) GetValidIndexes(key string, indexes []int) map[int]struct{} {
 	idxes := make(map[int]struct{})
 	listLen, err := l.Size(key)
 	if err != nil || listLen == 0 {
@@ -484,6 +500,11 @@ func (l *List) GetListTTL(key string) (uint32, error) {
 	remain := timestamp + uint64(ttl) - uint64(now)
 
 	return uint32(remain), nil
+}
+
+func (l *List) ExpireList(key []byte, ttl uint32) {
+	l.TTL[string(key)] = ttl
+	l.TimeStamp[string(key)] = uint64(time.Now().Unix())
 }
 
 func checkBounds(start, end int, size int) (int, int, error) {

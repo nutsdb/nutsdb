@@ -7,11 +7,7 @@ import (
 	"io"
 	"path/filepath"
 	"reflect"
-
-	"github.com/nutsdb/nutsdb/internal/data"
 )
-
-var IsExpired = data.IsExpired
 
 func ConvertBigEndianBytesToUint64(data []byte) uint64 {
 	return binary.BigEndian.Uint64(data)
@@ -106,4 +102,11 @@ func OneOfUint16Array(value uint16, array []uint16) bool {
 		}
 	}
 	return false
+}
+
+func EncodeListKey(key []byte, seq uint64) []byte {
+	buf := make([]byte, len(key)+8)
+	binary.LittleEndian.PutUint64(buf[:8], seq)
+	copy(buf[8:], key[:])
+	return buf
 }

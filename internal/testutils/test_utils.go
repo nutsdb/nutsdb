@@ -15,6 +15,9 @@ package testutils
 
 import (
 	"math/rand"
+	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
@@ -39,4 +42,12 @@ func GetRandomBytes(length int) []byte {
 		b[i] = charset[rand.Intn(len(charset))]
 	}
 	return b
+}
+
+func AssertErr(t *testing.T, err error, expectErr error) {
+	if expectErr != nil {
+		require.Equal(t, expectErr, err)
+	} else {
+		require.NoError(t, err)
+	}
 }

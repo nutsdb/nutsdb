@@ -415,7 +415,7 @@ func TestDB_MergeForSet(t *testing.T) {
 			err = db.Update(func(tx *Tx) error {
 				var err error
 				spopValue, err = tx.SPop(bucket, key)
-				assertErr(t, err, nil)
+				AssertErr(t, err, nil)
 				return nil
 			})
 			require.NoError(t, err)

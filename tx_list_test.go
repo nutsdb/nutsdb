@@ -15,10 +15,13 @@
 package nutsdb
 
 import (
+	"os"
+	"path"
 	"testing"
 	"time"
 
 	"github.com/nutsdb/nutsdb/internal/testutils"
+	"github.com/nutsdb/nutsdb/internal/utils"
 	"github.com/stretchr/testify/require"
 )
 
@@ -148,7 +151,7 @@ func TestTx_LPushRaw(t *testing.T) {
 
 		seq := uint64(100000)
 		for i := 0; i <= 100; i++ {
-			key := encodeListKey([]byte("0"), seq)
+			key := utils.EncodeListKey([]byte("0"), seq)
 			seq--
 			txPushRaw(t, db, bucket, key, testutils.GetTestBytes(i), true, nil, nil)
 		}
@@ -166,7 +169,7 @@ func TestTx_RPushRaw(t *testing.T) {
 		txCreateBucket(t, db, DataStructureList, bucket, nil)
 		seq := uint64(100000)
 		for i := 0; i <= 100; i++ {
-			key := encodeListKey([]byte("0"), seq)
+			key := utils.EncodeListKey([]byte("0"), seq)
 			seq++
 			txPushRaw(t, db, bucket, key, testutils.GetTestBytes(i), false, nil, nil)
 		}
@@ -537,4 +540,176 @@ func TestTx_ListEntryIdxMode_HintKeyAndRAMIdxMode(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, []byte("a"), val)
 	})
+}
+
+// TestTx_PushPopPushSequence tests Push->Pop->Push sequence numbers
+func TestTx_PushPopPushSequence(t *testing.T) {
+	bucket := "bucket"
+	key := testutils.GetTestBytes(0)
+
+	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureList, bucket, nil)
+
+		// Push 3 elements
+		txPush(t, db, bucket, key, testutils.GetTestBytes(0), false, nil, nil)
+		txPush(t, db, bucket, key, testutils.GetTestBytes(1), false, nil, nil)
+		txPush(t, db, bucket, key, testutils.GetTestBytes(2), false, nil, nil)
+
+		// Pop one from left
+		txPop(t, db, bucket, key, testutils.GetTestBytes(0), nil, true)
+
+		// Push another to right
+		txPush(t, db, bucket, key, testutils.GetTestBytes(3), false, nil, nil)
+
+		// Pop from right
+		txPop(t, db, bucket, key, testutils.GetTestBytes(3), nil, false)
+
+		// Push to left
+		txPush(t, db, bucket, key, testutils.GetTestBytes(99), true, nil, nil)
+
+		// Verify final order: [99, 1, 2]
+		txLRange(t, db, bucket, key, 0, -1, 3, [][]byte{
+			testutils.GetTestBytes(99), testutils.GetTestBytes(1), testutils.GetTestBytes(2),
+		}, nil)
+	})
+}
+
+// TestTx_ListRecoveryAfterRestart tests that list data is correctly recovered after DB restart
+func TestTx_ListRecoveryAfterRestart(t *testing.T) {
+	bucket := "list_bucket"
+	key := testutils.GetTestBytes(0)
+
+	dir := path.Join(t.TempDir(), "test_nutsdb_list_recovery")
+	defer os.RemoveAll(dir)
+
+	// Step 1: Create DB and insert data
+	opts := DefaultOptions
+	opts.Dir = dir
+	db, err := Open(opts)
+	require.NoError(t, err)
+
+	// Create bucket and insert data
+	txCreateBucket(t, db, DataStructureList, bucket, nil)
+
+	// Insert 10 elements using RPush
+	for i := 0; i < 10; i++ {
+		txPush(t, db, bucket, key, testutils.GetTestBytes(i), false, nil, nil)
+	}
+
+	// Verify data before closing
+	txLSize(t, db, bucket, key, 10, nil)
+	txLRange(t, db, bucket, key, 0, -1, 10, [][]byte{
+		testutils.GetTestBytes(0), testutils.GetTestBytes(1), testutils.GetTestBytes(2), testutils.GetTestBytes(3), testutils.GetTestBytes(4),
+		testutils.GetTestBytes(5), testutils.GetTestBytes(6), testutils.GetTestBytes(7), testutils.GetTestBytes(8), testutils.GetTestBytes(9),
+	}, nil)
+
+	// Step 2: Close DB
+	err = db.Close()
+	require.NoError(t, err)
+
+	// Step 3: Reopen DB
+	db, err = Open(opts)
+	require.NoError(t, err)
+	defer db.Close()
+
+	// Step 4: Verify data after recovery
+	txLSize(t, db, bucket, key, 10, nil)
+	txLRange(t, db, bucket, key, 0, -1, 10, [][]byte{
+		testutils.GetTestBytes(0), testutils.GetTestBytes(1), testutils.GetTestBytes(2), testutils.GetTestBytes(3), testutils.GetTestBytes(4),
+		testutils.GetTestBytes(5), testutils.GetTestBytes(6), testutils.GetTestBytes(7), testutils.GetTestBytes(8), testutils.GetTestBytes(9),
+	}, nil)
+
+	// Step 5: Test continued operations after recovery
+	txPush(t, db, bucket, key, testutils.GetTestBytes(10), false, nil, nil)
+	txPush(t, db, bucket, key, testutils.GetTestBytes(99), true, nil, nil)
+
+	// Verify final state
+	txLSize(t, db, bucket, key, 12, nil)
+	txLRange(t, db, bucket, key, 0, 0, 1, [][]byte{testutils.GetTestBytes(99)}, nil)
+	txLRange(t, db, bucket, key, 11, 11, 1, [][]byte{testutils.GetTestBytes(10)}, nil)
+}
+
+// TestTx_ListRecoveryWithMixedOperations tests recovery after complex operations
+func TestTx_ListRecoveryWithMixedOperations(t *testing.T) {
+	bucket := "list_bucket"
+	key := testutils.GetTestBytes(0)
+
+	dir := path.Join(t.TempDir(), "test_nutsdb_list_recovery_mixed")
+	defer os.RemoveAll(dir)
+
+	opts := DefaultOptions
+	opts.Dir = dir
+	db, err := Open(opts)
+	require.NoError(t, err)
+
+	// Create bucket
+	txCreateBucket(t, db, DataStructureList, bucket, nil)
+
+	// RPush 5 elements: [0,1,2,3,4]
+	for i := 0; i < 5; i++ {
+		txPush(t, db, bucket, key, testutils.GetTestBytes(i), false, nil, nil)
+	}
+
+	// LPush 2 elements: [98,99,0,1,2,3,4]
+	txPush(t, db, bucket, key, testutils.GetTestBytes(99), true, nil, nil)
+	txPush(t, db, bucket, key, testutils.GetTestBytes(98), true, nil, nil)
+
+	// Close and reopen
+	err = db.Close()
+	require.NoError(t, err)
+
+	db, err = Open(opts)
+	require.NoError(t, err)
+	defer db.Close()
+
+	// Verify recovered state - should have 7 elements
+	txLSize(t, db, bucket, key, 7, nil)
+	txLRange(t, db, bucket, key, 0, -1, 7, [][]byte{
+		testutils.GetTestBytes(98), testutils.GetTestBytes(99), testutils.GetTestBytes(0), testutils.GetTestBytes(1),
+		testutils.GetTestBytes(2), testutils.GetTestBytes(3), testutils.GetTestBytes(4),
+	}, nil)
+}
+
+// TestTx_ListRecoveryMultipleLists tests recovery of multiple lists
+func TestTx_ListRecoveryMultipleLists(t *testing.T) {
+	bucket := "list_bucket"
+
+	dir := path.Join(t.TempDir(), "test_nutsdb_list_recovery_multiple")
+	defer os.RemoveAll(dir)
+
+	opts := DefaultOptions
+	opts.Dir = dir
+	db, err := Open(opts)
+	require.NoError(t, err)
+
+	// Create bucket
+	txCreateBucket(t, db, DataStructureList, bucket, nil)
+
+	// Create multiple lists
+	for listIdx := 0; listIdx < 3; listIdx++ {
+		key := testutils.GetTestBytes(listIdx)
+		for i := 0; i < 5; i++ {
+			txPush(t, db, bucket, key, testutils.GetTestBytes(listIdx*100+i), false, nil, nil)
+		}
+	}
+
+	// Close and reopen
+	err = db.Close()
+	require.NoError(t, err)
+
+	db, err = Open(opts)
+	require.NoError(t, err)
+	defer db.Close()
+
+	// Verify all lists recovered correctly
+	for listIdx := 0; listIdx < 3; listIdx++ {
+		key := testutils.GetTestBytes(listIdx)
+		txLSize(t, db, bucket, key, 5, nil)
+
+		expected := make([][]byte, 5)
+		for i := 0; i < 5; i++ {
+			expected[i] = testutils.GetTestBytes(listIdx*100 + i)
+		}
+		txLRange(t, db, bucket, key, 0, -1, 5, expected, nil)
+	}
 }

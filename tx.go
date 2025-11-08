@@ -304,10 +304,10 @@ func (tx *Tx) getListEntryNewAddRecordCount(bucketId BucketId, entry *Entry) (in
 		res--
 	case DataLRemByIndex:
 		indexes, _ := utils.UnmarshalInts([]byte(value))
-		res -= int64(len(l.getValidIndexes(key, indexes)))
+		res -= int64(len(l.GetValidIndexes(key, indexes)))
 	case DataLRemFlag:
 		count, newValue := splitIntStringStr(value, SeparatorForListKey)
-		removeIndices, err := l.getRemoveIndexes(key, count, func(r *data.Record) (bool, error) {
+		removeIndices, err := l.GetRemoveIndexes(key, count, func(r *data.Record) (bool, error) {
 			v, err := tx.db.getValueByRecord(r)
 			if err != nil {
 				return false, err

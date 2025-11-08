@@ -1381,7 +1381,7 @@ func TestMergeV2ApplyLookupUpdatesSecondaryIndexes(t *testing.T) {
 	}
 
 	// Apply list lookup
-	listKeyEncoded := encodeListKey(listKey, seq)
+	listKeyEncoded := utils.EncodeListKey(listKey, seq)
 	job.applyLookup(&mergeLookupEntry{
 		hint: &HintEntry{
 			BucketId:  uint64(buckets[1].id),
