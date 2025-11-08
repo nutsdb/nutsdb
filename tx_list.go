@@ -153,7 +153,7 @@ func (tx *Tx) LPush(bucket string, key []byte, values ...[]byte) error {
 
 	for _, value := range values {
 		l := tx.getListWithDefault(bucket)
-		newKey := l.GeneratePushKey(key, false)
+		newKey := l.GeneratePushKey(key, true)
 		err := tx.push(bucket, newKey, DataLPushFlag, value)
 		if err != nil {
 			return err
