@@ -1,7 +1,6 @@
 package data
 
 import (
-	"encoding/binary"
 	"errors"
 	"time"
 
@@ -140,13 +139,6 @@ func NewList(listImpl ListImplementationType) *List {
 	}
 }
 
-func DecodeListKey(buf []byte) ([]byte, uint64) {
-	seq := binary.LittleEndian.Uint64(buf[:8])
-	key := make([]byte, len(buf[8:]))
-	copy(key[:], buf[8:])
-	return key, seq
-}
-
 // CreateListStructure creates a new list storage structure based on configuration.
 func (l *List) CreateListStructure() ListStructure {
 	switch l.ListImpl {
@@ -170,7 +162,7 @@ func (l *List) RPush(key string, r *Record) error {
 
 func (l *List) Push(key string, r *Record, isLeft bool) error {
 	// key is seq + user_key
-	userKey, curSeq := DecodeListKey([]byte(key))
+	userKey, curSeq := utils.DecodeListKey([]byte(key))
 	userKeyStr := string(userKey)
 	if l.IsExpire(userKeyStr) {
 		return ErrListNotFound

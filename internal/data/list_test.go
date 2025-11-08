@@ -395,7 +395,6 @@ func TestList_ErrListNotFound(t *testing.T) {
 		l.ExpireList(key, 1)
 		r.False(l.IsExpire(string(key)))
 		newKey := l.GeneratePushKey(key, true)
-		t.Log(data.DecodeListKey(newKey))
 		l.Push(string(newKey), data.NewRecord().WithKey(newKey), true)
 		<-time.After(1100 * time.Millisecond)
 		newKey = l.GeneratePushKey(key, true)
