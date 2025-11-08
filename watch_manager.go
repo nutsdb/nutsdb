@@ -66,6 +66,14 @@ func (wm *watchManager) startDistributor() error {
 
 	fmt.Println("🧭 Starting distributor.....")
 	maxBatchSize := 1000
+	pendingSend := make(chan struct{}, 1)
+	batches := make([]*message, 0, maxBatchSize)
+
+	//distribute and clear the batches
+	distribute := func(batches []*message) {
+		_ = wm.distributeAllMessages(batches)
+		<-pendingSend
+	}
 
 	//Distribute the messages to the subscribers
 	for {
@@ -73,28 +81,30 @@ func (wm *watchManager) startDistributor() error {
 		if !ok {
 			return nil
 		}
-		batches := make([]*message, 0, maxBatchSize)
 		batches = append(batches, msg)
 
 	distribute:
 		for {
 			if len(batches) >= maxBatchSize {
-				_ = wm.distributeAllMessages(batches)
+				pendingSend <- struct{}{}
+				distribute(batches)
+				batches = batches[:0]
 				break distribute
 			}
 
 			select {
 			case <-wm.workerCtx.Done():
-				fmt.Println("Watch manager context done")
+				fmt.Println("[watch_manager] Watch manager context done")
 				goto drain
 			case msg, ok := <-wm.watchChan:
 				if !ok {
-					fmt.Println("Watch channel closed")
+					fmt.Println("[watch_manager] Watch channel closed")
 					goto drain
 				}
 				batches = append(batches, msg)
-			default:
-				_ = wm.distributeAllMessages(batches)
+			case pendingSend <- struct{}{}:
+				distribute(batches)
+				batches = batches[:0]
 				break distribute
 			}
 		}
@@ -104,8 +114,8 @@ func (wm *watchManager) startDistributor() error {
 			select {
 			case msg := <-wm.watchChan:
 				batches = append(batches, msg)
-			default:
-				_ = wm.distributeAllMessages(batches)
+			case pendingSend <- struct{}{}:
+				distribute(batches)
 				return nil
 			}
 		}
@@ -155,7 +165,7 @@ func (wm *watchManager) distributeAllMessages(messages []*message) error {
 	return nil
 }
 
-// subcribe to the key and bucket
+// subscribe to the key and bucket
 func (wm *watchManager) subscribe(bucket string, key string) (<-chan *message, error) {
 	if wm.workerCtx.Err() != nil {
 		return nil, ErrWatchManagerClosed
@@ -232,10 +242,10 @@ func (wm *watchManager) findKeyAndReturnSubscriber(bucket string, key string) (*
 	defer wm.mu.Unlock()
 
 	if _, ok := wm.lookup[bucket]; !ok {
-		return nil, ErrBucketSubcriberNotFound
+		return nil, ErrBucketSubscriberNotFound
 	}
 	if _, ok := wm.lookup[bucket][key]; !ok {
-		return nil, ErrKeySubcriberNotFound
+		return nil, ErrKeySubscriberNotFound
 	}
 
 	return wm.lookup[bucket][key], nil

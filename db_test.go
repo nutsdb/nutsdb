@@ -189,6 +189,14 @@ func InitOpt(fileDir string, isRemoveFiles bool) {
 	opt.MaxFdNumsInCache = 1024
 }
 
+func txPutWithWatch(t *testing.T, db *DB, bucket string, key, value []byte, ttl uint32, expectErr error, finalExpectErr error) {
+	txPut(t, db, bucket, key, value, ttl, expectErr, finalExpectErr)
+
+	//send message to the watch manager
+	err := db.wm.sendMessage(&message{bucket: bucket, key: string(key), value: value})
+	assert.NoError(t, err)
+}
+
 func TestDB_Basic(t *testing.T) {
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		bucket := "bucket"
@@ -2066,4 +2074,34 @@ func TestDB_HintFileDisabled(t *testing.T) {
 
 	require.NoError(t, db.Close())
 	removeDir(opts.Dir)
+}
+
+func TestDB_WatchBasic(t *testing.T) {
+	done := make(chan struct{})
+	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		bucket := "bucket"
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+		key0 := testutils.GetTestBytes(0)
+		val0 := testutils.GetRandomBytes(24)
+
+		go func() {
+			err := db.Watch(bucket, key0, func(msg *message) error {
+				assert.Equal(t, bucket, msg.bucket)
+				assert.Equal(t, string(key0), msg.key)
+				close(done)
+				return nil
+			})
+
+			assert.NoError(t, err)
+		}()
+
+		// put
+		txPutWithWatch(t, db, bucket, key0, val0, Persistent, nil, nil)
+		select {
+		case <-done:
+			t.Log("Received message")
+		case <-time.After(2 * time.Second):
+			t.Fatal("Timeout waiting for message")
+		}
+	})
 }

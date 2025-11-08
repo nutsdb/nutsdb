@@ -26,6 +26,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/bwmarrin/snowflake"
 	"github.com/gofrs/flock"
@@ -1058,33 +1059,63 @@ func (db *DB) rebuildBucketManager() error {
 
 // Watch watches the key and bucket and calls the callback function with the message
 // The callback will be called to handle the batch of messages
-func (db *DB) Watch(bucket string, key string, cb func(message *message) error) error {
-	receiveChan, err := db.wm.subscribe(bucket, key)
-	batch := make([]*message, 0)
+func (db *DB) Watch(bucket string, key []byte, cb func(message *message) error) error {
+	receiveChan, err := db.wm.subscribe(bucket, string(key))
+	batch := make([]*message, 0, 100)
+	keyString := string(key)
+	//Use a ticker to process the batch every 100 milliseconds
+	//Avoid CPU busy spinning
+	ticker := time.NewTicker(100 * time.Millisecond)
 	if err != nil {
 		return err
 	}
 
+	defer func() {
+		ticker.Stop()
+		if err := db.wm.unsubscribe(bucket, keyString); err != nil {
+			fmt.Printf("Failed to unsubscribe from %s/%s: %v\n", bucket, key, err)
+		}
+	}()
+
+	processBatch := func(batch []*message) error {
+		for _, msg := range batch {
+			if err := cb(msg); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
 	for {
 		select {
+		case <-db.wm.workerCtx.Done():
+			//drain the batch
+			if err := processBatch(batch); err != nil {
+				return err
+			}
+			return ErrWatchingChannelClosed
 		case message, ok := <-receiveChan:
 			if !ok {
-				goto unsubscribe
+				if err := processBatch(batch); err != nil {
+					return err
+				}
+
+				return ErrWatchingChannelClosed
 			}
 			batch = append(batch, message)
-		default:
-			for len(batch) > 0 {
-				if err := cb(batch[0]); err != nil {
-					goto unsubscribe
+			if len(batch) >= 100 {
+				if err := processBatch(batch); err != nil {
+					return err
 				}
-				batch = batch[1:]
+				batch = batch[:0]
+			}
+		case <-ticker.C:
+			for len(batch) > 0 {
+				if err := processBatch(batch); err != nil {
+					return err
+				}
+				batch = batch[:0]
 			}
 		}
-
-	unsubscribe:
-		if err := db.wm.unsubscribe(bucket, key); err != nil {
-			return err
-		}
-		return ErrWatchingCallbackFailed
 	}
 }
