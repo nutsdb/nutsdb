@@ -108,15 +108,15 @@ func (tx *Tx) push(bucket string, key []byte, flag uint16, values ...[]byte) err
 // getListWithDefault
 // this function will get list, if list not exists, will create
 // a new one.
-func (tx *Tx) getListWithDefault(bucket string) *data.List {
+func (tx *Tx) getListWithDefault(bucket string) (*data.List, error) {
 	b, err := tx.db.bm.GetBucket(DataStructureList, bucket)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 	bucketId := b.Id
 
 	// 确保列表索引存在
-	return tx.db.Index.list.getWithDefault(bucketId)
+	return tx.db.Index.list.getWithDefault(bucketId), nil
 }
 
 // RPush inserts the values at the tail of the list stored in the bucket at given bucket,key and values.
@@ -130,9 +130,12 @@ func (tx *Tx) RPush(bucket string, key []byte, values ...[]byte) error {
 	}
 
 	for _, value := range values {
-		l := tx.getListWithDefault(bucket)
+		l, err := tx.getListWithDefault(bucket)
+		if err != nil {
+			return err
+		}
 		newKey := l.GeneratePushKey(key, false)
-		err := tx.push(bucket, newKey, DataRPushFlag, value)
+		err = tx.push(bucket, newKey, DataRPushFlag, value)
 		if err != nil {
 			return err
 		}
@@ -152,9 +155,12 @@ func (tx *Tx) LPush(bucket string, key []byte, values ...[]byte) error {
 	}
 
 	for _, value := range values {
-		l := tx.getListWithDefault(bucket)
+		l, err := tx.getListWithDefault(bucket)
+		if err != nil {
+			return err
+		}
 		newKey := l.GeneratePushKey(key, true)
-		err := tx.push(bucket, newKey, DataLPushFlag, value)
+		err = tx.push(bucket, newKey, DataLPushFlag, value)
 		if err != nil {
 			return err
 		}
