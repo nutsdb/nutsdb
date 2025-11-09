@@ -193,7 +193,7 @@ func txPutWithWatch(t *testing.T, db *DB, bucket string, key, value []byte, ttl 
 	txPut(t, db, bucket, key, value, ttl, expectErr, finalExpectErr)
 
 	//send message to the watch manager
-	err := db.wm.sendMessage(&message{bucket: bucket, key: string(key), value: value})
+	err := db.wm.sendMessage(&Message{Bucket: bucket, Key: string(key), Value: value})
 	assert.NoError(t, err)
 }
 
@@ -2076,32 +2076,86 @@ func TestDB_HintFileDisabled(t *testing.T) {
 	removeDir(opts.Dir)
 }
 
-func TestDB_WatchBasic(t *testing.T) {
-	done := make(chan struct{})
-	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		bucket := "bucket"
-		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
-		key0 := testutils.GetTestBytes(0)
-		val0 := testutils.GetRandomBytes(24)
+func TestDB_Watch(t *testing.T) {
+	t.Run("db watch key and receive message", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			bucket := "bucket"
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			key0 := testutils.GetTestBytes(0)
+			val0 := testutils.GetRandomBytes(24)
+			done := make(chan struct{})
 
-		go func() {
-			err := db.Watch(bucket, key0, func(msg *message) error {
-				assert.Equal(t, bucket, msg.bucket)
-				assert.Equal(t, string(key0), msg.key)
-				close(done)
-				return nil
-			})
+			// Initial watching first
+			go func() {
+				err := db.Watch(bucket, key0, func(msg *Message) error {
+					assert.Equal(t, bucket, msg.Bucket)
+					assert.Equal(t, string(key0), msg.Key)
+					close(done)
+					return nil
+				})
 
-			assert.NoError(t, err)
-		}()
+				if err != nil {
+					assert.ErrorIs(t, err, ErrWatchingChannelClosed)
+					return
+				}
+			}()
 
-		// put
-		txPutWithWatch(t, db, bucket, key0, val0, Persistent, nil, nil)
-		select {
-		case <-done:
-			t.Log("Received message")
-		case <-time.After(2 * time.Second):
-			t.Fatal("Timeout waiting for message")
-		}
+			// Wait for the watching to be started
+			time.Sleep(100 * time.Millisecond)
+
+			// put
+			txPutWithWatch(t, db, bucket, key0, val0, Persistent, nil, nil)
+			select {
+			case <-done:
+				t.Log("Received message")
+			case <-time.After(10 * time.Second):
+				t.Fatal("Timeout waiting for message")
+			}
+		})
 	})
+
+	t.Run("db watch and callback failed", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			bucket := "bucket"
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			key := testutils.GetTestBytes(0)
+			val := testutils.GetTestBytes(0)
+			go func() {
+				err := db.Watch(bucket, key, func(msg *Message) error {
+					return ErrWatchingCallbackFailed
+				})
+				require.Equal(t, err, ErrWatchingCallbackFailed)
+			}()
+
+			time.Sleep(100 * time.Millisecond)
+
+			// put
+			txPutWithWatch(t, db, bucket, key, val, Persistent, nil, nil)
+
+		})
+	})
+
+	t.Run("db watch and watch manager closed", func(t *testing.T) {
+		opts := DefaultOptions
+		opts.Dir = "/tmp/test-watch-manager-closed/"
+		removeDir(opts.Dir)
+
+		db, err := Open(opts)
+		require.NoError(t, err)
+		bucket := "bucket"
+		key := testutils.GetTestBytes(0)
+		val := testutils.GetTestBytes(0)
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+		txPut(t, db, bucket, key, val, Persistent, nil, nil)
+
+		db.wm.close()
+		require.Equal(t, db.wm.isClosed(), true)
+		time.Sleep(100 * time.Millisecond)
+
+		err = db.Watch(bucket, key, func(msg *Message) error {
+			return nil
+		})
+		require.Equal(t, err, ErrWatchManagerClosed)
+	})
+
 }

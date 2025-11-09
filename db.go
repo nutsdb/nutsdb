@@ -255,6 +255,8 @@ func (db *DB) release() error {
 
 	db.tm.close()
 
+	db.wm.close()
+
 	if GCEnable {
 		runtime.GC()
 	}
@@ -1057,27 +1059,29 @@ func (db *DB) rebuildBucketManager() error {
 	return nil
 }
 
-// Watch watches the key and bucket and calls the callback function with the message
-// The callback will be called to handle the batch of messages
-func (db *DB) Watch(bucket string, key []byte, cb func(message *message) error) error {
+// Watch watches the key and bucket and calls the callback function for each message received.
+// The callback will be called once for each individual message in the batch.
+func (db *DB) Watch(bucket string, key []byte, cb func(message *Message) error) error {
 	receiveChan, err := db.wm.subscribe(bucket, string(key))
-	batch := make([]*message, 0, 100)
-	keyString := string(key)
-	//Use a ticker to process the batch every 100 milliseconds
-	//Avoid CPU busy spinning
-	ticker := time.NewTicker(100 * time.Millisecond)
 	if err != nil {
 		return err
 	}
 
+	batch := make([]*Message, 0, 100)
+
+	// Use a ticker to process the batch every 100 milliseconds
+	// Avoid CPU busy spinning
+	ticker := time.NewTicker(100 * time.Millisecond)
+	keyWatch := string(key)
+
 	defer func() {
 		ticker.Stop()
-		if err := db.wm.unsubscribe(bucket, keyString); err != nil {
-			fmt.Printf("Failed to unsubscribe from %s/%s: %v\n", bucket, key, err)
+		if err := db.wm.unsubscribe(bucket, keyWatch); err != nil {
+			log.Println("Failed to unsubscribe from", bucket, "/", keyWatch, ":", err)
 		}
 	}()
 
-	processBatch := func(batch []*message) error {
+	processBatch := func(batch []*Message) error {
 		for _, msg := range batch {
 			if err := cb(msg); err != nil {
 				return err
@@ -1088,8 +1092,8 @@ func (db *DB) Watch(bucket string, key []byte, cb func(message *message) error) 
 
 	for {
 		select {
-		case <-db.wm.workerCtx.Done():
-			//drain the batch
+		case <-db.wm.done():
+			// drain the batch
 			if err := processBatch(batch); err != nil {
 				return err
 			}
