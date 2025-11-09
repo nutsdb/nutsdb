@@ -10,4 +10,5 @@ var (
 	ErrWatchManagerClosed       = errors.New("watch manager closed")
 	ErrWatchingCallbackFailed   = errors.New("watching callback failed")
 	ErrWatchingChannelClosed    = errors.New("watching channel closed")
+	ErrChannelNotAvailable      = errors.New("channel not available")
 )
