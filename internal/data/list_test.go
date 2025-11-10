@@ -412,9 +412,30 @@ func TestList_Push_Success(t *testing.T) {
 			key := []byte("LPushKey")
 			N := 10
 			for i := 0; i < N; i++ {
-				err := l.LPush(string(key), data.NewRecord().WithKey([]byte(strconv.Itoa(i))))
+				newKey := l.GeneratePushKey(key, false)
+				err := l.LPush(string(newKey), data.NewRecord().WithKey([]byte(strconv.Itoa(i))))
 				r.NoError(err)
 			}
+			n, err := l.Size(string(key))
+			r.NoError(err)
+			r.Equal(N, n)
+		}
+	})
+	t.Run("many LPush no seq", func(t *testing.T) {
+		r := require.New(t)
+		for _, listImpl := range []data.ListImplementationType{data.ListImplDoublyLinkedList, data.ListImplBTree} {
+			l := data.NewList(listImpl)
+			key := []byte("LPushKeyNoSeq")
+			N := 10
+			for i := 0; i < N; i++ {
+				l.Seq = make(map[string]*data.HeadTailSeq)
+				newKey := l.GeneratePushKey(key, false)
+				err := l.LPush(string(newKey), data.NewRecord().WithKey([]byte(strconv.Itoa(i))))
+				r.NoError(err)
+			}
+			n, err := l.Size(string(key))
+			r.NoError(err)
+			r.Equal(N, n)
 		}
 	})
 }
