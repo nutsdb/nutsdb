@@ -16,13 +16,25 @@ const (
 )
 
 type Message struct {
-	Bucket string
-	Key    string
-	Value  []byte
+	BucketName BucketName
+	Key        string
+	Value      []byte
+	Flag       DataFlag
+	Timestamp  uint64
+}
+
+func NewMessage(bucketName BucketName, key string, value []byte, flag DataFlag, timestamp uint64) *Message {
+	return &Message{
+		BucketName: bucketName,
+		Key:        key,
+		Value:      value,
+		Flag:       flag,
+		Timestamp:  timestamp,
+	}
 }
 
 type subscriber struct {
-	bucket       string
+	bucketName   BucketName
 	key          string
 	receiveChan  chan *Message
 	deadMessages int
@@ -31,7 +43,7 @@ type subscriber struct {
 }
 
 type watchManager struct {
-	lookup         map[string]map[string]*subscriber
+	lookup         map[BucketName]map[string]*subscriber
 	watchChan      chan *Message
 	distributeChan chan []*Message
 	// cancellation for in-flight tasks
@@ -46,7 +58,7 @@ func NewWatchManager() *watchManager {
 	ctx := context.Background()
 	workerCtx, workerCancel := context.WithCancel(ctx)
 	return &watchManager{
-		lookup:         make(map[string]map[string]*subscriber),
+		lookup:         make(map[BucketName]map[string]*subscriber),
 		watchChan:      make(chan *Message, watchChanBufferSize),
 		distributeChan: make(chan []*Message, distributeChanBufferSize),
 		workerCtx:      workerCtx,
@@ -68,6 +80,22 @@ func (wm *watchManager) sendMessage(message *Message) error {
 	default:
 		return ErrWatchChanCannotSend
 	}
+}
+
+func (wm *watchManager) sendUpdatedEntries(entries []*Entry, getBucketName func(bucketId BucketId) (BucketName, error)) error {
+	for _, entry := range entries {
+		bucketName, err := getBucketName(entry.Meta.BucketId)
+		if err != nil {
+			continue
+		}
+
+		message := NewMessage(bucketName, string(entry.Key), entry.Value, entry.Meta.Flag, entry.Meta.Timestamp)
+		if err := wm.sendMessage(message); err != nil {
+			return err
+		}
+	}
+	return nil
+
 }
 
 // startDistributor starts both the collector and distributor goroutines
@@ -196,8 +224,7 @@ func (wm *watchManager) distributeAllMessages(messages []*Message) error {
 	}
 
 	for _, message := range messages {
-		bucket := message.Bucket
-		bucketMap, ok1 := wm.lookup[bucket]
+		bucketMap, ok1 := wm.lookup[message.BucketName]
 		if !ok1 {
 			continue
 		}
@@ -216,12 +243,12 @@ func (wm *watchManager) distributeAllMessages(messages []*Message) error {
 			subscriber.deadMessages++
 			if subscriber.deadMessages >= deadMessageThreshold {
 				fmt.Printf("Force-unsubscribing slow subscriber %s/%s\n",
-					message.Bucket, message.Key)
+					message.BucketName, message.Key)
 
-				if _, err := wm.findKeyAndReturnSubscriber(message.Bucket, message.Key); err == nil {
-					delete(wm.lookup[message.Bucket], message.Key)
-					if len(wm.lookup[message.Bucket]) == 0 {
-						delete(wm.lookup, message.Bucket)
+				if _, err := wm.findKeyAndReturnSubscriber(message.BucketName, message.Key); err == nil {
+					delete(wm.lookup[message.BucketName], message.Key)
+					if len(wm.lookup[message.BucketName]) == 0 {
+						delete(wm.lookup, message.BucketName)
 					}
 
 					if !subscriber.closed {
@@ -237,41 +264,41 @@ func (wm *watchManager) distributeAllMessages(messages []*Message) error {
 }
 
 // subscribe to the key and bucket
-func (wm *watchManager) subscribe(bucket string, key string) (<-chan *Message, error) {
+func (wm *watchManager) subscribe(bucketName BucketName, key string) (<-chan *Message, error) {
 	if wm.workerCtx.Err() != nil {
 		return nil, ErrWatchManagerClosed
 	}
 
 	wm.mu.Lock()
 	defer wm.mu.Unlock()
-	if _, ok := wm.lookup[bucket]; !ok {
-		wm.lookup[bucket] = make(map[string]*subscriber)
+	if _, ok := wm.lookup[bucketName]; !ok {
+		wm.lookup[bucketName] = make(map[string]*subscriber)
 	}
 
-	if subscriber, ok := wm.lookup[bucket][key]; ok {
+	if subscriber, ok := wm.lookup[bucketName][key]; ok {
 		subscriber.watching++
 		return subscriber.receiveChan, nil
 	}
 
 	receiveChan := make(chan *Message, receiveChanBufferSize)
 	subscriber := subscriber{
-		bucket:      bucket,
+		bucketName:  bucketName,
 		key:         key,
 		receiveChan: receiveChan,
 		watching:    1,
 	}
 
-	wm.lookup[bucket][key] = &subscriber
+	wm.lookup[bucketName][key] = &subscriber
 
 	return receiveChan, nil
 }
 
 // unsubscribe from the key and bucket
-func (wm *watchManager) unsubscribe(bucket string, key string) error {
+func (wm *watchManager) unsubscribe(bucketName BucketName, key string) error {
 	wm.mu.Lock()
 	defer wm.mu.Unlock()
 
-	subscriber, err := wm.findKeyAndReturnSubscriber(bucket, key)
+	subscriber, err := wm.findKeyAndReturnSubscriber(bucketName, key)
 	if err != nil {
 		return err
 	}
@@ -281,11 +308,11 @@ func (wm *watchManager) unsubscribe(bucket string, key string) error {
 			close(subscriber.receiveChan)
 			subscriber.closed = true
 		}
-		delete(wm.lookup[bucket], key)
+		delete(wm.lookup[bucketName], key)
 	}
 
-	if len(wm.lookup[bucket]) == 0 {
-		delete(wm.lookup, bucket)
+	if len(wm.lookup[bucketName]) == 0 {
+		delete(wm.lookup, bucketName)
 	}
 
 	return nil
@@ -320,15 +347,15 @@ func (wm *watchManager) close() error {
 	return nil
 }
 
-func (wm *watchManager) findKeyAndReturnSubscriber(bucket string, key string) (*subscriber, error) {
-	if _, ok := wm.lookup[bucket]; !ok {
+func (wm *watchManager) findKeyAndReturnSubscriber(bucketName BucketName, key string) (*subscriber, error) {
+	if _, ok := wm.lookup[bucketName]; !ok {
 		return nil, ErrBucketSubscriberNotFound
 	}
-	if _, ok := wm.lookup[bucket][key]; !ok {
+	if _, ok := wm.lookup[bucketName][key]; !ok {
 		return nil, ErrKeySubscriberNotFound
 	}
 
-	return wm.lookup[bucket][key], nil
+	return wm.lookup[bucketName][key], nil
 }
 
 func (wm *watchManager) done() <-chan struct{} {

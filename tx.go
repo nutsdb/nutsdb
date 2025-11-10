@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"sync/atomic"
 
@@ -266,6 +267,8 @@ func (tx *Tx) Commit() (err error) {
 		return err
 	}
 
+	tx.sendUpdatedEntries(pendingWriteList)
+
 	if err := tx.buildIdxes(records, pendingWriteList); err != nil {
 		return err
 	}
@@ -274,7 +277,6 @@ func (tx *Tx) Commit() (err error) {
 	if err := tx.buildBucketInIndex(); err != nil {
 		return err
 	}
-
 	return nil
 }
 
@@ -840,4 +842,19 @@ func (tx *Tx) findEntryAndItsStatus(ds Ds, bucket BucketName, key string) (Entry
 		}
 	}
 	return NotFoundEntry, nil
+}
+
+func (tx *Tx) sendUpdatedEntries(pendingWriteList []*Entry) {
+	err := tx.db.wm.sendUpdatedEntries(pendingWriteList, func(bucketId BucketId) (BucketName, error) {
+		bucket, err := tx.db.bm.GetBucketById(bucketId)
+		if err != nil {
+			return "", err
+		}
+
+		return bucket.Name, nil
+	})
+
+	if err != nil {
+		log.Println("send updated entries error", err)
+	}
 }

@@ -1,5 +1,4 @@
-// Copyright 2019 The nutsdb Author. All rights reserved.
-//
+// Copyright 2019 The nutsdb Author. All rights reserved.  //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -187,14 +186,6 @@ func InitOpt(fileDir string, isRemoveFiles bool) {
 	opt.SegmentSize = 8 * 1024
 	opt.CleanFdsCacheThreshold = 0.5
 	opt.MaxFdNumsInCache = 1024
-}
-
-func txPutWithWatch(t *testing.T, db *DB, bucket string, key, value []byte, ttl uint32, expectErr error, finalExpectErr error) {
-	txPut(t, db, bucket, key, value, ttl, expectErr, finalExpectErr)
-
-	//send message to the watch manager
-	err := db.wm.sendMessage(&Message{Bucket: bucket, Key: string(key), Value: value})
-	assert.NoError(t, err)
 }
 
 func TestDB_Basic(t *testing.T) {
@@ -2075,7 +2066,6 @@ func TestDB_HintFileDisabled(t *testing.T) {
 	require.NoError(t, db.Close())
 	removeDir(opts.Dir)
 }
-
 func TestDB_Watch(t *testing.T) {
 	t.Run("db watch key and receive message", func(t *testing.T) {
 		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
@@ -2088,7 +2078,7 @@ func TestDB_Watch(t *testing.T) {
 			// Initial watching first
 			go func() {
 				err := db.Watch(bucket, key0, func(msg *Message) error {
-					assert.Equal(t, bucket, msg.Bucket)
+					assert.Equal(t, bucket, msg.BucketName)
 					assert.Equal(t, string(key0), msg.Key)
 					close(done)
 					return nil
@@ -2104,7 +2094,7 @@ func TestDB_Watch(t *testing.T) {
 			time.Sleep(100 * time.Millisecond)
 
 			// put
-			txPutWithWatch(t, db, bucket, key0, val0, Persistent, nil, nil)
+			txPut(t, db, bucket, key0, val0, Persistent, nil, nil)
 			select {
 			case <-done:
 				t.Log("Received message")
@@ -2130,7 +2120,7 @@ func TestDB_Watch(t *testing.T) {
 			time.Sleep(100 * time.Millisecond)
 
 			// put
-			txPutWithWatch(t, db, bucket, key, val, Persistent, nil, nil)
+			txPut(t, db, bucket, key, val, Persistent, nil, nil)
 
 		})
 	})
