@@ -16,6 +16,7 @@ package data_test
 
 import (
 	"bytes"
+	"strconv"
 	"testing"
 	"time"
 
@@ -401,4 +402,19 @@ func TestList_ErrListNotFound(t *testing.T) {
 		err := l.Push(string(newKey), data.NewRecord().WithKey(newKey), true)
 		r.Equal(data.ErrListNotFound, err)
 	}
+}
+
+func TestList_Push_Success(t *testing.T) {
+	t.Run("many LPush", func(t *testing.T) {
+		r := require.New(t)
+		for _, listImpl := range []data.ListImplementationType{data.ListImplDoublyLinkedList, data.ListImplBTree} {
+			l := data.NewList(listImpl)
+			key := []byte("LPushKey")
+			N := 10
+			for i := 0; i < N; i++ {
+				err := l.LPush(string(key), data.NewRecord().WithKey([]byte(strconv.Itoa(i))))
+				r.NoError(err)
+			}
+		}
+	})
 }
