@@ -41,7 +41,7 @@ func wmUnsubscribe(t *testing.T, wm *watchManager, bucket, key string) {
 
 // wmSendMessage sends a message and asserts no error
 func wmSendMessage(t *testing.T, wm *watchManager, bucket, key string, value []byte) {
-	err := wm.sendMessage(&Message{Bucket: bucket, Key: key, Value: value})
+	err := wm.sendMessage(&Message{BucketName: bucket, Key: key, Value: value})
 	assert.NoError(t, err)
 }
 
@@ -57,7 +57,7 @@ func wmSendMessages(t *testing.T, wm *watchManager, bucket, key string, count in
 func wmReceiveMessage(t *testing.T, receiveChan <-chan *Message, expectBucket, expectKey string, timeout time.Duration) *Message {
 	select {
 	case msg := <-receiveChan:
-		assert.Equal(t, expectBucket, msg.Bucket)
+		assert.Equal(t, expectBucket, msg.BucketName)
 		assert.Equal(t, expectKey, msg.Key)
 		assert.NotNil(t, msg.Value)
 		return msg
@@ -78,7 +78,7 @@ func wmReceiveMessages(t *testing.T, receiveChan <-chan *Message, expectBucket, 
 			if !ok {
 				return received
 			}
-			assert.Equal(t, expectBucket, msg.Bucket)
+			assert.Equal(t, expectBucket, msg.BucketName)
 			assert.Equal(t, expectKey, msg.Key)
 			assert.NotNil(t, msg.Value)
 			received++
@@ -149,7 +149,7 @@ func wmStartSender(wm *watchManager, bucket, key string, sent *int, stopChan <-c
 				return
 			case <-ticker.C:
 				value := []byte(fmt.Sprintf("value_%d", sent))
-				err := wm.sendMessage(&Message{Bucket: bucket, Key: key, Value: value})
+				err := wm.sendMessage(&Message{BucketName: bucket, Key: key, Value: value})
 				if err == nil {
 					*sent++
 				}
@@ -165,7 +165,7 @@ func wmStartReceiver(t *testing.T, receiveChan <-chan *Message, expectBucket, ex
 	go func() {
 		defer wg.Done()
 		for msg := range receiveChan {
-			assert.Equal(t, expectBucket, msg.Bucket)
+			assert.Equal(t, expectBucket, msg.BucketName)
 			assert.Equal(t, expectKey, msg.Key)
 			assert.NotNil(t, msg.Value)
 			*received++
@@ -246,7 +246,7 @@ func TestWatchManager_SubscribeAndSendMessage(t *testing.T) {
 							break
 						}
 
-						assert.Equal(t, bucket, message.Bucket)
+						assert.Equal(t, bucket, message.BucketName)
 						assert.Equal(t, key, message.Key)
 						assert.NotNil(t, message.Value)
 
@@ -272,9 +272,9 @@ func TestWatchManager_SubscribeAndSendMessage(t *testing.T) {
 				value := fmt.Sprintf("value_test_%d_%d", i, j)
 
 				err := wm.sendMessage(&Message{
-					Bucket: bucket,
-					Key:    key,
-					Value:  []byte(value),
+					BucketName: bucket,
+					Key:        key,
+					Value:      []byte(value),
 				})
 				assert.NoError(t, err)
 			}
