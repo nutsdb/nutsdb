@@ -10,7 +10,7 @@ import (
 
 func TestGetDiskSizeFromSingleObject(t *testing.T) {
 	type args struct {
-		obj interface{}
+		obj any
 	}
 	tests := []struct {
 		name string
@@ -70,4 +70,13 @@ func TestMatchForRange(t *testing.T) {
 	})
 	assertions.NoError(err, "TestMatchForRange")
 	assertions.True(end, "TestMatchForRange")
+}
+
+func TestEncodeListKeyAndDecodeListKey(t *testing.T) {
+	key := []byte("test_key")
+	seq := uint64(114514)
+	dataKey := utils.EncodeListKey(key, seq)
+	newKey, newSeq := utils.DecodeListKey(dataKey)
+	assert.Equal(t, key, newKey)
+	assert.Equal(t, seq, newSeq)
 }

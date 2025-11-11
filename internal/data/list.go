@@ -1,7 +1,6 @@
 package data
 
 import (
-	"encoding/binary"
 	"errors"
 	"time"
 
@@ -140,13 +139,6 @@ func NewList(listImpl ListImplementationType) *List {
 	}
 }
 
-func decodeListKey(buf []byte) ([]byte, uint64) {
-	seq := binary.LittleEndian.Uint64(buf[:8])
-	key := make([]byte, len(buf[8:]))
-	copy(key[:], buf[8:])
-	return key, seq
-}
-
 // CreateListStructure creates a new list storage structure based on configuration.
 func (l *List) CreateListStructure() ListStructure {
 	switch l.ListImpl {
@@ -170,7 +162,7 @@ func (l *List) RPush(key string, r *Record) error {
 
 func (l *List) Push(key string, r *Record, isLeft bool) error {
 	// key is seq + user_key
-	userKey, curSeq := decodeListKey([]byte(key))
+	userKey, curSeq := utils.DecodeListKey([]byte(key))
 	userKeyStr := string(userKey)
 	if l.IsExpire(userKeyStr) {
 		return ErrListNotFound
@@ -505,6 +497,33 @@ func (l *List) GetListTTL(key string) (uint32, error) {
 func (l *List) ExpireList(key []byte, ttl uint32) {
 	l.TTL[string(key)] = ttl
 	l.TimeStamp[string(key)] = uint64(time.Now().Unix())
+}
+
+func (l *List) GeneratePushKey(key []byte, isLeft bool) []byte {
+	// 获取或创建HeadTailSeq
+	keyStr := string(key)
+	seq, ok := l.Seq[keyStr]
+	if !ok {
+		// 如果不存在，先尝试从现有项推断
+		if items, exists := l.Items[keyStr]; exists && items.Count() > 0 {
+			minSeq, okMinSeq := items.Min()
+			maxSeq, okMaxSeq := items.Max()
+			if !okMinSeq || !okMaxSeq {
+				seq = &HeadTailSeq{Head: InitialListSeq, Tail: InitialListSeq + 1}
+			} else {
+				seq = &HeadTailSeq{
+					Head: utils.ConvertBigEndianBytesToUint64(minSeq.Key) - 1,
+					Tail: utils.ConvertBigEndianBytesToUint64(maxSeq.Key) + 1,
+				}
+			}
+		} else {
+			seq = &HeadTailSeq{Head: InitialListSeq, Tail: InitialListSeq + 1}
+		}
+		l.Seq[keyStr] = seq
+	}
+
+	seqValue := seq.GenerateSeq(isLeft)
+	return utils.EncodeListKey(key, seqValue)
 }
 
 func checkBounds(start, end int, size int) (int, int, error) {

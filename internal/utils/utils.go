@@ -110,3 +110,10 @@ func EncodeListKey(key []byte, seq uint64) []byte {
 	copy(buf[8:], key[:])
 	return buf
 }
+
+func DecodeListKey(buf []byte) ([]byte, uint64) {
+	seq := binary.LittleEndian.Uint64(buf[:8])
+	key := make([]byte, len(buf[8:]))
+	copy(key[:], buf[8:])
+	return key, seq
+}

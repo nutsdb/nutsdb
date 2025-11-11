@@ -16,6 +16,7 @@ package data_test
 
 import (
 	"bytes"
+	"strconv"
 	"testing"
 	"time"
 
@@ -381,7 +382,62 @@ func TestList_PushTTL_ErrListNotFound(t *testing.T) {
 		key := []byte("expire_list")
 		l.ExpireList(key, 1)
 		r.False(l.IsExpire(string(key)))
-		<-time.After(1500 * time.Millisecond)
+		<-time.After(1100 * time.Millisecond)
 		r.True(l.IsExpire(string(key)))
 	}
+}
+
+func TestList_ErrListNotFound(t *testing.T) {
+	r := require.New(t)
+	for _, listImpl := range []data.ListImplementationType{data.ListImplDoublyLinkedList, data.ListImplBTree} {
+		l := data.NewList(listImpl)
+		key := []byte("expire_list")
+		t.Log(key)
+		l.ExpireList(key, 1)
+		r.False(l.IsExpire(string(key)))
+		newKey := l.GeneratePushKey(key, true)
+		r.NoError(l.Push(string(newKey), data.NewRecord().WithKey(newKey), true))
+		<-time.After(1100 * time.Millisecond)
+		newKey = l.GeneratePushKey(key, true)
+		r.Equal(
+			data.ErrListNotFound,
+			l.Push(string(newKey), data.NewRecord().WithKey(newKey), true),
+		)
+	}
+}
+
+func TestList_Push_Success(t *testing.T) {
+	t.Run("many LPush", func(t *testing.T) {
+		r := require.New(t)
+		for _, listImpl := range []data.ListImplementationType{data.ListImplDoublyLinkedList, data.ListImplBTree} {
+			l := data.NewList(listImpl)
+			key := []byte("LPushKey")
+			N := 10
+			for i := 0; i < N; i++ {
+				newKey := l.GeneratePushKey(key, false)
+				err := l.LPush(string(newKey), data.NewRecord().WithKey([]byte(strconv.Itoa(i))))
+				r.NoError(err)
+			}
+			n, err := l.Size(string(key))
+			r.NoError(err)
+			r.Equal(N, n)
+		}
+	})
+	t.Run("many LPush no seq", func(t *testing.T) {
+		r := require.New(t)
+		for _, listImpl := range []data.ListImplementationType{data.ListImplDoublyLinkedList, data.ListImplBTree} {
+			l := data.NewList(listImpl)
+			key := []byte("LPushKeyNoSeq")
+			N := 10
+			for i := 0; i < N; i++ {
+				l.Seq = make(map[string]*data.HeadTailSeq)
+				newKey := l.GeneratePushKey(key, false)
+				err := l.LPush(string(newKey), data.NewRecord().WithKey([]byte(strconv.Itoa(i))))
+				r.NoError(err)
+			}
+			n, err := l.Size(string(key))
+			r.NoError(err)
+			r.Equal(N, n)
+		}
+	})
 }

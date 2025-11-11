@@ -105,40 +105,18 @@ func (tx *Tx) push(bucket string, key []byte, flag uint16, values ...[]byte) err
 	return nil
 }
 
-func (tx *Tx) getListNewKey(bucket string, key []byte, isLeft bool) []byte {
+// getListWithDefault
+// this function will get list, if list not exists, will create
+// a new one.
+func (tx *Tx) getListWithDefault(bucket string) (*data.List, error) {
 	b, err := tx.db.bm.GetBucket(DataStructureList, bucket)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 	bucketId := b.Id
 
 	// 确保列表索引存在
-	l := tx.db.Index.list.getWithDefault(bucketId)
-
-	// 获取或创建HeadTailSeq
-	keyStr := string(key)
-	seq, ok := l.Seq[keyStr]
-	if !ok {
-		// 如果不存在，先尝试从现有项推断
-		if items, exists := l.Items[keyStr]; exists && items.Count() > 0 {
-			minSeq, okMinSeq := items.Min()
-			maxSeq, okMaxSeq := items.Max()
-			if !okMinSeq || !okMaxSeq {
-				seq = &data.HeadTailSeq{Head: data.InitialListSeq, Tail: data.InitialListSeq + 1}
-			} else {
-				seq = &data.HeadTailSeq{
-					Head: utils.ConvertBigEndianBytesToUint64(minSeq.Key) - 1,
-					Tail: utils.ConvertBigEndianBytesToUint64(maxSeq.Key) + 1,
-				}
-			}
-		} else {
-			seq = &data.HeadTailSeq{Head: data.InitialListSeq, Tail: data.InitialListSeq + 1}
-		}
-		l.Seq[keyStr] = seq
-	}
-
-	seqValue := seq.GenerateSeq(isLeft)
-	return utils.EncodeListKey(key, seqValue)
+	return tx.db.Index.list.getWithDefault(bucketId), nil
 }
 
 // RPush inserts the values at the tail of the list stored in the bucket at given bucket,key and values.
@@ -152,8 +130,12 @@ func (tx *Tx) RPush(bucket string, key []byte, values ...[]byte) error {
 	}
 
 	for _, value := range values {
-		newKey := tx.getListNewKey(bucket, key, false)
-		err := tx.push(bucket, newKey, DataRPushFlag, value)
+		l, err := tx.getListWithDefault(bucket)
+		if err != nil {
+			return err
+		}
+		newKey := l.GeneratePushKey(key, false)
+		err = tx.push(bucket, newKey, DataRPushFlag, value)
 		if err != nil {
 			return err
 		}
@@ -173,8 +155,12 @@ func (tx *Tx) LPush(bucket string, key []byte, values ...[]byte) error {
 	}
 
 	for _, value := range values {
-		newKey := tx.getListNewKey(bucket, key, true)
-		err := tx.push(bucket, newKey, DataLPushFlag, value)
+		l, err := tx.getListWithDefault(bucket)
+		if err != nil {
+			return err
+		}
+		newKey := l.GeneratePushKey(key, true)
+		err = tx.push(bucket, newKey, DataLPushFlag, value)
 		if err != nil {
 			return err
 		}
