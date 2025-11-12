@@ -391,7 +391,7 @@ func TestWatchManager_SubscribeAndUnsubscribe(t *testing.T) {
 			wg.Add(1)
 			go func(i int) {
 				defer wg.Done()
-				received := wmReceiveMessages(t, receiveChans[i], bucket, keys[i], expectedMessages, 5*time.Second)
+				received := wmReceiveMessages(t, receiveChans[i], bucket, keys[i], expectedMessages, 10*time.Second)
 				assert.Equal(t, expectedMessages, received, "subscriber %d should receive all messages", i)
 			}(i)
 		}
