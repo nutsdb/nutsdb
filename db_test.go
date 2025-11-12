@@ -2066,6 +2066,7 @@ func TestDB_HintFileDisabled(t *testing.T) {
 	require.NoError(t, db.Close())
 	removeDir(opts.Dir)
 }
+
 func TestDB_Watch(t *testing.T) {
 	t.Run("db watch key and receive message", func(t *testing.T) {
 		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
@@ -2075,11 +2076,11 @@ func TestDB_Watch(t *testing.T) {
 			val0 := testutils.GetRandomBytes(24)
 			done := make(chan struct{})
 
-			// Initial watching first
 			go func() {
 				err := db.Watch(bucket, key0, func(msg *Message) error {
 					assert.Equal(t, bucket, msg.BucketName)
 					assert.Equal(t, string(key0), msg.Key)
+					assert.Equal(t, val0, msg.Value)
 					close(done)
 					return nil
 				})
@@ -2148,4 +2149,42 @@ func TestDB_Watch(t *testing.T) {
 		require.Equal(t, err, ErrWatchManagerClosed)
 	})
 
+	t.Run("db watch and tx delete", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			bucket := "bucket"
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			key := testutils.GetTestBytes(0)
+			val := testutils.GetTestBytes(0)
+			done := make(chan struct{})
+			go func() {
+				flag := DataSetFlag
+				err := db.Watch(bucket, key, func(msg *Message) error {
+					assert.Equal(t, bucket, msg.BucketName)
+					assert.Equal(t, string(key), msg.Key)
+					assert.Equal(t, flag, msg.Flag)
+					if flag != DataSetFlag {
+						close(done)
+					}
+					flag = DataDeleteFlag
+					return nil
+				})
+
+				if err != nil {
+					assert.ErrorIs(t, err, ErrWatchingChannelClosed)
+					return
+				}
+			}()
+
+			txPut(t, db, bucket, key, val, Persistent, nil, nil)
+			txDel(t, db, bucket, key, nil)
+			require.NoError(t, err)
+
+			select {
+			case <-done:
+				t.Log("Received delete message")
+			case <-time.After(10 * time.Second):
+				t.Fatal("Timeout waiting for message")
+			}
+		})
+	})
 }
