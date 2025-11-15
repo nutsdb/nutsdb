@@ -1,4 +1,5 @@
-// Copyright 2019 The nutsdb Author. All rights reserved.  //
+// Copyright 2019 The nutsdb Author. All rights reserved.
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -16,6 +17,7 @@ package nutsdb
 import (
 	"fmt"
 	"math"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -67,6 +69,12 @@ func runNutsDBTest(t *testing.T, opts *Options, test func(t *testing.T, db *DB))
 			require.NoError(t, db.Close())
 		}
 	})
+}
+
+func runNutsDBTestWithWatch(t *testing.T, test func(t *testing.T, db *DB)) {
+	option := DefaultOptions
+	option.EnableWatch = true
+	runNutsDBTest(t, &option, test)
 }
 
 func txPut(t *testing.T, db *DB, bucket string, key, value []byte, ttl uint32, expectErr error, finalExpectErr error) {
@@ -2069,7 +2077,7 @@ func TestDB_HintFileDisabled(t *testing.T) {
 
 func TestDB_Watch(t *testing.T) {
 	t.Run("db watch key and receive message", func(t *testing.T) {
-		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		runNutsDBTestWithWatch(t, func(t *testing.T, db *DB) {
 			bucket := "bucket"
 			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 			key0 := testutils.GetTestBytes(0)
@@ -2106,7 +2114,7 @@ func TestDB_Watch(t *testing.T) {
 	})
 
 	t.Run("db watch and callback failed", func(t *testing.T) {
-		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		runNutsDBTestWithWatch(t, func(t *testing.T, db *DB) {
 			bucket := "bucket"
 			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 			key := testutils.GetTestBytes(0)
@@ -2128,6 +2136,7 @@ func TestDB_Watch(t *testing.T) {
 
 	t.Run("db watch and watch manager closed", func(t *testing.T) {
 		opts := DefaultOptions
+		opts.EnableWatch = true
 		opts.Dir = "/tmp/test-watch-manager-closed/"
 		removeDir(opts.Dir)
 
@@ -2149,8 +2158,38 @@ func TestDB_Watch(t *testing.T) {
 		require.Equal(t, err, ErrWatchManagerClosed)
 	})
 
+	t.Run("db is watching and watch manager closed", func(t *testing.T) {
+		runNutsDBTestWithWatch(t, func(t *testing.T, db *DB) {
+			bucket := "bucket"
+			key := testutils.GetTestBytes(0)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+			go func() {
+				err := db.Watch(bucket, key, func(msg *Message) error {
+					return nil
+				})
+				require.NoError(t, err)
+			}()
+
+			go func() {
+				time.Sleep(time.Duration(rand.Intn(100)) * time.Millisecond)
+				db.wm.close()
+				require.Equal(t, db.wm.isClosed(), true)
+			}()
+
+			ticker := time.NewTicker(10 * time.Millisecond)
+			defer ticker.Stop()
+			for i := 0; i < 100; i++ {
+				val := testutils.GetTestBytes(i)
+				<-ticker.C
+				txPut(t, db, bucket, key, val, Persistent, nil, nil)
+			}
+
+		})
+	})
+
 	t.Run("db watch and tx delete", func(t *testing.T) {
-		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		runNutsDBTestWithWatch(t, func(t *testing.T, db *DB) {
 			bucket := "bucket"
 			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 			key := testutils.GetTestBytes(0)
@@ -2185,6 +2224,18 @@ func TestDB_Watch(t *testing.T) {
 			case <-time.After(10 * time.Second):
 				t.Fatal("Timeout waiting for message")
 			}
+		})
+	})
+
+	t.Run("db watch and watch feature disabled", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			bucket := "bucket"
+			key := testutils.GetTestBytes(0)
+			err := db.Watch(bucket, key, func(msg *Message) error {
+				t.Fatal("Watch feature should be disabled")
+				return nil
+			})
+			require.ErrorIs(t, err, ErrWatchFeatureDisabled)
 		})
 	})
 }

@@ -19,17 +19,17 @@ func startDistributor() *watchManager {
 }
 
 // wmSubscribe subscribes to a bucket/key and verifies subscription
-func wmSubscribe(t *testing.T, wm *watchManager, bucket, key string) <-chan *Message {
-	receiveChan, err := wm.subscribe(bucket, key)
+func wmSubscribe(t *testing.T, wm *watchManager, bucket, key string) (<-chan *Message, BucketId) {
+	receiveChan, id, err := wm.subscribe(bucket, key)
 	require.NoError(t, err)
 
-	wmVerifySubscriberExists(t, wm, bucket, key)
-	return receiveChan
+	wmVerifySubscriberExists(t, wm, bucket, key, id)
+	return receiveChan, id
 }
 
 // wmUnsubscribe unsubscribes from a bucket/key and verifies removal
-func wmUnsubscribe(t *testing.T, wm *watchManager, bucket, key string) {
-	err := wm.unsubscribe(bucket, key)
+func wmUnsubscribe(t *testing.T, wm *watchManager, bucket, key string, id uint64) {
+	err := wm.unsubscribe(bucket, key, id)
 	require.NoError(t, err)
 
 	wm.mu.Lock()
@@ -76,6 +76,7 @@ func wmReceiveMessages(t *testing.T, receiveChan <-chan *Message, expectBucket, 
 		select {
 		case msg, ok := <-receiveChan:
 			if !ok {
+				t.Logf("receive channel closed after receiving %d/%d messages", received, expectCount)
 				return received
 			}
 			assert.Equal(t, expectBucket, msg.BucketName)
@@ -110,11 +111,12 @@ func wmDrainChannel(t *testing.T, receiveChan <-chan *Message, timeout time.Dura
 }
 
 // wmVerifySubscriberExists checks if a subscriber exists in the lookup table
-func wmVerifySubscriberExists(t *testing.T, wm *watchManager, bucket, key string) {
+func wmVerifySubscriberExists(t *testing.T, wm *watchManager, bucket, key string, id BucketId) {
 	wm.mu.Lock()
 	defer wm.mu.Unlock()
 	assert.Contains(t, wm.lookup, bucket)
 	assert.Contains(t, wm.lookup[bucket], key)
+	assert.Contains(t, wm.lookup[bucket][key], id)
 }
 
 // wmVerifySubscriberRemoved checks if a subscriber is removed from the lookup table
@@ -182,7 +184,7 @@ func TestWatchManager_SubscribeAndSendMessage(t *testing.T) {
 		key := "test"
 		value := []byte("updated value")
 
-		receiveChan := wmSubscribe(t, wm, bucket, key)
+		receiveChan, _ := wmSubscribe(t, wm, bucket, key)
 		wmSendMessage(t, wm, bucket, key, value)
 
 		msg := wmReceiveMessage(t, receiveChan, bucket, key, 1*time.Second)
@@ -197,23 +199,59 @@ func TestWatchManager_SubscribeAndSendMessage(t *testing.T) {
 		key := "key_test"
 
 		// Subscribe but don't receive messages
-		receiveChan := wmSubscribe(t, wm, bucket, key)
+		receiveChan, _ := wmSubscribe(t, wm, bucket, key)
 
 		// Send enough messages to:
-		// 1. Fill receiveChan buffer (1000)
+		// 1. Fill receiveChan buffer (1024)
 		// 2. Trigger 100+ drops to force-unsubscribe
 		// Total: 1100+ messages
-		messagesToSend := 1100
+		messagesToSend := 1124
 		wmSendMessages(t, wm, bucket, key, messagesToSend)
 
 		time.Sleep(100 * time.Millisecond)
 		drained := wmDrainChannel(t, receiveChan, 2*time.Second)
 
-		assert.Equal(t, 1000, drained, "should have buffered exactly 1000 messages")
+		assert.Equal(t, 1024, drained, "should have buffered exactly 1024 messages")
 
 		// Verify subscriber was force-unsubscribed due to slow consumption
 		wmVerifySubscriberRemoved(t, wm, bucket, key)
 		wmVerifyBucketRemoved(t, wm, bucket)
+	})
+
+	t.Run("multiple subscribers for the same key", func(t *testing.T) {
+		wm := startDistributor()
+		defer wm.close()
+
+		bucket := "bucket_test"
+		key := "key_test"
+		numSubscribers := 10
+		messagesPerSubscriber := 10
+
+		wg := sync.WaitGroup{}
+
+		// start subscribers goroutines for the same key
+		for i := 0; i < numSubscribers; i++ {
+			wg.Add(1)
+			go func(i int) {
+				defer wg.Done()
+				receiveChan, _ := wmSubscribe(t, wm, bucket, key)
+				received := wmReceiveMessages(t, receiveChan, bucket, key, messagesPerSubscriber, 5*time.Second)
+				assert.Equal(t, messagesPerSubscriber, received)
+			}(i)
+		}
+
+		// wait for subscribers to register
+		time.Sleep(100 * time.Millisecond)
+
+		// start sender goroutine
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			wmSendMessages(t, wm, bucket, key, messagesPerSubscriber)
+		}()
+
+		wg.Wait()
+
 	})
 
 	t.Run("multiple subscribers", func(t *testing.T) {
@@ -234,7 +272,7 @@ func TestWatchManager_SubscribeAndSendMessage(t *testing.T) {
 				key := fmt.Sprintf("key_test_%d", i)
 				receivedCounts := 0
 
-				receiveChan, err := wm.subscribe(bucket, key)
+				receiveChan, _, err := wm.subscribe(bucket, key)
 				assert.NoError(t, err)
 
 				timeout := time.After(5 * time.Second)
@@ -261,10 +299,10 @@ func TestWatchManager_SubscribeAndSendMessage(t *testing.T) {
 			}(i)
 		}
 
-		// Give subscribers time to register
+		// wait for subscribers to register
 		time.Sleep(100 * time.Millisecond)
 
-		// Send exactly 10 messages to each subscriber (deterministic)
+		// send exactly 10 messages to each subscriber (deterministic)
 		for i := 0; i < numSubscribers; i++ {
 			for j := 0; j < messagesPerSubscriber; j++ {
 				bucket := fmt.Sprintf("bucket_test_%d", i)
@@ -280,7 +318,7 @@ func TestWatchManager_SubscribeAndSendMessage(t *testing.T) {
 			}
 		}
 
-		// Wait for all subscribers to finish (with timeout)
+		// wait for all subscribers to finish (with timeout)
 		wg.Wait()
 	})
 
@@ -297,20 +335,20 @@ func TestWatchManager_SubscribeAndSendMessage(t *testing.T) {
 		bucket := "bucket_test"
 		key := "key_test"
 
-		receiveChan := wmSubscribe(t, wm, bucket, key)
+		receiveChan, _ := wmSubscribe(t, wm, bucket, key)
 
-		// Track successful sends/receives with WaitGroup
+		// track successful sends/receives with WaitGroup
 		stopChan := make(chan struct{})
 		var sentCount, receivedCount int
-		senderWg := sync.WaitGroup{}   // For sender only
-		receiverWg := sync.WaitGroup{} // For receiver only
+		senderWg := sync.WaitGroup{}   // for sender only
+		receiverWg := sync.WaitGroup{} // for receiver only
 
-		// Start both sender and receiver goroutines
+		// start both sender and receiver goroutines
 		wmStartSender(wm, bucket, key, &sentCount, stopChan, &senderWg)
 		wmStartReceiver(t, receiveChan, bucket, key, &receivedCount, &receiverWg)
 
 		time.Sleep(200 * time.Millisecond)
-		close(stopChan) // Stop sender first
+		close(stopChan) // stop sender first
 		senderWg.Wait()
 
 		isClosed = true
@@ -322,6 +360,7 @@ func TestWatchManager_SubscribeAndSendMessage(t *testing.T) {
 		assert.Greater(t, sentCount, 0, "should have sent some messages")
 		assert.Greater(t, receivedCount, 0, "should have received some messages")
 	})
+
 }
 
 func TestWatchManager_SubscribeAndUnsubscribe(t *testing.T) {
@@ -333,18 +372,18 @@ func TestWatchManager_SubscribeAndUnsubscribe(t *testing.T) {
 		key := "key_test"
 		expectedMessages := 1000
 
-		receiveChan := wmSubscribe(t, wm, bucket, key)
+		receiveChan, id := wmSubscribe(t, wm, bucket, key)
 
 		wg := sync.WaitGroup{}
 
-		// Send messages in goroutine
+		// send messages in goroutine
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			wmSendMessages(t, wm, bucket, key, expectedMessages)
 		}()
 
-		// Receive messages in goroutine
+		// receive messages in goroutine
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -354,8 +393,8 @@ func TestWatchManager_SubscribeAndUnsubscribe(t *testing.T) {
 
 		wg.Wait()
 
-		// Unsubscribe after receiving all messages
-		wmUnsubscribe(t, wm, bucket, key)
+		// unsubscribe after receiving all messages
+		wmUnsubscribe(t, wm, bucket, key, id)
 		wmVerifyBucketRemoved(t, wm, bucket)
 	})
 
@@ -364,20 +403,21 @@ func TestWatchManager_SubscribeAndUnsubscribe(t *testing.T) {
 		defer wm.close()
 
 		expectedSubscribers := 10
-		expectedMessages := 100 // Reduced for faster test
+		expectedMessages := 100 // reduced for faster test
 		bucket := "bucket_test"
 
-		// Subscribe all keys
+		// subscribe all keys
 		receiveChans := make([]<-chan *Message, expectedSubscribers)
 		keys := make([]string, expectedSubscribers)
+		ids := make([]BucketId, expectedSubscribers)
 		for i := 0; i < expectedSubscribers; i++ {
 			keys[i] = fmt.Sprintf("key_test_%d", i)
-			receiveChans[i] = wmSubscribe(t, wm, bucket, keys[i])
+			receiveChans[i], ids[i] = wmSubscribe(t, wm, bucket, keys[i])
 		}
 
 		wg := sync.WaitGroup{}
 
-		// Start sender goroutines
+		// start sender goroutines
 		for i := 0; i < expectedSubscribers; i++ {
 			wg.Add(1)
 			go func(i int) {
@@ -386,25 +426,88 @@ func TestWatchManager_SubscribeAndUnsubscribe(t *testing.T) {
 			}(i)
 		}
 
-		// Start receiver goroutines with timeout
+		// start receiver goroutines with timeout
 		for i := 0; i < expectedSubscribers; i++ {
 			wg.Add(1)
 			go func(i int) {
 				defer wg.Done()
-				received := wmReceiveMessages(t, receiveChans[i], bucket, keys[i], expectedMessages, 10*time.Second)
+				received := wmReceiveMessages(t, receiveChans[i], bucket, keys[i], expectedMessages, 5*time.Second)
 				assert.Equal(t, expectedMessages, received, "subscriber %d should receive all messages", i)
 			}(i)
 		}
 
 		wg.Wait()
 
-		// Unsubscribe all keys
+		// unsubscribe all keys
 		for i := 0; i < expectedSubscribers; i++ {
-			wmUnsubscribe(t, wm, bucket, keys[i])
+			wmUnsubscribe(t, wm, bucket, keys[i], ids[i])
 			wmVerifySubscriberRemoved(t, wm, bucket, keys[i])
 		}
 
-		// Verify bucket is completely removed after all keys unsubscribe
+		// verify bucket is completely removed after all keys unsubscribe
 		wmVerifyBucketRemoved(t, wm, bucket)
 	})
+}
+
+func TestWatchManager_RunCollector(t *testing.T) {
+	t.Run("send messages and receive them in batches", func(t *testing.T) {
+
+		wm := startDistributor()
+		defer wm.close()
+		time.Sleep(50 * time.Millisecond)
+
+		bucket := "test_bucket"
+		key := "test_key"
+
+		receiveChan, _ := wmSubscribe(t, wm, bucket, key)
+
+		messageCount := 128
+		for i := 0; i < messageCount; i++ {
+			wmSendMessage(t, wm, bucket, key, []byte(fmt.Sprintf("value_%d", i)))
+		}
+
+		received := wmReceiveMessages(t, receiveChan, bucket, key, messageCount, 2*time.Second)
+		assert.Equal(t, messageCount, received, "should receive all messages")
+	})
+
+	t.Run("max batch size triggers immediate send", func(t *testing.T) {
+		wm := startDistributor()
+		defer wm.close()
+		time.Sleep(50 * time.Millisecond)
+
+		bucket := "test_bucket"
+		key := "test_key"
+		receiveChan, _ := wmSubscribe(t, wm, bucket, key)
+
+		for i := 0; i < maxBatchSize; i++ {
+			wmSendMessage(t, wm, bucket, key, []byte(fmt.Sprintf("value_%d", i)))
+		}
+
+		received := wmReceiveMessages(t, receiveChan, bucket, key, maxBatchSize, 3*time.Second)
+		assert.Equal(t, maxBatchSize, received, "should receive full batch immediately")
+
+		wm.close()
+	})
+
+	//TODO: This test will be fail because the channel of a subscriber is only 1024. then the rest of the messages will be dropped.
+	// we need to fix this with plan for handling the dropped messages in the future.
+	// t.Run("send messages and receive them in multiple batches", func(t *testing.T) {
+	// 	wm := startDistributor()
+	// 	defer wm.close()
+	// 	time.Sleep(50 * time.Millisecond)
+
+	// 	bucket := "test_bucket"
+	// 	key := "test_key"
+	// 	receiveChan, _ := wmSubscribe(t, wm, bucket, key)
+
+	// 	totalMessages := 10 * maxBatchSize // 10 * 1024
+	// 	for i := 0; i < totalMessages; i++ {
+	// 		wmSendMessage(t, wm, bucket, key, []byte(fmt.Sprintf("value_%d", i)))
+	// 	}
+
+	// 	received := wmReceiveMessages(t, receiveChan, bucket, key, totalMessages, 5*time.Second)
+	// 	assert.Equal(t, totalMessages, received, "should receive all messages across multiple batches")
+
+	// 	wm.close()
+	// })
 }
