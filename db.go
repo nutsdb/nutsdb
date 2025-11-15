@@ -26,6 +26,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/bwmarrin/snowflake"
 	"github.com/gofrs/flock"
@@ -71,6 +72,7 @@ type (
 		bm                      *BucketManager
 		hintKeyAndRAMIdxModeLru *utils.LRUCache // lru cache for HintKeyAndRAMIdxMode
 		sm                      *SnowflakeManager
+		wm                      *watchManager
 	}
 )
 
@@ -145,6 +147,13 @@ func open(opt Options) (*DB, error) {
 
 	if err := db.buildIndexes(); err != nil {
 		return nil, fmt.Errorf("db.buildIndexes error: %s", err)
+	}
+
+	if db.opt.EnableWatch {
+		db.wm = NewWatchManager()
+		go db.wm.startDistributor()
+	} else {
+		db.wm = nil
 	}
 
 	go db.mergeWorker()
@@ -249,6 +258,10 @@ func (db *DB) release() error {
 	db.commitBuffer = nil
 
 	db.tm.close()
+
+	if db.wm != nil {
+		db.wm.close()
+	}
 
 	if GCEnable {
 		runtime.GC()
@@ -1050,4 +1063,77 @@ func (db *DB) rebuildBucketManager() error {
 		}
 	}
 	return nil
+}
+
+// Watch watches the key and bucket and calls the callback function for each message received.
+// The callback will be called once for each individual message in the batch.
+func (db *DB) Watch(bucket string, key []byte, cb func(message *Message) error) error {
+	if db.wm == nil {
+		return ErrWatchFeatureDisabled
+	}
+
+	receiveChan, id, err := db.wm.subscribe(bucket, string(key))
+	if err != nil {
+		return err
+	}
+
+	batch := make([]*Message, 0, 128)
+
+	// Use a ticker to process the batch every 100 milliseconds
+	// Avoid CPU busy spinning
+	ticker := time.NewTicker(100 * time.Millisecond)
+	keyWatch := string(key)
+	processBatch := func(batch []*Message) error {
+		if len(batch) == 0 {
+			return nil
+		}
+
+		for _, msg := range batch {
+			if err := cb(msg); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	defer func() {
+		ticker.Stop()
+
+		if err := db.wm.unsubscribe(bucket, keyWatch, id); err != nil {
+			log.Println("Failed to unsubscribe from", bucket, "/", keyWatch, ":", err)
+		}
+	}()
+
+	for {
+		select {
+		case <-db.wm.done():
+			// drain the batch
+			if err := processBatch(batch); err != nil {
+				return err
+			}
+			return nil
+		case message, ok := <-receiveChan:
+			if !ok {
+				if err := processBatch(batch); err != nil {
+					return err
+				}
+
+				return ErrWatchingChannelClosed
+			}
+			batch = append(batch, message)
+			if len(batch) >= 100 {
+				if err := processBatch(batch); err != nil {
+					return err
+				}
+				batch = batch[:0]
+			}
+		case <-ticker.C:
+			for len(batch) > 0 {
+				if err := processBatch(batch); err != nil {
+					return err
+				}
+				batch = batch[:0]
+			}
+		}
+	}
 }

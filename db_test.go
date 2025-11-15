@@ -2067,3 +2067,139 @@ func TestDB_HintFileDisabled(t *testing.T) {
 	require.NoError(t, db.Close())
 	removeDir(opts.Dir)
 }
+
+func TestDB_Watch(t *testing.T) {
+	t.Run("db watch key and receive message", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			bucket := "bucket"
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			key0 := testutils.GetTestBytes(0)
+			val0 := testutils.GetRandomBytes(24)
+			done := make(chan struct{})
+
+			go func() {
+				err := db.Watch(bucket, key0, func(msg *Message) error {
+					assert.Equal(t, bucket, msg.BucketName)
+					assert.Equal(t, string(key0), msg.Key)
+					assert.Equal(t, val0, msg.Value)
+					close(done)
+					return nil
+				})
+
+				if err != nil {
+					assert.ErrorIs(t, err, ErrWatchingChannelClosed)
+					return
+				}
+			}()
+
+			// Wait for the watching to be started
+			time.Sleep(100 * time.Millisecond)
+
+			// put
+			txPut(t, db, bucket, key0, val0, Persistent, nil, nil)
+			select {
+			case <-done:
+				t.Log("Received message")
+			case <-time.After(10 * time.Second):
+				t.Fatal("Timeout waiting for message")
+			}
+		})
+	})
+
+	t.Run("db watch and callback failed", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			bucket := "bucket"
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			key := testutils.GetTestBytes(0)
+			val := testutils.GetTestBytes(0)
+			go func() {
+				err := db.Watch(bucket, key, func(msg *Message) error {
+					return ErrWatchingCallbackFailed
+				})
+				require.Equal(t, err, ErrWatchingCallbackFailed)
+			}()
+
+			time.Sleep(100 * time.Millisecond)
+
+			// put
+			txPut(t, db, bucket, key, val, Persistent, nil, nil)
+
+		})
+	})
+
+	t.Run("db watch and watch manager closed", func(t *testing.T) {
+		opts := DefaultOptions
+		opts.Dir = "/tmp/test-watch-manager-closed/"
+		removeDir(opts.Dir)
+
+		db, err := Open(opts)
+		require.NoError(t, err)
+		bucket := "bucket"
+		key := testutils.GetTestBytes(0)
+		val := testutils.GetTestBytes(0)
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+		txPut(t, db, bucket, key, val, Persistent, nil, nil)
+
+		db.wm.close()
+		require.Equal(t, db.wm.isClosed(), true)
+		time.Sleep(100 * time.Millisecond)
+
+		err = db.Watch(bucket, key, func(msg *Message) error {
+			return nil
+		})
+		require.Equal(t, err, ErrWatchManagerClosed)
+	})
+
+	t.Run("db watch and tx delete", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			bucket := "bucket"
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			key := testutils.GetTestBytes(0)
+			val := testutils.GetTestBytes(0)
+			done := make(chan struct{})
+			go func() {
+				flag := DataSetFlag
+				err := db.Watch(bucket, key, func(msg *Message) error {
+					assert.Equal(t, bucket, msg.BucketName)
+					assert.Equal(t, string(key), msg.Key)
+					assert.Equal(t, flag, msg.Flag)
+					if flag != DataSetFlag {
+						close(done)
+					}
+					flag = DataDeleteFlag
+					return nil
+				})
+
+				if err != nil {
+					assert.ErrorIs(t, err, ErrWatchingChannelClosed)
+					return
+				}
+			}()
+
+			txPut(t, db, bucket, key, val, Persistent, nil, nil)
+			txDel(t, db, bucket, key, nil)
+			require.NoError(t, err)
+
+			select {
+			case <-done:
+				t.Log("Received delete message")
+			case <-time.After(10 * time.Second):
+				t.Fatal("Timeout waiting for message")
+			}
+		})
+	})
+
+	t.Run("db watch and watch feature disabled", func(t *testing.T) {
+		option := DefaultOptions
+		option.EnableWatch = false
+		runNutsDBTest(t, &option, func(t *testing.T, db *DB) {
+			bucket := "bucket"
+			key := testutils.GetTestBytes(0)
+			err := db.Watch(bucket, key, func(msg *Message) error {
+				t.Fatal("Watch feature should be disabled")
+				return nil
+			})
+			require.ErrorIs(t, err, ErrWatchFeatureDisabled)
+		})
+	})
+}

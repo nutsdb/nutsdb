@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"sync/atomic"
 
@@ -170,17 +171,21 @@ func (tx *Tx) getTxID() uint64 {
 //
 // 4. build Hint index.
 //
-// 5. Unlock the database and clear the db field.
+// 5. send updated entries to watch manager if watch feature is enabled.
+//
+// 6. Unlock the database and clear the db field.
 func (tx *Tx) Commit() (err error) {
 	defer func() {
 		if err != nil {
 			tx.handleErr(err)
 		}
+
 		tx.unlock()
 		tx.db = nil
 
 		tx.pendingWrites = nil
 	}()
+
 	if tx.isClosed() {
 		return ErrCannotCommitAClosedTx
 	}
@@ -273,6 +278,11 @@ func (tx *Tx) Commit() (err error) {
 
 	if err := tx.buildBucketInIndex(); err != nil {
 		return err
+	}
+
+	// send updated entries to watch manager
+	if tx.db.wm != nil {
+		tx.sendUpdatedEntries(pendingWriteList)
 	}
 
 	return nil
@@ -840,4 +850,19 @@ func (tx *Tx) findEntryAndItsStatus(ds Ds, bucket BucketName, key string) (Entry
 		}
 	}
 	return NotFoundEntry, nil
+}
+
+func (tx *Tx) sendUpdatedEntries(pendingWriteList []*Entry) {
+	err := tx.db.wm.sendUpdatedEntries(pendingWriteList, func(bucketId BucketId) (BucketName, error) {
+		bucket, err := tx.db.bm.GetBucketById(bucketId)
+		if err != nil {
+			return "", err
+		}
+
+		return bucket.Name, nil
+	})
+
+	if err != nil {
+		log.Println("send updated entries error", err)
+	}
 }
