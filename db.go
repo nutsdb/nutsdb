@@ -149,12 +149,16 @@ func open(opt Options) (*DB, error) {
 		return nil, fmt.Errorf("db.buildIndexes error: %s", err)
 	}
 
-	db.wm = NewWatchManager()
+	if db.opt.EnableWatch {
+		db.wm = NewWatchManager()
+		go db.wm.startDistributor()
+	} else {
+		db.wm = nil
+	}
 
 	go db.mergeWorker()
 	go db.doWrites()
 	go db.tm.run()
-	go db.wm.startDistributor()
 
 	return db, nil
 }
@@ -255,7 +259,9 @@ func (db *DB) release() error {
 
 	db.tm.close()
 
-	db.wm.close()
+	if db.wm != nil {
+		db.wm.close()
+	}
 
 	if GCEnable {
 		runtime.GC()
@@ -1062,26 +1068,26 @@ func (db *DB) rebuildBucketManager() error {
 // Watch watches the key and bucket and calls the callback function for each message received.
 // The callback will be called once for each individual message in the batch.
 func (db *DB) Watch(bucket string, key []byte, cb func(message *Message) error) error {
-	receiveChan, err := db.wm.subscribe(bucket, string(key))
+	if db.wm == nil {
+		return ErrWatchFeatureDisabled
+	}
+
+	receiveChan, id, err := db.wm.subscribe(bucket, string(key))
 	if err != nil {
 		return err
 	}
 
-	batch := make([]*Message, 0, 100)
+	batch := make([]*Message, 0, 128)
 
 	// Use a ticker to process the batch every 100 milliseconds
 	// Avoid CPU busy spinning
 	ticker := time.NewTicker(100 * time.Millisecond)
 	keyWatch := string(key)
-
-	defer func() {
-		ticker.Stop()
-		if err := db.wm.unsubscribe(bucket, keyWatch); err != nil {
-			log.Println("Failed to unsubscribe from", bucket, "/", keyWatch, ":", err)
-		}
-	}()
-
 	processBatch := func(batch []*Message) error {
+		if len(batch) == 0 {
+			return nil
+		}
+
 		for _, msg := range batch {
 			if err := cb(msg); err != nil {
 				return err
@@ -1090,6 +1096,14 @@ func (db *DB) Watch(bucket string, key []byte, cb func(message *Message) error) 
 		return nil
 	}
 
+	defer func() {
+		ticker.Stop()
+
+		if err := db.wm.unsubscribe(bucket, keyWatch, id); err != nil {
+			log.Println("Failed to unsubscribe from", bucket, "/", keyWatch, ":", err)
+		}
+	}()
+
 	for {
 		select {
 		case <-db.wm.done():
@@ -1097,7 +1111,7 @@ func (db *DB) Watch(bucket string, key []byte, cb func(message *Message) error) 
 			if err := processBatch(batch); err != nil {
 				return err
 			}
-			return ErrWatchingChannelClosed
+			return nil
 		case message, ok := <-receiveChan:
 			if !ok {
 				if err := processBatch(batch); err != nil {

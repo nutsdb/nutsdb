@@ -1,4 +1,5 @@
-// Copyright 2019 The nutsdb Author. All rights reserved.  //
+// Copyright 2019 The nutsdb Author. All rights reserved.
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -2185,6 +2186,20 @@ func TestDB_Watch(t *testing.T) {
 			case <-time.After(10 * time.Second):
 				t.Fatal("Timeout waiting for message")
 			}
+		})
+	})
+
+	t.Run("db watch and watch feature disabled", func(t *testing.T) {
+		option := DefaultOptions
+		option.EnableWatch = false
+		runNutsDBTest(t, &option, func(t *testing.T, db *DB) {
+			bucket := "bucket"
+			key := testutils.GetTestBytes(0)
+			err := db.Watch(bucket, key, func(msg *Message) error {
+				t.Fatal("Watch feature should be disabled")
+				return nil
+			})
+			require.ErrorIs(t, err, ErrWatchFeatureDisabled)
 		})
 	})
 }
