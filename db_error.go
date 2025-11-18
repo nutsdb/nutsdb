@@ -35,4 +35,7 @@ var (
 
 	// ErrWatchFeatureDisabled is returned when the watch feature is disabled
 	ErrWatchFeatureDisabled = errors.New("watch feature is disabled")
+
+	// ErrWatchingCallbackTimeout is returned when the callback timeout
+	ErrWatchingCallbackTimeout = errors.New("watching callback timeout")
 )
