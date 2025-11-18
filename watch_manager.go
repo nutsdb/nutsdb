@@ -305,7 +305,7 @@ func (wm *watchManager) distributeAllMessages(messages []*Message) error {
 			continue
 		}
 
-		key := string(message.Key)
+		key := message.Key
 		subscriberMap, ok := bucketMap[key]
 		if !ok {
 			continue
