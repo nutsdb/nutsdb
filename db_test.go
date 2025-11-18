@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -2130,11 +2131,60 @@ func TestDB_Watch(t *testing.T) {
 
 			// put
 			txPut(t, db, bucket, key, val, Persistent, nil, nil)
-
 		})
 	})
 
-	t.Run("db watch and watch manager closed", func(t *testing.T) {
+	t.Run("db watch and callback timeout", func(t *testing.T) {
+		runNutsDBTestWithWatch(t, func(t *testing.T, db *DB) {
+			bucket := "bucket"
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			key := testutils.GetTestBytes(0)
+			val := testutils.GetTestBytes(0)
+			watchOpts := NewWatchOptions()
+			watchOpts.WithCallbackTimeout(100 * time.Millisecond)
+
+			go func() {
+				err := db.Watch(bucket, key, func(msg *Message) error {
+					time.Sleep(200 * time.Millisecond)
+					return nil
+				}, *watchOpts)
+				require.ErrorIs(t, err, ErrWatchingCallbackTimeout)
+			}()
+
+			time.Sleep(100 * time.Millisecond)
+
+			txPut(t, db, bucket, key, val, Persistent, nil, nil)
+		})
+	})
+
+	t.Run("db watch with default callback timeout and run long", func(t *testing.T) {
+		runNutsDBTestWithWatch(t, func(t *testing.T, db *DB) {
+			bucket := "bucket"
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			key := testutils.GetTestBytes(0)
+			val := testutils.GetTestBytes(0)
+			watchOpts := NewWatchOptions()
+
+			go func() {
+				err := db.Watch(bucket, key, func(msg *Message) error {
+					done := make(chan struct{})
+
+					// block the callback
+					<-done
+					return nil
+				}, *watchOpts)
+				require.ErrorIs(t, err, ErrWatchingCallbackTimeout)
+			}()
+
+			time.Sleep(100 * time.Millisecond)
+
+			for i := 0; i < 2; i++ {
+				txPut(t, db, bucket, key, val, Persistent, nil, nil)
+			}
+		})
+	})
+
+	t.Run("db watch after watch manager closed", func(t *testing.T) {
 		opts := DefaultOptions
 		opts.EnableWatch = true
 		opts.Dir = "/tmp/test-watch-manager-closed/"
@@ -2158,7 +2208,7 @@ func TestDB_Watch(t *testing.T) {
 		require.Equal(t, err, ErrWatchManagerClosed)
 	})
 
-	t.Run("db is watching and watch manager closed", func(t *testing.T) {
+	t.Run("db is watching and watch manager is closing", func(t *testing.T) {
 		runNutsDBTestWithWatch(t, func(t *testing.T, db *DB) {
 			bucket := "bucket"
 			key := testutils.GetTestBytes(0)
@@ -2227,6 +2277,66 @@ func TestDB_Watch(t *testing.T) {
 		})
 	})
 
+	t.Run("db watch and transaction rollback", func(t *testing.T) {
+		opts := DefaultOptions
+		opts.EnableWatch = true
+		opts.Dir = "/tmp/test-watch-and-transaction-rollback/"
+		removeDir(opts.Dir)
+
+		db, err := Open(opts)
+
+		defer func() {
+			if db != nil {
+				db.Close()
+			}
+		}()
+
+		require.NoError(t, err)
+		bucket := "bucket"
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+		key := testutils.GetTestBytes(0)
+
+		wg := sync.WaitGroup{}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			count := 0
+			err := db.Watch(bucket, key, func(msg *Message) error {
+				count++
+				return nil
+			})
+
+			require.NoError(t, err)
+			require.Equal(t, count, 0, "all actions should be rolled back")
+			t.Log("watch callback should not be called due to rollback")
+		}()
+
+		time.Sleep(100 * time.Millisecond)
+
+		errUpdate := db.Update(func(tx *Tx) error {
+			for i := 0; i < 10; i++ {
+				val := testutils.GetTestBytes(i)
+				currentKey := key
+
+				//deliberately set error key to make tx rollback
+				if i == 9 {
+					currentKey = []byte("")
+				}
+				if err := tx.Put(bucket, currentKey, val, Persistent); err != nil {
+					if i < 9 {
+						t.Fatal("check rollback watching failed")
+					}
+				}
+
+			}
+			return nil
+		})
+
+		require.NoError(t, errUpdate)
+		require.NoError(t, db.wm.close())
+		wg.Wait()
+	})
+
 	t.Run("db watch and watch feature disabled", func(t *testing.T) {
 		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 			bucket := "bucket"
@@ -2238,4 +2348,5 @@ func TestDB_Watch(t *testing.T) {
 			require.ErrorIs(t, err, ErrWatchFeatureDisabled)
 		})
 	})
+
 }

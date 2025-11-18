@@ -260,7 +260,9 @@ func (db *DB) release() error {
 	db.tm.close()
 
 	if db.wm != nil {
-		db.wm.close()
+		if err := db.wm.close(); err != nil {
+			log.Printf("watch manager closed already")
+		}
 	}
 
 	if GCEnable {
@@ -1065,9 +1067,25 @@ func (db *DB) rebuildBucketManager() error {
 	return nil
 }
 
-// Watch watches the key and bucket and calls the callback function for each message received.
-// The callback will be called once for each individual message in the batch.
-func (db *DB) Watch(bucket string, key []byte, cb func(message *Message) error) error {
+/**
+ * Watch watches the key and bucket and calls the callback function for each message received.
+ * The callback will be called once for each individual message in the batch.
+ *
+ * @param bucket - the bucket name to watch
+ * @param key - the key in the bucket to watch
+ * @param cb - the callback function to call for each message received
+ * @param opts - the options for the watch
+ *   - CallbackTimeout - the timeout for the callback, default is 1 second
+ *
+ * @return error - the error if the watch is stopped
+ */
+func (db *DB) Watch(bucket string, key []byte, cb func(message *Message) error, opts ...WatchOptions) error {
+	watchOpts := NewWatchOptions()
+
+	if len(opts) > 0 {
+		watchOpts = &opts[0]
+	}
+
 	if db.wm == nil {
 		return ErrWatchFeatureDisabled
 	}
@@ -1083,14 +1101,25 @@ func (db *DB) Watch(bucket string, key []byte, cb func(message *Message) error) 
 	// Avoid CPU busy spinning
 	ticker := time.NewTicker(100 * time.Millisecond)
 	keyWatch := string(key)
+
 	processBatch := func(batch []*Message) error {
 		if len(batch) == 0 {
 			return nil
 		}
 
 		for _, msg := range batch {
-			if err := cb(msg); err != nil {
-				return err
+			errChan := make(chan error, 1)
+			go func(msg *Message) {
+				errChan <- cb(msg)
+			}(msg)
+
+			select {
+			case <-time.After(watchOpts.CallbackTimeout):
+				return ErrWatchingCallbackTimeout
+			case err := <-errChan:
+				if err != nil {
+					return err
+				}
 			}
 		}
 		return nil

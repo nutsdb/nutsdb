@@ -6,6 +6,7 @@ import (
 	"log"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 // errors
@@ -31,6 +32,10 @@ const (
 	distributeChanBufferSize = 128
 )
 
+const (
+	DefaultCallbackTimeout = 1 * time.Second
+)
+
 type Message struct {
 	BucketName BucketName
 	Key        string
@@ -47,6 +52,21 @@ func NewMessage(bucketName BucketName, key string, value []byte, flag DataFlag, 
 		Flag:       flag,
 		Timestamp:  timestamp,
 	}
+}
+
+type WatchOptions struct {
+	CallbackTimeout time.Duration
+}
+
+func NewWatchOptions() *WatchOptions {
+	return &WatchOptions{
+		CallbackTimeout: DefaultCallbackTimeout,
+	}
+}
+
+// WithCallbackTimeout sets the callback timeout
+func (opts *WatchOptions) WithCallbackTimeout(timeout time.Duration) {
+	opts.CallbackTimeout = timeout
 }
 
 type subscriber struct {
@@ -125,7 +145,7 @@ func (wm *watchManager) sendUpdatedEntries(entries []*Entry, getBucketName func(
 }
 
 // startDistributor starts both the collector and distributor goroutines
-func (wm *watchManager) startDistributor() error {
+func (wm *watchManager) startDistributor() {
 	defer wm.cleanUpSubscribers()
 
 	// Start the distributor goroutine (consumes from distributeChan)
@@ -143,8 +163,6 @@ func (wm *watchManager) startDistributor() error {
 	}()
 
 	wm.wg.Wait()
-
-	return nil
 }
 
 // runCollector collects messages from watchChan and batches them
@@ -224,26 +242,6 @@ func (wm *watchManager) runCollector() {
 		}
 	}
 }
-
-// func (wm *watchManager) runDropCollector() {
-// 	batches := make([]*Message, 0, dropChanBufferSize)
-// 	for {
-// 		select {
-// 		case msg, ok := <-wm.dropChan:
-// 			if !ok {
-// 				return
-// 			}
-// 			batches = append(batches, msg)
-// 		case <-wm.workerCtx.Done():
-// 			return
-// 		default:
-// 			if len(batches) > 0 {
-// 				wm.distributeAllMessages(batches)
-// 				batches = batches[:0]
-// 			}
-// 		}
-// 	}
-// }
 
 // runDistributor distributes batches to subscribers
 func (wm *watchManager) runDistributor() {
