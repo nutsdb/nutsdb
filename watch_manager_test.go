@@ -621,4 +621,51 @@ func TestWatchManager_StartDistributor(t *testing.T) {
 		// verify bucket is completely removed after all keys unsubscribe
 		wmVerifyBucketRemoved(t, wm, bucket)
 	})
+
+	//TODO: This test will be fail because the channel of a subscriber is only 1024. then the rest of the messages will be dropped.
+	// we need to fix this with plan for handling the dropped messages in the future.
+	t.Run("send messages with large number of messages over max watch channel buffer size", func(t *testing.T) {
+		watchChanBufferSize = 124   // Change the watch channel buffer size to 124 for testing
+		receiveChanBufferSize = 124 // Change the receive channel buffer size to 124 for testing
+		wm := startDistributor()
+		defer wm.close()
+		time.Sleep(50 * time.Millisecond)
+
+		bucket := "test_bucket"
+		key := "test_key"
+		receiveChan, _ := wmSubscribe(t, wm, bucket, key)
+		totalMessages := 10 * 1024
+		sendingDone := make(chan struct{})
+		receivingDone := make(chan struct{})
+		countOfSent := 0
+
+		// send a large number of messages to the watch channel
+		go func() {
+			defer close(sendingDone)
+
+			for i := 0; i < totalMessages; i++ {
+				value := []byte(fmt.Sprintf("value_%d", i))
+				err := wm.sendMessage(&Message{BucketName: bucket, Key: key, Value: value})
+				if err != nil {
+					t.Logf("channel buffer is full, send message error: %+v", err)
+					assert.EqualError(t, err, ErrWatchChanCannotSend.Error())
+				}
+				countOfSent++
+			}
+
+			assert.Equal(t, countOfSent, totalMessages, "should send all messages")
+		}()
+
+		// receive messages from the subscriber
+		// expect there are some messages dropped
+		go func() {
+			defer close(receivingDone)
+			receivedCount := wmReceiveMessages(t, receiveChan, bucket, key, totalMessages, 10*time.Second)
+			assert.GreaterOrEqual(t, totalMessages, receivedCount, "should receive less than or equal to total messages")
+		}()
+
+		<-sendingDone
+		<-receivingDone
+		wm.close()
+	})
 }

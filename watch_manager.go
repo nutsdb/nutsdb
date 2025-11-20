@@ -22,8 +22,8 @@ var (
 	ErrChannelNotAvailable      = errors.New("channel not available")
 )
 
-// constants for configuration
-const (
+// convert these variables to var for testing
+var (
 	watchChanBufferSize      = 1024
 	receiveChanBufferSize    = 1024
 	maxBatchSize             = 1024
