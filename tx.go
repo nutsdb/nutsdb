@@ -853,16 +853,6 @@ func (tx *Tx) findEntryAndItsStatus(ds Ds, bucket BucketName, key string) (Entry
 }
 
 func (tx *Tx) sendUpdatedEntries(pendingWriteList []*Entry) {
-	for _, entry := range pendingWriteList {
-		// if the entry is a list entry, we need to trim the separator for list key
-		key, err := tx.decodeKey(entry, entry.Meta.Ds)
-		if err != nil {
-			log.Printf("decode key %+v error: %+v", entry.Key, err)
-			continue
-		}
-		entry.Key = key
-	}
-
 	err := tx.db.wm.sendUpdatedEntries(pendingWriteList, func(bucketId BucketId) (BucketName, error) {
 		bucket, err := tx.db.bm.GetBucketById(bucketId)
 		if err != nil {
@@ -874,39 +864,5 @@ func (tx *Tx) sendUpdatedEntries(pendingWriteList []*Entry) {
 
 	if err != nil {
 		log.Println("send updated entries error: ", err)
-	}
-}
-
-func (tx *Tx) decodeKey(entry *Entry, ds DataStructure) ([]byte, error) {
-	key := entry.Key
-
-	switch ds {
-	case DataStructureList:
-		if entry.Meta.Flag != DataLPushFlag && entry.Meta.Flag != DataRPushFlag {
-			return key, nil
-		}
-
-		if len(key) < 8 {
-			return key, ErrInvalidKey
-		}
-
-		return key[8:], nil
-	case DataStructureSortedSet:
-		if entry.Meta.Flag != DataZAddFlag {
-			return key, nil
-		}
-
-		strList := bytes.Split(key, []byte(SeparatorForZSetKey))
-		if len(strList) != 2 {
-			return key, ErrInvalidKey
-		}
-
-		return []byte(strList[0]), nil
-	case DataStructureSet:
-		return key, nil
-	case DataStructureBTree:
-		return key, nil
-	default:
-		return key, ErrDataStructureNotSupported
 	}
 }
