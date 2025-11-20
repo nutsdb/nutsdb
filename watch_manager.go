@@ -135,7 +135,13 @@ func (wm *watchManager) sendUpdatedEntries(entries []*Entry, getBucketName func(
 			continue
 		}
 
-		message := NewMessage(bucketName, string(entry.Key), entry.Value, entry.Meta.Flag, entry.Meta.Timestamp)
+		rawKey, err := entry.getRawKey()
+		if err != nil {
+			log.Printf("get raw key %+v error: %+v", entry.Key, err)
+			continue
+		}
+
+		message := NewMessage(bucketName, string(rawKey), entry.Value, entry.Meta.Flag, entry.Meta.Timestamp)
 		if err := wm.sendMessage(message); err != nil {
 			return err
 		}
@@ -213,15 +219,6 @@ func (wm *watchManager) runCollector() {
 				batches = batches[:0]
 				break accumulate
 			}
-
-			// select {
-			// case msg, ok := <-wm.dropChan:
-			// 	if !ok {
-			// 		return
-			// 	}
-			// 	batches = append(batches, msg)
-			// default:
-			// }
 
 			select {
 			case msg, ok := <-wm.watchChan:

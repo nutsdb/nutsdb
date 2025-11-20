@@ -2123,14 +2123,14 @@ func TestDB_Watch(t *testing.T) {
 			key0 := testutils.GetTestBytes(0)
 			val0 := testutils.GetRandomBytes(24)
 			count := 0
-			expectCount := 3
+			expectCount := 6
 			done := make(chan struct{})
 
 			go func() {
 				err := db.Watch(bucket, key0, func(msg *Message) error {
 					assert.Equal(t, bucket, msg.BucketName)
 					assert.Equal(t, string(key0), msg.Key)
-					if msg.Flag != DataLRemFlag {
+					if msg.Flag != DataLRemFlag && msg.Flag != DataLRemByIndex {
 						assert.Equal(t, val0, msg.Value)
 					}
 					count++
@@ -2145,7 +2145,6 @@ func TestDB_Watch(t *testing.T) {
 					assert.ErrorIs(t, err, ErrWatchingChannelClosed)
 					return
 				}
-
 			}()
 
 			// Wait for the watching to be started
@@ -2158,7 +2157,12 @@ func TestDB_Watch(t *testing.T) {
 			txPush(t, db, bucket, key0, val0, true, nil, nil)
 
 			// remove elements of key
-			txLRem(t, db, bucket, key0, 1, val0, nil)
+			txLRem(t, db, bucket, key0, 0, val0, nil)
+
+			// push two elements to the list and lrem by index
+			txPush(t, db, bucket, key0, val0, true, nil, nil)
+			txPush(t, db, bucket, key0, val0, true, nil, nil)
+			txLRemByIndex(t, db, bucket, key0, nil, 0, 1)
 
 			// must receive one message
 			select {
@@ -2200,10 +2204,9 @@ func TestDB_Watch(t *testing.T) {
 					assert.ErrorIs(t, err, ErrWatchingChannelClosed)
 					return
 				}
-
 			}()
 
-			// Wait for the watching to be started
+			// wait for the watching to be started
 			time.Sleep(100 * time.Millisecond)
 
 			txZAdd(t, db, bucket, key, value, score, nil, nil)
@@ -2212,11 +2215,60 @@ func TestDB_Watch(t *testing.T) {
 			txZAdd(t, db, bucket, key, value, score, nil, nil)
 
 			txZPop(t, db, bucket, key, true, value, score, nil)
-			// txZPop(t, db, bucket, key, false, value, score+2.0, nil)
 
-			// must receive one message
 			select {
 			case <-done:
+				require.Equal(t, count.Load(), int32(expectCount), "must receive one message")
+			case <-time.After(10 * time.Second):
+				t.Fatal("Timeout waiting for message")
+			}
+		})
+	})
+
+	t.Run("db set watch key and receive message", func(t *testing.T) {
+		runNutsDBTestWithWatch(t, func(t *testing.T, db *DB) {
+			bucket := "bucket"
+			txCreateBucket(t, db, DataStructureSet, bucket, nil)
+			key := testutils.GetTestBytes(0)
+			val := testutils.GetTestBytes(0)
+			val1 := testutils.GetTestBytes(1)
+
+			count := atomic.Int32{}
+			expectCount := 3
+			done := make(chan struct{})
+
+			go func() {
+				err := db.Watch(bucket, key, func(msg *Message) error {
+					assert.Equal(t, bucket, msg.BucketName)
+					assert.Equal(t, string(key), msg.Key)
+					assert.NotNil(t, msg.Value)
+
+					count.Add(1)
+					if count.Load() == int32(expectCount) {
+						close(done)
+					}
+					return nil
+				})
+
+				if err != nil {
+					assert.ErrorIs(t, err, ErrWatchingChannelClosed)
+					return
+				}
+			}()
+
+			// wait for the watching to be started
+			time.Sleep(100 * time.Millisecond)
+			txSAdd(t, db, bucket, key, val, nil, nil)
+
+			// add duplicate value
+			txSAdd(t, db, bucket, key, val, nil, nil)
+
+			txSAdd(t, db, bucket, key, val1, nil, nil)
+			txSRem(t, db, bucket, key, val1, nil)
+
+			select {
+			case <-done:
+				txSRem(t, db, bucket, key, val1, ErrSetMemberNotExist)
 				require.Equal(t, count.Load(), int32(expectCount), "must receive one message")
 			case <-time.After(10 * time.Second):
 				t.Fatal("Timeout waiting for message")
