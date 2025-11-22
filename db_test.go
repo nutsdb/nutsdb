@@ -2271,6 +2271,7 @@ func TestDB_Watch(t *testing.T) {
 				txSRem(t, db, bucket, key, val1, ErrSetMemberNotExist)
 				require.Equal(t, count.Load(), int32(expectCount), "must receive one message")
 			case <-time.After(10 * time.Second):
+				t.Logf("receive count at test set: %+v", count.Load())
 				t.Fatal("Timeout waiting for message")
 			}
 		})
@@ -2534,7 +2535,7 @@ func TestDB_Watch(t *testing.T) {
 			txCreateBucket(t, db, DataStructureList, bucket2, nil)
 			key1 := []byte("key1")
 			key2 := []byte("key2")
-			countOfMessages := int64(107)
+			countOfMessages := int64(204)
 
 			// Initialize the watcher for bucket2
 			for i := 0; i < int(limitCount); i++ {
@@ -2593,11 +2594,15 @@ func TestDB_Watch(t *testing.T) {
 			txPush(t, db, bucket1, []byte("0"), []byte("value1"), false, nil, ErrTxnExceedWriteLimit)
 			//  Delete item and add one
 			txDel(t, db, bucket1, []byte("0"), nil)
+			// NOTE: after delete the key, the watch of key "0" will be unsubscribed
+			// so the watch callback will not be called
 			txPush(t, db, bucket1, []byte("0"), []byte("value1"), false, nil, nil)
+
 			// Trigger the limit
 			txSAdd(t, db, bucket1, []byte("key1"), []byte("value1"), nil, ErrTxnExceedWriteLimit)
 			// Delete item and add one
 			txDel(t, db, bucket1, []byte("1"), nil)
+
 			txSAdd(t, db, bucket1, key1, []byte("value1"), nil, nil)
 			// Trigger the limit
 			txZAdd(t, db, bucket1, key1, []byte("value1"), score, nil, ErrTxnExceedWriteLimit)
@@ -2635,5 +2640,143 @@ func TestDB_Watch(t *testing.T) {
 			require.ErrorIs(t, err, ErrWatchFeatureDisabled)
 		})
 	})
+}
 
+func TestDB_WatchTTL(t *testing.T) {
+	t.Run("db watch and ttl", func(t *testing.T) {
+		runNutsDBTestWithWatch(t, func(t *testing.T, db *DB) {
+			bucket := "bucket"
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			key := testutils.GetTestBytes(0)
+			done := make(chan struct{})
+			count := atomic.Int64{}
+			expectCount := int64(2)
+
+			go func() {
+				err := db.Watch(bucket, key, func(msg *Message) error {
+					count.Add(1)
+					if count.Load() == expectCount {
+						close(done)
+					}
+					return nil
+				})
+				require.NoError(t, err)
+			}()
+
+			time.Sleep(100 * time.Millisecond)
+
+			txPut(t, db, bucket, key, []byte("value"), 1, nil, nil)
+
+			select {
+			case <-done:
+				t.Log("Received message")
+			case <-time.After(10 * time.Second):
+				t.Fatal("Timeout waiting for message")
+			}
+		})
+	})
+
+	t.Run("db watch and ttl expired list", func(t *testing.T) {
+		runNutsDBTestWithWatch(t, func(t *testing.T, db *DB) {
+			bucket := "bucket"
+			txCreateBucket(t, db, DataStructureList, bucket, nil)
+			key := testutils.GetTestBytes(0)
+			done := make(chan struct{})
+			count := atomic.Int64{}
+			expectCount := int64(2)
+
+			go func() {
+				err := db.Watch(bucket, key, func(msg *Message) error {
+					count.Add(1)
+					if count.Load() == expectCount {
+						close(done)
+					}
+					return nil
+				})
+				require.NoError(t, err)
+			}()
+
+			time.Sleep(100 * time.Millisecond)
+
+			txPush(t, db, bucket, key, []byte("value"), false, nil, nil)
+			txExpireList(t, db, bucket, key, 1, nil)
+
+			select {
+			case <-done:
+				t.Log("Received message")
+			case <-time.After(10 * time.Second):
+				t.Fatal("Timeout waiting for message")
+			}
+		})
+	})
+}
+
+func TestDB_WatchDeleteBucket(t *testing.T) {
+	t.Run("db watch and delete bucket", func(t *testing.T) {
+		runNutsDBTestWithWatch(t, func(t *testing.T, db *DB) {
+			bucket := "bucket"
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			key := testutils.GetTestBytes(0)
+			done := make(chan struct{})
+			count := atomic.Int64{}
+			expectCount := int64(2)
+
+			go func() {
+				err := db.Watch(bucket, key, func(msg *Message) error {
+					count.Add(1)
+					if count.Load() == expectCount {
+						close(done)
+					}
+					return nil
+				})
+				require.NoError(t, err)
+			}()
+
+			time.Sleep(100 * time.Millisecond)
+
+			txPut(t, db, bucket, key, []byte("value"), 1, nil, nil)
+
+			txDeleteBucket(t, db, DataStructureBTree, bucket, nil)
+			select {
+			case <-done:
+				t.Log("Received message")
+			case <-time.After(10 * time.Second):
+				t.Fatal("Timeout waiting for message")
+			}
+		})
+	})
+
+	t.Run("db watch and delete bucket", func(t *testing.T) {
+		runNutsDBTestWithWatch(t, func(t *testing.T, db *DB) {
+			bucket := "bucket"
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			key := testutils.GetTestBytes(0)
+			done := make(chan struct{})
+			count := atomic.Int64{}
+			expectCount := int64(2)
+
+			go func() {
+				err := db.Watch(bucket, key, func(msg *Message) error {
+					count.Add(1)
+					if count.Load() == expectCount {
+						close(done)
+					}
+					return nil
+				})
+				require.NoError(t, err)
+			}()
+
+			time.Sleep(100 * time.Millisecond)
+
+			txPut(t, db, bucket, key, []byte("value"), 1, nil, nil)
+
+			txDeleteBucket(t, db, DataStructureBTree, bucket, nil)
+			select {
+			case <-done:
+				t.Log("Received message")
+			case <-time.After(10 * time.Second):
+				t.Fatal("Timeout waiting for message")
+			}
+		})
+	})
 }

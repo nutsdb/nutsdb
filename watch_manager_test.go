@@ -669,3 +669,247 @@ func TestWatchManager_StartDistributor(t *testing.T) {
 		wm.close()
 	})
 }
+
+func TestWatchManager_DeleteBucket(t *testing.T) {
+	t.Run("delete existing bucket closes channels and removes subscribers", func(t *testing.T) {
+		wm := NewWatchManager()
+		// Start both collector and distributor goroutines
+		go wm.startDistributor()
+		defer wm.close()
+
+		// Give goroutines time to start
+		time.Sleep(50 * time.Millisecond)
+
+		bucket := BucketName("bucket_test")
+		keys := []string{"key1", "key2"}
+
+		type subscriberInfo struct {
+			ch  <-chan *Message
+			id  uint64
+			key string
+		}
+		var subscribers []subscriberInfo
+
+		// Subscribe multiple times to different keys
+		for _, key := range keys {
+			for i := 0; i < 2; i++ {
+				ch, id, err := wm.subscribe(bucket, key)
+				require.NoError(t, err)
+				subscribers = append(subscribers, subscriberInfo{ch: ch, id: id, key: key})
+			}
+		}
+
+		// Verify all subscribers are active
+		wm.mu.Lock()
+		bucketMap, ok := wm.lookup[bucket]
+		wm.mu.Unlock()
+		require.True(t, ok, "bucket should exist in lookup")
+		assert.Len(t, bucketMap, len(keys), "bucket should have correct number of keys")
+
+		// Send bucket delete message
+		deleteMsg := NewMessage(bucket, "", nil, DataBucketDeleteFlag,
+			uint64(time.Now().Unix()), MessageOptions{Priority: MessagePriorityHigh})
+		err := wm.sendMessage(deleteMsg)
+		require.NoError(t, err)
+
+		// Wait for processing
+		time.Sleep(200 * time.Millisecond)
+
+		// Bucket should be removed from lookup
+		wm.mu.Lock()
+		_, ok = wm.lookup[bucket]
+		wm.mu.Unlock()
+		assert.False(t, ok, "bucket should be removed from lookup")
+
+		// All subscribers should receive a delete message, then channel closes
+		for _, sub := range subscribers {
+			select {
+			case msg, ok := <-sub.ch:
+				if ok {
+					assert.Equal(t, DataDeleteFlag, msg.Flag, "should receive delete flag")
+					assert.Equal(t, bucket, msg.BucketName, "should match bucket name")
+					assert.Equal(t, sub.key, msg.Key, "should match subscriber key")
+				}
+			case <-time.After(1 * time.Second):
+				t.Fatalf("timeout waiting for delete message on subscriber %d", sub.id)
+			}
+
+			// Channel should be closed
+			select {
+			case _, ok := <-sub.ch:
+				assert.False(t, ok, "subscriber channel should be closed")
+			case <-time.After(500 * time.Millisecond):
+				t.Fatalf("timeout waiting for channel close on subscriber %d", sub.id)
+			}
+		}
+	})
+
+	t.Run("delete non-existent bucket is no-op", func(t *testing.T) {
+		wm := NewWatchManager()
+		go wm.startDistributor()
+		defer wm.close()
+
+		time.Sleep(50 * time.Millisecond)
+
+		bucket := BucketName("bucket1")
+		key := "key1"
+		ch, id, err := wm.subscribe(bucket, key)
+		require.NoError(t, err)
+
+		// Send delete for an unrelated bucket
+		deleteMsg := NewMessage("otherBucket", "", nil, DataBucketDeleteFlag,
+			uint64(time.Now().Unix()), MessageOptions{Priority: MessagePriorityHigh})
+		err = wm.sendMessage(deleteMsg)
+		require.NoError(t, err)
+
+		// Wait for processing
+		time.Sleep(200 * time.Millisecond)
+
+		// Original subscriber should still exist and be active
+		wm.mu.Lock()
+		sub, err := wm.findSubscriber(bucket, key, id)
+		wm.mu.Unlock()
+		require.NoError(t, err)
+		assert.True(t, sub.active.Load(), "subscriber should remain active")
+
+		// Channel should not be closed
+		select {
+		case msg, ok := <-ch:
+			if !ok {
+				t.Fatal("channel should not be closed for unrelated bucket deletion")
+			}
+			t.Fatalf("unexpected message received: %+v", msg)
+		case <-time.After(100 * time.Millisecond):
+			// Expected - no message received
+		}
+	})
+
+	t.Run("delete bucket with no subscribers is no-op", func(t *testing.T) {
+		wm := NewWatchManager()
+		go wm.startDistributor()
+		defer wm.close()
+
+		time.Sleep(50 * time.Millisecond)
+
+		// Send delete for a bucket with no subscribers
+		deleteMsg := NewMessage("nonExistentBucket", "", nil, DataBucketDeleteFlag,
+			uint64(time.Now().Unix()), MessageOptions{Priority: MessagePriorityHigh})
+		err := wm.sendMessage(deleteMsg)
+		require.NoError(t, err)
+
+		// Wait for processing - should not panic or error
+		time.Sleep(200 * time.Millisecond)
+	})
+
+	t.Run("multiple bucket deletions handled correctly", func(t *testing.T) {
+		wm := NewWatchManager()
+		go wm.startDistributor()
+		defer wm.close()
+
+		time.Sleep(50 * time.Millisecond)
+
+		bucket1 := BucketName("bucket1")
+		bucket2 := BucketName("bucket2")
+
+		// Subscribe to both buckets
+		ch1, _, err := wm.subscribe(bucket1, "key1")
+		require.NoError(t, err)
+		ch2, _, err := wm.subscribe(bucket2, "key2")
+		require.NoError(t, err)
+
+		// Delete both buckets
+		deleteMsg1 := NewMessage(bucket1, "", nil, DataBucketDeleteFlag,
+			uint64(time.Now().Unix()), MessageOptions{Priority: MessagePriorityHigh})
+		err = wm.sendMessage(deleteMsg1)
+		require.NoError(t, err)
+
+		deleteMsg2 := NewMessage(bucket2, "", nil, DataBucketDeleteFlag,
+			uint64(time.Now().Unix()), MessageOptions{Priority: MessagePriorityHigh})
+		err = wm.sendMessage(deleteMsg2)
+		require.NoError(t, err)
+
+		// Wait for processing
+		time.Sleep(300 * time.Millisecond)
+
+		// Both buckets should be removed
+		wm.mu.Lock()
+		_, ok1 := wm.lookup[bucket1]
+		_, ok2 := wm.lookup[bucket2]
+		wm.mu.Unlock()
+		assert.False(t, ok1, "bucket1 should be removed")
+		assert.False(t, ok2, "bucket2 should be removed")
+
+		// Both channels should receive delete and close
+		for i, ch := range []<-chan *Message{ch1, ch2} {
+			select {
+			case msg, ok := <-ch:
+				if ok {
+					assert.Equal(t, DataDeleteFlag, msg.Flag)
+				}
+			case <-time.After(1 * time.Second):
+				t.Fatalf("timeout on bucket %d", i+1)
+			}
+
+			_, ok := <-ch
+			assert.False(t, ok, fmt.Sprintf("channel %d should be closed", i+1))
+		}
+	})
+
+	t.Run("new subscription after bucket deletion uses fresh state", func(t *testing.T) {
+		wm := NewWatchManager()
+		go wm.startDistributor()
+		defer wm.close()
+
+		time.Sleep(50 * time.Millisecond)
+
+		bucket := BucketName("reusable_bucket")
+		key := "key1"
+
+		// First subscription
+		ch1, _, err := wm.subscribe(bucket, key)
+		require.NoError(t, err)
+
+		// Delete bucket
+		deleteMsg := NewMessage(bucket, "", nil, DataBucketDeleteFlag,
+			uint64(time.Now().Unix()), MessageOptions{Priority: MessagePriorityHigh})
+		err = wm.sendMessage(deleteMsg)
+		require.NoError(t, err)
+
+		// Wait for deletion to complete
+		time.Sleep(200 * time.Millisecond)
+
+		// Drain and verify first channel is closed
+		for {
+			if _, ok := <-ch1; !ok {
+				break
+			}
+		}
+
+		// New subscription to same bucket/key should work
+		ch2, id2, err := wm.subscribe(bucket, key)
+		require.NoError(t, err)
+		assert.NotNil(t, ch2)
+
+		// New subscriber should exist and be active
+		wm.mu.Lock()
+		sub, err := wm.findSubscriber(bucket, key, id2)
+		wm.mu.Unlock()
+		require.NoError(t, err)
+		assert.True(t, sub.active.Load(), "new subscriber should be active")
+
+		// Send a regular update message to verify new subscription works
+		updateMsg := NewMessage(bucket, key, []byte("test_value"), DataSetFlag, uint64(time.Now().Unix()))
+		err = wm.sendMessage(updateMsg)
+		require.NoError(t, err)
+
+		// New subscriber should receive the update
+		select {
+		case msg, ok := <-ch2:
+			require.True(t, ok, "new subscriber should receive message")
+			assert.Equal(t, DataSetFlag, msg.Flag)
+			assert.Equal(t, []byte("test_value"), msg.Value)
+		case <-time.After(1 * time.Second):
+			t.Fatal("timeout waiting for message on new subscription")
+		}
+	})
+}
