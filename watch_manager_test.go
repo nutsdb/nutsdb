@@ -42,7 +42,8 @@ func wmUnsubscribe(t *testing.T, wm *watchManager, bucket, key string, id uint64
 
 // wmSendMessage sends a message and asserts no error
 func wmSendMessage(t *testing.T, wm *watchManager, bucket, key string, value []byte) {
-	err := wm.sendMessage(&Message{BucketName: bucket, Key: key, Value: value})
+	message := NewMessage(bucket, key, value, DataFlag(0), uint64(time.Now().Unix()), MessageOptions{Priority: MessagePriorityMedium})
+	err := wm.sendMessage(message)
 	assert.NoError(t, err)
 }
 
@@ -50,7 +51,9 @@ func wmSendMessage(t *testing.T, wm *watchManager, bucket, key string, value []b
 func wmSendMessages(t *testing.T, wm *watchManager, bucket, key string, count int) {
 	for i := 0; i < count; i++ {
 		value := []byte(fmt.Sprintf("value_%d", i))
-		wmSendMessage(t, wm, bucket, key, value)
+		message := NewMessage(bucket, key, value, DataFlag(0), uint64(time.Now().Unix()), MessageOptions{Priority: MessagePriorityMedium})
+		err := wm.sendMessage(message)
+		assert.NoError(t, err)
 	}
 }
 
@@ -168,7 +171,8 @@ func wmStartSender(wm *watchManager, bucket, key string, sent *int, stopChan <-c
 				return
 			case <-ticker.C:
 				value := []byte(fmt.Sprintf("value_%d", sent))
-				err := wm.sendMessage(&Message{BucketName: bucket, Key: key, Value: value})
+				message := NewMessage(bucket, key, value, DataSetFlag, uint64(time.Now().Unix()), MessageOptions{Priority: MessagePriorityMedium})
+				err := wm.sendMessage(message)
 				if err == nil {
 					*sent++
 				}
@@ -187,6 +191,7 @@ func wmStartReceiver(t *testing.T, receiveChan <-chan *Message, expectBucket, ex
 			assert.Equal(t, expectBucket, msg.BucketName)
 			assert.Equal(t, expectKey, msg.Key)
 			assert.NotNil(t, msg.Value)
+			assert.Equal(t, DataSetFlag, msg.Flag)
 			*received++
 		}
 	}()
@@ -326,11 +331,8 @@ func TestWatchManager_SubscribeAndSendMessage(t *testing.T) {
 				key := fmt.Sprintf("key_test_%d", i)
 				value := fmt.Sprintf("value_test_%d_%d", i, j)
 
-				err := wm.sendMessage(&Message{
-					BucketName: bucket,
-					Key:        key,
-					Value:      []byte(value),
-				})
+				message := NewMessage(bucket, key, []byte(value), DataFlag(0), uint64(time.Now().Unix()), MessageOptions{Priority: MessagePriorityMedium})
+				err := wm.sendMessage(message)
 				assert.NoError(t, err)
 			}
 		}
@@ -354,30 +356,40 @@ func TestWatchManager_SubscribeAndSendMessage(t *testing.T) {
 
 		receiveChan, _ := wmSubscribe(t, wm, bucket, key)
 
-		// track successful sends/receives with WaitGroup
+		// Use stopChan to signal sender to stop
 		stopChan := make(chan struct{})
 		var sentCount, receivedCount int
-		senderWg := sync.WaitGroup{}   // for sender only
-		receiverWg := sync.WaitGroup{} // for receiver only
+		senderWg := sync.WaitGroup{}
+		receiverWg := sync.WaitGroup{}
 
-		// start both sender and receiver goroutines
-		wmStartSender(wm, bucket, key, &sentCount, stopChan, &senderWg)
+		// Start both sender and receiver goroutines
 		wmStartReceiver(t, receiveChan, bucket, key, &receivedCount, &receiverWg)
+		wmStartSender(wm, bucket, key, &sentCount, stopChan, &senderWg)
 
+		// Let them run for a bit
 		time.Sleep(200 * time.Millisecond)
-		close(stopChan) // stop sender first
+
+		// CLOSE the stopChan to signal sender to stop (not read from it!)
+		close(stopChan)
+
+		// Wait for sender to finish
 		senderWg.Wait()
 
+		// Close watch manager and wait for cleanup
 		isClosed = true
 		wm.close()
 
+		// Wait for the watch manager's internal goroutines to finish and cleanup
+		// This ensures cleanUpSubscribers() has run and closed all channels
+		wm.wg.Wait()
+
+		// Wait for receiver to finish (channel should now be closed)
 		receiverWg.Wait()
 
 		t.Logf("Sent: %d, Received: %d", sentCount, receivedCount)
 		assert.Greater(t, sentCount, 0, "should have sent some messages")
 		assert.Greater(t, receivedCount, 0, "should have received some messages")
 	})
-
 }
 
 func TestWatchManager_SubscribeAndUnsubscribe(t *testing.T) {
