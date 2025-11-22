@@ -70,16 +70,6 @@ func splitStringFloat64Str(str, separator string) (string, float64) {
 	return firstItem, secondItem
 }
 
-func getFnv32(value []byte) (uint32, error) {
-	_, err := fnvHash.Write(value)
-	if err != nil {
-		return 0, err
-	}
-	hash := fnvHash.Sum32()
-	fnvHash.Reset()
-	return hash, nil
-}
-
 func createNewBufferWithSize(size int) *bytes.Buffer {
 	buf := new(bytes.Buffer)
 	buf.Grow(int(size))

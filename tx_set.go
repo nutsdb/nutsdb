@@ -45,7 +45,7 @@ func (tx *Tx) sPut(bucket string, key []byte, dataFlag uint16, values ...[]byte)
 		}
 
 		for _, value := range values {
-			hash, err := getFnv32(value)
+			hash, err := utils.GetFnv32(value)
 			if err != nil {
 				return err
 			}
@@ -370,7 +370,7 @@ func (tx *Tx) SMoveByTwoBuckets(bucket1 string, key1 []byte, bucket2 string, key
 		return false, ErrNotFoundKeyInBucket(bucket2, key2)
 	}
 
-	hash, err := getFnv32(item)
+	hash, err := utils.GetFnv32(item)
 	if err != nil {
 		return false, err
 	}

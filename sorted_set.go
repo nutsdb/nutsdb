@@ -20,6 +20,7 @@ import (
 	"math/rand"
 
 	"github.com/nutsdb/nutsdb/internal/data"
+	"github.com/nutsdb/nutsdb/internal/utils"
 )
 
 var (
@@ -180,7 +181,7 @@ func (z *SortedSet) ZRangeByRank(key string, start int, end int) ([]*data.Record
 
 func (z *SortedSet) ZRem(key string, value []byte) (*data.Record, error) {
 	if sortedSet, ok := z.M[key]; ok {
-		hash, err := getFnv32(value)
+		hash, err := utils.GetFnv32(value)
 		if err != nil {
 			return nil, err
 		}
@@ -214,7 +215,7 @@ func (z *SortedSet) getZRemRangeByRankNodes(key string, start int, end int) ([]*
 
 func (z *SortedSet) ZRank(key string, value []byte) (int, error) {
 	if sortedSet, ok := z.M[key]; ok {
-		hash, err := getFnv32(value)
+		hash, err := utils.GetFnv32(value)
 		if err != nil {
 			return 0, err
 		}
@@ -229,7 +230,7 @@ func (z *SortedSet) ZRank(key string, value []byte) (int, error) {
 
 func (z *SortedSet) ZRevRank(key string, value []byte) (int, error) {
 	if sortedSet, ok := z.M[key]; ok {
-		hash, err := getFnv32(value)
+		hash, err := utils.GetFnv32(value)
 		if err != nil {
 			return 0, err
 		}
@@ -255,7 +256,7 @@ func (z *SortedSet) ZScore(key string, value []byte) (float64, error) {
 
 func (z *SortedSet) ZExist(key string, value []byte) (bool, error) {
 	if sortedSet, ok := z.M[key]; ok {
-		hash, err := getFnv32(value)
+		hash, err := utils.GetFnv32(value)
 		if err != nil {
 			return false, err
 		}
@@ -337,7 +338,7 @@ func newSkipList(db *DB) *SkipList {
 		level: 1,
 		dict:  make(map[uint32]*SkipListNode),
 	}
-	hash, _ := getFnv32([]byte(""))
+	hash, _ := utils.GetFnv32([]byte(""))
 	skipList.header = createNode(SkipListMaxLevel, 0, hash, nil)
 	return skipList
 }
@@ -516,7 +517,7 @@ func (sl *SkipList) PopMax() *SkipListNode {
 func (sl *SkipList) Put(score SCORE, value []byte, record *data.Record) error {
 	var newNode *SkipListNode
 
-	hash, _ := getFnv32(value)
+	hash, _ := utils.GetFnv32(value)
 
 	if n, ok := sl.dict[hash]; ok {
 		// score does not change, only update value
@@ -768,7 +769,7 @@ func (sl *SkipList) GetByRank(rank int, remove bool) *SkipListNode {
 //
 // Time complexity : O(1).
 func (sl *SkipList) GetByValue(value []byte) *SkipListNode {
-	hash, _ := getFnv32(value)
+	hash, _ := utils.GetFnv32(value)
 	return sl.dict[hash]
 }
 
