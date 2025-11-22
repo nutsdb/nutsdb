@@ -359,6 +359,8 @@ func (wm *watchManager) runVictimCollector() {
 			}
 		case <-ticker.C:
 			// avoid busy spinning
+		case <-wm.workerCtx.Done():
+			return
 		}
 	}
 }
