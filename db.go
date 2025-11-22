@@ -1130,7 +1130,7 @@ func (db *DB) Watch(bucket string, key []byte, cb func(message *Message) error, 
 		ticker.Stop()
 
 		if err := db.wm.unsubscribe(bucket, keyWatch, id); err != nil {
-			log.Println("Failed to unsubscribe from", bucket, "/", keyWatch, ":", err)
+			// ignore the error
 		}
 	}()
 
