@@ -85,6 +85,10 @@ const (
 
 	// DataExpireListFlag represents that set ttl for the list
 	DataExpireListFlag DataFlag = 19
+
+	// DataBucketDeleteFlag represents the delete bucket flag
+	// This is used for watch manager to delete the bucket when the bucket is deleted.
+	DataBucketDeleteFlag DataFlag = 20
 )
 
 const (

@@ -282,7 +282,7 @@ func (tx *Tx) Commit() (err error) {
 
 	// send updated entries to watch manager
 	if tx.db.wm != nil {
-		tx.sendUpdatedEntries(pendingWriteList)
+		tx.sendUpdatedEntries(pendingWriteList, tx.getDeletedBuckets())
 	}
 
 	return nil
@@ -852,8 +852,17 @@ func (tx *Tx) findEntryAndItsStatus(ds Ds, bucket BucketName, key string) (Entry
 	return NotFoundEntry, nil
 }
 
-func (tx *Tx) sendUpdatedEntries(pendingWriteList []*Entry) {
-	err := tx.db.wm.sendUpdatedEntries(pendingWriteList, func(bucketId BucketId) (BucketName, error) {
+/*
+ * send updated entries to watch manager for monitoring
+ * and specifying the buckets to be deleted
+ * @param pendingWriteList: the list of entries to be sent
+ * @param deletedBuckets: the buckets to be deleted
+ *
+ *
+ * @return: nil if success, error if any
+ */
+func (tx *Tx) sendUpdatedEntries(pendingWriteList []*Entry, deletedBuckets map[BucketName]bool) {
+	err := tx.db.wm.sendUpdatedEntries(pendingWriteList, deletedBuckets, func(bucketId BucketId) (BucketName, error) {
 		bucket, err := tx.db.bm.GetBucketById(bucketId)
 		if err != nil {
 			return "", err
@@ -865,4 +874,27 @@ func (tx *Tx) sendUpdatedEntries(pendingWriteList []*Entry) {
 	if err != nil {
 		log.Println("send updated entries error: ", err)
 	}
+}
+
+/*
+* send buckets to watch manager for specifying the bucket to be deleted
+
+* @param pendingWriteList: the list of entries to be sent
+* @return: nil if success, error if any
+ */
+func (tx *Tx) getDeletedBuckets() (deletedBuckets map[BucketName]bool) {
+	if len(tx.pendingBucketList) == 0 {
+		return nil
+	}
+
+	deletedBuckets = make(map[BucketName]bool)
+	for _, mapper := range tx.pendingBucketList {
+		for name, bucket := range mapper {
+			if _, ok := deletedBuckets[name]; !ok && bucket.Meta.Op == BucketDeleteOperation {
+				deletedBuckets[name] = true
+			}
+		}
+	}
+
+	return deletedBuckets
 }

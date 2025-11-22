@@ -1095,7 +1095,8 @@ func (db *DB) Watch(bucket string, key []byte, cb func(message *Message) error, 
 		return err
 	}
 
-	batch := make([]*Message, 0, 128)
+	maxBatchSize := 128
+	batch := make([]*Message, 0, maxBatchSize)
 
 	// Use a ticker to process the batch every 100 milliseconds
 	// Avoid CPU busy spinning
@@ -1149,8 +1150,20 @@ func (db *DB) Watch(bucket string, key []byte, cb func(message *Message) error, 
 
 				return ErrWatchingChannelClosed
 			}
+
 			batch = append(batch, message)
-			if len(batch) >= 100 {
+
+			// unsubscribe the message from the watch channel
+			// when receive the deleted flag operation
+			if message.Flag == DataDeleteFlag {
+				if err := processBatch(batch); err != nil {
+					return err
+				}
+
+				return nil
+			}
+
+			if len(batch) >= maxBatchSize {
 				if err := processBatch(batch); err != nil {
 					return err
 				}
