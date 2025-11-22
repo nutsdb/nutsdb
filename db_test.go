@@ -2779,4 +2779,243 @@ func TestDB_WatchDeleteBucket(t *testing.T) {
 			}
 		})
 	})
+
+	t.Run("db watch many keys and delete bucket", func(t *testing.T) {
+		runNutsDBTestWithWatch(t, func(t *testing.T, db *DB) {
+			bucket := "bucket"
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			keys := make([][]byte, 100)
+			count := atomic.Int64{}
+			expectCount := int64(200)
+			done := make(chan struct{})
+			for i := 0; i < 100; i++ {
+				keys[i] = testutils.GetTestBytes(i)
+			}
+
+			for _, key := range keys {
+				go func(key []byte) {
+					err := db.Watch(bucket, key, func(msg *Message) error {
+						assert.NotNil(t, msg)
+						assert.Equal(t, bucket, msg.BucketName)
+						count.Add(1)
+						if count.Load() == expectCount {
+							close(done)
+						}
+						return nil
+					})
+					require.NoError(t, err)
+				}(key)
+			}
+
+			for _, key := range keys {
+				txPut(t, db, bucket, key, []byte("value"), Persistent, nil, nil)
+			}
+
+			txDeleteBucket(t, db, DataStructureBTree, bucket, nil)
+
+			select {
+			case <-done:
+				t.Log("Received message")
+			case <-time.After(10 * time.Second):
+				t.Log("Received message", count.Load(), "times")
+				t.Fatal("Timeout waiting for message")
+			}
+		})
+	})
+
+	t.Run("db watch different data structures and delete bucket", func(t *testing.T) {
+		runNutsDBTestWithWatch(t, func(t *testing.T, db *DB) {
+			// Create separate buckets for each data structure
+			btreeBucket := "btree_bucket"
+			listBucket := "list_bucket"
+			setBucket := "set_bucket"
+			zsetBucket := "zset_bucket"
+
+			txCreateBucket(t, db, DataStructureBTree, btreeBucket, nil)
+			txCreateBucket(t, db, DataStructureList, listBucket, nil)
+			txCreateBucket(t, db, DataStructureSet, setBucket, nil)
+			txCreateBucket(t, db, DataStructureSortedSet, zsetBucket, nil)
+
+			// Keys to watch
+			btreeKey := testutils.GetTestBytes(1)
+			listKey := testutils.GetTestBytes(2)
+			setKey := testutils.GetTestBytes(3)
+			zsetKey := testutils.GetTestBytes(4)
+
+			// Track message counts
+			// Each watcher should receive: 1 data operation + 1 delete = 2 messages
+			count := atomic.Int64{}
+			expectCount := int64(8) // 4 data structures × 2 messages each
+			done := make(chan struct{})
+
+			// Watch BTree bucket
+			go func() {
+				err := db.Watch(btreeBucket, btreeKey, func(msg *Message) error {
+					assert.NotNil(t, msg)
+					assert.Equal(t, BucketName(btreeBucket), msg.BucketName)
+					assert.Equal(t, string(btreeKey), msg.Key)
+					t.Logf("BTree watcher received: flag=%v, value=%v", msg.Flag, msg.Value)
+
+					if count.Add(1) == expectCount {
+						close(done)
+					}
+					return nil
+				})
+				require.NoError(t, err)
+			}()
+
+			// Watch List bucket
+			go func() {
+				err := db.Watch(listBucket, listKey, func(msg *Message) error {
+					assert.NotNil(t, msg)
+					assert.Equal(t, BucketName(listBucket), msg.BucketName)
+					assert.Equal(t, string(listKey), msg.Key)
+					t.Logf("List watcher received: flag=%v, value=%v", msg.Flag, msg.Value)
+
+					if count.Add(1) == expectCount {
+						close(done)
+					}
+					return nil
+				})
+				require.NoError(t, err)
+			}()
+
+			// Watch Set bucket
+			go func() {
+				err := db.Watch(setBucket, setKey, func(msg *Message) error {
+					assert.NotNil(t, msg)
+					assert.Equal(t, BucketName(setBucket), msg.BucketName)
+					assert.Equal(t, string(setKey), msg.Key)
+					t.Logf("Set watcher received: flag=%v, value=%v", msg.Flag, msg.Value)
+
+					if count.Add(1) == expectCount {
+						close(done)
+					}
+					return nil
+				})
+				require.NoError(t, err)
+			}()
+
+			// Watch SortedSet bucket
+			go func() {
+				err := db.Watch(zsetBucket, zsetKey, func(msg *Message) error {
+					assert.NotNil(t, msg)
+					assert.Equal(t, BucketName(zsetBucket), msg.BucketName)
+					assert.Equal(t, string(zsetKey), msg.Key)
+					t.Logf("ZSet watcher received: flag=%v, value=%v", msg.Flag, msg.Value)
+
+					if count.Add(1) == expectCount {
+						close(done)
+					}
+					return nil
+				})
+				require.NoError(t, err)
+			}()
+
+			// Give watchers time to subscribe
+			time.Sleep(100 * time.Millisecond)
+
+			// BTree: Put key-value
+			txPut(t, db, btreeBucket, btreeKey, []byte("btree_value"), Persistent, nil, nil)
+
+			// List: Push items
+			txPush(t, db, listBucket, listKey, []byte("list_item_1"), true, nil, nil)
+
+			// Set: Add members
+			txSAdd(t, db, setBucket, setKey, []byte("set_member_1"), nil, nil)
+
+			// SortedSet: Add scored members
+			txZAdd(t, db, zsetBucket, zsetKey, []byte("zset_member_1"), 1.0, nil, nil)
+
+			// Give time for messages to be processed
+			time.Sleep(100 * time.Millisecond)
+
+			// Delete all buckets - each watcher should receive a delete notification
+			txDeleteBucket(t, db, DataStructureBTree, btreeBucket, nil)
+			txDeleteBucket(t, db, DataStructureList, listBucket, nil)
+			txDeleteBucket(t, db, DataStructureSet, setBucket, nil)
+			txDeleteBucket(t, db, DataStructureSortedSet, zsetBucket, nil)
+
+			// Wait for all expected messages
+			select {
+			case <-done:
+				t.Logf("Received all %d expected messages (count=%d)", expectCount, count.Load())
+			case <-time.After(10 * time.Second):
+				t.Fatalf("Timeout waiting for messages. Received %d/%d messages", count.Load(), expectCount)
+			}
+		})
+	})
+
+	t.Run("db watch same bucket name across different data structures", func(t *testing.T) {
+		runNutsDBTestWithWatch(t, func(t *testing.T, db *DB) {
+			// Use the SAME bucket name for different data structures
+			// This tests that the bucket manager correctly handles multiple data structures
+			bucket := "shared_bucket"
+
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureList, bucket, nil)
+			txCreateBucket(t, db, DataStructureSet, bucket, nil)
+			txCreateBucket(t, db, DataStructureSortedSet, bucket, nil)
+
+			// Use different keys for each data structure type
+			btreeKey := testutils.GetTestBytes(10)
+			listKey := testutils.GetTestBytes(20)
+			setKey := testutils.GetTestBytes(30)
+			zsetKey := testutils.GetTestBytes(40)
+
+			count := atomic.Int64{}
+			expectCount := int64(8)
+			done := make(chan struct{})
+
+			// Setup watchers
+			watcherSetup := []struct {
+				key  []byte
+				name string
+			}{
+				{btreeKey, "BTree"},
+				{listKey, "List"},
+				{setKey, "Set"},
+				{zsetKey, "ZSet"},
+			}
+
+			for _, ws := range watcherSetup {
+				go func(key []byte, name string) {
+					err := db.Watch(bucket, key, func(msg *Message) error {
+						assert.NotNil(t, msg)
+						assert.Equal(t, BucketName(bucket), msg.BucketName)
+						t.Logf("%s watcher received: key=%s, flag=%v", name, msg.Key, msg.Flag)
+
+						if count.Add(1) == expectCount {
+							close(done)
+						}
+						return nil
+					})
+					require.NoError(t, err)
+				}(ws.key, ws.name)
+			}
+
+			time.Sleep(100 * time.Millisecond)
+
+			// Perform operations
+			txPut(t, db, bucket, btreeKey, []byte("value"), Persistent, nil, nil)
+			txPush(t, db, bucket, listKey, []byte("item"), true, nil, nil)
+			txSAdd(t, db, bucket, setKey, []byte("member"), nil, nil)
+			txZAdd(t, db, bucket, zsetKey, []byte("member"), 1.0, nil, nil)
+
+			time.Sleep(100 * time.Millisecond)
+
+			// Delete all versions of the bucket
+			txDeleteBucket(t, db, DataStructureBTree, bucket, nil)
+			txDeleteBucket(t, db, DataStructureList, bucket, nil)
+			txDeleteBucket(t, db, DataStructureSet, bucket, nil)
+			txDeleteBucket(t, db, DataStructureSortedSet, bucket, nil)
+
+			select {
+			case <-done:
+				t.Logf("Received all %d expected messages", expectCount)
+			case <-time.After(10 * time.Second):
+				t.Fatalf("Timeout. Received %d/%d messages", count.Load(), expectCount)
+			}
+		})
+	})
 }
