@@ -1090,7 +1090,7 @@ func (db *DB) Watch(bucket string, key []byte, cb func(message *Message) error, 
 		return ErrWatchFeatureDisabled
 	}
 
-	receiveChan, id, err := db.wm.subscribe(bucket, string(key))
+	subscriber, err := db.wm.subscribe(bucket, string(key))
 	if err != nil {
 		return err
 	}
@@ -1129,8 +1129,10 @@ func (db *DB) Watch(bucket string, key []byte, cb func(message *Message) error, 
 	defer func() {
 		ticker.Stop()
 
-		if err := db.wm.unsubscribe(bucket, keyWatch, id); err != nil {
-			// ignore the error
+		if subscriber != nil && subscriber.active.Load() {
+			if err := db.wm.unsubscribe(bucket, keyWatch, subscriber.id); err != nil {
+				// ignore the error
+			}
 		}
 	}()
 
@@ -1142,26 +1144,16 @@ func (db *DB) Watch(bucket string, key []byte, cb func(message *Message) error, 
 				return err
 			}
 			return nil
-		case message, ok := <-receiveChan:
+		case message, ok := <-subscriber.receiveChan:
 			if !ok {
-				if err := processBatch(batch); err != nil {
-					return err
-				}
-
-				return ErrWatchingChannelClosed
-			}
-
-			batch = append(batch, message)
-
-			// unsubscribe the message from the watch channel
-			// when receive the deleted flag operation
-			if message.Flag == DataDeleteFlag {
 				if err := processBatch(batch); err != nil {
 					return err
 				}
 
 				return nil
 			}
+
+			batch = append(batch, message)
 
 			if len(batch) >= maxBatchSize {
 				if err := processBatch(batch); err != nil {

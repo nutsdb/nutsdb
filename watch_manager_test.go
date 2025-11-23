@@ -20,12 +20,12 @@ func startDistributor() *watchManager {
 }
 
 // wmSubscribe subscribes to a bucket/key and verifies subscription
-func wmSubscribe(t *testing.T, wm *watchManager, bucket, key string) (<-chan *Message, BucketId) {
-	receiveChan, id, err := wm.subscribe(bucket, key)
+func wmSubscribe(t *testing.T, wm *watchManager, bucket, key string) (<-chan *Message, uint64) {
+	subscriber, err := wm.subscribe(bucket, key)
 	require.NoError(t, err)
 
-	wmVerifySubscriberExists(t, wm, bucket, key, id)
-	return receiveChan, id
+	wmVerifySubscriberExists(t, wm, bucket, key, subscriber.id)
+	return subscriber.receiveChan, subscriber.id
 }
 
 // wmUnsubscribe unsubscribes from a bucket/key and verifies removal
@@ -294,14 +294,14 @@ func TestWatchManager_SubscribeAndSendMessage(t *testing.T) {
 				key := fmt.Sprintf("key_test_%d", i)
 				receivedCounts := 0
 
-				receiveChan, _, err := wm.subscribe(bucket, key)
+				subscriber, err := wm.subscribe(bucket, key)
 				assert.NoError(t, err)
 
 				timeout := time.After(5 * time.Second)
 
 				for {
 					select {
-					case message, ok := <-receiveChan:
+					case message, ok := <-subscriber.receiveChan:
 						if !ok {
 							break
 						}
@@ -657,7 +657,8 @@ func TestWatchManager_StartDistributor(t *testing.T) {
 
 			for i := 0; i < totalMessages; i++ {
 				value := []byte(fmt.Sprintf("value_%d", i))
-				err := wm.sendMessage(&Message{BucketName: bucket, Key: key, Value: value})
+				message := NewMessage(bucket, key, value, DataSetFlag, uint64(time.Now().Unix()))
+				err := wm.sendMessage(message)
 				if err != nil {
 					t.Logf("channel buffer is full, send message error: %+v", err)
 					assert.EqualError(t, err, ErrWatchChanCannotSend.Error())
@@ -705,9 +706,9 @@ func TestWatchManager_DeleteBucket(t *testing.T) {
 		// Subscribe multiple times to different keys
 		for _, key := range keys {
 			for i := 0; i < 2; i++ {
-				ch, id, err := wm.subscribe(bucket, key)
+				subscriber, err := wm.subscribe(bucket, key)
 				require.NoError(t, err)
-				subscribers = append(subscribers, subscriberInfo{ch: ch, id: id, key: key})
+				subscribers = append(subscribers, subscriberInfo{ch: subscriber.receiveChan, id: subscriber.id, key: key})
 			}
 		}
 
@@ -738,7 +739,7 @@ func TestWatchManager_DeleteBucket(t *testing.T) {
 			select {
 			case msg, ok := <-sub.ch:
 				if ok {
-					assert.Equal(t, DataDeleteFlag, msg.Flag, "should receive delete flag")
+					assert.Equal(t, DataBucketDeleteFlag, msg.Flag, "should receive delete flag")
 					assert.Equal(t, bucket, msg.BucketName, "should match bucket name")
 					assert.Equal(t, sub.key, msg.Key, "should match subscriber key")
 				}
@@ -765,7 +766,7 @@ func TestWatchManager_DeleteBucket(t *testing.T) {
 
 		bucket := BucketName("bucket1")
 		key := "key1"
-		ch, id, err := wm.subscribe(bucket, key)
+		subscriber, err := wm.subscribe(bucket, key)
 		require.NoError(t, err)
 
 		// Send delete for an unrelated bucket
@@ -779,14 +780,14 @@ func TestWatchManager_DeleteBucket(t *testing.T) {
 
 		// Original subscriber should still exist and be active
 		wm.mu.Lock()
-		sub, err := wm.findSubscriber(bucket, key, id)
+		sub, err := wm.findSubscriber(bucket, key, subscriber.id)
 		wm.mu.Unlock()
 		require.NoError(t, err)
 		assert.True(t, sub.active.Load(), "subscriber should remain active")
 
 		// Channel should not be closed
 		select {
-		case msg, ok := <-ch:
+		case msg, ok := <-subscriber.receiveChan:
 			if !ok {
 				t.Fatal("channel should not be closed for unrelated bucket deletion")
 			}
@@ -824,9 +825,9 @@ func TestWatchManager_DeleteBucket(t *testing.T) {
 		bucket2 := BucketName("bucket2")
 
 		// Subscribe to both buckets
-		ch1, _, err := wm.subscribe(bucket1, "key1")
+		subscriber1, err := wm.subscribe(bucket1, "key1")
 		require.NoError(t, err)
-		ch2, _, err := wm.subscribe(bucket2, "key2")
+		subscriber2, err := wm.subscribe(bucket2, "key2")
 		require.NoError(t, err)
 
 		// Delete both buckets
@@ -852,11 +853,11 @@ func TestWatchManager_DeleteBucket(t *testing.T) {
 		assert.False(t, ok2, "bucket2 should be removed")
 
 		// Both channels should receive delete and close
-		for i, ch := range []<-chan *Message{ch1, ch2} {
+		for i, ch := range []<-chan *Message{subscriber1.receiveChan, subscriber2.receiveChan} {
 			select {
 			case msg, ok := <-ch:
 				if ok {
-					assert.Equal(t, DataDeleteFlag, msg.Flag)
+					assert.Equal(t, DataBucketDeleteFlag, msg.Flag)
 				}
 			case <-time.After(1 * time.Second):
 				t.Fatalf("timeout on bucket %d", i+1)
@@ -878,7 +879,7 @@ func TestWatchManager_DeleteBucket(t *testing.T) {
 		key := "key1"
 
 		// First subscription
-		ch1, _, err := wm.subscribe(bucket, key)
+		subscriber1, err := wm.subscribe(bucket, key)
 		require.NoError(t, err)
 
 		// Delete bucket
@@ -892,19 +893,19 @@ func TestWatchManager_DeleteBucket(t *testing.T) {
 
 		// Drain and verify first channel is closed
 		for {
-			if _, ok := <-ch1; !ok {
+			if _, ok := <-subscriber1.receiveChan; !ok {
 				break
 			}
 		}
 
 		// New subscription to same bucket/key should work
-		ch2, id2, err := wm.subscribe(bucket, key)
+		subscriber2, err := wm.subscribe(bucket, key)
 		require.NoError(t, err)
-		assert.NotNil(t, ch2)
+		assert.NotNil(t, subscriber2.receiveChan)
 
 		// New subscriber should exist and be active
 		wm.mu.Lock()
-		sub, err := wm.findSubscriber(bucket, key, id2)
+		sub, err := wm.findSubscriber(bucket, key, subscriber2.id)
 		wm.mu.Unlock()
 		require.NoError(t, err)
 		assert.True(t, sub.active.Load(), "new subscriber should be active")
@@ -916,7 +917,7 @@ func TestWatchManager_DeleteBucket(t *testing.T) {
 
 		// New subscriber should receive the update
 		select {
-		case msg, ok := <-ch2:
+		case msg, ok := <-subscriber2.receiveChan:
 			require.True(t, ok, "new subscriber should receive message")
 			assert.Equal(t, DataSetFlag, msg.Flag)
 			assert.Equal(t, []byte("test_value"), msg.Value)

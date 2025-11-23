@@ -327,6 +327,8 @@ func (wm *watchManager) runDistributor() {
 
 // runVictimCollector collects the victim buckets from the victim channel
 // and handle delete bucket operation
+// The bucket is deleted only when its all ds bucket are deleted
+// we will send the delete bucket message to the subscribers when the bucket is deleted
 func (wm *watchManager) runVictimCollector() {
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
@@ -342,7 +344,7 @@ func (wm *watchManager) runVictimCollector() {
 				for key, keyMap := range bucketMap {
 					for _, subscriber := range keyMap {
 						if subscriber.active.Load() {
-							message := NewMessage(subscriber.bucketName, subscriber.key, nil, DataDeleteFlag, uint64(time.Now().Unix()))
+							message := NewMessage(subscriber.bucketName, subscriber.key, nil, DataBucketDeleteFlag, uint64(time.Now().Unix()))
 							select {
 							case subscriber.receiveChan <- message:
 							default:
@@ -436,9 +438,9 @@ func (wm *watchManager) distributeAllMessages(messages []*Message) error {
 
 // subscribe to the key and bucket
 // each subscriber has a own channel to receive messages
-func (wm *watchManager) subscribe(bucketName BucketName, key string) (<-chan *Message, BucketId, error) {
+func (wm *watchManager) subscribe(bucketName BucketName, key string) (*subscriber, error) {
 	if wm.isClosed() {
-		return nil, 0, ErrWatchManagerClosed
+		return nil, ErrWatchManagerClosed
 	}
 
 	wm.mu.Lock()
@@ -465,7 +467,7 @@ func (wm *watchManager) subscribe(bucketName BucketName, key string) (<-chan *Me
 
 	wm.lookup[bucketName][key][id] = &registeredSubscriber
 
-	return receiveChan, id, nil
+	return &registeredSubscriber, nil
 }
 
 // unsubscribe from the key and bucket

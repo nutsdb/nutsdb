@@ -2535,7 +2535,7 @@ func TestDB_Watch(t *testing.T) {
 			txCreateBucket(t, db, DataStructureList, bucket2, nil)
 			key1 := []byte("key1")
 			key2 := []byte("key2")
-			countOfMessages := int64(204)
+			countOfMessages := int64(107)
 
 			// Initialize the watcher for bucket2
 			for i := 0; i < int(limitCount); i++ {
@@ -2592,8 +2592,10 @@ func TestDB_Watch(t *testing.T) {
 
 			// Trigger the limit
 			txPush(t, db, bucket1, []byte("0"), []byte("value1"), false, nil, ErrTxnExceedWriteLimit)
+
 			//  Delete item and add one
 			txDel(t, db, bucket1, []byte("0"), nil)
+
 			// NOTE: after delete the key, the watch of key "0" will be unsubscribed
 			// so the watch callback will not be called
 			txPush(t, db, bucket1, []byte("0"), []byte("value1"), false, nil, nil)
@@ -2854,7 +2856,6 @@ func TestDB_WatchDeleteBucket(t *testing.T) {
 					assert.NotNil(t, msg)
 					assert.Equal(t, BucketName(btreeBucket), msg.BucketName)
 					assert.Equal(t, string(btreeKey), msg.Key)
-					t.Logf("BTree watcher received: flag=%v, value=%v", msg.Flag, msg.Value)
 
 					if count.Add(1) == expectCount {
 						close(done)
@@ -2870,7 +2871,6 @@ func TestDB_WatchDeleteBucket(t *testing.T) {
 					assert.NotNil(t, msg)
 					assert.Equal(t, BucketName(listBucket), msg.BucketName)
 					assert.Equal(t, string(listKey), msg.Key)
-					t.Logf("List watcher received: flag=%v, value=%v", msg.Flag, msg.Value)
 
 					if count.Add(1) == expectCount {
 						close(done)
@@ -2886,7 +2886,6 @@ func TestDB_WatchDeleteBucket(t *testing.T) {
 					assert.NotNil(t, msg)
 					assert.Equal(t, BucketName(setBucket), msg.BucketName)
 					assert.Equal(t, string(setKey), msg.Key)
-					t.Logf("Set watcher received: flag=%v, value=%v", msg.Flag, msg.Value)
 
 					if count.Add(1) == expectCount {
 						close(done)
@@ -2902,7 +2901,6 @@ func TestDB_WatchDeleteBucket(t *testing.T) {
 					assert.NotNil(t, msg)
 					assert.Equal(t, BucketName(zsetBucket), msg.BucketName)
 					assert.Equal(t, string(zsetKey), msg.Key)
-					t.Logf("ZSet watcher received: flag=%v, value=%v", msg.Flag, msg.Value)
 
 					if count.Add(1) == expectCount {
 						close(done)
@@ -2964,7 +2962,7 @@ func TestDB_WatchDeleteBucket(t *testing.T) {
 			zsetKey := testutils.GetTestBytes(40)
 
 			count := atomic.Int64{}
-			expectCount := int64(8)
+			expectCount := int64(5)
 			done := make(chan struct{})
 
 			// Setup watchers
@@ -2983,7 +2981,6 @@ func TestDB_WatchDeleteBucket(t *testing.T) {
 					err := db.Watch(bucket, key, func(msg *Message) error {
 						assert.NotNil(t, msg)
 						assert.Equal(t, BucketName(bucket), msg.BucketName)
-						t.Logf("%s watcher received: key=%s, flag=%v", name, msg.Key, msg.Flag)
 
 						if count.Add(1) == expectCount {
 							close(done)
@@ -3005,6 +3002,8 @@ func TestDB_WatchDeleteBucket(t *testing.T) {
 			time.Sleep(100 * time.Millisecond)
 
 			// Delete all versions of the bucket
+			// When all the ds bucket are deleted, the bucket in watch manager will be deleted
+			// it will send the delete bucket message to the subscribers
 			txDeleteBucket(t, db, DataStructureBTree, bucket, nil)
 			txDeleteBucket(t, db, DataStructureList, bucket, nil)
 			txDeleteBucket(t, db, DataStructureSet, bucket, nil)

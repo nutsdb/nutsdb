@@ -890,9 +890,11 @@ func (tx *Tx) getDeletedBuckets() (deletedBuckets map[BucketName]bool) {
 	deletedBuckets = make(map[BucketName]bool)
 	for _, mapper := range tx.pendingBucketList {
 		for name, bucket := range mapper {
-			if _, ok := deletedBuckets[name]; !ok && bucket.Meta.Op == BucketDeleteOperation {
+			isAllDsDeleted := len(tx.db.bm.BucketIDMarker[name]) == 0
+			if _, ok := deletedBuckets[name]; !ok && bucket.Meta.Op == BucketDeleteOperation && isAllDsDeleted {
 				deletedBuckets[name] = true
 			}
+
 		}
 	}
 
