@@ -22,6 +22,17 @@ import (
 	"github.com/pkg/errors"
 )
 
+var (
+	// ErrSetNotExist is returned when the key does not exist.
+	ErrSetNotExist = data.ErrSetNotExist
+
+	// ErrSetMemberNotExist is returned when the member of set does not exist
+	ErrSetMemberNotExist = data.ErrSetMemberNotExist
+
+	// ErrMemberEmpty is returned when the item received is nil
+	ErrMemberEmpty = data.ErrMemberEmpty
+)
+
 func (tx *Tx) sPut(bucket string, key []byte, dataFlag uint16, values ...[]byte) error {
 
 	if dataFlag == DataSetFlag {
@@ -274,7 +285,7 @@ func (tx *Tx) SDiffByTwoBuckets(bucket1 string, key1 []byte, bucket2 string, key
 	}
 
 	var (
-		set1, set2 *Set
+		set1, set2 *data.Set
 		ok         bool
 	)
 
@@ -338,7 +349,7 @@ func (tx *Tx) SMoveByTwoBuckets(bucket1 string, key1 []byte, bucket2 string, key
 	}
 
 	var (
-		set1, set2 *Set
+		set1, set2 *data.Set
 		ok         bool
 	)
 
@@ -429,7 +440,7 @@ func (tx *Tx) SUnionByTwoBuckets(bucket1 string, key1 []byte, bucket2 string, ke
 	}
 
 	var (
-		set1, set2 *Set
+		set1, set2 *data.Set
 		ok         bool
 	)
 	b1, err := tx.db.bm.GetBucket(DataStructureSet, bucket1)
