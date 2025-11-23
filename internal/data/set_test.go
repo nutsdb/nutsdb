@@ -18,6 +18,7 @@ import (
 	"testing"
 
 	"github.com/nutsdb/nutsdb/internal/testutils"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -325,6 +326,12 @@ func TestSet_SPop(t *testing.T) {
 			require.Equal(t, tt.ok, ok)
 		})
 	}
+
+	t.Run("set SPop key not found", func(t *testing.T) {
+		s := NewSet()
+		rec := s.SPop("not_found_key")
+		assert.Nil(t, rec)
+	})
 }
 
 func TestSet_SIsMember(t *testing.T) {
