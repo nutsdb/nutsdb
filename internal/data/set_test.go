@@ -12,20 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package nutsdb
+package data
 
 import (
 	"testing"
 
-	"github.com/nutsdb/nutsdb/internal/data"
 	"github.com/nutsdb/nutsdb/internal/testutils"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestSet_SAdd(t *testing.T) {
 	set := NewSet()
 	key := "key"
-	expectRecords := data.GenerateRecords(3)
+	expectRecords := GenerateRecords(3)
 
 	values := make([][]byte, 3)
 	for i := range expectRecords {
@@ -42,7 +42,7 @@ func TestSet_SAdd(t *testing.T) {
 func TestSet_SRem(t *testing.T) {
 	set := NewSet()
 	key := "key"
-	expectRecords := data.GenerateRecords(4)
+	expectRecords := GenerateRecords(4)
 	values := make([][]byte, 4)
 	for i := range expectRecords {
 		values[i] = expectRecords[i].Value
@@ -68,7 +68,7 @@ func TestSet_SDiff(t *testing.T) {
 	key3 := "set3"
 	key4 := "set4"
 
-	expectRecords := data.GenerateRecords(10)
+	expectRecords := GenerateRecords(10)
 
 	values := make([][]byte, 10)
 	for i := range expectRecords {
@@ -89,7 +89,7 @@ func TestSet_SDiff(t *testing.T) {
 		name    string
 		args    args
 		set     *Set
-		want    []*data.Record
+		want    []*Record
 		wantErr bool
 	}{
 		{"normal set diff1", args{key1, key2}, set, expectRecords[:2], false},
@@ -119,7 +119,7 @@ func TestSet_SCard(t *testing.T) {
 	key3 := "set3"
 	key4 := "set4"
 
-	expectRecords := data.GenerateRecords(10)
+	expectRecords := GenerateRecords(10)
 
 	values := make([][]byte, 10)
 	for i := range expectRecords {
@@ -159,7 +159,7 @@ func TestSet_SInter(t *testing.T) {
 	key3 := "set3"
 	key4 := "set4"
 
-	expectRecords := data.GenerateRecords(10)
+	expectRecords := GenerateRecords(10)
 
 	values := make([][]byte, 10)
 	for i := range expectRecords {
@@ -180,11 +180,11 @@ func TestSet_SInter(t *testing.T) {
 		name    string
 		args    args
 		set     *Set
-		want    []*data.Record
+		want    []*Record
 		wantErr bool
 	}{
-		{"normal set inter1", args{key1, key2}, set, []*data.Record{expectRecords[2], expectRecords[3], expectRecords[4]}, false},
-		{"normal set inter1", args{key2, key3}, set, []*data.Record{expectRecords[2], expectRecords[3], expectRecords[4], expectRecords[5]}, false},
+		{"normal set inter1", args{key1, key2}, set, []*Record{expectRecords[2], expectRecords[3], expectRecords[4]}, false},
+		{"normal set inter1", args{key2, key3}, set, []*Record{expectRecords[2], expectRecords[3], expectRecords[4], expectRecords[5]}, false},
 		{"normal set inter2", args{key1, key4}, set, nil, false},
 		{"first fake set", args{"fake_key1", key2}, set, nil, true},
 		{"second fake set", args{key1, "fake_key2"}, set, nil, true},
@@ -207,7 +207,7 @@ func TestSet_SMembers(t *testing.T) {
 
 	key := "set"
 
-	expectRecords := data.GenerateRecords(3)
+	expectRecords := GenerateRecords(3)
 
 	values := make([][]byte, 3)
 	for i := range expectRecords {
@@ -220,7 +220,7 @@ func TestSet_SMembers(t *testing.T) {
 		name    string
 		key     string
 		set     *Set
-		want    []*data.Record
+		want    []*Record
 		wantErr bool
 	}{
 		{"normal SMembers", key, set, expectRecords[0:1], false},
@@ -246,7 +246,7 @@ func TestSet_SMove(t *testing.T) {
 	key1 := "set1"
 	key2 := "set2"
 
-	expectRecords := data.GenerateRecords(3)
+	expectRecords := GenerateRecords(3)
 	values := make([][]byte, 3)
 	for i := range expectRecords {
 		values[i] = expectRecords[i].Value
@@ -265,8 +265,8 @@ func TestSet_SMove(t *testing.T) {
 		name      string
 		args      args
 		set       *Set
-		want1     []*data.Record
-		want2     []*data.Record
+		want1     []*Record
+		want2     []*Record
 		expectErr error
 	}{
 		{"normal SMove", args{key1, key2, values[1]}, set, expectRecords[0:1], expectRecords[1:], nil},
@@ -296,12 +296,12 @@ func TestSet_SPop(t *testing.T) {
 
 	key := "set"
 
-	expectRecords := data.GenerateRecords(2)
+	expectRecords := GenerateRecords(2)
 	values := make([][]byte, 2)
 	for i := range expectRecords {
 		values[i] = expectRecords[i].Value
 	}
-	m := map[*data.Record]struct{}{}
+	m := map[*Record]struct{}{}
 	for _, expectRecord := range expectRecords {
 		m[expectRecord] = struct{}{}
 	}
@@ -326,6 +326,12 @@ func TestSet_SPop(t *testing.T) {
 			require.Equal(t, tt.ok, ok)
 		})
 	}
+
+	t.Run("set SPop key not found", func(t *testing.T) {
+		s := NewSet()
+		rec := s.SPop("not_found_key")
+		assert.Nil(t, rec)
+	})
 }
 
 func TestSet_SIsMember(t *testing.T) {
@@ -333,7 +339,7 @@ func TestSet_SIsMember(t *testing.T) {
 
 	key := "key"
 
-	expectRecords := data.GenerateRecords(1)
+	expectRecords := GenerateRecords(1)
 	values := [][]byte{expectRecords[0].Value}
 
 	require.NoError(t, set.SAdd(key, values, expectRecords))
@@ -362,7 +368,7 @@ func TestSet_SAreMembers(t *testing.T) {
 
 	key := "set"
 
-	expectRecords := data.GenerateRecords(4)
+	expectRecords := GenerateRecords(4)
 	values := make([][]byte, 4)
 	for i := range expectRecords {
 		values[i] = expectRecords[i].Value
@@ -399,7 +405,7 @@ func TestSet_SUnion(t *testing.T) {
 	key3 := "set3"
 	key4 := "set4"
 
-	expectRecords := data.GenerateRecords(10)
+	expectRecords := GenerateRecords(10)
 
 	values := make([][]byte, 10)
 	for i := range expectRecords {
@@ -420,15 +426,15 @@ func TestSet_SUnion(t *testing.T) {
 		name    string
 		args    args
 		set     *Set
-		want    []*data.Record
+		want    []*Record
 		wantErr bool
 	}{
 		{"normal set Union1", args{key1, key4}, set,
-			[]*data.Record{expectRecords[0], expectRecords[1], expectRecords[2], expectRecords[3], expectRecords[4], expectRecords[7], expectRecords[8], expectRecords[9]},
+			[]*Record{expectRecords[0], expectRecords[1], expectRecords[2], expectRecords[3], expectRecords[4], expectRecords[7], expectRecords[8], expectRecords[9]},
 			false},
 		{
 			"normal set Union2", args{key2, key3}, set,
-			[]*data.Record{expectRecords[2], expectRecords[3], expectRecords[4], expectRecords[5], expectRecords[6]},
+			[]*Record{expectRecords[2], expectRecords[3], expectRecords[4], expectRecords[5], expectRecords[6]},
 			false,
 		},
 		{"first fake set", args{"fake_key1", key2}, set, nil, true},

@@ -19,6 +19,7 @@ import (
 	"testing"
 
 	"github.com/nutsdb/nutsdb/internal/testutils"
+	"github.com/nutsdb/nutsdb/internal/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -503,7 +504,7 @@ func TestTx_ZSetEntryIdxMode_HintKeyValAndRAMIdxMode(t *testing.T) {
 		require.NoError(t, err)
 
 		zset := db.Index.sortedSet.getWithDefault(1, db).M[string(key)]
-		hash, _ := getFnv32(value)
+		hash, _ := utils.GetFnv32(value)
 		node := zset.dict[hash]
 
 		require.NotNil(t, node.record.Value)
@@ -531,7 +532,7 @@ func TestTx_ZSetEntryIdxMode_HintKeyAndRAMIdxMode(t *testing.T) {
 		require.NoError(t, err)
 
 		zset := db.Index.sortedSet.getWithDefault(1, db).M[string(key)]
-		hash, _ := getFnv32(value)
+		hash, _ := utils.GetFnv32(value)
 		node := zset.dict[hash]
 
 		require.Nil(t, node.record.Value)

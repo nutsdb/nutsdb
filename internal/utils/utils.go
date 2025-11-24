@@ -4,10 +4,23 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"hash/fnv"
 	"io"
 	"path/filepath"
 	"reflect"
 )
+
+var fnvHash = fnv.New32a()
+
+func GetFnv32(value []byte) (uint32, error) {
+	_, err := fnvHash.Write(value)
+	if err != nil {
+		return 0, err
+	}
+	hash := fnvHash.Sum32()
+	fnvHash.Reset()
+	return hash, nil
+}
 
 func ConvertBigEndianBytesToUint64(data []byte) uint64 {
 	return binary.BigEndian.Uint64(data)

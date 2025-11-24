@@ -80,3 +80,12 @@ func TestEncodeListKeyAndDecodeListKey(t *testing.T) {
 	assert.Equal(t, key, newKey)
 	assert.Equal(t, seq, newSeq)
 }
+
+func TestFnvHash32(t *testing.T) {
+	t.Run("test hash32", func(t *testing.T) {
+		bytes := []byte("test-fnv-hash32")
+		hash_result, err := utils.GetFnv32(bytes)
+		assert.NoError(t, err)
+		assert.Equal(t, uint32(1486366400), hash_result)
+	})
+}
