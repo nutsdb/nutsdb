@@ -61,4 +61,6 @@ var (
 	ErrKVArgsLenNotEven = errors.New("parameters is used to represent key value pairs and cannot be odd numbers")
 
 	ErrStartGreaterThanEnd = errors.New("start is greater than end")
+
+	ErrInvalidKey = errors.New("invalid key")
 )

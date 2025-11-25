@@ -26,6 +26,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/bwmarrin/snowflake"
 	"github.com/gofrs/flock"
@@ -71,6 +72,7 @@ type (
 		bm                      *BucketManager
 		hintKeyAndRAMIdxModeLru *utils.LRUCache // lru cache for HintKeyAndRAMIdxMode
 		sm                      *SnowflakeManager
+		wm                      *watchManager
 	}
 )
 
@@ -145,6 +147,13 @@ func open(opt Options) (*DB, error) {
 
 	if err := db.buildIndexes(); err != nil {
 		return nil, fmt.Errorf("db.buildIndexes error: %s", err)
+	}
+
+	if db.opt.EnableWatch {
+		db.wm = NewWatchManager()
+		go db.wm.startDistributor()
+	} else {
+		db.wm = nil
 	}
 
 	go db.mergeWorker()
@@ -249,6 +258,12 @@ func (db *DB) release() error {
 	db.commitBuffer = nil
 
 	db.tm.close()
+
+	if db.wm != nil {
+		if err := db.wm.close(); err != nil {
+			log.Printf("watch manager closed already")
+		}
+	}
 
 	if GCEnable {
 		runtime.GC()
@@ -1050,4 +1065,109 @@ func (db *DB) rebuildBucketManager() error {
 		}
 	}
 	return nil
+}
+
+/**
+ * Watch watches the key and bucket and calls the callback function for each message received.
+ * The callback will be called once for each individual message in the batch.
+ *
+ * @param bucket - the bucket name to watch
+ * @param key - the key in the bucket to watch
+ * @param cb - the callback function to call for each message received
+ * @param opts - the options for the watch
+ *   - CallbackTimeout - the timeout for the callback, default is 1 second
+ *
+ * @return error - the error if the watch is stopped
+ */
+func (db *DB) Watch(bucket string, key []byte, cb func(message *Message) error, opts ...WatchOptions) error {
+	watchOpts := NewWatchOptions()
+
+	if len(opts) > 0 {
+		watchOpts = &opts[0]
+	}
+
+	if db.wm == nil {
+		return ErrWatchFeatureDisabled
+	}
+
+	subscriber, err := db.wm.subscribe(bucket, string(key))
+	if err != nil {
+		return err
+	}
+
+	maxBatchSize := 128
+	batch := make([]*Message, 0, maxBatchSize)
+
+	// Use a ticker to process the batch every 100 milliseconds
+	// Avoid CPU busy spinning
+	ticker := time.NewTicker(100 * time.Millisecond)
+	keyWatch := string(key)
+
+	processBatch := func(batch []*Message) error {
+		if len(batch) == 0 {
+			return nil
+		}
+
+		for _, msg := range batch {
+			errChan := make(chan error, 1)
+			go func(msg *Message) {
+				errChan <- cb(msg)
+			}(msg)
+
+			select {
+			case <-time.After(watchOpts.CallbackTimeout):
+				return ErrWatchingCallbackTimeout
+			case err := <-errChan:
+				if err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	}
+
+	defer func() {
+		ticker.Stop()
+
+		if subscriber != nil && subscriber.active.Load() {
+			if err := db.wm.unsubscribe(bucket, keyWatch, subscriber.id); err != nil {
+				// ignore the error
+			}
+		}
+	}()
+
+	for {
+		select {
+		case <-db.wm.done():
+			// drain the batch
+			if err := processBatch(batch); err != nil {
+				return err
+			}
+			return nil
+		case message, ok := <-subscriber.receiveChan:
+			if !ok {
+				if err := processBatch(batch); err != nil {
+					return err
+				}
+
+				return nil
+			}
+
+			batch = append(batch, message)
+
+			if len(batch) >= maxBatchSize {
+				if err := processBatch(batch); err != nil {
+					return err
+				}
+				batch = batch[:0]
+			}
+		case <-ticker.C:
+			for len(batch) > 0 {
+				if err := processBatch(batch); err != nil {
+					return err
+				}
+				batch = batch[:0]
+			}
+		}
+	}
 }
