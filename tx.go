@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"sync/atomic"
 
@@ -170,17 +171,21 @@ func (tx *Tx) getTxID() uint64 {
 //
 // 4. build Hint index.
 //
-// 5. Unlock the database and clear the db field.
+// 5. send updated entries to watch manager if watch feature is enabled.
+//
+// 6. Unlock the database and clear the db field.
 func (tx *Tx) Commit() (err error) {
 	defer func() {
 		if err != nil {
 			tx.handleErr(err)
 		}
+
 		tx.unlock()
 		tx.db = nil
 
 		tx.pendingWrites = nil
 	}()
+
 	if tx.isClosed() {
 		return ErrCannotCommitAClosedTx
 	}
@@ -273,6 +278,11 @@ func (tx *Tx) Commit() (err error) {
 
 	if err := tx.buildBucketInIndex(); err != nil {
 		return err
+	}
+
+	// send updated entries to watch manager
+	if tx.db.wm != nil {
+		tx.sendUpdatedEntries(pendingWriteList, tx.getDeletedBuckets())
 	}
 
 	return nil
@@ -840,4 +850,53 @@ func (tx *Tx) findEntryAndItsStatus(ds Ds, bucket BucketName, key string) (Entry
 		}
 	}
 	return NotFoundEntry, nil
+}
+
+/*
+ * send updated entries to watch manager for monitoring
+ * and specifying the buckets to be deleted
+ * @param pendingWriteList: the list of entries to be sent
+ * @param deletedBuckets: the buckets to be deleted
+ *
+ *
+ * @return: nil if success, error if any
+ */
+func (tx *Tx) sendUpdatedEntries(pendingWriteList []*Entry, deletedBuckets map[BucketName]bool) {
+	err := tx.db.wm.sendUpdatedEntries(pendingWriteList, deletedBuckets, func(bucketId BucketId) (BucketName, error) {
+		bucket, err := tx.db.bm.GetBucketById(bucketId)
+		if err != nil {
+			return "", err
+		}
+
+		return bucket.Name, nil
+	})
+
+	if err != nil {
+		log.Println("send updated entries error: ", err)
+	}
+}
+
+/*
+* send buckets to watch manager for specifying the bucket to be deleted
+
+* @param pendingWriteList: the list of entries to be sent
+* @return: nil if success, error if any
+ */
+func (tx *Tx) getDeletedBuckets() (deletedBuckets map[BucketName]bool) {
+	if len(tx.pendingBucketList) == 0 {
+		return nil
+	}
+
+	deletedBuckets = make(map[BucketName]bool)
+	for _, mapper := range tx.pendingBucketList {
+		for name, bucket := range mapper {
+			isAllDsDeleted := len(tx.db.bm.BucketIDMarker[name]) == 0
+			if _, ok := deletedBuckets[name]; !ok && bucket.Meta.Op == BucketDeleteOperation && isAllDsDeleted {
+				deletedBuckets[name] = true
+			}
+
+		}
+	}
+
+	return deletedBuckets
 }

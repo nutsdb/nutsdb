@@ -19,6 +19,7 @@ About options see here for detail.
 | MaxBatchCount        | `MaxBatchCount` represents max entries in batch.             | int64             |
 | MaxBatchSize         | `MaxBatchSize` represents max batch size in bytes.           | int64             |
 | ExpiredDeleteType    | `ExpiredDeleteType ` represents the data structure used for expired deletion. TimeWheel means use the time wheel, You can use it when you need high performance or low memory usage. TimeHeap means use the time heap, You can use it when you need to delete precisely or memory usage will be high. | ExpiredDeleteType |
+| EnableWatch          | `EnableWatch` toggles the watch feature. If `EnableWatch` is true, the watch feature will be enabled. The watch feature will be disabled by default. | bool              |
 
 ### Default Options
 
@@ -37,6 +38,7 @@ var DefaultOptions = func() Options {
         MaxBatchSize:      (15 * defaultSegmentSize / 4) / 100,
         MaxBatchCount:     (15 * defaultSegmentSize / 4) / 100 / 100,
         ExpiredDeleteType: TimeWheel,
+        EnableWatch:       false,
     }
 }()
 ```

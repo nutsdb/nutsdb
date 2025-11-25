@@ -335,6 +335,7 @@ if err := db.Merge(); err != nil {
   <summary><b>Advanced Features</b></summary>
 
 - [Merge V2 and HintFile](#merge-v2-and-hintfile)
+- [Watch Key Changes](./docs/user_guides/others.md#watch-key-changes)
 - [More Operation](./docs/user_guides/others.md)
 </details>
 

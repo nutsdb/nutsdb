@@ -15,6 +15,7 @@
 package nutsdb
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"hash/crc32"
@@ -350,4 +351,46 @@ func (dt *dataInTx) appendEntry(e *EntryWhenRecovery) {
 func (dt *dataInTx) reset() {
 	dt.es = make([]*EntryWhenRecovery, 0)
 	dt.txId = 0
+}
+
+/**
+ * decode the key of the entry
+ * 1. in the case of list flag is DataLPushFlag or DataRPushFlag, the key is transformed from seq + user_key to user_key
+ * so we need to decode the key to get the raw key
+ * 2. in the case of sorted set flag is DataZAddFlag, the key is transformed from score + user_key to user_key
+ * so we need to decode the key to get the raw key
+ * 3. All other cases, the key is the raw key
+ */
+func (entry *Entry) getRawKey() ([]byte, error) {
+	key := entry.Key
+
+	switch entry.Meta.Ds {
+	case DataStructureList:
+		if entry.Meta.Flag != DataLPushFlag && entry.Meta.Flag != DataRPushFlag {
+			return key, nil
+		}
+
+		if len(key) < 8 {
+			return key, ErrInvalidKey
+		}
+
+		return key[8:], nil
+	case DataStructureSortedSet:
+		if entry.Meta.Flag != DataZAddFlag {
+			return key, nil
+		}
+
+		strList := bytes.Split(key, []byte(SeparatorForZSetKey))
+		if len(strList) != 2 {
+			return key, ErrInvalidKey
+		}
+
+		return []byte(strList[0]), nil
+	case DataStructureSet:
+		return key, nil
+	case DataStructureBTree:
+		return key, nil
+	default:
+		return key, ErrDataStructureNotSupported
+	}
 }

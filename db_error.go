@@ -32,4 +32,10 @@ var (
 
 	// ErrRecordIsNil is returned when Record is nil
 	ErrRecordIsNil = errors.New("the record is nil")
+
+	// ErrWatchFeatureDisabled is returned when the watch feature is disabled
+	ErrWatchFeatureDisabled = errors.New("watch feature is disabled")
+
+	// ErrWatchingCallbackTimeout is returned when the callback timeout
+	ErrWatchingCallbackTimeout = errors.New("watching callback timeout")
 )

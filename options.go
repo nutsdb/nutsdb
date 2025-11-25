@@ -158,6 +158,10 @@ type Options struct {
 	// ListImpl specifies the implementation type for List data structure.
 	// Default: ListImplDoublyLinkedList (maintains backward compatibility)
 	ListImpl ListImplementationType
+
+	// EnableWatch toggles the watch feature.
+	// If EnableWatch is true, the watch feature will be enabled. The watch feature will be disabled by default.
+	EnableWatch bool
 }
 
 const (
@@ -187,6 +191,7 @@ var DefaultOptions = func() Options {
 		EnableHintFile:            false,
 		EnableMergeV2:             false,
 		ListImpl:                  ListImplementationType(ListImplBTree),
+		EnableWatch:               false,
 	}
 }()
 
