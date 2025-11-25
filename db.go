@@ -814,7 +814,7 @@ func (db *DB) buildSortedSetIdx(record *data.Record, entry *Entry) error {
 	}
 	bucketId := bucket.Id
 
-	ss := db.Index.sortedSet.getWithDefault(bucketId, db)
+	ss := db.Index.sortedSet.getWithDefault(bucketId)
 
 	switch meta.Flag {
 	case DataZAddFlag:

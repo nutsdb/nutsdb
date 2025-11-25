@@ -40,21 +40,19 @@ const (
 )
 
 type SortedSet struct {
-	db *DB
-	M  map[string]*SkipList
+	M map[string]*SkipList
 }
 
-func NewSortedSet(db *DB) *SortedSet {
+func NewSortedSet() *SortedSet {
 	return &SortedSet{
-		db: db,
-		M:  map[string]*SkipList{},
+		M: map[string]*SkipList{},
 	}
 }
 
 func (z *SortedSet) ZAdd(key string, score SCORE, value []byte, record *data.Record) error {
 	sortedSet, ok := z.M[key]
 	if !ok {
-		z.M[key] = newSkipList(z.db)
+		z.M[key] = newSkipList()
 		sortedSet = z.M[key]
 	}
 
@@ -277,7 +275,6 @@ type SkipListLevel struct {
 
 // The SkipList represents the sorted set.
 type SkipList struct {
-	db     *DB
 	header *SkipListNode
 	tail   *SkipListNode
 	length int64
@@ -332,9 +329,8 @@ func randomLevel() int {
 	return SkipListMaxLevel
 }
 
-func newSkipList(db *DB) *SkipList {
+func newSkipList() *SkipList {
 	skipList := &SkipList{
-		db:    db,
 		level: 1,
 		dict:  make(map[uint32]*SkipListNode),
 	}
@@ -344,8 +340,8 @@ func newSkipList(db *DB) *SkipList {
 }
 
 func (sl *SkipList) cmp(r1 *data.Record, r2 *data.Record) int {
-	val1, _ := sl.db.getValueByRecord(r1)
-	val2, _ := sl.db.getValueByRecord(r2)
+	val1 := r1.Value
+	val2 := r2.Value
 	return bytes.Compare(val1, val2)
 }
 

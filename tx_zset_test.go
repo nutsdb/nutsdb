@@ -503,7 +503,7 @@ func TestTx_ZSetEntryIdxMode_HintKeyValAndRAMIdxMode(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		zset := db.Index.sortedSet.getWithDefault(1, db).M[string(key)]
+		zset := db.Index.sortedSet.getWithDefault(1).M[string(key)]
 		hash, _ := utils.GetFnv32(value)
 		node := zset.dict[hash]
 
@@ -531,7 +531,7 @@ func TestTx_ZSetEntryIdxMode_HintKeyAndRAMIdxMode(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		zset := db.Index.sortedSet.getWithDefault(1, db).M[string(key)]
+		zset := db.Index.sortedSet.getWithDefault(1).M[string(key)]
 		hash, _ := utils.GetFnv32(value)
 		node := zset.dict[hash]
 

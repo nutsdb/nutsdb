@@ -1349,7 +1349,7 @@ func TestMergeV2ApplyLookupUpdatesSecondaryIndexes(t *testing.T) {
 	listIdx.Items[string(listKey)].InsertRecord(utils.ConvertUint64ToBigEndianBytes(seq), listRecord)
 
 	// Sorted set bucket
-	sortedIdx := db.Index.sortedSet.getWithDefault(buckets[2].id, db)
+	sortedIdx := db.Index.sortedSet.getWithDefault(buckets[2].id)
 	sortedValue := []byte("sorted-member")
 	sortedRecord := &data.Record{Value: sortedValue, FileID: 12, Timestamp: 3, TTL: Persistent}
 	if err := sortedIdx.ZAdd("zset-key", SCORE(1.5), sortedValue, sortedRecord); err != nil {

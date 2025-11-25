@@ -87,9 +87,9 @@ type SortedSetIdx struct {
 	*defaultOp[SortedSet]
 }
 
-func (idx SortedSetIdx) getWithDefault(id BucketId, db *DB) *SortedSet {
+func (idx SortedSetIdx) getWithDefault(id BucketId) *SortedSet {
 	return idx.defaultOp.computeIfAbsent(id, func() *SortedSet {
-		return NewSortedSet(db)
+		return NewSortedSet()
 	})
 }
 
