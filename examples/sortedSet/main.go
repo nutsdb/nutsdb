@@ -26,7 +26,7 @@ func init() {
 			}
 		}
 	}
-	db, _ = nutsdb.Open(
+	db, err = nutsdb.Open(
 		nutsdb.DefaultOptions,
 		nutsdb.WithDir(fileDir),
 		nutsdb.WithSegmentSize(1024*1024), // 1MB
@@ -35,9 +35,16 @@ func init() {
 		panic(err)
 	}
 
+	if err = db.Update(func(tx *nutsdb.Tx) error {
+		bucket := "myZSet1"
+		return tx.NewSortSetBucket(bucket)
+	}); err != nil {
+		panic(err)
+	}
 }
 
 func main() {
+
 	testZAdd()
 
 	testZScore()
