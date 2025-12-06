@@ -400,7 +400,7 @@ func (tx *Tx) getSortedSetEntryNewAddRecordCount(bucketId BucketId, entry *Entry
 		res--
 	case DataZRemRangeByRankFlag:
 		start, end := splitIntIntStr(value, SeparatorForZSetKey)
-		delNodes, err := tx.db.Index.sortedSet.getWithDefault(bucketId, tx.db).getZRemRangeByRankNodes(key, start, end)
+		delNodes, err := tx.db.Index.sortedSet.getWithDefault(bucketId).GetZRemRangeByRankNodes(key, start, end)
 		if err != nil {
 			return res, err
 		}
@@ -717,7 +717,7 @@ func (tx *Tx) buildBucketInIndex() error {
 				case DataStructureSet:
 					tx.db.Index.set.getWithDefault(bucket.Id)
 				case DataStructureSortedSet:
-					tx.db.Index.sortedSet.getWithDefault(bucket.Id, tx.db)
+					tx.db.Index.sortedSet.getWithDefault(bucket.Id)
 				default:
 					return ErrDataStructureNotSupported
 				}

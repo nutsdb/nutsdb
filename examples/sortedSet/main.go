@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 
 	"github.com/nutsdb/nutsdb"
 )
@@ -14,19 +15,25 @@ var (
 )
 
 func init() {
-	fileDir := "/tmp/nutsdb_example"
+	tmpdir := "tmp"
+	fileDir := filepath.Join(tmpdir, "nutsdb_example")
+	defer func() {
+		if err := os.RemoveAll(tmpdir); err != nil {
+			log.Println(err)
+		}
+	}()
 
 	files, _ := os.ReadDir(fileDir)
 	for _, f := range files {
 		name := f.Name()
 		if name != "" {
-			err := os.RemoveAll(fileDir + "/" + name)
+			err := os.RemoveAll(filepath.Join(fileDir, name))
 			if err != nil {
 				panic(err)
 			}
 		}
 	}
-	db, _ = nutsdb.Open(
+	db, err = nutsdb.Open(
 		nutsdb.DefaultOptions,
 		nutsdb.WithDir(fileDir),
 		nutsdb.WithSegmentSize(1024*1024), // 1MB
@@ -35,9 +42,16 @@ func init() {
 		panic(err)
 	}
 
+	if err = db.Update(func(tx *nutsdb.Tx) error {
+		bucket := "myZSet1"
+		return tx.NewSortSetBucket(bucket)
+	}); err != nil {
+		panic(err)
+	}
 }
 
 func main() {
+
 	testZAdd()
 
 	testZScore()

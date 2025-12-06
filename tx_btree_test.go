@@ -856,7 +856,7 @@ func TestTx_RangeScan_NotFound(t *testing.T) {
 }
 
 func TestTx_ExpiredDeletion(t *testing.T) {
-	bucket := "bucket"
+	bucket := string(testutils.GetTestBytes(18))
 
 	t.Run("expired deletion", func(t *testing.T) {
 		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
