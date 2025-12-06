@@ -713,11 +713,11 @@ func (job *mergeV2Job) applyLookup(entry *mergeLookupEntry) {
 		if !entry.hasValueHash {
 			return
 		}
-		node, ok := sl.dict[entry.valueHash]
+		node, ok := sl.Dict()[entry.valueHash]
 		if !ok || node == nil {
 			return
 		}
-		record := node.record
+		record := node.Record
 		if record == nil {
 			return
 		}

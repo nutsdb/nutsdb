@@ -21,8 +21,17 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nutsdb/nutsdb/internal/data"
 	"github.com/nutsdb/nutsdb/internal/utils"
 	"github.com/xujiajun/utils/strconv2"
+)
+
+var (
+	ErrSortedSetNotFound = errors.New("the sortedSet does not exist")
+
+	ErrSortedSetMemberNotExist = errors.New("the member of sortedSet does not exist")
+
+	ErrSortedSetIsEmpty = errors.New("the sortedSet if empty")
 )
 
 // SeparatorForZSetKey represents separator for zSet key.
@@ -63,7 +72,7 @@ func (tx *Tx) ZMembers(bucket string, key []byte) (map[*SortedSetMember]struct{}
 
 	var (
 		bucketId  = b.Id
-		sortedSet *SortedSet
+		sortedSet *data.SortedSet
 		exist     bool
 	)
 
@@ -104,7 +113,7 @@ func (tx *Tx) ZCard(bucket string, key []byte) (int, error) {
 
 	var (
 		bucketId  = b.Id
-		sortedSet *SortedSet
+		sortedSet *data.SortedSet
 		exist     bool
 	)
 
@@ -120,7 +129,7 @@ func (tx *Tx) ZCard(bucket string, key []byte) (int, error) {
 // Limit        int  // limit the max nodes to return
 // ExcludeStart bool // exclude start value, so it search in interval (start, end] or (start, end)
 // ExcludeEnd   bool // exclude end value, so it search in interval [start, end) or (start, end)
-func (tx *Tx) ZCount(bucket string, key []byte, start, end float64, opts *GetByScoreRangeOptions) (int, error) {
+func (tx *Tx) ZCount(bucket string, key []byte, start, end float64, opts *data.GetByScoreRangeOptions) (int, error) {
 	if err := tx.ZCheck(bucket); err != nil {
 		return 0, err
 	}
@@ -132,7 +141,7 @@ func (tx *Tx) ZCount(bucket string, key []byte, start, end float64, opts *GetByS
 
 	var (
 		bucketId  = b.Id
-		sortedSet *SortedSet
+		sortedSet *data.SortedSet
 		exist     bool
 	)
 
@@ -140,7 +149,7 @@ func (tx *Tx) ZCount(bucket string, key []byte, start, end float64, opts *GetByS
 		return 0, ErrBucket
 	}
 
-	return sortedSet.ZCount(string(key), SCORE(start), SCORE(end), opts)
+	return sortedSet.ZCount(string(key), data.SCORE(start), data.SCORE(end), opts)
 }
 
 // ZPopMax Removes and returns the member with the highest score in the sorted set specified by key in a bucket.
@@ -156,7 +165,7 @@ func (tx *Tx) ZPopMax(bucket string, key []byte) (*SortedSetMember, error) {
 
 	var (
 		bucketId  = b.Id
-		sortedSet *SortedSet
+		sortedSet *data.SortedSet
 		exist     bool
 	)
 
@@ -190,7 +199,7 @@ func (tx *Tx) ZPopMin(bucket string, key []byte) (*SortedSetMember, error) {
 
 	var (
 		bucketId  = b.Id
-		sortedSet *SortedSet
+		sortedSet *data.SortedSet
 		exist     bool
 	)
 
@@ -224,7 +233,7 @@ func (tx *Tx) ZPeekMax(bucket string, key []byte) (*SortedSetMember, error) {
 
 	var (
 		bucketId  = b.Id
-		sortedSet *SortedSet
+		sortedSet *data.SortedSet
 		exist     bool
 	)
 
@@ -258,7 +267,7 @@ func (tx *Tx) ZPeekMin(bucket string, key []byte) (*SortedSetMember, error) {
 
 	var (
 		bucketId  = b.Id
-		sortedSet *SortedSet
+		sortedSet *data.SortedSet
 		exist     bool
 	)
 
@@ -281,7 +290,7 @@ func (tx *Tx) ZPeekMin(bucket string, key []byte) (*SortedSetMember, error) {
 
 // ZRangeByScore Returns all the elements in the sorted set specified by key in a bucket with a score between min and max.
 // And the parameter `Opts` is the same as ZCount's.
-func (tx *Tx) ZRangeByScore(bucket string, key []byte, start, end float64, opts *GetByScoreRangeOptions) ([]*SortedSetMember, error) {
+func (tx *Tx) ZRangeByScore(bucket string, key []byte, start, end float64, opts *data.GetByScoreRangeOptions) ([]*SortedSetMember, error) {
 	if err := tx.ZCheck(bucket); err != nil {
 		return nil, err
 	}
@@ -293,7 +302,7 @@ func (tx *Tx) ZRangeByScore(bucket string, key []byte, start, end float64, opts 
 
 	var (
 		bucketId  = b.Id
-		sortedSet *SortedSet
+		sortedSet *data.SortedSet
 		exist     bool
 	)
 
@@ -301,7 +310,7 @@ func (tx *Tx) ZRangeByScore(bucket string, key []byte, start, end float64, opts 
 		return nil, ErrBucket
 	}
 
-	records, scores, err := sortedSet.ZRangeByScore(string(key), SCORE(start), SCORE(end), opts)
+	records, scores, err := sortedSet.ZRangeByScore(string(key), data.SCORE(start), data.SCORE(end), opts)
 	if err != nil {
 		return nil, err
 	}
@@ -332,7 +341,7 @@ func (tx *Tx) ZRangeByRank(bucket string, key []byte, start, end int) ([]*Sorted
 
 	var (
 		bucketId  = b.Id
-		sortedSet *SortedSet
+		sortedSet *data.SortedSet
 		exist     bool
 	)
 
@@ -370,7 +379,7 @@ func (tx *Tx) ZRem(bucket string, key []byte, value []byte) error {
 
 	var (
 		bucketId  = b.Id
-		sortedSet *SortedSet
+		sortedSet *data.SortedSet
 		exist     bool
 	)
 
@@ -415,7 +424,7 @@ func (tx *Tx) ZRank(bucket string, key, value []byte) (int, error) {
 
 	var (
 		bucketId  = b.Id
-		sortedSet *SortedSet
+		sortedSet *data.SortedSet
 		exist     bool
 	)
 
@@ -439,7 +448,7 @@ func (tx *Tx) ZRevRank(bucket string, key, value []byte) (int, error) {
 
 	var (
 		bucketId  = b.Id
-		sortedSet *SortedSet
+		sortedSet *data.SortedSet
 		exist     bool
 	)
 
@@ -463,7 +472,7 @@ func (tx *Tx) ZScore(bucket string, key, value []byte) (float64, error) {
 
 	var (
 		bucketId  = b.Id
-		sortedSet *SortedSet
+		sortedSet *data.SortedSet
 		exist     bool
 	)
 
@@ -487,7 +496,7 @@ func (tx *Tx) ZKeys(bucket, pattern string, f func(key string) bool) error {
 
 	var (
 		bucketId  = b.Id
-		sortedSet *SortedSet
+		sortedSet *data.SortedSet
 		exist     bool
 	)
 

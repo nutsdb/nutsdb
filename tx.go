@@ -400,7 +400,7 @@ func (tx *Tx) getSortedSetEntryNewAddRecordCount(bucketId BucketId, entry *Entry
 		res--
 	case DataZRemRangeByRankFlag:
 		start, end := splitIntIntStr(value, SeparatorForZSetKey)
-		delNodes, err := tx.db.Index.sortedSet.getWithDefault(bucketId).getZRemRangeByRankNodes(key, start, end)
+		delNodes, err := tx.db.Index.sortedSet.getWithDefault(bucketId).GetZRemRangeByRankNodes(key, start, end)
 		if err != nil {
 			return res, err
 		}

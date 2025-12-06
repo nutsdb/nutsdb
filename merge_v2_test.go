@@ -1352,7 +1352,7 @@ func TestMergeV2ApplyLookupUpdatesSecondaryIndexes(t *testing.T) {
 	sortedIdx := db.Index.sortedSet.getWithDefault(buckets[2].id)
 	sortedValue := []byte("sorted-member")
 	sortedRecord := &data.Record{Value: sortedValue, FileID: 12, Timestamp: 3, TTL: Persistent}
-	if err := sortedIdx.ZAdd("zset-key", SCORE(1.5), sortedValue, sortedRecord); err != nil {
+	if err := sortedIdx.ZAdd("zset-key", data.SCORE(1.5), sortedValue, sortedRecord); err != nil {
 		t.Fatalf("ZAdd: %v", err)
 	}
 	sortedHash := fnv.New32a()
@@ -1417,8 +1417,8 @@ func TestMergeV2ApplyLookupUpdatesSecondaryIndexes(t *testing.T) {
 		hasValueHash: true,
 	})
 
-	node := sortedIdx.M["zset-key"].dict[sortedHash.Sum32()]
-	if node == nil || node.record.FileID != 300 || node.record.DataPos != 3000 {
+	node := sortedIdx.M["zset-key"].Dict()[sortedHash.Sum32()]
+	if node == nil || node.Record.FileID != 300 || node.Record.DataPos != 3000 {
 		t.Fatalf("sorted set node not updated: %+v", node)
 	}
 }

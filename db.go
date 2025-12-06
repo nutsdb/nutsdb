@@ -837,7 +837,7 @@ func (db *DB) buildSortedSetIdx(record *data.Record, entry *Entry) error {
 		if len(keyAndScore) == 2 {
 			key := keyAndScore[0]
 			score, _ := strconv2.StrToFloat64(keyAndScore[1])
-			err = ss.ZAdd(key, SCORE(score), val, record)
+			err = ss.ZAdd(key, data.SCORE(score), val, record)
 		}
 	case DataZRemFlag:
 		_, err = ss.ZRem(string(key), val)
