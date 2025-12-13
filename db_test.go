@@ -2443,7 +2443,8 @@ func TestDB_Watch(t *testing.T) {
 	t.Run("db watch and transaction rollback", func(t *testing.T) {
 		opts := DefaultOptions
 		opts.EnableWatch = true
-		opts.Dir = "/tmp/test-watch-and-transaction-rollback/"
+		opts.Dir = filepath.Join(t.TempDir(), "test-do-watch-and-transaction-rollback")
+		t.Log(t.TempDir())
 		removeDir(opts.Dir)
 
 		db, err := Open(opts)
