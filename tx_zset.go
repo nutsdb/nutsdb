@@ -156,13 +156,18 @@ func (tx *Tx) ZCount(bucket string, key []byte, start, end float64, opts *GetByS
 		return 0, ErrBucket
 	}
 
-	return sortedSet.ZCount(
-		string(key), data.SCORE(start), data.SCORE(end),
-		&data.InternalGetByScoreRangeOptions{
+	var internalOpts *data.InternalGetByScoreRangeOptions
+	if opts == nil {
+		internalOpts = nil
+	} else {
+		internalOpts = &data.InternalGetByScoreRangeOptions{
 			Limit:        opts.Limit,
 			ExcludeStart: opts.ExcludeStart,
 			ExcludeEnd:   opts.ExcludeEnd,
-		},
+		}
+	}
+	return sortedSet.ZCount(
+		string(key), data.SCORE(start), data.SCORE(end), internalOpts,
 	)
 }
 
@@ -323,14 +328,18 @@ func (tx *Tx) ZRangeByScore(bucket string, key []byte, start, end float64, opts 
 	if sortedSet, exist = tx.db.Index.sortedSet.exist(bucketId); !exist {
 		return nil, ErrBucket
 	}
-
-	records, scores, err := sortedSet.ZRangeByScore(
-		string(key), data.SCORE(start), data.SCORE(end),
-		&data.InternalGetByScoreRangeOptions{
+	var internalOpts *data.InternalGetByScoreRangeOptions
+	if opts == nil {
+		internalOpts = nil
+	} else {
+		internalOpts = &data.InternalGetByScoreRangeOptions{
 			Limit:        opts.Limit,
 			ExcludeStart: opts.ExcludeStart,
 			ExcludeEnd:   opts.ExcludeEnd,
-		},
+		}
+	}
+	records, scores, err := sortedSet.ZRangeByScore(
+		string(key), data.SCORE(start), data.SCORE(end), internalOpts,
 	)
 	if err != nil {
 		return nil, err
