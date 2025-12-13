@@ -83,7 +83,7 @@ func (z *SortedSet) ZCard(key string) (int, error) {
 	return 0, ErrSortedSetNotFound
 }
 
-func (z *SortedSet) ZCount(key string, start SCORE, end SCORE, opts *GetByScoreRangeOptions) (int, error) {
+func (z *SortedSet) ZCount(key string, start SCORE, end SCORE, opts *InternalGetByScoreRangeOptions) (int, error) {
 	if sortedSet, ok := z.M[key]; ok {
 		return len(sortedSet.GetByScoreRange(start, end, opts)), nil
 	}
@@ -138,7 +138,7 @@ func (z *SortedSet) ZPopMin(key string) (*Record, SCORE, error) {
 	return nil, 0, ErrSortedSetNotFound
 }
 
-func (z *SortedSet) ZRangeByScore(key string, start SCORE, end SCORE, opts *GetByScoreRangeOptions) ([]*Record, []float64, error) {
+func (z *SortedSet) ZRangeByScore(key string, start SCORE, end SCORE, opts *InternalGetByScoreRangeOptions) ([]*Record, []float64, error) {
 	if sortedSet, ok := z.M[key]; ok {
 
 		nodes := sortedSet.GetByScoreRange(start, end, opts)
@@ -548,8 +548,8 @@ func (sl *SkipList) Remove(hash uint32) *SkipListNode {
 	return nil
 }
 
-// GetByScoreRangeOptions represents the options of the GetByScoreRange function.
-type GetByScoreRangeOptions struct {
+// InternalGetByScoreRangeOptions represents the options of the GetByScoreRange function.
+type InternalGetByScoreRangeOptions struct {
 	Limit        int  // limit the max nodes to return
 	ExcludeStart bool // exclude start value, so it search in interval (start, end] or (start, end)
 	ExcludeEnd   bool // exclude end value, so it search in interval [start, end) or (start, end)
@@ -559,7 +559,7 @@ type GetByScoreRangeOptions struct {
 // If options is nil, it searches in interval [start, end] without any limit by default.
 //
 // Time complexity of this method is : O(log(N)).
-func (sl *SkipList) GetByScoreRange(start SCORE, end SCORE, options *GetByScoreRangeOptions) []*SkipListNode {
+func (sl *SkipList) GetByScoreRange(start SCORE, end SCORE, options *InternalGetByScoreRangeOptions) []*SkipListNode {
 	limit := 1<<31 - 1
 	if options != nil && options.Limit > 0 {
 		limit = options.Limit

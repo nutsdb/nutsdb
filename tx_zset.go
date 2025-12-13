@@ -34,6 +34,13 @@ var (
 	ErrSortedSetIsEmpty = data.ErrSortedSetIsEmpty
 )
 
+// GetByScoreRangeOptions represents the options of the GetByScoreRange function.
+type GetByScoreRangeOptions struct {
+	Limit        int  // limit the max nodes to return
+	ExcludeStart bool // exclude start value, so it search in interval (start, end] or (start, end)
+	ExcludeEnd   bool // exclude end value, so it search in interval [start, end) or (start, end)
+}
+
 // SeparatorForZSetKey represents separator for zSet key.
 const SeparatorForZSetKey = "|"
 
@@ -129,7 +136,7 @@ func (tx *Tx) ZCard(bucket string, key []byte) (int, error) {
 // Limit        int  // limit the max nodes to return
 // ExcludeStart bool // exclude start value, so it search in interval (start, end] or (start, end)
 // ExcludeEnd   bool // exclude end value, so it search in interval [start, end) or (start, end)
-func (tx *Tx) ZCount(bucket string, key []byte, start, end float64, opts *data.GetByScoreRangeOptions) (int, error) {
+func (tx *Tx) ZCount(bucket string, key []byte, start, end float64, opts *GetByScoreRangeOptions) (int, error) {
 	if err := tx.ZCheck(bucket); err != nil {
 		return 0, err
 	}
@@ -149,7 +156,14 @@ func (tx *Tx) ZCount(bucket string, key []byte, start, end float64, opts *data.G
 		return 0, ErrBucket
 	}
 
-	return sortedSet.ZCount(string(key), data.SCORE(start), data.SCORE(end), opts)
+	return sortedSet.ZCount(
+		string(key), data.SCORE(start), data.SCORE(end),
+		&data.InternalGetByScoreRangeOptions{
+			Limit:        opts.Limit,
+			ExcludeStart: opts.ExcludeStart,
+			ExcludeEnd:   opts.ExcludeEnd,
+		},
+	)
 }
 
 // ZPopMax Removes and returns the member with the highest score in the sorted set specified by key in a bucket.
@@ -290,7 +304,7 @@ func (tx *Tx) ZPeekMin(bucket string, key []byte) (*SortedSetMember, error) {
 
 // ZRangeByScore Returns all the elements in the sorted set specified by key in a bucket with a score between min and max.
 // And the parameter `Opts` is the same as ZCount's.
-func (tx *Tx) ZRangeByScore(bucket string, key []byte, start, end float64, opts *data.GetByScoreRangeOptions) ([]*SortedSetMember, error) {
+func (tx *Tx) ZRangeByScore(bucket string, key []byte, start, end float64, opts *GetByScoreRangeOptions) ([]*SortedSetMember, error) {
 	if err := tx.ZCheck(bucket); err != nil {
 		return nil, err
 	}
@@ -310,7 +324,14 @@ func (tx *Tx) ZRangeByScore(bucket string, key []byte, start, end float64, opts 
 		return nil, ErrBucket
 	}
 
-	records, scores, err := sortedSet.ZRangeByScore(string(key), data.SCORE(start), data.SCORE(end), opts)
+	records, scores, err := sortedSet.ZRangeByScore(
+		string(key), data.SCORE(start), data.SCORE(end),
+		&data.InternalGetByScoreRangeOptions{
+			Limit:        opts.Limit,
+			ExcludeStart: opts.ExcludeStart,
+			ExcludeEnd:   opts.ExcludeEnd,
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
