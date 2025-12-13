@@ -2440,6 +2440,8 @@ func TestDB_Watch(t *testing.T) {
 		})
 	})
 
+	// TODO
+	// this test may randomly failed during testing.
 	t.Run("db watch and transaction rollback", func(t *testing.T) {
 		opts := DefaultOptions
 		opts.EnableWatch = true
