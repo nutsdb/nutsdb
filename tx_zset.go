@@ -27,11 +27,11 @@ import (
 )
 
 var (
-	ErrSortedSetNotFound = errors.New("the sortedSet does not exist")
+	ErrSortedSetNotFound = data.ErrSortedSetNotFound
 
-	ErrSortedSetMemberNotExist = errors.New("the member of sortedSet does not exist")
+	ErrSortedSetMemberNotExist = data.ErrSortedSetMemberNotExist
 
-	ErrSortedSetIsEmpty = errors.New("the sortedSet if empty")
+	ErrSortedSetIsEmpty = data.ErrSortedSetIsEmpty
 )
 
 // SeparatorForZSetKey represents separator for zSet key.
