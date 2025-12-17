@@ -17,18 +17,20 @@ package ttl
 import (
 	"testing"
 
-	"github.com/nutsdb/nutsdb/internal/clock"
+	"github.com/nutsdb/nutsdb/internal/core"
+	"github.com/nutsdb/nutsdb/internal/ttl/checker"
+	"github.com/nutsdb/nutsdb/internal/ttl/clock"
 )
 
-// DataStructureBTree constant is already defined in checker_test.go
+// core.DataStructureBTree constant is already defined in checker_test.go
 
 func TestNewBaseStore(t *testing.T) {
-	store := NewBaseStore(DataStructureBTree)
+	store := NewBaseStore(core.DataStructureBTree)
 	if store == nil {
 		t.Fatal("NewBaseStore returned nil")
 	}
-	if store.ds != DataStructureBTree {
-		t.Errorf("Expected ds to be %d, got %d", DataStructureBTree, store.ds)
+	if store.ds != core.DataStructureBTree {
+		t.Errorf("Expected ds to be %d, got %d", core.DataStructureBTree, store.ds)
 	}
 	if store.ttlChecker != nil {
 		t.Error("Expected ttlChecker to be nil initially")
@@ -36,9 +38,9 @@ func TestNewBaseStore(t *testing.T) {
 }
 
 func TestBaseStore_SetTTLChecker(t *testing.T) {
-	store := NewBaseStore(DataStructureBTree)
+	store := NewBaseStore(core.DataStructureBTree)
 	clk := clock.NewMockClock(1000000) // Start at 1000 seconds in milliseconds
-	checker := NewChecker(clk)
+	checker := checker.NewChecker(clk)
 
 	store.SetTTLChecker(checker)
 	if store.ttlChecker != checker {
@@ -46,10 +48,10 @@ func TestBaseStore_SetTTLChecker(t *testing.T) {
 	}
 }
 
-func TestBaseStore_isExpired(t *testing.T) {
-	store := NewBaseStore(DataStructureBTree)
+func TestBaseStore_IsExpiredRecord(t *testing.T) {
+	store := NewBaseStore(core.DataStructureBTree)
 	clk := clock.NewMockClock(1000000) // Start at 1000 seconds in milliseconds
-	checker := NewChecker(clk)
+	checker := checker.NewChecker(clk)
 	store.SetTTLChecker(checker)
 
 	tests := []struct {
@@ -60,7 +62,7 @@ func TestBaseStore_isExpired(t *testing.T) {
 	}{
 		{
 			name:      "persistent record",
-			ttl:       Persistent,
+			ttl:       core.Persistent,
 			timestamp: 500000, // 500 seconds ago
 			expected:  false,
 		},
@@ -80,7 +82,7 @@ func TestBaseStore_isExpired(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := store.isExpired(tt.ttl, tt.timestamp)
+			result := store.IsExpiredRecord(tt.ttl, tt.timestamp)
 			if result != tt.expected {
 				t.Errorf("Expected %v, got %v", tt.expected, result)
 			}
@@ -88,10 +90,10 @@ func TestBaseStore_isExpired(t *testing.T) {
 	}
 }
 
-func TestBaseStore_calculateRemainingTTL(t *testing.T) {
-	store := NewBaseStore(DataStructureBTree)
+func TestBaseStore_CalculateRemainingTTL(t *testing.T) {
+	store := NewBaseStore(core.DataStructureBTree)
 	clk := clock.NewMockClock(1000000) // Start at 1000 seconds in milliseconds
-	checker := NewChecker(clk)
+	checker := checker.NewChecker(clk)
 	store.SetTTLChecker(checker)
 
 	tests := []struct {
@@ -102,7 +104,7 @@ func TestBaseStore_calculateRemainingTTL(t *testing.T) {
 	}{
 		{
 			name:      "persistent record",
-			ttl:       Persistent,
+			ttl:       core.Persistent,
 			timestamp: 500000,
 			expected:  -1,
 		},
@@ -122,7 +124,7 @@ func TestBaseStore_calculateRemainingTTL(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := store.calculateRemainingTTL(tt.ttl, tt.timestamp)
+			result := store.CalculateRemainingTTL(tt.ttl, tt.timestamp)
 			if result != tt.expected {
 				t.Errorf("Expected %d, got %d", tt.expected, result)
 			}
@@ -130,30 +132,30 @@ func TestBaseStore_calculateRemainingTTL(t *testing.T) {
 	}
 }
 
-func TestBaseStore_isValid(t *testing.T) {
-	store := NewBaseStore(DataStructureBTree)
+func TestBaseStore_IsValid(t *testing.T) {
+	store := NewBaseStore(core.DataStructureBTree)
 	clk := clock.NewMockClock(1000000) // Start at 1000 seconds in milliseconds
-	checker := NewChecker(clk)
+	checker := checker.NewChecker(clk)
 	store.SetTTLChecker(checker)
 
 	// Test with valid record
 	key := []byte("test-key")
-	result := store.isValid(key, 600, 500000) // Valid record
+	result := store.IsValid(key, 600, 500000) // Valid record
 	if !result {
 		t.Error("Expected true for valid record")
 	}
 
 	// Test with expired record
-	result = store.isValid(key, 300, 500000) // Expired record
+	result = store.IsValid(key, 300, 500000) // Expired record
 	if result {
 		t.Error("Expected false for expired record")
 	}
 }
 
-func TestBaseStore_triggerExpiredCallback(t *testing.T) {
-	store := NewBaseStore(DataStructureBTree)
+func TestBaseStore_TriggerExpiredCallback(t *testing.T) {
+	store := NewBaseStore(core.DataStructureBTree)
 	clk := clock.NewMockClock(1000000)
-	checker := NewChecker(clk)
+	checker := checker.NewChecker(clk)
 
 	// Set up callback to track calls
 	var callbackCalled bool
@@ -170,7 +172,7 @@ func TestBaseStore_triggerExpiredCallback(t *testing.T) {
 
 	// Trigger callback
 	key := []byte("test-key")
-	store.triggerExpiredCallback(key)
+	store.TriggerExpiredCallback(key)
 
 	if !callbackCalled {
 		t.Error("Expected callback to be called")
@@ -178,8 +180,8 @@ func TestBaseStore_triggerExpiredCallback(t *testing.T) {
 	if string(callbackKey) != string(key) {
 		t.Errorf("Expected callback key %s, got %s", string(key), string(callbackKey))
 	}
-	if callbackDs != DataStructureBTree {
-		t.Errorf("Expected callback ds %d, got %d", DataStructureBTree, callbackDs)
+	if callbackDs != core.DataStructureBTree {
+		t.Errorf("Expected callback ds %d, got %d", core.DataStructureBTree, callbackDs)
 	}
 }
 
@@ -232,7 +234,7 @@ func TestCalculateExpirationTime(t *testing.T) {
 		{
 			name:      "persistent record",
 			timestamp: 1000000,
-			ttl:       Persistent,
+			ttl:       core.Persistent,
 			expected:  -1,
 		},
 		{
@@ -269,7 +271,7 @@ func TestIsExpiredAt(t *testing.T) {
 	}{
 		{
 			name:      "persistent record",
-			ttl:       Persistent,
+			ttl:       core.Persistent,
 			timestamp: 1000000,
 			checkTime: 2000000,
 			expected:  false,

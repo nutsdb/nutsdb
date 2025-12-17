@@ -1,4 +1,4 @@
-package data
+package core
 
 type Item[T any] struct {
 	Key    []byte

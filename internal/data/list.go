@@ -75,17 +75,17 @@ type ListStructure interface {
 
 	// Min returns the item with the smallest key (head of the list).
 	// Returns the item and true if the list is not empty, nil and false otherwise.
-	Min() (*Item[core.Record], bool)
+	Min() (*core.Item[core.Record], bool)
 
 	// Max returns the item with the largest key (tail of the list).
 	// Returns the item and true if the list is not empty, nil and false otherwise.
-	Max() (*Item[core.Record], bool)
+	Max() (*core.Item[core.Record], bool)
 
 	// All returns all records in ascending key order.
 	All() []*core.Record
 
 	// AllItems returns all items (key + record pairs) in ascending key order.
-	AllItems() []*Item[core.Record]
+	AllItems() []*core.Item[core.Record]
 
 	// Count returns the number of elements in the list.
 	Count() int
@@ -106,11 +106,11 @@ type ListStructure interface {
 
 	// PopMin removes and returns the item with the smallest key.
 	// Returns the item and true if the list is not empty, nil and false otherwise.
-	PopMin() (*Item[core.Record], bool)
+	PopMin() (*core.Item[core.Record], bool)
 
 	// PopMax removes and returns the item with the largest key.
 	// Returns the item and true if the list is not empty, nil and false otherwise.
-	PopMax() (*Item[core.Record], bool)
+	PopMax() (*core.Item[core.Record], bool)
 }
 
 // Compile-time interface implementation checks
@@ -248,15 +248,15 @@ func (l *List) RPop(key string) (*core.Record, error) {
 	return item.Record, nil
 }
 
-func (l *List) LPeek(key string) (*Item[core.Record], error) {
+func (l *List) LPeek(key string) (*core.Item[core.Record], error) {
 	return l.peek(key, true)
 }
 
-func (l *List) RPeek(key string) (*Item[core.Record], error) {
+func (l *List) RPeek(key string) (*core.Item[core.Record], error) {
 	return l.peek(key, false)
 }
 
-func (l *List) peek(key string, isLeft bool) (*Item[core.Record], error) {
+func (l *List) peek(key string, isLeft bool) (*core.Item[core.Record], error) {
 	if l.IsExpire(key) {
 		return nil, ErrListNotFound
 	}
@@ -316,7 +316,7 @@ func (l *List) GetRemoveIndexes(key string, count int, cmp func(r *core.Record) 
 	}
 
 	var res [][]byte
-	var allItems []*Item[core.Record]
+	var allItems []*core.Item[core.Record]
 	if count == 0 {
 		count = list.Count()
 	}

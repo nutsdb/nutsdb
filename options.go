@@ -19,6 +19,7 @@ import (
 
 	"github.com/nutsdb/nutsdb/internal/data"
 	"github.com/nutsdb/nutsdb/internal/fileio"
+	"github.com/nutsdb/nutsdb/internal/ttl/clock"
 )
 
 // EntryIdxMode represents entry index mode.
@@ -165,7 +166,7 @@ type Options struct {
 
 	// Clock provides time operations for TTL calculations.
 	// If nil, a RealClock will be used by default.
-	Clock Clock
+	Clock clock.Clock
 }
 
 const (
@@ -196,7 +197,7 @@ var DefaultOptions = func() Options {
 		EnableMergeV2:             false,
 		ListImpl:                  ListImplementationType(ListImplBTree),
 		EnableWatch:               false,
-		Clock:                     NewRealClock(),
+		Clock:                     clock.NewRealClock(),
 	}
 }()
 
@@ -216,7 +217,7 @@ var doublyLinkedListOptions = func() Options {
 		EnableHintFile:            false,
 		EnableMergeV2:             false,
 		ListImpl:                  ListImplementationType(ListImplDoublyLinkedList),
-		Clock:                     NewRealClock(),
+		Clock:                     clock.NewRealClock(),
 	}
 }()
 
@@ -342,7 +343,7 @@ func WithListImpl(implType ListImplementationType) Option {
 	}
 }
 
-func WithClock(clock Clock) Option {
+func WithClock(clock clock.Clock) Option {
 	return func(opt *Options) {
 		opt.Clock = clock
 	}

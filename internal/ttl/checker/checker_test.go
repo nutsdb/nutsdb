@@ -12,15 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package ttl
+package checker
 
 import (
 	"testing"
 	"time"
 
-	"github.com/nutsdb/nutsdb/internal/clock"
 	"github.com/nutsdb/nutsdb/internal/core"
-	"github.com/nutsdb/nutsdb/internal/data"
+	"github.com/nutsdb/nutsdb/internal/ttl/clock"
 )
 
 // Data structure constants for testing
@@ -235,7 +234,7 @@ func TestChecker_FilterExpiredItems(t *testing.T) {
 		callbackKeys = append(callbackKeys, key)
 	})
 
-	items := []*data.Item[core.Record]{
+	items := []*core.Item[core.Record]{
 		{
 			Key: []byte("persistent"),
 			Record: &core.Record{

@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/nutsdb/nutsdb/internal/core"
-	"github.com/nutsdb/nutsdb/internal/data"
 	"github.com/xujiajun/utils/strconv2"
 )
 
@@ -162,7 +161,7 @@ func (tx *Tx) getMaxOrMinKey(bucket string, isMax bool) ([]byte, error) {
 
 	if idx, ok := tx.db.Index.bTree.exist(bucketId); ok {
 		var (
-			item  *data.Item[core.Record]
+			item  *core.Item[core.Record]
 			found bool
 		)
 
