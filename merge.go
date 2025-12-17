@@ -364,7 +364,7 @@ func (db *DB) isPendingBtreeEntry(entry *Entry) bool {
 	}
 
 	if r.IsExpired() {
-		db.tm.del(entry.Meta.BucketId, string(entry.Key))
+		db.tm.Del(entry.Meta.BucketId, string(entry.Key))
 		idx.Delete(entry.Key)
 		return false
 	}

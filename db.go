@@ -32,6 +32,7 @@ import (
 	"github.com/gofrs/flock"
 	"github.com/nutsdb/nutsdb/internal/data"
 	"github.com/nutsdb/nutsdb/internal/fileio"
+	"github.com/nutsdb/nutsdb/internal/ttl"
 	"github.com/nutsdb/nutsdb/internal/utils"
 	"github.com/xujiajun/utils/filesystem"
 	"github.com/xujiajun/utils/strconv2"
@@ -67,7 +68,7 @@ type (
 		mergeEndCh              chan error
 		mergeWorkCloseCh        chan struct{}
 		writeCh                 chan *request
-		tm                      *ttlManager
+		tm                      *ttl.Manager
 		RecordCount             int64 // current valid record count, exclude deleted, repeated
 		bm                      *BucketManager
 		hintKeyAndRAMIdxModeLru *utils.LRUCache // lru cache for HintKeyAndRAMIdxMode
@@ -109,7 +110,7 @@ func open(opt Options) (*DB, error) {
 		mergeEndCh:              make(chan error),
 		mergeWorkCloseCh:        make(chan struct{}),
 		writeCh:                 make(chan *request, KvWriteChCapacity),
-		tm:                      newTTLManager(opt.ExpiredDeleteType),
+		tm:                      ttl.NewManager(ttl.ExpiredDeleteType(opt.ExpiredDeleteType)),
 		hintKeyAndRAMIdxModeLru: utils.NewLruCache(opt.HintKeyAndRAMIdxCacheSize),
 		sm:                      NewSnowflakeManager(opt.NodeNum),
 	}
@@ -158,7 +159,7 @@ func open(opt Options) (*DB, error) {
 
 	go db.mergeWorker()
 	go db.doWrites()
-	go db.tm.run()
+	go db.tm.Run()
 
 	return db, nil
 }
@@ -257,7 +258,7 @@ func (db *DB) release() error {
 
 	db.commitBuffer = nil
 
-	db.tm.close()
+	db.tm.Close()
 
 	if db.wm != nil {
 		if err := db.wm.close(); err != nil {
@@ -757,13 +758,13 @@ func (db *DB) buildBTreeIdx(record *data.Record, entry *Entry) error {
 	bTree := db.Index.bTree.getWithDefault(bucketId)
 
 	if record.IsExpired() || meta.Flag == DataDeleteFlag {
-		db.tm.del(bucketId, string(key))
+		db.tm.Del(bucketId, string(key))
 		bTree.Delete(key)
 	} else {
 		if meta.TTL != Persistent {
-			db.tm.add(bucketId, string(key), expireTime(meta.Timestamp, meta.TTL), db.buildExpireCallback(bucket.Name, key))
+			db.tm.Add(bucketId, string(key), expireTime(meta.Timestamp, meta.TTL), db.buildExpireCallback(bucket.Name, key))
 		} else {
-			db.tm.del(bucketId, string(key))
+			db.tm.Del(bucketId, string(key))
 		}
 		bTree.InsertRecord(record.Key, record)
 	}
@@ -1024,7 +1025,7 @@ func (db *DB) buildExpireCallback(bucket string, key []byte) func() {
 				return err
 			}
 			bucketId := b.Id
-			if db.tm.exist(bucketId, string(key)) {
+			if db.tm.Exist(bucketId, string(key)) {
 				return tx.Delete(bucket, key)
 			}
 			return nil

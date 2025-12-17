@@ -12,12 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package nutsdb
+package ttl
 
 import (
 	"time"
 
 	"github.com/antlabs/timer"
+)
+
+// BucketId represents the bucket identifier type
+type BucketId = uint64
+
+// ExpiredDeleteType represents the type of expired deletion strategy
+type ExpiredDeleteType int
+
+const (
+	TimeWheel ExpiredDeleteType = iota
+	TimeHeap
 )
 
 type nodesInBucket map[string]timer.TimeNoder // key to timer node
@@ -52,12 +63,14 @@ func (n nodes) delNode(bucketId BucketId, key string) {
 	}
 }
 
-type ttlManager struct {
+// Manager handles TTL management using timer-based expiration
+type Manager struct {
 	t          timer.Timer
 	timerNodes nodes
 }
 
-func newTTLManager(expiredDeleteType ExpiredDeleteType) *ttlManager {
+// NewManager creates a new TTL manager with the specified expiration deletion type
+func NewManager(expiredDeleteType ExpiredDeleteType) *Manager {
 	var t timer.Timer
 
 	switch expiredDeleteType {
@@ -69,22 +82,25 @@ func newTTLManager(expiredDeleteType ExpiredDeleteType) *ttlManager {
 		t = timer.NewTimer()
 	}
 
-	return &ttlManager{
+	return &Manager{
 		t:          t,
 		timerNodes: make(nodes),
 	}
 }
 
-func (tm *ttlManager) run() {
+// Run starts the TTL manager
+func (tm *Manager) Run() {
 	tm.t.Run()
 }
 
-func (tm *ttlManager) exist(bucketId BucketId, key string) bool {
+// Exist checks if a TTL entry exists for the given bucket and key
+func (tm *Manager) Exist(bucketId BucketId, key string) bool {
 	_, ok := tm.timerNodes.getNode(bucketId, key)
 	return ok
 }
 
-func (tm *ttlManager) add(bucketId BucketId, key string, expire time.Duration, callback func()) {
+// Add adds a TTL entry with the specified expiration duration and callback
+func (tm *Manager) Add(bucketId BucketId, key string, expire time.Duration, callback func()) {
 	if node, ok := tm.timerNodes.getNode(bucketId, key); ok {
 		node.Stop()
 	}
@@ -93,11 +109,13 @@ func (tm *ttlManager) add(bucketId BucketId, key string, expire time.Duration, c
 	tm.timerNodes.addNode(bucketId, key, node)
 }
 
-func (tm *ttlManager) del(bucket BucketId, key string) {
+// Del removes a TTL entry for the given bucket and key
+func (tm *Manager) Del(bucket BucketId, key string) {
 	tm.timerNodes.delNode(bucket, key)
 }
 
-func (tm *ttlManager) close() {
+// Close closes the TTL manager and stops all timers
+func (tm *Manager) Close() {
 	tm.timerNodes = nil
 	tm.t.Stop()
 }
