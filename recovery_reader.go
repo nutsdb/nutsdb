@@ -4,6 +4,8 @@ import (
 	"bufio"
 	"io"
 	"os"
+
+	"github.com/nutsdb/nutsdb/internal/core"
 )
 
 // fileRecovery use bufio.Reader to read entry
@@ -31,9 +33,9 @@ func newFileRecovery(path string, bufSize int) (fr *fileRecovery, err error) {
 }
 
 // readEntry will read an Entry from disk.
-func (fr *fileRecovery) readEntry(off int64) (e *Entry, err error) {
-	var size int64 = MaxEntryHeaderSize
-	// Since MaxEntryHeaderSize may be larger than the actual Header, it needs to be calculated
+func (fr *fileRecovery) readEntry(off int64) (e *core.Entry, err error) {
+	var size int64 = core.MaxEntryHeaderSize
+	// Since core.MaxEntryHeaderSize may be larger than the actual Header, it needs to be calculated
 	if off+size > fr.size {
 		size = fr.size - off
 	}
@@ -49,7 +51,7 @@ func (fr *fileRecovery) readEntry(off int64) (e *Entry, err error) {
 		return nil, err
 	}
 
-	e = new(Entry)
+	e = new(core.Entry)
 	headerSize, err := e.ParseMeta(buf)
 	if err != nil {
 		return nil, err
@@ -89,15 +91,15 @@ func (fr *fileRecovery) readEntry(off int64) (e *Entry, err error) {
 	return e, nil
 }
 
-func (fr *fileRecovery) readBucket() (b *Bucket, err error) {
-	buf := make([]byte, BucketMetaSize)
+func (fr *fileRecovery) readBucket() (b *core.Bucket, err error) {
+	buf := make([]byte, core.BucketMetaSize)
 	_, err = io.ReadFull(fr.reader, buf)
 	if err != nil {
 		return nil, err
 	}
-	meta := new(BucketMeta)
+	meta := new(core.BucketMeta)
 	meta.Decode(buf)
-	bucket := new(Bucket)
+	bucket := new(core.Bucket)
 	bucket.Meta = meta
 	dataBuf := make([]byte, meta.Size)
 	_, err = io.ReadFull(fr.reader, dataBuf)
@@ -110,7 +112,7 @@ func (fr *fileRecovery) readBucket() (b *Bucket, err error) {
 	}
 
 	if bucket.GetCRC(buf, dataBuf) != bucket.Meta.Crc {
-		return nil, ErrBucketCrcInvalid
+		return nil, core.ErrBucketCrcInvalid
 	}
 
 	return bucket, nil

@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/nutsdb/nutsdb/internal/core"
 	"github.com/nutsdb/nutsdb/internal/testutils"
 )
 
@@ -43,7 +44,7 @@ func setupIteratorBenchmark(b *testing.B, numKeys int) (*DB, string) {
 		for i := 0; i < numKeys; i++ {
 			key := testutils.GetTestBytes(i)
 			value := testutils.GetTestBytes(i * 2)
-			if err := tx.Put(bucket, key, value, Persistent); err != nil {
+			if err := tx.Put(bucket, key, value, core.Persistent); err != nil {
 				return err
 			}
 		}
@@ -418,7 +419,7 @@ func BenchmarkIterator_LargeValues(b *testing.B) {
 		}
 		for i := 0; i < 1000; i++ {
 			key := testutils.GetTestBytes(i)
-			if err := tx.Put(bucket, key, largeValue, Persistent); err != nil {
+			if err := tx.Put(bucket, key, largeValue, core.Persistent); err != nil {
 				return err
 			}
 		}

@@ -17,6 +17,7 @@ package data_test
 import (
 	"testing"
 
+	"github.com/nutsdb/nutsdb/internal/core"
 	"github.com/nutsdb/nutsdb/internal/data"
 	"github.com/nutsdb/nutsdb/internal/utils"
 	"github.com/stretchr/testify/assert"
@@ -27,9 +28,9 @@ func TestDoublyLinkedList_InsertAndFind(t *testing.T) {
 	dll := data.NewDoublyLinkedList()
 
 	// Insert records with sequence numbers
-	r1 := &data.Record{Key: []byte("key1"), Value: []byte("value1")}
-	r2 := &data.Record{Key: []byte("key2"), Value: []byte("value2")}
-	r3 := &data.Record{Key: []byte("key3"), Value: []byte("value3")}
+	r1 := &core.Record{Key: []byte("key1"), Value: []byte("value1")}
+	r2 := &core.Record{Key: []byte("key2"), Value: []byte("value2")}
+	r3 := &core.Record{Key: []byte("key3"), Value: []byte("value3")}
 
 	seq1 := utils.ConvertUint64ToBigEndianBytes(100)
 	seq2 := utils.ConvertUint64ToBigEndianBytes(200)
@@ -57,10 +58,10 @@ func TestDoublyLinkedList_OrderedInsertion(t *testing.T) {
 
 	// Insert in non-sorted order
 	sequences := []uint64{150, 100, 200, 50, 175}
-	records := make([]*data.Record, len(sequences))
+	records := make([]*core.Record, len(sequences))
 
 	for i, seq := range sequences {
-		records[i] = &data.Record{
+		records[i] = &core.Record{
 			Key:   []byte("key"),
 			Value: []byte{byte(seq)},
 		}
@@ -89,9 +90,9 @@ func TestDoublyLinkedList_MinMax(t *testing.T) {
 	assert.False(t, ok)
 
 	// Add elements
-	r1 := &data.Record{Value: []byte("value1")}
-	r2 := &data.Record{Value: []byte("value2")}
-	r3 := &data.Record{Value: []byte("value3")}
+	r1 := &core.Record{Value: []byte("value1")}
+	r2 := &core.Record{Value: []byte("value2")}
+	r3 := &core.Record{Value: []byte("value3")}
 
 	dll.InsertRecord(utils.ConvertUint64ToBigEndianBytes(100), r1)
 	dll.InsertRecord(utils.ConvertUint64ToBigEndianBytes(200), r2)
@@ -113,9 +114,9 @@ func TestDoublyLinkedList_MinMax(t *testing.T) {
 func TestDoublyLinkedList_Delete(t *testing.T) {
 	dll := data.NewDoublyLinkedList()
 
-	r1 := &data.Record{Value: []byte("value1")}
-	r2 := &data.Record{Value: []byte("value2")}
-	r3 := &data.Record{Value: []byte("value3")}
+	r1 := &core.Record{Value: []byte("value1")}
+	r2 := &core.Record{Value: []byte("value2")}
+	r3 := &core.Record{Value: []byte("value3")}
 
 	seq1 := utils.ConvertUint64ToBigEndianBytes(100)
 	seq2 := utils.ConvertUint64ToBigEndianBytes(200)
@@ -161,9 +162,9 @@ func TestDoublyLinkedList_Delete(t *testing.T) {
 func TestDoublyLinkedList_PopMinMax(t *testing.T) {
 	dll := data.NewDoublyLinkedList()
 
-	r1 := &data.Record{Value: []byte("value1")}
-	r2 := &data.Record{Value: []byte("value2")}
-	r3 := &data.Record{Value: []byte("value3")}
+	r1 := &core.Record{Value: []byte("value1")}
+	r2 := &core.Record{Value: []byte("value2")}
+	r3 := &core.Record{Value: []byte("value3")}
 
 	dll.InsertRecord(utils.ConvertUint64ToBigEndianBytes(100), r1)
 	dll.InsertRecord(utils.ConvertUint64ToBigEndianBytes(200), r2)
@@ -197,7 +198,7 @@ func TestDoublyLinkedList_PopMinMax(t *testing.T) {
 func TestDoublyLinkedList_All(t *testing.T) {
 	dll := data.NewDoublyLinkedList()
 
-	records := []*data.Record{
+	records := []*core.Record{
 		{Value: []byte("value1")},
 		{Value: []byte("value2")},
 		{Value: []byte("value3")},
@@ -220,7 +221,7 @@ func TestDoublyLinkedList_Range(t *testing.T) {
 	dll := data.NewDoublyLinkedList()
 
 	for i := uint64(0); i < 10; i++ {
-		r := &data.Record{Value: []byte{byte(i * 10)}}
+		r := &core.Record{Value: []byte{byte(i * 10)}}
 		dll.InsertRecord(utils.ConvertUint64ToBigEndianBytes(i*10), r)
 	}
 
@@ -238,7 +239,7 @@ func TestDoublyLinkedList_Range(t *testing.T) {
 
 func BenchmarkDoublyLinkedList_InsertHead(b *testing.B) {
 	dll := data.NewDoublyLinkedList()
-	r := &data.Record{Key: []byte("key"), Value: []byte("value")}
+	r := &core.Record{Key: []byte("key"), Value: []byte("value")}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -249,7 +250,7 @@ func BenchmarkDoublyLinkedList_InsertHead(b *testing.B) {
 
 func BenchmarkDoublyLinkedList_InsertTail(b *testing.B) {
 	dll := data.NewDoublyLinkedList()
-	r := &data.Record{Key: []byte("key"), Value: []byte("value")}
+	r := &core.Record{Key: []byte("key"), Value: []byte("value")}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -260,7 +261,7 @@ func BenchmarkDoublyLinkedList_InsertTail(b *testing.B) {
 
 func BenchmarkDoublyLinkedList_PopMin(b *testing.B) {
 	dll := data.NewDoublyLinkedList()
-	r := &data.Record{Key: []byte("key"), Value: []byte("value")}
+	r := &core.Record{Key: []byte("key"), Value: []byte("value")}
 
 	// Pre-populate
 	for i := 0; i < b.N; i++ {
@@ -275,7 +276,7 @@ func BenchmarkDoublyLinkedList_PopMin(b *testing.B) {
 
 func BenchmarkDoublyLinkedList_PopMax(b *testing.B) {
 	dll := data.NewDoublyLinkedList()
-	r := &data.Record{Key: []byte("key"), Value: []byte("value")}
+	r := &core.Record{Key: []byte("key"), Value: []byte("value")}
 
 	// Pre-populate
 	for i := 0; i < b.N; i++ {

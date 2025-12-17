@@ -21,6 +21,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/nutsdb/nutsdb/internal/core"
 	"github.com/nutsdb/nutsdb/internal/testutils"
 	"github.com/stretchr/testify/require"
 	"github.com/xujiajun/utils/strconv2"
@@ -81,7 +82,7 @@ func TestDB_MergeForString(t *testing.T) {
 			removeDir(opts.Dir)
 			opts.EntryIdxMode = idxMode
 			db, err := Open(opts)
-			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
 			require.NoError(t, err)
 
 			// Merge is not needed
@@ -91,7 +92,7 @@ func TestDB_MergeForString(t *testing.T) {
 			// Add some data
 			n := 1000
 			for i := 0; i < n; i++ {
-				txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), Persistent, nil, nil)
+				txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), core.Persistent, nil, nil)
 			}
 
 			// Delete some data
@@ -219,10 +220,10 @@ func TestDB_MergeMultipleTimesWithRestarts(t *testing.T) {
 			db, err := Open(opts)
 			require.NoError(t, err)
 
-			txCreateBucket(t, db, DataStructureBTree, stringBucket, nil)
-			txCreateBucket(t, db, DataStructureSet, setBucket, nil)
-			txCreateBucket(t, db, DataStructureList, listBucket, nil)
-			txCreateBucket(t, db, DataStructureSortedSet, zsetBucket, nil)
+			txCreateBucket(t, db, core.DataStructureBTree, stringBucket, nil)
+			txCreateBucket(t, db, core.DataStructureSet, setBucket, nil)
+			txCreateBucket(t, db, core.DataStructureList, listBucket, nil)
+			txCreateBucket(t, db, core.DataStructureSortedSet, zsetBucket, nil)
 
 			state := &multiDSState{
 				stringExpected: make(map[string][]byte),
@@ -282,11 +283,11 @@ func TestDB_MergeMultipleTimesWithRestarts(t *testing.T) {
 				currentStringKeys := make([][]byte, 0, entriesPerCycle)
 				for i := 0; i < entriesPerCycle; i++ {
 					rawKey := testutils.GetTestBytes(stringBase + i)
-					txPut(t, db, stringBucket, rawKey, rawKey, Persistent, nil, nil)
+					txPut(t, db, stringBucket, rawKey, rawKey, core.Persistent, nil, nil)
 					currentStringKeys = append(currentStringKeys, rawKey)
 				}
 				for _, rawKey := range currentStringKeys {
-					txPut(t, db, stringBucket, rawKey, rawKey, Persistent, nil, nil)
+					txPut(t, db, stringBucket, rawKey, rawKey, core.Persistent, nil, nil)
 				}
 				for i, rawKey := range currentStringKeys {
 					keyStr := string(rawKey)
@@ -388,8 +389,8 @@ func TestDB_MergeForSet(t *testing.T) {
 			removeDir(opts.Dir)
 			opts.EntryIdxMode = idxMode
 			db, err := Open(opts)
-			if exist := db.bm.ExistBucket(DataStructureSet, bucket); !exist {
-				txCreateBucket(t, db, DataStructureSet, bucket, nil)
+			if exist := db.bm.ExistBucket(core.DataStructureSet, bucket); !exist {
+				txCreateBucket(t, db, core.DataStructureSet, bucket, nil)
 			}
 
 			require.NoError(t, err)
@@ -490,8 +491,8 @@ func TestDB_MergeForZSet(t *testing.T) {
 			removeDir(opts.Dir)
 			opts.EntryIdxMode = idxMode
 			db, err := Open(opts)
-			if exist := db.bm.ExistBucket(DataStructureSortedSet, bucket); !exist {
-				txCreateBucket(t, db, DataStructureSortedSet, bucket, nil)
+			if exist := db.bm.ExistBucket(core.DataStructureSortedSet, bucket); !exist {
+				txCreateBucket(t, db, core.DataStructureSortedSet, bucket, nil)
 			}
 			require.NoError(t, err)
 
@@ -596,8 +597,8 @@ func TestDB_MergeForList(t *testing.T) {
 			removeDir(opts.Dir)
 			opts.EntryIdxMode = idxMode
 			db, err := Open(opts)
-			if exist := db.bm.ExistBucket(DataStructureList, bucket); !exist {
-				txCreateBucket(t, db, DataStructureList, bucket, nil)
+			if exist := db.bm.ExistBucket(core.DataStructureList, bucket); !exist {
+				txCreateBucket(t, db, core.DataStructureList, bucket, nil)
 			}
 
 			require.NoError(t, err)
@@ -678,12 +679,12 @@ func TestDB_MergeWithHintFile(t *testing.T) {
 			// First, create a database with some data
 			db, err := Open(opts)
 			require.NoError(t, err)
-			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
 
 			// Add some data to create multiple data files
 			n := 2000
 			for i := 0; i < n; i++ {
-				txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), Persistent, nil, nil)
+				txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), core.Persistent, nil, nil)
 			}
 
 			// Delete some data to create dirty entries
@@ -791,12 +792,12 @@ func TestDB_MergeHintFileCleanup(t *testing.T) {
 		// Create a database with some data
 		db, err := Open(opts)
 		require.NoError(t, err)
-		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+		txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
 
 		// Add enough data to create multiple files
 		n := 500
 		for i := 0; i < n; i++ {
-			txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), Persistent, nil, nil)
+			txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), core.Persistent, nil, nil)
 		}
 
 		// Delete some data to trigger merge
@@ -821,9 +822,9 @@ func TestDB_MergeHintFileCleanup(t *testing.T) {
 				ValueSize: 3,
 				Timestamp: 1234567890,
 				TTL:       3600,
-				Flag:      DataSetFlag,
-				Status:    Committed,
-				Ds:        DataStructureBTree,
+				Flag:      core.DataSetFlag,
+				Status:    core.Committed,
+				Ds:        core.DataStructureBTree,
 				DataPos:   100,
 				FileID:    fileID,
 				Key:       []byte("key"),
@@ -884,12 +885,12 @@ func TestDB_MergeHintFileDisabled(t *testing.T) {
 		// Create a database with some data
 		db, err := Open(opts)
 		require.NoError(t, err)
-		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+		txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
 
 		// Add some data
 		n := 500
 		for i := 0; i < n; i++ {
-			txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), Persistent, nil, nil)
+			txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), core.Persistent, nil, nil)
 		}
 
 		// Delete some data to trigger merge
@@ -936,14 +937,14 @@ func TestDB_MergeHintFileDifferentDataStructures(t *testing.T) {
 
 		// Test BTree
 		bucketBTree := "bucket_btree"
-		txCreateBucket(t, db, DataStructureBTree, bucketBTree, nil)
+		txCreateBucket(t, db, core.DataStructureBTree, bucketBTree, nil)
 		for i := 0; i < 100; i++ {
-			txPut(t, db, bucketBTree, testutils.GetTestBytes(i), testutils.GetTestBytes(i), Persistent, nil, nil)
+			txPut(t, db, bucketBTree, testutils.GetTestBytes(i), testutils.GetTestBytes(i), core.Persistent, nil, nil)
 		}
 
 		// Test Set
 		bucketSet := "bucket_set"
-		txCreateBucket(t, db, DataStructureSet, bucketSet, nil)
+		txCreateBucket(t, db, core.DataStructureSet, bucketSet, nil)
 		key := testutils.GetTestBytes(0)
 		for i := 0; i < 50; i++ {
 			txSAdd(t, db, bucketSet, key, testutils.GetTestBytes(i), nil, nil)
@@ -951,7 +952,7 @@ func TestDB_MergeHintFileDifferentDataStructures(t *testing.T) {
 
 		// Test List
 		bucketList := "bucket_list"
-		txCreateBucket(t, db, DataStructureList, bucketList, nil)
+		txCreateBucket(t, db, core.DataStructureList, bucketList, nil)
 		listKey := testutils.GetTestBytes(0)
 		for i := 0; i < 30; i++ {
 			txPush(t, db, bucketList, listKey, testutils.GetTestBytes(i), true, nil, nil)
@@ -959,7 +960,7 @@ func TestDB_MergeHintFileDifferentDataStructures(t *testing.T) {
 
 		// Test SortedSet
 		bucketZSet := "bucket_zset"
-		txCreateBucket(t, db, DataStructureSortedSet, bucketZSet, nil)
+		txCreateBucket(t, db, core.DataStructureSortedSet, bucketZSet, nil)
 		zsetKey := testutils.GetTestBytes(0)
 		for i := 0; i < 20; i++ {
 			txZAdd(t, db, bucketZSet, zsetKey, testutils.GetTestBytes(i), float64(i), nil, nil)
@@ -1012,13 +1013,13 @@ func TestDB_MergeHintFileDifferentDataStructures(t *testing.T) {
 				require.NoError(t, err)
 
 				switch entry.Ds {
-				case DataStructureBTree:
+				case core.DataStructureBTree:
 					btreeCount++
-				case DataStructureSet:
+				case core.DataStructureSet:
 					setCount++
-				case DataStructureList:
+				case core.DataStructureList:
 					listCount++
-				case DataStructureSortedSet:
+				case core.DataStructureSortedSet:
 					zsetCount++
 				}
 			}
@@ -1103,7 +1104,7 @@ func TestDB_MergeModeSwitching(t *testing.T) {
 			key := []byte(fmt.Sprintf("key-%04d", i))
 			value := valueFor(stage, i)
 			require.NoError(t, db.Update(func(tx *Tx) error {
-				return tx.Put(bucket, key, value, Persistent)
+				return tx.Put(bucket, key, value, core.Persistent)
 			}))
 		}
 	}
@@ -1134,7 +1135,7 @@ func TestDB_MergeModeSwitching(t *testing.T) {
 	// Start with legacy merge to generate user data files and hint files.
 	db := openWith(legacyOpts)
 	require.NoError(t, db.Update(func(tx *Tx) error {
-		return tx.NewBucket(DataStructureBTree, bucket)
+		return tx.NewBucket(core.DataStructureBTree, bucket)
 	}))
 
 	writeStage(db, 'A')

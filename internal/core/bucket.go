@@ -1,4 +1,4 @@
-package nutsdb
+package core
 
 import (
 	"encoding/binary"
@@ -7,6 +7,12 @@ import (
 
 	"github.com/nutsdb/nutsdb/internal/utils"
 )
+
+type Ds = uint16
+type BucketId = uint64
+type BucketName = string
+type IDMarkerInBucket map[BucketName]map[Ds]BucketId
+type InfoMapperInBucket map[BucketId]*Bucket
 
 var BucketMetaSize int64
 

@@ -23,6 +23,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/nutsdb/nutsdb/internal/core"
 	"github.com/nutsdb/nutsdb/internal/utils"
 	"github.com/xujiajun/utils/strconv2"
 )
@@ -124,7 +125,7 @@ func (db *DB) mergeLegacy() error {
 					break
 				}
 
-				if entry.isFilter() {
+				if entry.IsFilter() {
 					off += entry.Size()
 					if off >= db.opt.SegmentSize {
 						break
@@ -146,11 +147,11 @@ func (db *DB) mergeLegacy() error {
 						bucketName := bucket.Name
 
 						switch entry.Meta.Flag {
-						case DataLPushFlag:
+						case core.DataLPushFlag:
 							if err := tx.LPushRaw(bucketName, entry.Key, entry.Value); err != nil {
 								return err
 							}
-						case DataRPushFlag:
+						case core.DataRPushFlag:
 							if err := tx.RPushRaw(bucketName, entry.Key, entry.Value); err != nil {
 								return err
 							}
@@ -187,7 +188,7 @@ func (db *DB) mergeLegacy() error {
 					break
 				}
 			} else {
-				if errors.Is(err, io.EOF) || errors.Is(err, ErrIndexOutOfBound) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, ErrHeaderSizeOutOfBounds) {
+				if errors.Is(err, io.EOF) || errors.Is(err, ErrIndexOutOfBound) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, core.ErrHeaderSizeOutOfBounds) {
 					break
 				}
 				return fmt.Errorf("when merge operation build hintIndex readAt err: %s", err)
@@ -269,7 +270,7 @@ func (db *DB) buildHintFilesAfterMerge(startFileID, endFileID int64) error {
 		for {
 			entry, err := fr.readEntry(off)
 			if err != nil {
-				if errors.Is(err, io.EOF) || errors.Is(err, ErrIndexOutOfBound) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, ErrHeaderSizeOutOfBounds) {
+				if errors.Is(err, io.EOF) || errors.Is(err, ErrIndexOutOfBound) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, core.ErrHeaderSizeOutOfBounds) {
 					break
 				}
 				cleanup(true)
@@ -338,7 +339,7 @@ func (db *DB) mergeWorker() {
 	}
 }
 
-func (db *DB) isPendingMergeEntry(entry *Entry) bool {
+func (db *DB) isPendingMergeEntry(entry *core.Entry) bool {
 	switch {
 	case entry.IsBelongsToBTree():
 		return db.isPendingBtreeEntry(entry)
@@ -352,7 +353,7 @@ func (db *DB) isPendingMergeEntry(entry *Entry) bool {
 	return false
 }
 
-func (db *DB) isPendingBtreeEntry(entry *Entry) bool {
+func (db *DB) isPendingBtreeEntry(entry *core.Entry) bool {
 	idx, exist := db.Index.bTree.exist(entry.Meta.BucketId)
 	if !exist {
 		return false
@@ -376,7 +377,7 @@ func (db *DB) isPendingBtreeEntry(entry *Entry) bool {
 	return true
 }
 
-func (db *DB) isPendingSetEntry(entry *Entry) bool {
+func (db *DB) isPendingSetEntry(entry *core.Entry) bool {
 	setIdx, exist := db.Index.set.exist(entry.Meta.BucketId)
 	if !exist {
 		return false
@@ -390,7 +391,7 @@ func (db *DB) isPendingSetEntry(entry *Entry) bool {
 	return true
 }
 
-func (db *DB) isPendingZSetEntry(entry *Entry) bool {
+func (db *DB) isPendingZSetEntry(entry *core.Entry) bool {
 	key, score := splitStringFloat64Str(string(entry.Key), SeparatorForZSetKey)
 	sortedSetIdx, exist := db.Index.sortedSet.exist(entry.Meta.BucketId)
 	if !exist {
@@ -404,12 +405,12 @@ func (db *DB) isPendingZSetEntry(entry *Entry) bool {
 	return true
 }
 
-func (db *DB) isPendingListEntry(entry *Entry) bool {
+func (db *DB) isPendingListEntry(entry *core.Entry) bool {
 	var userKeyStr string
 	var curSeq uint64
 	var userKey []byte
 
-	if entry.Meta.Flag == DataExpireListFlag {
+	if entry.Meta.Flag == core.DataExpireListFlag {
 		userKeyStr = string(entry.Key)
 		list, exist := db.Index.list.exist(entry.Meta.BucketId)
 		if !exist {
@@ -433,7 +434,7 @@ func (db *DB) isPendingListEntry(entry *Entry) bool {
 		return true
 	}
 
-	if entry.Meta.Flag == DataLPushFlag || entry.Meta.Flag == DataRPushFlag {
+	if entry.Meta.Flag == core.DataLPushFlag || entry.Meta.Flag == core.DataRPushFlag {
 		userKey, curSeq = decodeListKey(entry.Key)
 		userKeyStr = string(userKey)
 
@@ -463,6 +464,6 @@ func (db *DB) isPendingListEntry(entry *Entry) bool {
 
 // mergedEntryInfo 用于在 merge 过程中暂存条目信息
 type mergedEntryInfo struct {
-	entry    *Entry
-	bucketId BucketId
+	entry    *core.Entry
+	bucketId core.BucketId
 }

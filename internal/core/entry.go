@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package nutsdb
+package core
 
 import (
 	"bytes"
@@ -22,7 +22,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/nutsdb/nutsdb/internal/data"
 	"github.com/nutsdb/nutsdb/internal/utils"
 	"github.com/xujiajun/utils/strconv2"
 )
@@ -30,11 +29,20 @@ import (
 var (
 	ErrPayLoadSizeMismatch   = errors.New("the payload size in Meta mismatch with the payload size needed")
 	ErrHeaderSizeOutOfBounds = errors.New("the header size is out of bounds")
+
+	// Error constants moved from root package
+	ErrDataSizeExceed            = errors.New("data size too big")
+	ErrKeyEmpty                  = errors.New("key cannot be empty")
+	ErrInvalidKey                = errors.New("invalid key")
+	ErrDataStructureNotSupported = errors.New("this data structure is not supported for now")
 )
 
 const (
 	MaxEntryHeaderSize = 4 + binary.MaxVarintLen32*3 + binary.MaxVarintLen64*3 + binary.MaxVarintLen16*3
 	MinEntryHeaderSize = 4 + 9
+
+	// SeparatorForZSetKey represents separator for zSet key.
+	SeparatorForZSetKey = "|"
 )
 
 type (
@@ -128,8 +136,8 @@ func (e *Entry) ParsePayload(data []byte) error {
 	return nil
 }
 
-// checkPayloadSize checks the payload size
-func (e *Entry) checkPayloadSize(size int64) error {
+// CheckPayloadSize checks the payload size
+func (e *Entry) CheckPayloadSize(size int64) error {
 	if e.Meta.PayloadSize() != size {
 		return ErrPayLoadSizeMismatch
 	}
@@ -184,8 +192,8 @@ func (e *Entry) ParseMeta(buf []byte) (int64, error) {
 	return int64(index), nil
 }
 
-// isFilter to confirm if this entry is can be filtered
-func (e *Entry) isFilter() bool {
+// IsFilter to confirm if this entry is can be filtered
+func (e *Entry) IsFilter() bool {
 	meta := e.Meta
 	var filterDataSet = []uint16{
 		DataDeleteFlag,
@@ -202,12 +210,15 @@ func (e *Entry) isFilter() bool {
 	return utils.OneOfUint16Array(meta.Flag, filterDataSet)
 }
 
-// valid check the entry fields valid or not
-func (e *Entry) valid() error {
+// Valid check the entry fields valid or not
+func (e *Entry) Valid() error {
 	if len(e.Key) == 0 {
 		return ErrKeyEmpty
 	}
-	if len(e.Key) > MAX_SIZE || len(e.Value) > MAX_SIZE {
+	// Note: MAX_SIZE will be re-exported from root package for backward compatibility
+	// For now, we'll use a reasonable default that works on both 32-bit and 64-bit systems
+	const maxSize = 1 << 30 // 1GB, reasonable for most use cases
+	if len(e.Key) > maxSize || len(e.Value) > maxSize {
 		return ErrDataSizeExceed
 	}
 	return nil
@@ -282,7 +293,7 @@ func (e Entries) processEntriesScanOnDisk() (result []*Entry) {
 	sort.Sort(e)
 	for _, ele := range e {
 		curE := ele
-		if !data.IsExpired(curE.Meta.TTL, curE.Meta.Timestamp) && curE.Meta.Flag != DataDeleteFlag {
+		if !IsExpired(curE.Meta.TTL, curE.Meta.Timestamp) && curE.Meta.Flag != DataDeleteFlag {
 			result = append(result, curE)
 		}
 	}
@@ -320,7 +331,7 @@ func (c CEntries) processEntriesScanOnDisk() (result []*Entry) {
 	sort.Sort(c)
 	for _, ele := range c.Entries {
 		curE := ele
-		if !data.IsExpired(curE.Meta.TTL, curE.Meta.Timestamp) && curE.Meta.Flag != DataDeleteFlag {
+		if !IsExpired(curE.Meta.TTL, curE.Meta.Timestamp) && curE.Meta.Flag != DataDeleteFlag {
 			result = append(result, curE)
 		}
 	}
@@ -330,27 +341,27 @@ func (c CEntries) processEntriesScanOnDisk() (result []*Entry) {
 
 type EntryWhenRecovery struct {
 	Entry
-	fid int64
-	off int64
+	Fid int64
+	Off int64
 }
 
-type dataInTx struct {
-	es       []*EntryWhenRecovery
-	txId     uint64
-	startOff int64
+type DataInTx struct {
+	Es       []*EntryWhenRecovery
+	TxId     uint64
+	StartOff int64
 }
 
-func (dt *dataInTx) isSameTx(e *EntryWhenRecovery) bool {
-	return dt.txId == e.Meta.TxID
+func (dt *DataInTx) IsSameTx(e *EntryWhenRecovery) bool {
+	return dt.TxId == e.Meta.TxID
 }
 
-func (dt *dataInTx) appendEntry(e *EntryWhenRecovery) {
-	dt.es = append(dt.es, e)
+func (dt *DataInTx) AppendEntry(e *EntryWhenRecovery) {
+	dt.Es = append(dt.Es, e)
 }
 
-func (dt *dataInTx) reset() {
-	dt.es = make([]*EntryWhenRecovery, 0)
-	dt.txId = 0
+func (dt *DataInTx) Reset() {
+	dt.Es = make([]*EntryWhenRecovery, 0)
+	dt.TxId = 0
 }
 
 /**
@@ -361,7 +372,7 @@ func (dt *dataInTx) reset() {
  * so we need to decode the key to get the raw key
  * 3. All other cases, the key is the raw key
  */
-func (entry *Entry) getRawKey() ([]byte, error) {
+func (entry *Entry) GetRawKey() ([]byte, error) {
 	key := entry.Key
 
 	switch entry.Meta.Ds {

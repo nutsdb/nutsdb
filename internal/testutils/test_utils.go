@@ -16,7 +16,9 @@ package testutils
 import (
 	"math/rand"
 	"testing"
+	"time"
 
+	"github.com/nutsdb/nutsdb/internal/core"
 	"github.com/stretchr/testify/require"
 )
 
@@ -50,4 +52,26 @@ func AssertErr(t *testing.T, err error, expectErr error) {
 	} else {
 		require.NoError(t, err)
 	}
+}
+
+func GenerateRecords(count int) []*core.Record {
+	rand.Seed(time.Now().UnixNano())
+	records := make([]*core.Record, count)
+	for i := 0; i < count; i++ {
+		key := GetTestBytes(i)
+		val := GetRandomBytes(24)
+
+		record := &core.Record{
+			Key:       key,
+			Value:     val,
+			FileID:    int64(i),
+			DataPos:   uint64(rand.Uint32()),
+			ValueSize: uint32(len(val)),
+			Timestamp: uint64(time.Now().Unix()),
+			TTL:       uint32(rand.Intn(3600)),
+			TxID:      uint64(rand.Intn(1000)),
+		}
+		records[i] = record
+	}
+	return records
 }

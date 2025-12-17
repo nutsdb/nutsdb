@@ -14,7 +14,10 @@
 
 package nutsdb
 
-import "github.com/nutsdb/nutsdb/internal/utils"
+import (
+	"github.com/nutsdb/nutsdb/internal/core"
+	"github.com/nutsdb/nutsdb/internal/utils"
+)
 
 // IterateBuckets iterate over all the bucket depends on ds (represents the data structure)
 func (tx *Tx) IterateBuckets(ds uint16, pattern string, f func(bucket string) bool) error {
@@ -22,7 +25,7 @@ func (tx *Tx) IterateBuckets(ds uint16, pattern string, f func(bucket string) bo
 		return err
 	}
 
-	if ds == DataStructureSet {
+	if ds == core.DataStructureSet {
 		for bucketId := range tx.db.Index.set.idx {
 			bucket, err := tx.db.bm.GetBucketById(uint64(bucketId))
 			if err != nil {
@@ -33,7 +36,7 @@ func (tx *Tx) IterateBuckets(ds uint16, pattern string, f func(bucket string) bo
 			}
 		}
 	}
-	if ds == DataStructureSortedSet {
+	if ds == core.DataStructureSortedSet {
 		for bucketId := range tx.db.Index.sortedSet.idx {
 			bucket, err := tx.db.bm.GetBucketById(uint64(bucketId))
 			if err != nil {
@@ -44,7 +47,7 @@ func (tx *Tx) IterateBuckets(ds uint16, pattern string, f func(bucket string) bo
 			}
 		}
 	}
-	if ds == DataStructureList {
+	if ds == core.DataStructureList {
 		for bucketId := range tx.db.Index.list.idx {
 			bucket, err := tx.db.bm.GetBucketById(uint64(bucketId))
 			if err != nil {
@@ -55,7 +58,7 @@ func (tx *Tx) IterateBuckets(ds uint16, pattern string, f func(bucket string) bo
 			}
 		}
 	}
-	if ds == DataStructureBTree {
+	if ds == core.DataStructureBTree {
 		for bucketId := range tx.db.Index.bTree.idx {
 			bucket, err := tx.db.bm.GetBucketById(uint64(bucketId))
 			if err != nil {
@@ -70,35 +73,35 @@ func (tx *Tx) IterateBuckets(ds uint16, pattern string, f func(bucket string) bo
 }
 
 func (tx *Tx) NewKVBucket(name string) error {
-	return tx.NewBucket(DataStructureBTree, name)
+	return tx.NewBucket(core.DataStructureBTree, name)
 }
 
 func (tx *Tx) NewListBucket(name string) error {
-	return tx.NewBucket(DataStructureList, name)
+	return tx.NewBucket(core.DataStructureList, name)
 }
 
 func (tx *Tx) NewSetBucket(name string) error {
-	return tx.NewBucket(DataStructureSet, name)
+	return tx.NewBucket(core.DataStructureSet, name)
 }
 
 func (tx *Tx) NewSortSetBucket(name string) error {
-	return tx.NewBucket(DataStructureSortedSet, name)
+	return tx.NewBucket(core.DataStructureSortedSet, name)
 }
 
 func (tx *Tx) NewBucket(ds uint16, name string) (err error) {
 	if tx.ExistBucket(ds, name) {
 		return ErrBucketAlreadyExist
 	}
-	bucket := &Bucket{
-		Meta: &BucketMeta{
-			Op: BucketInsertOperation,
+	bucket := &core.Bucket{
+		Meta: &core.BucketMeta{
+			Op: core.BucketInsertOperation,
 		},
 		Id:   tx.db.bm.Gen.GenId(),
 		Ds:   ds,
 		Name: name,
 	}
 	if _, exist := tx.pendingBucketList[ds]; !exist {
-		tx.pendingBucketList[ds] = map[BucketName]*Bucket{}
+		tx.pendingBucketList[ds] = map[core.BucketName]*core.Bucket{}
 	}
 	tx.pendingBucketList[ds][name] = bucket
 	return nil
@@ -115,9 +118,9 @@ func (tx *Tx) DeleteBucket(ds uint16, bucket string) error {
 		return ErrBucketNotFound
 	}
 
-	deleteBucket := &Bucket{
-		Meta: &BucketMeta{
-			Op: BucketDeleteOperation,
+	deleteBucket := &core.Bucket{
+		Meta: &core.BucketMeta{
+			Op: core.BucketDeleteOperation,
 		},
 		Id:   b.Id,
 		Ds:   ds,

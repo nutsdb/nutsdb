@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nutsdb/nutsdb/internal/core"
 	"github.com/nutsdb/nutsdb/internal/testutils"
 	"github.com/stretchr/testify/require"
 )
@@ -42,12 +43,12 @@ func TestHintFileIntegration_WriteMergeRestartVerify(t *testing.T) {
 			// Step 1: Create database and write data
 			db, err := Open(opts)
 			require.NoError(t, err)
-			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
 
 			// Write a significant amount of data to trigger merge
 			n := 2000
 			for i := 0; i < n; i++ {
-				txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), Persistent, nil, nil)
+				txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), core.Persistent, nil, nil)
 			}
 
 			// Delete some data to create dirty entries
@@ -119,12 +120,12 @@ func TestHintFileIntegration_EnableDisableToggle(t *testing.T) {
 
 		db, err := Open(opts)
 		require.NoError(t, err)
-		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+		txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
 
 		// Write enough data to generate at least 2 data files (for merge to work)
 		n := 2000
 		for i := 0; i < n; i++ {
-			txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), Persistent, nil, nil)
+			txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), core.Persistent, nil, nil)
 		}
 
 		// Perform merge
@@ -151,7 +152,7 @@ func TestHintFileIntegration_EnableDisableToggle(t *testing.T) {
 
 		// Write more data to generate additional files for the second merge
 		for i := n; i < n+1500; i++ {
-			txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), Persistent, nil, nil)
+			txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), core.Persistent, nil, nil)
 		}
 
 		// Perform merge (should not create hint files)
@@ -196,7 +197,7 @@ func TestHintFileIntegration_MultipleMerges(t *testing.T) {
 
 		db, err := Open(opts)
 		require.NoError(t, err)
-		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+		txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
 
 		// Perform multiple rounds of write->delete->merge
 		for round := 0; round < 3; round++ {
@@ -204,7 +205,7 @@ func TestHintFileIntegration_MultipleMerges(t *testing.T) {
 			start := round * 500
 			end := (round + 1) * 500
 			for i := start; i < end; i++ {
-				txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), Persistent, nil, nil)
+				txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), core.Persistent, nil, nil)
 			}
 
 			// Delete some data
@@ -290,14 +291,14 @@ func TestHintFileIntegration_MixedDataStructures(t *testing.T) {
 		bucketList := "bucket_list"
 		bucketZSet := "bucket_zset"
 
-		txCreateBucket(t, db, DataStructureBTree, bucketBTree, nil)
-		txCreateBucket(t, db, DataStructureSet, bucketSet, nil)
-		txCreateBucket(t, db, DataStructureList, bucketList, nil)
-		txCreateBucket(t, db, DataStructureSortedSet, bucketZSet, nil)
+		txCreateBucket(t, db, core.DataStructureBTree, bucketBTree, nil)
+		txCreateBucket(t, db, core.DataStructureSet, bucketSet, nil)
+		txCreateBucket(t, db, core.DataStructureList, bucketList, nil)
+		txCreateBucket(t, db, core.DataStructureSortedSet, bucketZSet, nil)
 
 		// Add data to each structure - increase data size to ensure 2 files are created
 		for i := 0; i < 2000; i++ {
-			txPut(t, db, bucketBTree, testutils.GetTestBytes(i), testutils.GetTestBytes(i), Persistent, nil, nil)
+			txPut(t, db, bucketBTree, testutils.GetTestBytes(i), testutils.GetTestBytes(i), core.Persistent, nil, nil)
 		}
 
 		setKey := testutils.GetTestBytes(0)
@@ -396,11 +397,11 @@ func TestHintFileIntegration_CrashRecovery(t *testing.T) {
 		// Create database and write data
 		db, err := Open(opts)
 		require.NoError(t, err)
-		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+		txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
 
 		n := 2000
 		for i := 0; i < n; i++ {
-			txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), Persistent, nil, nil)
+			txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), core.Persistent, nil, nil)
 		}
 
 		// Perform merge to create hint files
@@ -456,7 +457,7 @@ func TestHintFileIntegration_ConcurrentOperations(t *testing.T) {
 		require.NoError(t, err)
 
 		bucket := "bucket"
-		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+		txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
 
 		// Perform concurrent writes
 		done := make(chan bool, 20)
@@ -465,7 +466,7 @@ func TestHintFileIntegration_ConcurrentOperations(t *testing.T) {
 				for j := 0; j < 100; j++ {
 					key := testutils.GetTestBytes(id*100 + j)
 					value := testutils.GetTestBytes(id*100 + j)
-					txPut(t, db, bucket, key, value, Persistent, nil, nil)
+					txPut(t, db, bucket, key, value, core.Persistent, nil, nil)
 				}
 				done <- true
 			}(i)
@@ -529,12 +530,12 @@ func TestHintFileIntegration_LargeDataset(t *testing.T) {
 		require.NoError(t, err)
 
 		bucket := "bucket"
-		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+		txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
 
 		// Write a large amount of data
 		n := 10000
 		for i := 0; i < n; i++ {
-			txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), Persistent, nil, nil)
+			txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), core.Persistent, nil, nil)
 		}
 
 		// Delete some data

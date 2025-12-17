@@ -17,6 +17,7 @@ package data
 import (
 	"errors"
 
+	"github.com/nutsdb/nutsdb/internal/core"
 	"github.com/nutsdb/nutsdb/internal/utils"
 )
 
@@ -32,20 +33,20 @@ var (
 )
 
 type Set struct {
-	M map[string]map[uint32]*Record
+	M map[string]map[uint32]*core.Record
 }
 
 func NewSet() *Set {
 	return &Set{
-		M: map[string]map[uint32]*Record{},
+		M: map[string]map[uint32]*core.Record{},
 	}
 }
 
 // SAdd adds the specified members to the set stored at key.
-func (s *Set) SAdd(key string, values [][]byte, records []*Record) error {
+func (s *Set) SAdd(key string, values [][]byte, records []*core.Record) error {
 	set, ok := s.M[key]
 	if !ok {
-		s.M[key] = map[uint32]*Record{}
+		s.M[key] = map[uint32]*core.Record{}
 		set = s.M[key]
 	}
 
@@ -91,7 +92,7 @@ func (s *Set) SHasKey(key string) bool {
 }
 
 // SPop removes and returns one or more random elements from the set value store at key.
-func (s *Set) SPop(key string) *Record {
+func (s *Set) SPop(key string) *core.Record {
 	if !s.SHasKey(key) {
 		return nil
 	}
@@ -114,12 +115,12 @@ func (s *Set) SCard(key string) int {
 }
 
 // SDiff Returns the members of the set resulting from the difference between the first set and all the successive sets.
-func (s *Set) SDiff(key1, key2 string) ([]*Record, error) {
+func (s *Set) SDiff(key1, key2 string) ([]*core.Record, error) {
 	if !s.SHasKey(key1) || !s.SHasKey(key2) {
 		return nil, ErrSetNotExist
 	}
 
-	records := make([]*Record, 0)
+	records := make([]*core.Record, 0)
 
 	for hash, record := range s.M[key1] {
 		if _, ok := s.M[key2][hash]; !ok {
@@ -130,12 +131,12 @@ func (s *Set) SDiff(key1, key2 string) ([]*Record, error) {
 }
 
 // SInter Returns the members of the set resulting from the intersection of all the given sets.
-func (s *Set) SInter(key1, key2 string) ([]*Record, error) {
+func (s *Set) SInter(key1, key2 string) ([]*core.Record, error) {
 	if !s.SHasKey(key1) || !s.SHasKey(key2) {
 		return nil, ErrSetNotExist
 	}
 
-	records := make([]*Record, 0)
+	records := make([]*core.Record, 0)
 
 	for hash, record := range s.M[key1] {
 		if _, ok := s.M[key2][hash]; ok {
@@ -186,12 +187,12 @@ func (s *Set) SAreMembers(key string, values ...[]byte) (bool, error) {
 }
 
 // SMembers returns all the members of the set value stored at key.
-func (s *Set) SMembers(key string) ([]*Record, error) {
+func (s *Set) SMembers(key string) ([]*core.Record, error) {
 	if _, ok := s.M[key]; !ok {
 		return nil, ErrSetNotExist
 	}
 
-	records := make([]*Record, 0)
+	records := make([]*core.Record, 0)
 
 	for _, record := range s.M[key] {
 		records = append(records, record)
@@ -214,7 +215,7 @@ func (s *Set) SMove(key1, key2 string, value []byte) (bool, error) {
 	}
 
 	var (
-		member *Record
+		member *core.Record
 		ok     bool
 	)
 
@@ -223,7 +224,7 @@ func (s *Set) SMove(key1, key2 string, value []byte) (bool, error) {
 	}
 
 	if _, ok = set2[hash]; !ok {
-		err = s.SAdd(key2, [][]byte{value}, []*Record{member})
+		err = s.SAdd(key2, [][]byte{value}, []*core.Record{member})
 		if err != nil {
 			return false, err
 		}
@@ -238,7 +239,7 @@ func (s *Set) SMove(key1, key2 string, value []byte) (bool, error) {
 }
 
 // SUnion returns the members of the set resulting from the union of all the given sets.
-func (s *Set) SUnion(key1, key2 string) ([]*Record, error) {
+func (s *Set) SUnion(key1, key2 string) ([]*core.Record, error) {
 	if !s.SHasKey(key1) || !s.SHasKey(key2) {
 		return nil, ErrSetNotExist
 	}

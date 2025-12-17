@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/nutsdb/nutsdb/internal/core"
 	"github.com/nutsdb/nutsdb/internal/testutils"
 	"github.com/nutsdb/nutsdb/internal/utils"
 	"github.com/stretchr/testify/assert"
@@ -41,7 +42,7 @@ func TestTx_ZAdd(t *testing.T) {
 	bucket := "bucket"
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, DataStructureSortedSet, bucket, nil)
+		txCreateBucket(t, db, core.DataStructureSortedSet, bucket, nil)
 		for i := 0; i < 10; i++ {
 			txZAdd(t, db, bucket, testutils.GetTestBytes(0), testutils.GetTestBytes(i), float64(i), nil, nil)
 		}
@@ -54,7 +55,7 @@ func TestTx_ZScore(t *testing.T) {
 	bucket := "bucket"
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, DataStructureSortedSet, bucket, nil)
+		txCreateBucket(t, db, core.DataStructureSortedSet, bucket, nil)
 		for i := 0; i < 10; i++ {
 			txZAdd(t, db, bucket, testutils.GetTestBytes(0), testutils.GetTestBytes(i), float64(i), nil, nil)
 		}
@@ -76,7 +77,7 @@ func TestTx_ZRem(t *testing.T) {
 	bucket := "bucket"
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, DataStructureSortedSet, bucket, nil)
+		txCreateBucket(t, db, core.DataStructureSortedSet, bucket, nil)
 
 		for i := 0; i < 10; i++ {
 			txZAdd(t, db, bucket, testutils.GetTestBytes(0), testutils.GetTestBytes(i), float64(i), nil, nil)
@@ -104,7 +105,7 @@ func TestTx_ZMembers(t *testing.T) {
 	key := testutils.GetTestBytes(0)
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, DataStructureSortedSet, bucket, nil)
+		txCreateBucket(t, db, core.DataStructureSortedSet, bucket, nil)
 
 		for i := 0; i < 10; i++ {
 			txZAdd(t, db, bucket, key, testutils.GetTestBytes(i), float64(i), nil, nil)
@@ -132,7 +133,7 @@ func TestTx_ZCount(t *testing.T) {
 	key := testutils.GetTestBytes(0)
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, DataStructureSortedSet, bucket, nil)
+		txCreateBucket(t, db, core.DataStructureSortedSet, bucket, nil)
 
 		for i := 0; i < 30; i++ {
 			txZAdd(t, db, bucket, key, testutils.GetRandomBytes(24), float64(i), nil, nil)
@@ -155,7 +156,7 @@ func TestTx_ZPop(t *testing.T) {
 	key := testutils.GetTestBytes(0)
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, DataStructureSortedSet, bucket, nil)
+		txCreateBucket(t, db, core.DataStructureSortedSet, bucket, nil)
 
 		txZPop(t, db, bucket, key, true, nil, 0, ErrSortedSetNotFound)
 		txZPop(t, db, bucket, key, false, nil, 0, ErrSortedSetNotFound)
@@ -183,7 +184,7 @@ func TestTx_ZRangeByScore(t *testing.T) {
 	key := testutils.GetTestBytes(0)
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, DataStructureSortedSet, bucket, nil)
+		txCreateBucket(t, db, core.DataStructureSortedSet, bucket, nil)
 		err := db.View((func(tx *Tx) error {
 			_, err := tx.ZRangeByScore(bucket, key, 1, 10, nil)
 			require.Error(t, err)
@@ -229,7 +230,7 @@ func TestTx_ZPeekMin(t *testing.T) {
 	key := testutils.GetTestBytes(0)
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, DataStructureSortedSet, bucket, nil)
+		txCreateBucket(t, db, core.DataStructureSortedSet, bucket, nil)
 
 		for i := 0; i < 30; i++ {
 			txZAdd(t, db, bucket, key, testutils.GetTestBytes(i), float64(i), nil, nil)
@@ -289,7 +290,7 @@ func TestTx_ZRangeByRank(t *testing.T) {
 	key := testutils.GetTestBytes(0)
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, DataStructureSortedSet, bucket, nil)
+		txCreateBucket(t, db, core.DataStructureSortedSet, bucket, nil)
 
 		err := db.View(func(tx *Tx) error {
 			_, err := tx.ZRangeByRank(bucket, key, 1, 10)
@@ -347,7 +348,7 @@ func TestTx_ZRemRangeByRank(t *testing.T) {
 	key := testutils.GetTestBytes(0)
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, DataStructureSortedSet, bucket, nil)
+		txCreateBucket(t, db, core.DataStructureSortedSet, bucket, nil)
 
 		err := db.Update(func(tx *Tx) error {
 			err := tx.ZRemRangeByRank(bucket, key, 1, 10)
@@ -422,7 +423,7 @@ func TestTx_ZRank(t *testing.T) {
 	key := testutils.GetTestBytes(0)
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, DataStructureSortedSet, bucket, nil)
+		txCreateBucket(t, db, core.DataStructureSortedSet, bucket, nil)
 
 		txZRank(t, db, bucket, key, testutils.GetTestBytes(0), true, 0, ErrSortedSetNotFound)
 		txZRank(t, db, bucket, key, testutils.GetTestBytes(0), false, 0, ErrSortedSetNotFound)
@@ -452,7 +453,7 @@ func TestTx_ZKeys(t *testing.T) {
 	val := testutils.GetTestBytes(0)
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, DataStructureSortedSet, bucket, nil)
+		txCreateBucket(t, db, core.DataStructureSortedSet, bucket, nil)
 		for i := 0; i < 3; i++ {
 			txZAdd(t, db, bucket, []byte(fmt.Sprintf(key, i)), val, float64(i), nil, nil)
 		}
@@ -493,7 +494,7 @@ func TestTx_ZSetEntryIdxMode_HintKeyValAndRAMIdxMode(t *testing.T) {
 
 	// HintKeyValAndRAMIdxMode
 	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, DataStructureSortedSet, bucket, nil)
+		txCreateBucket(t, db, core.DataStructureSortedSet, bucket, nil)
 
 		err := db.Update(func(tx *Tx) error {
 			err := tx.ZAdd(bucket, key, float64(0), value)
@@ -522,7 +523,7 @@ func TestTx_ZSetEntryIdxMode_HintKeyAndRAMIdxMode(t *testing.T) {
 
 	// HintKeyValAndRAMIdxMode
 	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, DataStructureSortedSet, bucket, nil)
+		txCreateBucket(t, db, core.DataStructureSortedSet, bucket, nil)
 		err := db.Update(func(tx *Tx) error {
 			err := tx.ZAdd(bucket, key, float64(0), value)
 			require.NoError(t, err)

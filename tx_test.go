@@ -19,6 +19,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nutsdb/nutsdb/internal/core"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -27,7 +28,7 @@ func TestTx_Rollback(t *testing.T) {
 
 	withDefaultDB(t, func(t *testing.T, db *DB) {
 		bucket := "bucket_rollback_test"
-		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+		txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
 		tx, err := db.Begin(true)
 		assert.NoError(t, err)
 
@@ -37,7 +38,7 @@ func TestTx_Rollback(t *testing.T) {
 			if i == 7 {
 				key = []byte("") // set error key to make tx rollback
 			}
-			if err = tx.Put(bucket, key, val, Persistent); err != nil {
+			if err = tx.Put(bucket, key, val, core.Persistent); err != nil {
 				// tx rollback
 				tx.Rollback()
 
@@ -137,7 +138,7 @@ func TestTx_CommittedStatus(t *testing.T) {
 		bucket := "bucket_committed_status"
 
 		{ // setup data
-			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
 			tx, err := db.Begin(true)
 			assert.NoError(t, err)
 
@@ -160,7 +161,7 @@ func TestTx_PutWithTimestamp(t *testing.T) {
 		timestamps := []uint64{1547707905, 1547707910, uint64(time.Now().Unix())}
 
 		{ // put with timestamp
-			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
 
 			tx, err := db.Begin(true)
 			assert.NoError(t, err)
@@ -183,24 +184,24 @@ func TestTx_Commit(t *testing.T) {
 		withDefaultDB(t, func(t *testing.T, db *DB) {
 			bucket := "bucket1"
 
-			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
 			assert.Equal(t, 1, db.Index.bTree.defaultOp.getIdxLen())
-			txDeleteBucket(t, db, DataStructureBTree, bucket, nil)
+			txDeleteBucket(t, db, core.DataStructureBTree, bucket, nil)
 			assert.Equal(t, 0, db.Index.bTree.defaultOp.getIdxLen())
 
-			txCreateBucket(t, db, DataStructureSortedSet, bucket, nil)
+			txCreateBucket(t, db, core.DataStructureSortedSet, bucket, nil)
 			assert.Equal(t, 1, db.Index.sortedSet.defaultOp.getIdxLen())
-			txDeleteBucket(t, db, DataStructureSortedSet, bucket, nil)
+			txDeleteBucket(t, db, core.DataStructureSortedSet, bucket, nil)
 			assert.Equal(t, 0, db.Index.sortedSet.defaultOp.getIdxLen())
 
-			txCreateBucket(t, db, DataStructureList, bucket, nil)
+			txCreateBucket(t, db, core.DataStructureList, bucket, nil)
 			assert.Equal(t, 1, db.Index.list.defaultOp.getIdxLen())
-			txDeleteBucket(t, db, DataStructureList, bucket, nil)
+			txDeleteBucket(t, db, core.DataStructureList, bucket, nil)
 			assert.Equal(t, 0, db.Index.list.defaultOp.getIdxLen())
 
-			txCreateBucket(t, db, DataStructureSet, bucket, nil)
+			txCreateBucket(t, db, core.DataStructureSet, bucket, nil)
 			assert.Equal(t, 1, db.Index.set.defaultOp.getIdxLen())
-			txDeleteBucket(t, db, DataStructureSet, bucket, nil)
+			txDeleteBucket(t, db, core.DataStructureSet, bucket, nil)
 			assert.Equal(t, 0, db.Index.set.defaultOp.getIdxLen())
 
 		})

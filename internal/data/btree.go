@@ -18,43 +18,44 @@ import (
 	"bytes"
 	"regexp"
 
+	"github.com/nutsdb/nutsdb/internal/core"
 	"github.com/tidwall/btree"
 )
 
 type BTree struct {
-	btree *btree.BTreeG[*Item[Record]]
+	btree *btree.BTreeG[*Item[core.Record]]
 }
 
 func NewBTree() *BTree {
 	return &BTree{
-		btree: btree.NewBTreeG(func(a, b *Item[Record]) bool {
+		btree: btree.NewBTreeG(func(a, b *Item[core.Record]) bool {
 			return bytes.Compare(a.Key, b.Key) == -1
 		}),
 	}
 }
 
-func (bt *BTree) Find(key []byte) (*Record, bool) {
-	item, ok := bt.btree.Get(NewItem[Record](key, nil))
+func (bt *BTree) Find(key []byte) (*core.Record, bool) {
+	item, ok := bt.btree.Get(NewItem[core.Record](key, nil))
 	if ok {
 		return item.Record, ok
 	}
 	return nil, ok
 }
 
-func (bt *BTree) InsertRecord(key []byte, record *Record) bool {
+func (bt *BTree) InsertRecord(key []byte, record *core.Record) bool {
 	_, replaced := bt.btree.Set(NewItem(key, record))
 	return replaced
 }
 
 func (bt *BTree) Delete(key []byte) bool {
-	_, deleted := bt.btree.Delete(NewItem[Record](key, nil))
+	_, deleted := bt.btree.Delete(NewItem[core.Record](key, nil))
 	return deleted
 }
 
-func (bt *BTree) All() []*Record {
+func (bt *BTree) All() []*core.Record {
 	items := bt.btree.Items()
 
-	records := make([]*Record, len(items))
+	records := make([]*core.Record, len(items))
 	for i, item := range items {
 		records[i] = item.Record
 	}
@@ -62,15 +63,15 @@ func (bt *BTree) All() []*Record {
 	return records
 }
 
-func (bt *BTree) AllItems() []*Item[Record] {
+func (bt *BTree) AllItems() []*Item[core.Record] {
 	items := bt.btree.Items()
 	return items
 }
 
-func (bt *BTree) Range(start, end []byte) []*Record {
-	records := make([]*Record, 0)
+func (bt *BTree) Range(start, end []byte) []*core.Record {
+	records := make([]*core.Record, 0)
 
-	bt.btree.Ascend(&Item[Record]{Key: start}, func(item *Item[Record]) bool {
+	bt.btree.Ascend(&Item[core.Record]{Key: start}, func(item *Item[core.Record]) bool {
 		if bytes.Compare(item.Key, end) > 0 {
 			return false
 		}
@@ -81,10 +82,10 @@ func (bt *BTree) Range(start, end []byte) []*Record {
 	return records
 }
 
-func (bt *BTree) PrefixScan(prefix []byte, offset, limitNum int) []*Record {
-	records := make([]*Record, 0)
+func (bt *BTree) PrefixScan(prefix []byte, offset, limitNum int) []*core.Record {
+	records := make([]*core.Record, 0)
 
-	bt.btree.Ascend(&Item[Record]{Key: prefix}, func(item *Item[Record]) bool {
+	bt.btree.Ascend(&Item[core.Record]{Key: prefix}, func(item *Item[core.Record]) bool {
 		if !bytes.HasPrefix(item.Key, prefix) {
 			return false
 		}
@@ -103,12 +104,12 @@ func (bt *BTree) PrefixScan(prefix []byte, offset, limitNum int) []*Record {
 	return records
 }
 
-func (bt *BTree) PrefixSearchScan(prefix []byte, reg string, offset, limitNum int) []*Record {
-	records := make([]*Record, 0)
+func (bt *BTree) PrefixSearchScan(prefix []byte, reg string, offset, limitNum int) []*core.Record {
+	records := make([]*core.Record, 0)
 
 	rgx := regexp.MustCompile(reg)
 
-	bt.btree.Ascend(&Item[Record]{Key: prefix}, func(item *Item[Record]) bool {
+	bt.btree.Ascend(&Item[core.Record]{Key: prefix}, func(item *Item[core.Record]) bool {
 		if !bytes.HasPrefix(item.Key, prefix) {
 			return false
 		}
@@ -135,22 +136,22 @@ func (bt *BTree) Count() int {
 	return bt.btree.Len()
 }
 
-func (bt *BTree) PopMin() (*Item[Record], bool) {
+func (bt *BTree) PopMin() (*Item[core.Record], bool) {
 	return bt.btree.PopMin()
 }
 
-func (bt *BTree) PopMax() (*Item[Record], bool) {
+func (bt *BTree) PopMax() (*Item[core.Record], bool) {
 	return bt.btree.PopMax()
 }
 
-func (bt *BTree) Min() (*Item[Record], bool) {
+func (bt *BTree) Min() (*Item[core.Record], bool) {
 	return bt.btree.Min()
 }
 
-func (bt *BTree) Max() (*Item[Record], bool) {
+func (bt *BTree) Max() (*Item[core.Record], bool) {
 	return bt.btree.Max()
 }
 
-func (bt *BTree) Iter() btree.IterG[*Item[Record]] {
+func (bt *BTree) Iter() btree.IterG[*Item[core.Record]] {
 	return bt.btree.Iter()
 }

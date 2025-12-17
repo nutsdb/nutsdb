@@ -9,7 +9,7 @@ import (
 	"os"
 	"sort"
 
-	"github.com/nutsdb/nutsdb/internal/data"
+	"github.com/nutsdb/nutsdb/internal/core"
 	"github.com/nutsdb/nutsdb/internal/utils"
 )
 
@@ -57,7 +57,7 @@ type mergeV2Job struct {
 	oldHints       []string
 	outputSeqBase  int
 	valueHasher    hash.Hash32
-	onRewriteEntry func(*Entry)
+	onRewriteEntry func(*core.Entry)
 }
 
 // mergeLookupEntry tracks minimal information needed to update indexes at commit time.
@@ -388,7 +388,7 @@ func (job *mergeV2Job) rewriteFile(fid int64) error {
 		}
 		entry, err := fr.readEntry(off)
 		if err != nil {
-			if errors.Is(err, io.EOF) || errors.Is(err, ErrIndexOutOfBound) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, ErrHeaderSizeOutOfBounds) {
+			if errors.Is(err, io.EOF) || errors.Is(err, ErrIndexOutOfBound) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, core.ErrHeaderSizeOutOfBounds) {
 				break
 			}
 			return fmt.Errorf("merge rewrite read entry at offset %d: %w", off, err)
@@ -407,15 +407,15 @@ func (job *mergeV2Job) rewriteFile(fid int64) error {
 		off += sz
 
 		// Skip entries that are not committed
-		if entry.Meta.Status != Committed {
+		if entry.Meta.Status != core.Committed {
 			continue
 		}
 		// Skip filter entries
-		if entry.isFilter() {
+		if entry.IsFilter() {
 			continue
 		}
 		// Skip expired entries
-		if data.IsExpired(entry.Meta.TTL, entry.Meta.Timestamp) {
+		if core.IsExpired(entry.Meta.TTL, entry.Meta.Timestamp) {
 			continue
 		}
 
@@ -442,7 +442,7 @@ func (job *mergeV2Job) rewriteFile(fid int64) error {
 
 // writeEntry writes an entry to the appropriate merge output file and creates the corresponding hint entry.
 // It also calculates value hashes for Set and SortedSet data structures to support duplicate detection.
-func (job *mergeV2Job) writeEntry(entry *Entry) error {
+func (job *mergeV2Job) writeEntry(entry *core.Entry) error {
 	if entry == nil {
 		return fmt.Errorf("cannot write nil entry")
 	}
@@ -478,7 +478,7 @@ func (job *mergeV2Job) writeEntry(entry *Entry) error {
 	}
 
 	// For Set and SortedSet, compute value hash to handle duplicate detection
-	if entry.Meta.Ds == DataStructureSet || entry.Meta.Ds == DataStructureSortedSet {
+	if entry.Meta.Ds == core.DataStructureSet || entry.Meta.Ds == core.DataStructureSortedSet {
 		h := job.valueHasher
 		h.Reset()
 		if _, err := h.Write(entry.Value); err != nil {
@@ -608,7 +608,7 @@ func (out *mergeOutput) finalize() error {
 
 // updateRecordWithHintIfNewer updates a record with hint data only if the hint is newer or same timestamp.
 // This prevents overwriting newer entries that were written after merge started.
-func updateRecordWithHintIfNewer(record *data.Record, hint *HintEntry) bool {
+func updateRecordWithHintIfNewer(record *core.Record, hint *HintEntry) bool {
 	// Only update if our hint is newer or same timestamp (don't overwrite newer data)
 	if record.Timestamp <= hint.Timestamp {
 		record.FileID = hint.FileID
@@ -634,10 +634,10 @@ func (job *mergeV2Job) applyLookup(entry *mergeLookupEntry) {
 	}
 
 	hint := entry.hint
-	bucketID := BucketId(hint.BucketId)
+	bucketID := core.BucketId(hint.BucketId)
 
 	switch hint.Ds {
-	case DataStructureBTree:
+	case core.DataStructureBTree:
 		// Update BTree index with new file location if hint is newer or same age
 		bt, exist := job.db.Index.bTree.exist(bucketID)
 		if !exist {
@@ -649,7 +649,7 @@ func (job *mergeV2Job) applyLookup(entry *mergeLookupEntry) {
 		}
 		updateRecordWithHintIfNewer(record, hint)
 
-	case DataStructureSet:
+	case core.DataStructureSet:
 		// Update Set index using value hash for duplicate detection
 		setIdx, exist := job.db.Index.set.exist(bucketID)
 		if !exist {
@@ -669,9 +669,9 @@ func (job *mergeV2Job) applyLookup(entry *mergeLookupEntry) {
 		}
 		updateRecordWithHintIfNewer(record, hint)
 
-	case DataStructureList:
+	case core.DataStructureList:
 		// Update List index entries (only push operations are merged)
-		if hint.Flag != DataLPushFlag && hint.Flag != DataRPushFlag {
+		if hint.Flag != core.DataLPushFlag && hint.Flag != core.DataRPushFlag {
 			return
 		}
 		listIdx, exist := job.db.Index.list.exist(bucketID)
@@ -694,7 +694,7 @@ func (job *mergeV2Job) applyLookup(entry *mergeLookupEntry) {
 		}
 		updateRecordWithHintIfNewer(record, hint)
 
-	case DataStructureSortedSet:
+	case core.DataStructureSortedSet:
 		// Update SortedSet index using both key and value hash
 		sortedIdx, exist := job.db.Index.sortedSet.exist(bucketID)
 		if !exist {

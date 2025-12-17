@@ -30,6 +30,7 @@ import (
 
 	"github.com/bwmarrin/snowflake"
 	"github.com/gofrs/flock"
+	"github.com/nutsdb/nutsdb/internal/core"
 	"github.com/nutsdb/nutsdb/internal/data"
 	"github.com/nutsdb/nutsdb/internal/fileio"
 	"github.com/nutsdb/nutsdb/internal/ttl"
@@ -273,7 +274,7 @@ func (db *DB) release() error {
 	return nil
 }
 
-func (db *DB) getValueByRecord(record *data.Record) ([]byte, error) {
+func (db *DB) getValueByRecord(record *core.Record) ([]byte, error) {
 	if record == nil {
 		return nil, ErrRecordIsNil
 	}
@@ -285,7 +286,7 @@ func (db *DB) getValueByRecord(record *data.Record) ([]byte, error) {
 	// firstly we find data in cache
 	if db.getHintKeyAndRAMIdxCacheSize() > 0 {
 		if value := db.hintKeyAndRAMIdxModeLru.Get(record); value != nil {
-			return value.(*Entry).Value, nil
+			return value.(*core.Entry).Value, nil
 		}
 	}
 
@@ -490,11 +491,11 @@ func (db *DB) parseDataFiles(dataFileIds []int64) (err error) {
 		off      int64
 		f        *fileRecovery
 		fID      int64
-		dataInTx dataInTx
+		dataInTx core.DataInTx
 	)
 
 	parseDataInTx := func() error {
-		for _, entry := range dataInTx.es {
+		for _, entry := range dataInTx.Es {
 			// if this bucket is not existed in bucket manager right now
 			// its because it already deleted in the feature WAL log.
 			// so we can just ignore here.
@@ -503,7 +504,7 @@ func (db *DB) parseDataFiles(dataFileIds []int64) (err error) {
 				continue
 			}
 
-			record := db.createRecordByModeWithFidAndOff(entry.fid, uint64(entry.off), &entry.Entry)
+			record := db.createRecordByModeWithFidAndOff(entry.Fid, uint64(entry.Off), &entry.Entry)
 
 			if err = db.buildIdxes(record, &entry.Entry); err != nil {
 				return err
@@ -521,7 +522,7 @@ func (db *DB) parseDataFiles(dataFileIds []int64) (err error) {
 			if err != nil {
 				// whatever which logic branch it will choose, we will release the fd.
 				_ = f.release()
-				if errors.Is(err, io.EOF) || errors.Is(err, ErrIndexOutOfBound) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, ErrEntryZero) || errors.Is(err, ErrHeaderSizeOutOfBounds) {
+				if errors.Is(err, io.EOF) || errors.Is(err, ErrIndexOutOfBound) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, ErrEntryZero) || errors.Is(err, core.ErrHeaderSizeOutOfBounds) {
 					break
 				}
 				if off >= db.opt.SegmentSize {
@@ -535,31 +536,31 @@ func (db *DB) parseDataFiles(dataFileIds []int64) (err error) {
 				break
 			}
 
-			entryWhenRecovery := &EntryWhenRecovery{
+			entryWhenRecovery := &core.EntryWhenRecovery{
 				Entry: *entry,
-				fid:   fID,
-				off:   off,
+				Fid:   fID,
+				Off:   off,
 			}
-			if dataInTx.txId == 0 {
-				dataInTx.appendEntry(entryWhenRecovery)
-				dataInTx.txId = entry.Meta.TxID
-				dataInTx.startOff = off
-			} else if dataInTx.isSameTx(entryWhenRecovery) {
-				dataInTx.appendEntry(entryWhenRecovery)
+			if dataInTx.TxId == 0 {
+				dataInTx.AppendEntry(entryWhenRecovery)
+				dataInTx.TxId = entry.Meta.TxID
+				dataInTx.StartOff = off
+			} else if dataInTx.IsSameTx(entryWhenRecovery) {
+				dataInTx.AppendEntry(entryWhenRecovery)
 			}
 
-			if entry.Meta.Status == Committed {
+			if entry.Meta.Status == core.Committed {
 				err := parseDataInTx()
 				if err != nil {
 					return err
 				}
-				dataInTx.reset()
-				dataInTx.startOff = off
+				dataInTx.Reset()
+				dataInTx.StartOff = off
 			}
 
-			if !dataInTx.isSameTx(entryWhenRecovery) {
-				dataInTx.reset()
-				dataInTx.startOff = off
+			if !dataInTx.IsSameTx(entryWhenRecovery) {
+				dataInTx.Reset()
+				dataInTx.StartOff = off
 			}
 
 			off += entry.Size()
@@ -645,7 +646,7 @@ func (db *DB) loadHintFile(fid int64) (bool, error) {
 		}
 
 		// Create a record from hint entry
-		record := data.NewRecord()
+		record := core.NewRecord()
 		record.WithKey(hintEntry.Key).
 			WithFileId(hintEntry.FileID).
 			WithDataPos(hintEntry.DataPos).
@@ -655,11 +656,11 @@ func (db *DB) loadHintFile(fid int64) (bool, error) {
 			WithTxID(0) // TxID is not stored in hint file
 
 		// Create an entry from hint entry
-		entry := NewEntry()
+		entry := core.NewEntry()
 		entry.WithKey(hintEntry.Key)
 
 		// Create metadata
-		meta := NewMetaData()
+		meta := core.NewMetaData()
 		meta.WithBucketId(hintEntry.BucketId).
 			WithKeySize(hintEntry.KeySize).
 			WithValueSize(hintEntry.ValueSize).
@@ -685,7 +686,7 @@ func (db *DB) loadHintFile(fid int64) (bool, error) {
 		} else if db.opt.EntryIdxMode == HintKeyAndRAMIdxMode {
 			// In HintKeyAndRAMIdxMode, for Set data structure, we also need to load the value
 			// because Set uses value hash as the key in its internal map structure
-			if hintEntry.Ds == DataStructureSet || hintEntry.Ds == DataStructureSortedSet {
+			if hintEntry.Ds == core.DataStructureSet || hintEntry.Ds == core.DataStructureSortedSet {
 				value, err := db.getValueByRecord(record)
 				if err != nil {
 					continue
@@ -746,7 +747,7 @@ func (db *DB) getRecordCount() (int64, error) {
 	return res, nil
 }
 
-func (db *DB) buildBTreeIdx(record *data.Record, entry *Entry) error {
+func (db *DB) buildBTreeIdx(record *core.Record, entry *core.Entry) error {
 	key, meta := entry.Key, entry.Meta
 
 	bucket, err := db.bm.GetBucketById(meta.BucketId)
@@ -757,11 +758,11 @@ func (db *DB) buildBTreeIdx(record *data.Record, entry *Entry) error {
 
 	bTree := db.Index.bTree.getWithDefault(bucketId)
 
-	if record.IsExpired() || meta.Flag == DataDeleteFlag {
+	if record.IsExpired() || meta.Flag == core.DataDeleteFlag {
 		db.tm.Del(bucketId, string(key))
 		bTree.Delete(key)
 	} else {
-		if meta.TTL != Persistent {
+		if meta.TTL != core.Persistent {
 			db.tm.Add(bucketId, string(key), expireTime(meta.Timestamp, meta.TTL), db.buildExpireCallback(bucket.Name, key))
 		} else {
 			db.tm.Del(bucketId, string(key))
@@ -771,20 +772,20 @@ func (db *DB) buildBTreeIdx(record *data.Record, entry *Entry) error {
 	return nil
 }
 
-func (db *DB) buildIdxes(record *data.Record, entry *Entry) error {
+func (db *DB) buildIdxes(record *core.Record, entry *core.Entry) error {
 	meta := entry.Meta
 	switch meta.Ds {
-	case DataStructureBTree:
+	case core.DataStructureBTree:
 		return db.buildBTreeIdx(record, entry)
-	case DataStructureList:
+	case core.DataStructureList:
 		if err := db.buildListIdx(record, entry); err != nil {
 			return err
 		}
-	case DataStructureSet:
+	case core.DataStructureSet:
 		if err := db.buildSetIdx(record, entry); err != nil {
 			return err
 		}
-	case DataStructureSortedSet:
+	case core.DataStructureSortedSet:
 		if err := db.buildSortedSetIdx(record, entry); err != nil {
 			return err
 		}
@@ -795,7 +796,7 @@ func (db *DB) buildIdxes(record *data.Record, entry *Entry) error {
 }
 
 // buildSetIdx builds set index when opening the DB.
-func (db *DB) buildSetIdx(record *data.Record, entry *Entry) error {
+func (db *DB) buildSetIdx(record *core.Record, entry *core.Entry) error {
 	key, val, meta := entry.Key, entry.Value, entry.Meta
 
 	bucket, err := db.bm.GetBucketById(entry.Meta.BucketId)
@@ -807,11 +808,11 @@ func (db *DB) buildSetIdx(record *data.Record, entry *Entry) error {
 	s := db.Index.set.getWithDefault(bucketId)
 
 	switch meta.Flag {
-	case DataSetFlag:
-		if err := s.SAdd(string(key), [][]byte{val}, []*data.Record{record}); err != nil {
+	case core.DataSetFlag:
+		if err := s.SAdd(string(key), [][]byte{val}, []*core.Record{record}); err != nil {
 			return fmt.Errorf("when build SetIdx SAdd index err: %s", err)
 		}
-	case DataDeleteFlag:
+	case core.DataDeleteFlag:
 		if err := s.SRem(string(key), val); err != nil {
 			return fmt.Errorf("when build SetIdx SRem index err: %s", err)
 		}
@@ -821,7 +822,7 @@ func (db *DB) buildSetIdx(record *data.Record, entry *Entry) error {
 }
 
 // buildSortedSetIdx builds sorted set index when opening the DB.
-func (db *DB) buildSortedSetIdx(record *data.Record, entry *Entry) error {
+func (db *DB) buildSortedSetIdx(record *core.Record, entry *core.Entry) error {
 	key, val, meta := entry.Key, entry.Value, entry.Meta
 
 	bucket, err := db.bm.GetBucketById(entry.Meta.BucketId)
@@ -833,21 +834,21 @@ func (db *DB) buildSortedSetIdx(record *data.Record, entry *Entry) error {
 	ss := db.Index.sortedSet.getWithDefault(bucketId, db)
 
 	switch meta.Flag {
-	case DataZAddFlag:
+	case core.DataZAddFlag:
 		keyAndScore := strings.Split(string(key), SeparatorForZSetKey)
 		if len(keyAndScore) == 2 {
 			key := keyAndScore[0]
 			score, _ := strconv2.StrToFloat64(keyAndScore[1])
 			err = ss.ZAdd(key, SCORE(score), val, record)
 		}
-	case DataZRemFlag:
+	case core.DataZRemFlag:
 		_, err = ss.ZRem(string(key), val)
-	case DataZRemRangeByRankFlag:
+	case core.DataZRemRangeByRankFlag:
 		start, end := splitIntIntStr(string(val), SeparatorForZSetKey)
 		err = ss.ZRemRangeByRank(string(key), start, end)
-	case DataZPopMaxFlag:
+	case core.DataZPopMaxFlag:
 		_, _, err = ss.ZPopMax(string(key))
-	case DataZPopMinFlag:
+	case core.DataZPopMinFlag:
 		_, _, err = ss.ZPopMin(string(key))
 	}
 
@@ -860,7 +861,7 @@ func (db *DB) buildSortedSetIdx(record *data.Record, entry *Entry) error {
 }
 
 // buildListIdx builds List index when opening the DB.
-func (db *DB) buildListIdx(record *data.Record, entry *Entry) error {
+func (db *DB) buildListIdx(record *core.Record, entry *core.Entry) error {
 	key, val, meta := entry.Key, entry.Value, entry.Meta
 
 	bucket, err := db.bm.GetBucketById(entry.Meta.BucketId)
@@ -871,31 +872,31 @@ func (db *DB) buildListIdx(record *data.Record, entry *Entry) error {
 
 	l := db.Index.list.getWithDefault(bucketId)
 
-	if data.IsExpired(meta.TTL, meta.Timestamp) {
+	if core.IsExpired(meta.TTL, meta.Timestamp) {
 		return nil
 	}
 
 	switch meta.Flag {
-	case DataExpireListFlag:
+	case core.DataExpireListFlag:
 		t, _ := strconv2.StrToInt64(string(val))
 		ttl := uint32(t)
 		l.TTL[string(key)] = ttl
 		l.TimeStamp[string(key)] = meta.Timestamp
-	case DataLPushFlag:
+	case core.DataLPushFlag:
 		err = l.LPush(string(key), record)
-	case DataRPushFlag:
+	case core.DataRPushFlag:
 		err = l.RPush(string(key), record)
-	case DataLRemFlag:
+	case core.DataLRemFlag:
 		err = db.buildListLRemIdx(val, l, key)
-	case DataLPopFlag:
+	case core.DataLPopFlag:
 		_, err = l.LPop(string(key))
-	case DataRPopFlag:
+	case core.DataRPopFlag:
 		_, err = l.RPop(string(key))
-	case DataLTrimFlag:
+	case core.DataLTrimFlag:
 		newKey, start := splitStringIntStr(string(key), SeparatorForListKey)
 		end, _ := strconv2.StrToInt(string(val))
 		err = l.LTrim(newKey, start, end)
-	case DataLRemByIndex:
+	case core.DataLRemByIndex:
 		indexes, _ := utils.UnmarshalInts(val)
 		err = l.LRemByIndex(string(key), indexes)
 	}
@@ -910,7 +911,7 @@ func (db *DB) buildListIdx(record *data.Record, entry *Entry) error {
 func (db *DB) buildListLRemIdx(value []byte, l *data.List, key []byte) error {
 	count, newValue := splitIntStringStr(string(value), SeparatorForListKey)
 
-	return l.LRem(string(key), count, func(r *data.Record) (bool, error) {
+	return l.LRem(string(key), count, func(r *core.Record) (bool, error) {
 		v, err := db.getValueByRecord(r)
 		if err != nil {
 			return false, err
@@ -944,8 +945,8 @@ func (db *DB) buildIndexes() (err error) {
 	return db.parseDataFiles(dataFileIds)
 }
 
-func (db *DB) createRecordByModeWithFidAndOff(fid int64, off uint64, entry *Entry) *data.Record {
-	record := data.NewRecord()
+func (db *DB) createRecordByModeWithFidAndOff(fid int64, off uint64, entry *core.Entry) *core.Record {
+	record := core.NewRecord()
 
 	record.WithKey(entry.Key).
 		WithTimestamp(entry.Meta.Timestamp).
@@ -1020,7 +1021,7 @@ func (db *DB) IsClose() bool {
 func (db *DB) buildExpireCallback(bucket string, key []byte) func() {
 	return func() {
 		_ = db.Update(func(tx *Tx) error {
-			b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
+			b, err := tx.db.bm.GetBucket(core.DataStructureBTree, bucket)
 			if err != nil {
 				return err
 			}
@@ -1054,7 +1055,7 @@ func (db *DB) rebuildBucketManager() error {
 		}
 		bucketRequest = append(bucketRequest, &bucketSubmitRequest{
 			ds:     bucket.Ds,
-			name:   BucketName(bucket.Name),
+			name:   core.BucketName(bucket.Name),
 			bucket: bucket,
 		})
 	}

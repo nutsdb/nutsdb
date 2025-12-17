@@ -15,6 +15,7 @@
 package nutsdb
 
 import (
+	"github.com/nutsdb/nutsdb/internal/core"
 	"github.com/nutsdb/nutsdb/internal/data"
 	"github.com/tidwall/btree"
 )
@@ -22,9 +23,9 @@ import (
 type Iterator struct {
 	tx      *Tx
 	options IteratorOptions
-	iter    btree.IterG[*data.Item[data.Record]]
+	iter    btree.IterG[*data.Item[core.Record]]
 	// Cached current item to avoid repeated iter.Item() calls
-	currentItem *data.Item[data.Record]
+	currentItem *data.Item[core.Record]
 	// Track validity state to avoid unnecessary checks
 	valid bool
 }
@@ -36,7 +37,7 @@ type IteratorOptions struct {
 // Returns a new iterator.
 // The Release method must be called when finished with the iterator.
 func NewIterator(tx *Tx, bucket string, options IteratorOptions) *Iterator {
-	b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
+	b, err := tx.db.bm.GetBucket(core.DataStructureBTree, bucket)
 	if err != nil {
 		return nil
 	}
@@ -77,7 +78,7 @@ func (it *Iterator) Rewind() bool {
 }
 
 func (it *Iterator) Seek(key []byte) bool {
-	it.valid = it.iter.Seek(&data.Item[data.Record]{Key: key})
+	it.valid = it.iter.Seek(&data.Item[core.Record]{Key: key})
 
 	if it.valid {
 		it.currentItem = it.iter.Item()
@@ -128,7 +129,7 @@ func (it *Iterator) Value() ([]byte, error) {
 
 // Item returns the current item (key + record) if valid
 // This is useful for advanced use cases that need direct access to the record
-func (it *Iterator) Item() *data.Item[data.Record] {
+func (it *Iterator) Item() *data.Item[core.Record] {
 	if !it.valid {
 		return nil
 	}

@@ -16,11 +16,12 @@ package ttl
 
 import (
 	"github.com/nutsdb/nutsdb/internal/clock"
+	"github.com/nutsdb/nutsdb/internal/core"
 	"github.com/nutsdb/nutsdb/internal/data"
 )
 
 // Persistent represents the data persistent flag
-const Persistent uint32 = data.Persistent
+const Persistent uint32 = core.Persistent
 
 // Checker handles TTL expiration logic using a unified clock.
 // This is the single source of truth for TTL checking across all data structures.
@@ -57,7 +58,7 @@ func (tc *Checker) IsExpired(ttl uint32, timestamp uint64) bool {
 
 // FilterExpiredRecord checks a single record and triggers cleanup if expired.
 // Returns true if the record is valid (not expired), false if expired.
-func (tc *Checker) FilterExpiredRecord(key []byte, record *data.Record, ds uint16) bool {
+func (tc *Checker) FilterExpiredRecord(key []byte, record *core.Record, ds uint16) bool {
 	if record == nil {
 		return false
 	}
@@ -77,8 +78,8 @@ func (tc *Checker) triggerExpiredCallback(key []byte, ds uint16) {
 
 // FilterExpiredRecords filters a slice of records, removing expired ones.
 // Returns a new slice containing only valid (non-expired) records.
-func (tc *Checker) FilterExpiredRecords(records []*data.Record, ds uint16) []*data.Record {
-	valid := make([]*data.Record, 0, len(records))
+func (tc *Checker) FilterExpiredRecords(records []*core.Record, ds uint16) []*core.Record {
+	valid := make([]*core.Record, 0, len(records))
 	for _, record := range records {
 		if !tc.IsExpired(record.TTL, record.Timestamp) {
 			valid = append(valid, record)
@@ -91,8 +92,8 @@ func (tc *Checker) FilterExpiredRecords(records []*data.Record, ds uint16) []*da
 
 // FilterExpiredItems filters a slice of items, removing expired ones.
 // Returns a new slice containing only valid (non-expired) items.
-func (tc *Checker) FilterExpiredItems(items []*data.Item[data.Record], ds uint16) []*data.Item[data.Record] {
-	valid := make([]*data.Item[data.Record], 0, len(items))
+func (tc *Checker) FilterExpiredItems(items []*data.Item[core.Record], ds uint16) []*data.Item[core.Record] {
+	valid := make([]*data.Item[core.Record], 0, len(items))
 	for _, item := range items {
 		if item.Record != nil && !tc.IsExpired(item.Record.TTL, item.Record.Timestamp) {
 			valid = append(valid, item)

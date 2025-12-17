@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/nutsdb/nutsdb/internal/core"
 	"github.com/nutsdb/nutsdb/internal/testutils"
 	"github.com/stretchr/testify/assert"
 )
@@ -27,7 +28,7 @@ func TestTx_SAdd(t *testing.T) {
 	bucket := "bucket"
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, DataStructureSet, bucket, nil)
+		txCreateBucket(t, db, core.DataStructureSet, bucket, nil)
 		txSAdd(t, db, bucket, []byte(""), []byte("val1"), ErrKeyEmpty, nil)
 
 		key := testutils.GetTestBytes(0)
@@ -48,7 +49,7 @@ func TestTx_SRem(t *testing.T) {
 	bucket := "bucket"
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, DataStructureSet, bucket, nil)
+		txCreateBucket(t, db, core.DataStructureSet, bucket, nil)
 		key := []byte("key1")
 		val1 := []byte("one")
 		val2 := []byte("two")
@@ -74,7 +75,7 @@ func TestTx_SRem2(t *testing.T) {
 	val2 := testutils.GetTestBytes(1)
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, DataStructureSet, bucket, nil)
+		txCreateBucket(t, db, core.DataStructureSet, bucket, nil)
 		txSAdd(t, db, bucket, key, val1, nil, nil)
 		txSAdd(t, db, bucket, key, val2, nil, nil)
 
@@ -95,7 +96,7 @@ func TestTx_SMembers(t *testing.T) {
 	val2 := testutils.GetTestBytes(1)
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, DataStructureSet, bucket, nil)
+		txCreateBucket(t, db, core.DataStructureSet, bucket, nil)
 		txSAdd(t, db, bucket, key, val1, nil, nil)
 		txSAdd(t, db, bucket, key, val2, nil, nil)
 
@@ -117,7 +118,7 @@ func TestTx_SCard(t *testing.T) {
 	val3 := testutils.GetTestBytes(3)
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, DataStructureSet, bucket, nil)
+		txCreateBucket(t, db, core.DataStructureSet, bucket, nil)
 		txSAdd(t, db, bucket, key, val1, nil, nil)
 		txSAdd(t, db, bucket, key, val2, nil, nil)
 		txSAdd(t, db, bucket, key, val3, nil, nil)
@@ -141,7 +142,7 @@ func TestTx_SDiffByOneBucket(t *testing.T) {
 	val5 := testutils.GetTestBytes(5)
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, DataStructureSet, bucket, nil)
+		txCreateBucket(t, db, core.DataStructureSet, bucket, nil)
 		txSAdd(t, db, bucket, key1, val1, nil, nil)
 		txSAdd(t, db, bucket, key1, val2, nil, nil)
 		txSAdd(t, db, bucket, key1, val3, nil, nil)
@@ -178,9 +179,9 @@ func TestTx_SDiffByTwoBuckets(t *testing.T) {
 	val5 := testutils.GetTestBytes(5)
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, DataStructureSet, bucket1, nil)
-		txCreateBucket(t, db, DataStructureSet, bucket2, nil)
-		txCreateBucket(t, db, DataStructureSet, bucket3, nil)
+		txCreateBucket(t, db, core.DataStructureSet, bucket1, nil)
+		txCreateBucket(t, db, core.DataStructureSet, bucket2, nil)
+		txCreateBucket(t, db, core.DataStructureSet, bucket3, nil)
 
 		txSAdd(t, db, bucket1, key1, val1, nil, nil)
 		txSAdd(t, db, bucket1, key1, val2, nil, nil)
@@ -214,7 +215,7 @@ func TestTx_SPop(t *testing.T) {
 	val3 := testutils.GetTestBytes(3)
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, DataStructureSet, bucket, nil)
+		txCreateBucket(t, db, core.DataStructureSet, bucket, nil)
 		txSAdd(t, db, bucket, key, val1, nil, nil)
 		txSAdd(t, db, bucket, key, val2, nil, nil)
 		txSAdd(t, db, bucket, key, val3, nil, nil)
@@ -238,7 +239,7 @@ func TestTx_SMoveByOneBucket(t *testing.T) {
 	val3 := testutils.GetTestBytes(3)
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, DataStructureSet, bucket, nil)
+		txCreateBucket(t, db, core.DataStructureSet, bucket, nil)
 		txSAdd(t, db, bucket, key1, val1, nil, nil)
 		txSAdd(t, db, bucket, key1, val2, nil, nil)
 
@@ -265,8 +266,8 @@ func TestTx_SMoveByTwoBuckets(t *testing.T) {
 	val3 := testutils.GetTestBytes(3)
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, DataStructureSet, bucket1, nil)
-		txCreateBucket(t, db, DataStructureSet, bucket2, nil)
+		txCreateBucket(t, db, core.DataStructureSet, bucket1, nil)
+		txCreateBucket(t, db, core.DataStructureSet, bucket2, nil)
 		txSAdd(t, db, bucket1, key1, val1, nil, nil)
 		txSAdd(t, db, bucket1, key1, val2, nil, nil)
 
@@ -295,7 +296,7 @@ func TestTx_SUnionByOneBucket(t *testing.T) {
 	val2 := testutils.GetTestBytes(2)
 	val3 := testutils.GetTestBytes(3)
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, DataStructureSet, bucket, nil)
+		txCreateBucket(t, db, core.DataStructureSet, bucket, nil)
 		txSAdd(t, db, bucket, key1, val1, nil, nil)
 		txSAdd(t, db, bucket, key1, val2, nil, nil)
 		txSAdd(t, db, bucket, key2, val3, nil, nil)
@@ -326,8 +327,8 @@ func TestTx_SUnionByTwoBuckets(t *testing.T) {
 	val3 := testutils.GetTestBytes(3)
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, DataStructureSet, bucket1, nil)
-		txCreateBucket(t, db, DataStructureSet, bucket2, nil)
+		txCreateBucket(t, db, core.DataStructureSet, bucket1, nil)
+		txCreateBucket(t, db, core.DataStructureSet, bucket2, nil)
 		txSAdd(t, db, bucket1, key1, val1, nil, nil)
 		txSAdd(t, db, bucket1, key1, val2, nil, nil)
 		txSAdd(t, db, bucket2, key2, val3, nil, nil)
@@ -348,7 +349,7 @@ func TestTx_SHasKey(t *testing.T) {
 	key := testutils.GetTestBytes(0)
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, DataStructureSet, bucket, nil)
+		txCreateBucket(t, db, core.DataStructureSet, bucket, nil)
 		txSAdd(t, db, bucket, key, testutils.GetTestBytes(1), nil, nil)
 
 		txSHasKey(t, db, bucket, key, true)
@@ -365,7 +366,7 @@ func TestTx_SIsMember(t *testing.T) {
 	fakeVal := testutils.GetTestBytes(1)
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, DataStructureSet, bucket, nil)
+		txCreateBucket(t, db, core.DataStructureSet, bucket, nil)
 		txSAdd(t, db, bucket, key, val, nil, nil)
 
 		txSIsMember(t, db, bucket, key, val, true)
@@ -385,7 +386,7 @@ func TestTx_SAreMembers(t *testing.T) {
 	fakeVal := testutils.GetTestBytes(2)
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, DataStructureSet, bucket, nil)
+		txCreateBucket(t, db, core.DataStructureSet, bucket, nil)
 		txSAdd(t, db, bucket, key, val1, nil, nil)
 		txSAdd(t, db, bucket, key, val2, nil, nil)
 
@@ -405,7 +406,7 @@ func TestTx_SKeys(t *testing.T) {
 	val := testutils.GetTestBytes(0)
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, DataStructureSet, bucket, nil)
+		txCreateBucket(t, db, core.DataStructureSet, bucket, nil)
 		num := 3
 		for i := 0; i < num; i++ {
 			txSAdd(t, db, bucket, []byte(fmt.Sprintf(key, i)), val, nil, nil)

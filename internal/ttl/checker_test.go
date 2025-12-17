@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/nutsdb/nutsdb/internal/clock"
+	"github.com/nutsdb/nutsdb/internal/core"
 	"github.com/nutsdb/nutsdb/internal/data"
 )
 
@@ -90,7 +91,7 @@ func TestChecker_FilterExpiredRecord(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		record         *data.Record
+		record         *core.Record
 		expectedValid  bool
 		expectCallback bool
 	}{
@@ -102,7 +103,7 @@ func TestChecker_FilterExpiredRecord(t *testing.T) {
 		},
 		{
 			name: "valid record should return true",
-			record: &data.Record{
+			record: &core.Record{
 				Key:       []byte("valid-key"),
 				TTL:       100,    // 100 seconds TTL
 				Timestamp: 950000, // 950 seconds, expires at 1050 seconds
@@ -112,7 +113,7 @@ func TestChecker_FilterExpiredRecord(t *testing.T) {
 		},
 		{
 			name: "expired record should return false and trigger callback",
-			record: &data.Record{
+			record: &core.Record{
 				Key:       []byte("expired-key"),
 				TTL:       50,     // 50 seconds TTL
 				Timestamp: 900000, // 900 seconds, expires at 950 seconds
@@ -170,7 +171,7 @@ func TestChecker_FilterExpiredRecords(t *testing.T) {
 		callbackKeys = append(callbackKeys, key)
 	})
 
-	records := []*data.Record{
+	records := []*core.Record{
 		{
 			Key:       []byte("persistent"),
 			TTL:       Persistent,
@@ -234,10 +235,10 @@ func TestChecker_FilterExpiredItems(t *testing.T) {
 		callbackKeys = append(callbackKeys, key)
 	})
 
-	items := []*data.Item[data.Record]{
+	items := []*data.Item[core.Record]{
 		{
 			Key: []byte("persistent"),
-			Record: &data.Record{
+			Record: &core.Record{
 				Key:       []byte("persistent"),
 				TTL:       Persistent,
 				Timestamp: 500000, // Should never expire
@@ -245,7 +246,7 @@ func TestChecker_FilterExpiredItems(t *testing.T) {
 		},
 		{
 			Key: []byte("valid"),
-			Record: &data.Record{
+			Record: &core.Record{
 				Key:       []byte("valid"),
 				TTL:       100,    // 100 seconds TTL
 				Timestamp: 950000, // 950 seconds, expires at 1050 seconds
@@ -253,7 +254,7 @@ func TestChecker_FilterExpiredItems(t *testing.T) {
 		},
 		{
 			Key: []byte("expired"),
-			Record: &data.Record{
+			Record: &core.Record{
 				Key:       []byte("expired"),
 				TTL:       50,     // 50 seconds TTL
 				Timestamp: 900000, // 900 seconds, expires at 950 seconds
@@ -297,7 +298,7 @@ func TestChecker_TimeAdvancement(t *testing.T) {
 	clk := clock.NewMockClock(1000000) // Start at 1000 seconds in milliseconds
 	checker := NewChecker(clk)
 
-	record := &data.Record{
+	record := &core.Record{
 		Key:       []byte("test-key"),
 		TTL:       60,     // 60 seconds TTL
 		Timestamp: 950000, // 950 seconds, expires at 1010 seconds

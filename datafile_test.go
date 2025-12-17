@@ -18,22 +18,23 @@ import (
 	"os"
 	"testing"
 
+	"github.com/nutsdb/nutsdb/internal/core"
 	"github.com/stretchr/testify/assert"
 )
 
 var (
 	filePath string
-	entry    Entry
+	entry    core.Entry
 )
 
 func init() {
 	filePath = "/tmp/foo"
-	entry = Entry{
+	entry = core.Entry{
 		Key:   []byte("key_0001"),
 		Value: []byte("val_0001"),
-		Meta: NewMetaData().WithKeySize(uint32(len("key_0001"))).
+		Meta: core.NewMetaData().WithKeySize(uint32(len("key_0001"))).
 			WithValueSize(uint32(len("val_0001"))).WithTimeStamp(1547707905).
-			WithTTL(Persistent).WithFlag(DataSetFlag).WithBucketId(1),
+			WithTTL(core.Persistent).WithFlag(core.DataSetFlag).WithBucketId(1),
 	}
 }
 

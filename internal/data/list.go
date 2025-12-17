@@ -4,6 +4,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/nutsdb/nutsdb/internal/core"
 	"github.com/nutsdb/nutsdb/internal/utils"
 )
 
@@ -62,7 +63,7 @@ func (seq *HeadTailSeq) GenerateSeq(isLeft bool) uint64 {
 type ListStructure interface {
 	// InsertRecord inserts a record with the given key (sequence number in big-endian format).
 	// Returns true if an existing record was replaced, false if a new record was inserted.
-	InsertRecord(key []byte, record *Record) bool
+	InsertRecord(key []byte, record *core.Record) bool
 
 	// Delete removes the record with the given key.
 	// Returns true if the record was found and deleted, false otherwise.
@@ -70,46 +71,46 @@ type ListStructure interface {
 
 	// Find retrieves the record with the given key.
 	// Returns the record and true if found, nil and false otherwise.
-	Find(key []byte) (*Record, bool)
+	Find(key []byte) (*core.Record, bool)
 
 	// Min returns the item with the smallest key (head of the list).
 	// Returns the item and true if the list is not empty, nil and false otherwise.
-	Min() (*Item[Record], bool)
+	Min() (*Item[core.Record], bool)
 
 	// Max returns the item with the largest key (tail of the list).
 	// Returns the item and true if the list is not empty, nil and false otherwise.
-	Max() (*Item[Record], bool)
+	Max() (*Item[core.Record], bool)
 
 	// All returns all records in ascending key order.
-	All() []*Record
+	All() []*core.Record
 
 	// AllItems returns all items (key + record pairs) in ascending key order.
-	AllItems() []*Item[Record]
+	AllItems() []*Item[core.Record]
 
 	// Count returns the number of elements in the list.
 	Count() int
 
 	// Range returns records with keys in the range [start, end] (inclusive).
-	Range(start, end []byte) []*Record
+	Range(start, end []byte) []*core.Record
 
 	// PrefixScan scans records with keys matching the given prefix.
 	// offset: number of matching records to skip
 	// limitNum: maximum number of records to return
-	PrefixScan(prefix []byte, offset, limitNum int) []*Record
+	PrefixScan(prefix []byte, offset, limitNum int) []*core.Record
 
 	// PrefixSearchScan scans records with keys matching the given prefix and regex pattern.
 	// The regex is applied to the portion of the key after removing the prefix.
 	// offset: number of matching records to skip
 	// limitNum: maximum number of records to return
-	PrefixSearchScan(prefix []byte, reg string, offset, limitNum int) []*Record
+	PrefixSearchScan(prefix []byte, reg string, offset, limitNum int) []*core.Record
 
 	// PopMin removes and returns the item with the smallest key.
 	// Returns the item and true if the list is not empty, nil and false otherwise.
-	PopMin() (*Item[Record], bool)
+	PopMin() (*Item[core.Record], bool)
 
 	// PopMax removes and returns the item with the largest key.
 	// Returns the item and true if the list is not empty, nil and false otherwise.
-	PopMax() (*Item[Record], bool)
+	PopMax() (*Item[core.Record], bool)
 }
 
 // Compile-time interface implementation checks
@@ -152,15 +153,15 @@ func (l *List) CreateListStructure() ListStructure {
 	}
 }
 
-func (l *List) LPush(key string, r *Record) error {
+func (l *List) LPush(key string, r *core.Record) error {
 	return l.Push(key, r, true)
 }
 
-func (l *List) RPush(key string, r *Record) error {
+func (l *List) RPush(key string, r *core.Record) error {
 	return l.Push(key, r, false)
 }
 
-func (l *List) Push(key string, r *Record, isLeft bool) error {
+func (l *List) Push(key string, r *core.Record, isLeft bool) error {
 	// key is seq + user_key
 	userKey, curSeq := utils.DecodeListKey([]byte(key))
 	userKeyStr := string(userKey)
@@ -202,7 +203,7 @@ func (l *List) Push(key string, r *Record, isLeft bool) error {
 	return nil
 }
 
-func (l *List) LPop(key string) (*Record, error) {
+func (l *List) LPop(key string) (*core.Record, error) {
 	if l.IsExpire(key) {
 		return nil, ErrListNotFound
 	}
@@ -225,7 +226,7 @@ func (l *List) LPop(key string) (*Record, error) {
 }
 
 // RPop removes and returns the last element of the list stored at key.
-func (l *List) RPop(key string) (*Record, error) {
+func (l *List) RPop(key string) (*core.Record, error) {
 	if l.IsExpire(key) {
 		return nil, ErrListNotFound
 	}
@@ -247,15 +248,15 @@ func (l *List) RPop(key string) (*Record, error) {
 	return item.Record, nil
 }
 
-func (l *List) LPeek(key string) (*Item[Record], error) {
+func (l *List) LPeek(key string) (*Item[core.Record], error) {
 	return l.peek(key, true)
 }
 
-func (l *List) RPeek(key string) (*Item[Record], error) {
+func (l *List) RPeek(key string) (*Item[core.Record], error) {
 	return l.peek(key, false)
 }
 
-func (l *List) peek(key string, isLeft bool) (*Item[Record], error) {
+func (l *List) peek(key string, isLeft bool) (*Item[core.Record], error) {
 	if l.IsExpire(key) {
 		return nil, ErrListNotFound
 	}
@@ -280,7 +281,7 @@ func (l *List) peek(key string, isLeft bool) (*Item[Record], error) {
 }
 
 // LRange returns the specified elements of the list stored at key [start,end]
-func (l *List) LRange(key string, start, end int) ([]*Record, error) {
+func (l *List) LRange(key string, start, end int) ([]*core.Record, error) {
 	size, err := l.Size(key)
 	if err != nil || size == 0 {
 		return nil, err
@@ -291,7 +292,7 @@ func (l *List) LRange(key string, start, end int) ([]*Record, error) {
 		return nil, err
 	}
 
-	var res []*Record
+	var res []*core.Record
 	allRecords := l.Items[key].All()
 	for i, item := range allRecords {
 		if i >= start && i <= end {
@@ -303,7 +304,7 @@ func (l *List) LRange(key string, start, end int) ([]*Record, error) {
 }
 
 // GetRemoveIndexes returns a slice of indices to be removed from the list based on the count
-func (l *List) GetRemoveIndexes(key string, count int, cmp func(r *Record) (bool, error)) ([][]byte, error) {
+func (l *List) GetRemoveIndexes(key string, count int, cmp func(r *core.Record) (bool, error)) ([][]byte, error) {
 	if l.IsExpire(key) {
 		return nil, ErrListNotFound
 	}
@@ -315,7 +316,7 @@ func (l *List) GetRemoveIndexes(key string, count int, cmp func(r *Record) (bool
 	}
 
 	var res [][]byte
-	var allItems []*Item[Record]
+	var allItems []*Item[core.Record]
 	if count == 0 {
 		count = list.Count()
 	}
@@ -361,7 +362,7 @@ func (l *List) GetRemoveIndexes(key string, count int, cmp func(r *Record) (bool
 // count > 0: Remove elements equal to value moving from head to tail.
 // count < 0: Remove elements equal to value moving from tail to head.
 // count = 0: Remove all elements equal to value.
-func (l *List) LRem(key string, count int, cmp func(r *Record) (bool, error)) error {
+func (l *List) LRem(key string, count int, cmp func(r *core.Record) (bool, error)) error {
 	removeIndexes, err := l.GetRemoveIndexes(key, count, cmp)
 	if err != nil {
 		return err

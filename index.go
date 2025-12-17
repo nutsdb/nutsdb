@@ -14,17 +14,20 @@
 
 package nutsdb
 
-import "github.com/nutsdb/nutsdb/internal/data"
+import (
+	"github.com/nutsdb/nutsdb/internal/core"
+	"github.com/nutsdb/nutsdb/internal/data"
+)
 
 type IdxType interface {
 	data.BTree | data.Set | SortedSet | data.List
 }
 
 type defaultOp[T IdxType] struct {
-	idx map[BucketId]*T
+	idx map[core.BucketId]*T
 }
 
-func (op *defaultOp[T]) computeIfAbsent(id BucketId, f func() *T) *T {
+func (op *defaultOp[T]) computeIfAbsent(id core.BucketId, f func() *T) *T {
 	if i, isExist := op.idx[id]; isExist {
 		return i
 	}
@@ -33,11 +36,11 @@ func (op *defaultOp[T]) computeIfAbsent(id BucketId, f func() *T) *T {
 	return i
 }
 
-func (op *defaultOp[T]) delete(id BucketId) {
+func (op *defaultOp[T]) delete(id core.BucketId) {
 	delete(op.idx, id)
 }
 
-func (op *defaultOp[T]) exist(id BucketId) (*T, bool) {
+func (op *defaultOp[T]) exist(id core.BucketId) (*T, bool) {
 	i, isExist := op.idx[id]
 	return i, isExist
 }
@@ -57,7 +60,7 @@ type ListIdx struct {
 	opts Options
 }
 
-func (idx ListIdx) getWithDefault(id BucketId) *data.List {
+func (idx ListIdx) getWithDefault(id core.BucketId) *data.List {
 	return idx.defaultOp.computeIfAbsent(id, func() *data.List {
 		return data.NewList(idx.opts.ListImpl.toInternal())
 	})
@@ -67,7 +70,7 @@ type BTreeIdx struct {
 	*defaultOp[data.BTree]
 }
 
-func (idx BTreeIdx) getWithDefault(id BucketId) *data.BTree {
+func (idx BTreeIdx) getWithDefault(id core.BucketId) *data.BTree {
 	return idx.defaultOp.computeIfAbsent(id, func() *data.BTree {
 		return data.NewBTree()
 	})
@@ -77,7 +80,7 @@ type SetIdx struct {
 	*defaultOp[data.Set]
 }
 
-func (idx SetIdx) getWithDefault(id BucketId) *data.Set {
+func (idx SetIdx) getWithDefault(id core.BucketId) *data.Set {
 	return idx.defaultOp.computeIfAbsent(id, func() *data.Set {
 		return data.NewSet()
 	})
@@ -87,7 +90,7 @@ type SortedSetIdx struct {
 	*defaultOp[SortedSet]
 }
 
-func (idx SortedSetIdx) getWithDefault(id BucketId, db *DB) *SortedSet {
+func (idx SortedSetIdx) getWithDefault(id core.BucketId, db *DB) *SortedSet {
 	return idx.defaultOp.computeIfAbsent(id, func() *SortedSet {
 		return NewSortedSet(db)
 	})
@@ -108,9 +111,9 @@ func newIndex() *index {
 func newIndexWithOptions(opts Options) *index {
 	i := new(index)
 	i.opts = opts
-	i.list = ListIdx{defaultOp: &defaultOp[data.List]{idx: map[BucketId]*data.List{}}, opts: opts}
-	i.bTree = BTreeIdx{&defaultOp[data.BTree]{idx: map[BucketId]*data.BTree{}}}
-	i.set = SetIdx{&defaultOp[data.Set]{idx: map[BucketId]*data.Set{}}}
-	i.sortedSet = SortedSetIdx{&defaultOp[SortedSet]{idx: map[BucketId]*SortedSet{}}}
+	i.list = ListIdx{defaultOp: &defaultOp[data.List]{idx: map[core.BucketId]*data.List{}}, opts: opts}
+	i.bTree = BTreeIdx{&defaultOp[data.BTree]{idx: map[core.BucketId]*data.BTree{}}}
+	i.set = SetIdx{&defaultOp[data.Set]{idx: map[core.BucketId]*data.Set{}}}
+	i.sortedSet = SortedSetIdx{&defaultOp[SortedSet]{idx: map[core.BucketId]*SortedSet{}}}
 	return i
 }

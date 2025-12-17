@@ -6,6 +6,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/nutsdb/nutsdb/internal/core"
 	"github.com/stretchr/testify/require"
 	"github.com/xujiajun/utils/time2"
 )
@@ -69,7 +70,7 @@ func TestBatchWrite(t *testing.T) {
 	}
 
 	testWrite := func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+		txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
 		key := func(i int) []byte {
 			return []byte(fmt.Sprintf("%10d", i))
 		}

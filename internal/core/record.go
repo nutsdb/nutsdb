@@ -12,13 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package data
+package core
 
 import (
-	"math/rand"
 	"time"
-
-	"github.com/nutsdb/nutsdb/internal/testutils"
 )
 
 const Persistent uint32 = 0
@@ -99,26 +96,4 @@ func (r *Record) WithTTL(ttl uint32) *Record {
 func (r *Record) WithTxID(txID uint64) *Record {
 	r.TxID = txID
 	return r
-}
-
-func GenerateRecords(count int) []*Record {
-	rand.Seed(time.Now().UnixNano())
-	records := make([]*Record, count)
-	for i := 0; i < count; i++ {
-		key := testutils.GetTestBytes(i)
-		val := testutils.GetRandomBytes(24)
-
-		record := &Record{
-			Key:       key,
-			Value:     val,
-			FileID:    int64(i),
-			DataPos:   uint64(rand.Uint32()),
-			ValueSize: uint32(len(val)),
-			Timestamp: uint64(time.Now().Unix()),
-			TTL:       uint32(rand.Intn(3600)),
-			TxID:      uint64(rand.Intn(1000)),
-		}
-		records[i] = record
-	}
-	return records
 }
