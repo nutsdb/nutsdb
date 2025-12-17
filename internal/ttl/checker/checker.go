@@ -4,17 +4,13 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//	http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
-// Package checker provides checker TTL interfaces that can be imported by data structures
-// without causing import cycles. This package should have no dependencies on other
-// internal packages except for basic utilities.
 package checker
 
 import (
@@ -26,71 +22,57 @@ import (
 const Persistent uint32 = 0
 
 // ExpiredCallback is a function type for handling expired record notifications.
-// It receives the key of the expired record and the data structure type.
 type ExpiredCallback func(key []byte, ds uint16)
 
 // Checker handles TTL expiration logic using a unified clock.
-// This is the single source of truth for TTL checking across all data structures.
 type Checker struct {
 	Clock     clock.Clock
-	onExpired func(key []byte, ds uint16) // Optional callback for cleanup
+	onExpired ExpiredCallback
 }
 
 // NewChecker creates a new Checker with the specified clock.
 func NewChecker(clk clock.Clock) *Checker {
-	return &Checker{
-		Clock: clk,
-	}
+	return &Checker{Clock: clk}
 }
 
 // SetExpiredCallback sets a callback to be invoked when expired records are detected.
-// The callback receives the expired key and data structure type.
-func (tc *Checker) SetExpiredCallback(callback func(key []byte, ds uint16)) {
-	tc.onExpired = callback
+func (c *Checker) SetExpiredCallback(callback ExpiredCallback) {
+	c.onExpired = callback
 }
 
 // IsExpired checks if a record is expired based on TTL and timestamp.
-// This is the single source of truth for TTL checking across all data structures.
-// TTL is in seconds, timestamp is in milliseconds for internal consistency.
-func (tc *Checker) IsExpired(ttl uint32, timestamp uint64) bool {
+// TTL is in seconds, timestamp is in milliseconds.
+func (c *Checker) IsExpired(ttl uint32, timestamp uint64) bool {
 	if ttl == Persistent {
 		return false
 	}
-
-	now := tc.Clock.NowMillis()
-	expirationTime := int64(timestamp) + int64(ttl)*1000 // Convert TTL seconds to milliseconds
+	now := c.Clock.NowMillis()
+	expirationTime := int64(timestamp) + int64(ttl)*1000
 	return now >= expirationTime
 }
 
 // FilterExpiredRecord checks a single record and triggers cleanup if expired.
-// Returns true if the record is valid (not expired), false if expired.
-func (tc *Checker) FilterExpiredRecord(key []byte, record *core.Record, ds uint16) bool {
+// Returns true if the record is valid (not expired).
+func (c *Checker) FilterExpiredRecord(key []byte, record *core.Record, ds uint16) bool {
 	if record == nil {
 		return false
 	}
-	if tc.IsExpired(record.TTL, record.Timestamp) {
-		tc.TriggerExpiredCallback(key, ds)
-		return false // Record is expired
+	if c.IsExpired(record.TTL, record.Timestamp) {
+		c.triggerCallback(key, ds)
+		return false
 	}
-	return true // Record is valid
-}
-
-// TriggerExpiredCallback invokes the expired callback if set.
-func (tc *Checker) TriggerExpiredCallback(key []byte, ds uint16) {
-	if tc.onExpired != nil {
-		tc.onExpired(key, ds)
-	}
+	return true
 }
 
 // FilterExpiredRecords filters a slice of records, removing expired ones.
 // Returns a new slice containing only valid (non-expired) records.
-func (tc *Checker) FilterExpiredRecords(records []*core.Record, ds uint16) []*core.Record {
+func (c *Checker) FilterExpiredRecords(records []*core.Record, ds uint16) []*core.Record {
 	valid := make([]*core.Record, 0, len(records))
 	for _, record := range records {
-		if !tc.IsExpired(record.TTL, record.Timestamp) {
+		if !c.IsExpired(record.TTL, record.Timestamp) {
 			valid = append(valid, record)
 		} else {
-			tc.TriggerExpiredCallback(record.Key, ds)
+			c.triggerCallback(record.Key, ds)
 		}
 	}
 	return valid
@@ -98,14 +80,36 @@ func (tc *Checker) FilterExpiredRecords(records []*core.Record, ds uint16) []*co
 
 // FilterExpiredItems filters a slice of items, removing expired ones.
 // Returns a new slice containing only valid (non-expired) items.
-func (tc *Checker) FilterExpiredItems(items []*core.Item[core.Record], ds uint16) []*core.Item[core.Record] {
+func (c *Checker) FilterExpiredItems(items []*core.Item[core.Record], ds uint16) []*core.Item[core.Record] {
 	valid := make([]*core.Item[core.Record], 0, len(items))
 	for _, item := range items {
-		if item.Record != nil && !tc.IsExpired(item.Record.TTL, item.Record.Timestamp) {
+		if item.Record != nil && !c.IsExpired(item.Record.TTL, item.Record.Timestamp) {
 			valid = append(valid, item)
 		} else if item.Record != nil {
-			tc.TriggerExpiredCallback(item.Key, ds)
+			c.triggerCallback(item.Key, ds)
 		}
 	}
 	return valid
+}
+
+// CalculateRemainingTTL calculates remaining TTL in seconds.
+// Returns -1 for persistent, 0 for expired, positive for remaining seconds.
+func (c *Checker) CalculateRemainingTTL(ttl uint32, timestamp uint64) int64 {
+	if ttl == Persistent {
+		return -1
+	}
+	now := c.Clock.NowMillis()
+	expirationTime := int64(timestamp) + int64(ttl)*1000
+	remaining := expirationTime - now
+	if remaining <= 0 {
+		return 0
+	}
+	return remaining / 1000
+}
+
+// triggerCallback invokes the expired callback if set.
+func (c *Checker) triggerCallback(key []byte, ds uint16) {
+	if c.onExpired != nil {
+		c.onExpired(key, ds)
+	}
 }
