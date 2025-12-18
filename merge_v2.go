@@ -639,7 +639,7 @@ func (job *mergeV2Job) applyLookup(entry *mergeLookupEntry) {
 	switch hint.Ds {
 	case core.DataStructureBTree:
 		// Update BTree index with new file location if hint is newer or same age
-		bt, exist := job.db.Index.bTree.exist(bucketID)
+		bt, exist := job.db.Index.BTree.exist(bucketID)
 		if !exist {
 			return
 		}
@@ -651,7 +651,7 @@ func (job *mergeV2Job) applyLookup(entry *mergeLookupEntry) {
 
 	case core.DataStructureSet:
 		// Update Set index using value hash for duplicate detection
-		setIdx, exist := job.db.Index.set.exist(bucketID)
+		setIdx, exist := job.db.Index.Set.exist(bucketID)
 		if !exist {
 			return
 		}
@@ -674,7 +674,7 @@ func (job *mergeV2Job) applyLookup(entry *mergeLookupEntry) {
 		if hint.Flag != core.DataLPushFlag && hint.Flag != core.DataRPushFlag {
 			return
 		}
-		listIdx, exist := job.db.Index.list.exist(bucketID)
+		listIdx, exist := job.db.Index.List.exist(bucketID)
 		if !exist {
 			return
 		}
@@ -696,7 +696,7 @@ func (job *mergeV2Job) applyLookup(entry *mergeLookupEntry) {
 
 	case core.DataStructureSortedSet:
 		// Update SortedSet index using both key and value hash
-		sortedIdx, exist := job.db.Index.sortedSet.exist(bucketID)
+		sortedIdx, exist := job.db.Index.SortedSet.exist(bucketID)
 		if !exist {
 			return
 		}

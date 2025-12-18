@@ -61,7 +61,7 @@ func (tx *Tx) PutIfNotExists(bucket string, key, value []byte, ttl uint32) error
 		return nil
 	}
 
-	idx, bucketExists := tx.db.Index.bTree.exist(bucketId)
+	idx, bucketExists := tx.db.Index.BTree.exist(bucketId)
 	if !bucketExists {
 		return tx.put(bucket, key, value, ttl, core.DataSetFlag, uint64(tx.db.opt.Clock.NowMillis()), core.DataStructureBTree)
 	}
@@ -107,7 +107,7 @@ func (tx *Tx) get(bucket string, key []byte) (value []byte, err error) {
 		return entry.Value, nil
 	}
 
-	if idx, ok := tx.db.Index.bTree.exist(bucketId); ok {
+	if idx, ok := tx.db.Index.BTree.exist(bucketId); ok {
 		// Index layer automatically filters expired records
 		record, found := idx.Find(key)
 		if !found {
@@ -156,7 +156,7 @@ func (tx *Tx) getMaxOrMinKey(bucket string, isMax bool) ([]byte, error) {
 
 	key, actuallyFound = tx.pendingWrites.MaxOrMinKey(bucket, isMax)
 
-	if idx, ok := tx.db.Index.bTree.exist(bucketId); ok {
+	if idx, ok := tx.db.Index.BTree.exist(bucketId); ok {
 		var (
 			item  *core.Item[core.Record]
 			found bool
@@ -216,7 +216,7 @@ func (tx *Tx) getAllOrKeysOrValues(bucket string, typ uint8) ([][]byte, [][]byte
 		return nil, nil, err
 	}
 
-	idx, bucketExists := tx.db.Index.bTree.exist(bucketId)
+	idx, bucketExists := tx.db.Index.BTree.exist(bucketId)
 	if !bucketExists {
 		return [][]byte{}, [][]byte{}, nil
 	}
@@ -276,7 +276,7 @@ func (tx *Tx) Has(bucket string, key []byte) (exists bool, err error) {
 		return true, nil
 	}
 
-	idx, bucketExists := tx.db.Index.bTree.exist(bucketId)
+	idx, bucketExists := tx.db.Index.BTree.exist(bucketId)
 	if !bucketExists {
 		return false, ErrBucketNotExist
 	}
@@ -300,7 +300,7 @@ func (tx *Tx) RangeScanEntries(bucket string, start, end []byte, includeKeys, in
 	}
 	bucketId := b.Id
 	pendingKeys, pendingValues := tx.pendingWrites.getDataByRange(start, end, b.Name)
-	if index, ok := tx.db.Index.bTree.exist(bucketId); ok {
+	if index, ok := tx.db.Index.BTree.exist(bucketId); ok {
 		records := index.Range(start, end)
 
 		needKeysForMerge := includeKeys || len(pendingKeys) > 0
@@ -370,7 +370,7 @@ func (tx *Tx) PrefixScanEntries(bucket string, prefix []byte, reg string, offset
 		return ErrPrefixSearchScan
 	}
 
-	if idx, ok := tx.db.Index.bTree.exist(bucketId); ok {
+	if idx, ok := tx.db.Index.BTree.exist(bucketId); ok {
 		var records []*core.Record
 		if reg == "" {
 			records = idx.PrefixScan(prefix, offsetNum, limitNum)
@@ -430,7 +430,7 @@ func (tx *Tx) Delete(bucket string, key []byte) error {
 		return tx.put(bucket, key, nil, core.Persistent, core.DataDeleteFlag, uint64(tx.db.opt.Clock.NowMillis()), core.DataStructureBTree)
 	}
 
-	if idx, ok := tx.db.Index.bTree.exist(bucketId); ok {
+	if idx, ok := tx.db.Index.BTree.exist(bucketId); ok {
 		if _, found := idx.Find(key); !found {
 			return ErrKeyNotFound
 		}
@@ -499,7 +499,7 @@ func (tx *Tx) tryGet(bucket string, key []byte, solveRecord func(record *core.Re
 	)
 	entry, err := tx.pendingWrites.Get(core.DataStructureBTree, bucket, key)
 	found = err == nil
-	if idx, ok := tx.db.Index.bTree.exist(bucketId); ok {
+	if idx, ok := tx.db.Index.BTree.exist(bucketId); ok {
 		record, ok = idx.Find(key)
 		if ok {
 			found = true
@@ -657,7 +657,7 @@ func (tx *Tx) GetTTL(bucket string, key []byte) (int64, error) {
 		return pendingTTL, nil
 	}
 
-	idx, bucketExists := tx.db.Index.bTree.exist(bucketId)
+	idx, bucketExists := tx.db.Index.BTree.exist(bucketId)
 	if !bucketExists {
 		return 0, ErrKeyNotFound
 	}

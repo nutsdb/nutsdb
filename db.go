@@ -56,7 +56,7 @@ type (
 	// DB represents a collection of buckets that persist on disk.
 	DB struct {
 		opt                     Options // the database options
-		Index                   *index
+		Index                   *Index
 		ActiveFile              *DataFile
 		MaxFileID               int64
 		mu                      sync.RWMutex
@@ -715,12 +715,12 @@ func (db *DB) getRecordCount() (int64, error) {
 	var res int64
 
 	// Iterate through the BTree indices
-	for _, btree := range db.Index.bTree.idx {
+	for _, btree := range db.Index.BTree.Idx {
 		res += int64(btree.Count())
 	}
 
 	// Iterate through the List indices
-	for _, listItem := range db.Index.list.idx {
+	for _, listItem := range db.Index.List.Idx {
 		for key := range listItem.Items {
 			curLen, err := listItem.Size(key)
 			if err != nil {
@@ -731,14 +731,14 @@ func (db *DB) getRecordCount() (int64, error) {
 	}
 
 	// Iterate through the Set indices
-	for _, setItem := range db.Index.set.idx {
+	for _, setItem := range db.Index.Set.Idx {
 		for key := range setItem.M {
 			res += int64(setItem.SCard(key))
 		}
 	}
 
 	// Iterate through the SortedSet indices
-	for _, zsetItem := range db.Index.sortedSet.idx {
+	for _, zsetItem := range db.Index.SortedSet.Idx {
 		for key := range zsetItem.M {
 			curLen, err := zsetItem.ZCard(key)
 			if err != nil {
@@ -760,7 +760,7 @@ func (db *DB) buildBTreeIdx(record *core.Record, entry *core.Entry) error {
 	}
 	bucketId := bucket.Id
 
-	bTree := db.Index.bTree.getWithDefault(bucketId)
+	bTree := db.Index.BTree.Get(bucketId)
 
 	if db.ttlChecker.IsExpired(record.TTL, record.Timestamp) || meta.Flag == core.DataDeleteFlag {
 		db.ttlManager.Del(bucketId, string(key))
@@ -809,7 +809,7 @@ func (db *DB) buildSetIdx(record *core.Record, entry *core.Entry) error {
 	}
 	bucketId := bucket.Id
 
-	s := db.Index.set.getWithDefault(bucketId)
+	s := db.Index.Set.Get(bucketId)
 
 	switch meta.Flag {
 	case core.DataSetFlag:
@@ -835,7 +835,7 @@ func (db *DB) buildSortedSetIdx(record *core.Record, entry *core.Entry) error {
 	}
 	bucketId := bucket.Id
 
-	ss := db.Index.sortedSet.getWithDefault(bucketId, db)
+	ss := db.Index.SortedSet.Get(bucketId)
 
 	switch meta.Flag {
 	case core.DataZAddFlag:
@@ -874,7 +874,7 @@ func (db *DB) buildListIdx(record *core.Record, entry *core.Entry) error {
 	}
 	bucketId := bucket.Id
 
-	l := db.Index.list.getWithDefault(bucketId)
+	l := db.Index.List.Get(bucketId)
 
 	if db.ttlChecker.IsExpired(meta.TTL, meta.Timestamp) {
 		return nil
@@ -1010,7 +1010,7 @@ func (db *DB) sendToWriteCh(tx *Tx) (*request, error) {
 }
 
 func (db *DB) checkListExpired() {
-	db.Index.list.rangeIdx(func(l *data.List) {
+	db.Index.List.rangeIdx(func(l *data.List) {
 		for key := range l.TTL {
 			l.IsExpire(key)
 		}

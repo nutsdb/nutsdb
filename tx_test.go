@@ -185,24 +185,24 @@ func TestTx_Commit(t *testing.T) {
 			bucket := "bucket1"
 
 			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
-			assert.Equal(t, 1, db.Index.bTree.defaultOp.getIdxLen())
+			assert.Equal(t, 1, db.Index.BTree.getIdxLen())
 			txDeleteBucket(t, db, core.DataStructureBTree, bucket, nil)
-			assert.Equal(t, 0, db.Index.bTree.defaultOp.getIdxLen())
+			assert.Equal(t, 0, db.Index.BTree.getIdxLen())
 
 			txCreateBucket(t, db, core.DataStructureSortedSet, bucket, nil)
-			assert.Equal(t, 1, db.Index.sortedSet.defaultOp.getIdxLen())
+			assert.Equal(t, 1, db.Index.SortedSet.getIdxLen())
 			txDeleteBucket(t, db, core.DataStructureSortedSet, bucket, nil)
-			assert.Equal(t, 0, db.Index.sortedSet.defaultOp.getIdxLen())
+			assert.Equal(t, 0, db.Index.SortedSet.getIdxLen())
 
 			txCreateBucket(t, db, core.DataStructureList, bucket, nil)
-			assert.Equal(t, 1, db.Index.list.defaultOp.getIdxLen())
+			assert.Equal(t, 1, db.Index.List.getIdxLen())
 			txDeleteBucket(t, db, core.DataStructureList, bucket, nil)
-			assert.Equal(t, 0, db.Index.list.defaultOp.getIdxLen())
+			assert.Equal(t, 0, db.Index.List.getIdxLen())
 
 			txCreateBucket(t, db, core.DataStructureSet, bucket, nil)
-			assert.Equal(t, 1, db.Index.set.defaultOp.getIdxLen())
+			assert.Equal(t, 1, db.Index.Set.getIdxLen())
 			txDeleteBucket(t, db, core.DataStructureSet, bucket, nil)
-			assert.Equal(t, 0, db.Index.set.defaultOp.getIdxLen())
+			assert.Equal(t, 0, db.Index.Set.getIdxLen())
 
 		})
 	})

@@ -354,7 +354,7 @@ func (db *DB) isPendingMergeEntry(entry *core.Entry) bool {
 }
 
 func (db *DB) isPendingBtreeEntry(entry *core.Entry) bool {
-	idx, exist := db.Index.bTree.exist(entry.Meta.BucketId)
+	idx, exist := db.Index.BTree.exist(entry.Meta.BucketId)
 	if !exist {
 		return false
 	}
@@ -378,7 +378,7 @@ func (db *DB) isPendingBtreeEntry(entry *core.Entry) bool {
 }
 
 func (db *DB) isPendingSetEntry(entry *core.Entry) bool {
-	setIdx, exist := db.Index.set.exist(entry.Meta.BucketId)
+	setIdx, exist := db.Index.Set.exist(entry.Meta.BucketId)
 	if !exist {
 		return false
 	}
@@ -393,7 +393,7 @@ func (db *DB) isPendingSetEntry(entry *core.Entry) bool {
 
 func (db *DB) isPendingZSetEntry(entry *core.Entry) bool {
 	key, score := splitStringFloat64Str(string(entry.Key), SeparatorForZSetKey)
-	sortedSetIdx, exist := db.Index.sortedSet.exist(entry.Meta.BucketId)
+	sortedSetIdx, exist := db.Index.SortedSet.exist(entry.Meta.BucketId)
 	if !exist {
 		return false
 	}
@@ -412,7 +412,7 @@ func (db *DB) isPendingListEntry(entry *core.Entry) bool {
 
 	if entry.Meta.Flag == core.DataExpireListFlag {
 		userKeyStr = string(entry.Key)
-		list, exist := db.Index.list.exist(entry.Meta.BucketId)
+		list, exist := db.Index.List.exist(entry.Meta.BucketId)
 		if !exist {
 			return false
 		}
@@ -438,7 +438,7 @@ func (db *DB) isPendingListEntry(entry *core.Entry) bool {
 		userKey, curSeq = decodeListKey(entry.Key)
 		userKeyStr = string(userKey)
 
-		list, exist := db.Index.list.exist(entry.Meta.BucketId)
+		list, exist := db.Index.List.exist(entry.Meta.BucketId)
 		if !exist {
 			return false
 		}

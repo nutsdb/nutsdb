@@ -26,7 +26,7 @@ func (tx *Tx) IterateBuckets(ds uint16, pattern string, f func(bucket string) bo
 	}
 
 	if ds == core.DataStructureSet {
-		for bucketId := range tx.db.Index.set.idx {
+		for bucketId := range tx.db.Index.Set.Idx {
 			bucket, err := tx.db.bucketManager.GetBucketById(uint64(bucketId))
 			if err != nil {
 				return err
@@ -37,7 +37,7 @@ func (tx *Tx) IterateBuckets(ds uint16, pattern string, f func(bucket string) bo
 		}
 	}
 	if ds == core.DataStructureSortedSet {
-		for bucketId := range tx.db.Index.sortedSet.idx {
+		for bucketId := range tx.db.Index.SortedSet.Idx {
 			bucket, err := tx.db.bucketManager.GetBucketById(uint64(bucketId))
 			if err != nil {
 				return err
@@ -48,7 +48,7 @@ func (tx *Tx) IterateBuckets(ds uint16, pattern string, f func(bucket string) bo
 		}
 	}
 	if ds == core.DataStructureList {
-		for bucketId := range tx.db.Index.list.idx {
+		for bucketId := range tx.db.Index.List.Idx {
 			bucket, err := tx.db.bucketManager.GetBucketById(uint64(bucketId))
 			if err != nil {
 				return err
@@ -59,7 +59,7 @@ func (tx *Tx) IterateBuckets(ds uint16, pattern string, f func(bucket string) bo
 		}
 	}
 	if ds == core.DataStructureBTree {
-		for bucketId := range tx.db.Index.bTree.idx {
+		for bucketId := range tx.db.Index.BTree.Idx {
 			bucket, err := tx.db.bucketManager.GetBucketById(uint64(bucketId))
 			if err != nil {
 				return err

@@ -678,7 +678,7 @@ func TestMergeV2CommitCollectorFailure(t *testing.T) {
 		},
 	}
 	db.Index = db.newIndex()
-	db.Index.bTree.idx[bucketID] = bt
+	db.Index.BTree.Idx[bucketID] = bt
 
 	collector := NewHintCollector(1, &failingHintWriter{writeErr: errors.New("writer failed")}, 1)
 	mock := &mockRWManager{}
@@ -1338,7 +1338,7 @@ func TestMergeV2ApplyLookupUpdatesSecondaryIndexes(t *testing.T) {
 
 	// Set bucket
 	setRecord := &core.Record{Value: []byte("member"), FileID: 10, Timestamp: 1, TTL: core.Persistent}
-	setIdx := db.Index.set.getWithDefault(buckets[0].id)
+	setIdx := db.Index.Set.Get(buckets[0].id)
 	if err := setIdx.SAdd("set-key", [][]byte{setRecord.Value}, []*core.Record{setRecord}); err != nil {
 		t.Fatalf("SAdd: %v", err)
 	}
@@ -1346,7 +1346,7 @@ func TestMergeV2ApplyLookupUpdatesSecondaryIndexes(t *testing.T) {
 	_, _ = setHash.Write(setRecord.Value)
 
 	// List bucket
-	listIdx := db.Index.list.getWithDefault(buckets[1].id)
+	listIdx := db.Index.List.Get(buckets[1].id)
 	listKey := []byte("list-key")
 	seq := uint64(42)
 	listRecord := &core.Record{FileID: 11, Timestamp: 2, TTL: core.Persistent, TxID: 1}
@@ -1354,7 +1354,7 @@ func TestMergeV2ApplyLookupUpdatesSecondaryIndexes(t *testing.T) {
 	listIdx.Items[string(listKey)].InsertRecord(utils.ConvertUint64ToBigEndianBytes(seq), listRecord)
 
 	// Sorted set bucket
-	sortedIdx := db.Index.sortedSet.getWithDefault(buckets[2].id, db)
+	sortedIdx := db.Index.SortedSet.Get(buckets[2].id)
 	sortedValue := []byte("sorted-member")
 	sortedRecord := &core.Record{Value: sortedValue, FileID: 12, Timestamp: 3, TTL: core.Persistent}
 	if err := sortedIdx.ZAdd("zset-key", SCORE(1.5), sortedValue, sortedRecord); err != nil {
@@ -2014,7 +2014,7 @@ func TestMergeV2RewriteFileSkipsCorruptedEntries(t *testing.T) {
 		},
 	}
 	db.Index = db.newIndex()
-	db.Index.bTree.idx[bucketID] = bt
+	db.Index.BTree.Idx[bucketID] = bt
 
 	mock := &mockRWManager{}
 	job := &mergeV2Job{

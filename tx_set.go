@@ -46,7 +46,7 @@ func (tx *Tx) sPut(bucket string, key []byte, dataFlag uint16, values ...[]byte)
 		}
 		bucketId := b1.Id
 
-		if set, ok := tx.db.Index.set.exist(bucketId); ok {
+		if set, ok := tx.db.Index.Set.exist(bucketId); ok {
 
 			if _, ok := set.M[string(key)]; ok {
 				for hash := range set.M[string(key)] {
@@ -103,7 +103,7 @@ func (tx *Tx) SRem(bucket string, key []byte, items ...[]byte) error {
 		return err
 	}
 	bucketId := b.Id
-	if set, ok := tx.db.Index.set.exist(bucketId); ok {
+	if set, ok := tx.db.Index.Set.exist(bucketId); ok {
 		ok, err := set.SAreMembers(string(key), items...)
 		if err != nil {
 			return err
@@ -126,7 +126,7 @@ func (tx *Tx) SAreMembers(bucket string, key []byte, items ...[]byte) (bool, err
 		return false, err
 	}
 	bucketId := b.Id
-	if set, ok := tx.db.Index.set.exist(bucketId); ok {
+	if set, ok := tx.db.Index.Set.exist(bucketId); ok {
 		return set.SAreMembers(string(key), items...)
 	}
 
@@ -143,7 +143,7 @@ func (tx *Tx) SIsMember(bucket string, key, item []byte) (bool, error) {
 		return false, err
 	}
 	bucketId := b.Id
-	if set, ok := tx.db.Index.set.exist(bucketId); ok {
+	if set, ok := tx.db.Index.Set.exist(bucketId); ok {
 		isMember, err := set.SIsMember(string(key), item)
 		if err != nil {
 			return false, err
@@ -164,7 +164,7 @@ func (tx *Tx) SMembers(bucket string, key []byte) ([][]byte, error) {
 		return nil, err
 	}
 	bucketId := b.Id
-	if set, ok := tx.db.Index.set.exist(bucketId); ok {
+	if set, ok := tx.db.Index.Set.exist(bucketId); ok {
 		items, err := set.SMembers(string(key))
 		if err != nil {
 			return nil, err
@@ -195,7 +195,7 @@ func (tx *Tx) SHasKey(bucket string, key []byte) (bool, error) {
 		return false, err
 	}
 	bucketId := b.Id
-	if set, ok := tx.db.Index.set.exist(bucketId); ok {
+	if set, ok := tx.db.Index.Set.exist(bucketId); ok {
 		return set.SHasKey(string(key)), nil
 	}
 
@@ -214,7 +214,7 @@ func (tx *Tx) SPop(bucket string, key []byte) ([]byte, error) {
 	}
 	bucketId := b.Id
 
-	if set, ok := tx.db.Index.set.exist(bucketId); ok {
+	if set, ok := tx.db.Index.Set.exist(bucketId); ok {
 		for _, items := range set.M[string(key)] {
 			value, err := tx.db.getValueByRecord(items)
 			if err != nil {
@@ -241,7 +241,7 @@ func (tx *Tx) SCard(bucket string, key []byte) (int, error) {
 		return 0, err
 	}
 	bucketId := b.Id
-	if set, ok := tx.db.Index.set.exist(bucketId); ok {
+	if set, ok := tx.db.Index.Set.exist(bucketId); ok {
 		return set.SCard(string(key)), nil
 	}
 
@@ -259,7 +259,7 @@ func (tx *Tx) SDiffByOneBucket(bucket string, key1, key2 []byte) ([][]byte, erro
 		return nil, err
 	}
 	bucketId := b.Id
-	if set, ok := tx.db.Index.set.exist(bucketId); ok {
+	if set, ok := tx.db.Index.Set.exist(bucketId); ok {
 		items, err := set.SDiff(string(key1), string(key2))
 		if err != nil {
 			return nil, err
@@ -302,11 +302,11 @@ func (tx *Tx) SDiffByTwoBuckets(bucket1 string, key1 []byte, bucket2 string, key
 	}
 	bucketId2 := b2.Id
 
-	if set1, ok = tx.db.Index.set.exist(bucketId1); !ok {
+	if set1, ok = tx.db.Index.Set.exist(bucketId1); !ok {
 		return nil, ErrBucketAndKey(bucket1, key1)
 	}
 
-	if set2, ok = tx.db.Index.set.exist(bucketId2); !ok {
+	if set2, ok = tx.db.Index.Set.exist(bucketId2); !ok {
 		return nil, ErrBucketAndKey(bucket2, key2)
 	}
 
@@ -336,7 +336,7 @@ func (tx *Tx) SMoveByOneBucket(bucket string, key1, key2, item []byte) (bool, er
 		return false, err
 	}
 	bucketId := b.Id
-	if set, ok := tx.db.Index.set.exist(bucketId); ok {
+	if set, ok := tx.db.Index.Set.exist(bucketId); ok {
 		return set.SMove(string(key1), string(key2), item)
 	}
 
@@ -366,11 +366,11 @@ func (tx *Tx) SMoveByTwoBuckets(bucket1 string, key1 []byte, bucket2 string, key
 	}
 	bucketId2 := b2.Id
 
-	if set1, ok = tx.db.Index.set.exist(bucketId1); !ok {
+	if set1, ok = tx.db.Index.Set.exist(bucketId1); !ok {
 		return false, ErrBucketAndKey(bucket1, key1)
 	}
 
-	if set2, ok = tx.db.Index.set.exist(bucketId2); !ok {
+	if set2, ok = tx.db.Index.Set.exist(bucketId2); !ok {
 		return false, ErrBucketAndKey(bucket2, key1)
 	}
 
@@ -413,7 +413,7 @@ func (tx *Tx) SUnionByOneBucket(bucket string, key1, key2 []byte) ([][]byte, err
 	}
 	bucketId := b1.Id
 
-	if set, ok := tx.db.Index.set.exist(bucketId); ok {
+	if set, ok := tx.db.Index.Set.exist(bucketId); ok {
 		items, err := set.SUnion(string(key1), string(key2))
 		if err != nil {
 			return nil, err
@@ -456,11 +456,11 @@ func (tx *Tx) SUnionByTwoBuckets(bucket1 string, key1 []byte, bucket2 string, ke
 	}
 	bucketId2 := b2.Id
 
-	if set1, ok = tx.db.Index.set.exist(bucketId1); !ok {
+	if set1, ok = tx.db.Index.Set.exist(bucketId1); !ok {
 		return nil, ErrBucketAndKey(bucket1, key1)
 	}
 
-	if set2, ok = tx.db.Index.set.exist(bucketId2); !ok {
+	if set2, ok = tx.db.Index.Set.exist(bucketId2); !ok {
 		return nil, ErrBucketAndKey(bucket2, key2)
 	}
 
@@ -505,7 +505,7 @@ func (tx *Tx) SKeys(bucket, pattern string, f func(key string) bool) error {
 		return err
 	}
 	bucketId := b.Id
-	if set, ok := tx.db.Index.set.exist(bucketId); !ok {
+	if set, ok := tx.db.Index.Set.exist(bucketId); !ok {
 		return ErrBucket
 	} else {
 		for key := range set.M {

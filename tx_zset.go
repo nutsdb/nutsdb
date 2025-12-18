@@ -68,7 +68,7 @@ func (tx *Tx) ZMembers(bucket string, key []byte) (map[*SortedSetMember]struct{}
 		exist     bool
 	)
 
-	if sortedSet, exist = tx.db.Index.sortedSet.exist(bucketId); !exist {
+	if sortedSet, exist = tx.db.Index.SortedSet.exist(bucketId); !exist {
 		return nil, ErrBucket
 	}
 
@@ -109,7 +109,7 @@ func (tx *Tx) ZCard(bucket string, key []byte) (int, error) {
 		exist     bool
 	)
 
-	if sortedSet, exist = tx.db.Index.sortedSet.exist(bucketId); !exist {
+	if sortedSet, exist = tx.db.Index.SortedSet.exist(bucketId); !exist {
 		return 0, ErrBucket
 	}
 
@@ -137,7 +137,7 @@ func (tx *Tx) ZCount(bucket string, key []byte, start, end float64, opts *GetByS
 		exist     bool
 	)
 
-	if sortedSet, exist = tx.db.Index.sortedSet.exist(bucketId); !exist {
+	if sortedSet, exist = tx.db.Index.SortedSet.exist(bucketId); !exist {
 		return 0, ErrBucket
 	}
 
@@ -161,7 +161,7 @@ func (tx *Tx) ZPopMax(bucket string, key []byte) (*SortedSetMember, error) {
 		exist     bool
 	)
 
-	if sortedSet, exist = tx.db.Index.sortedSet.exist(bucketId); !exist {
+	if sortedSet, exist = tx.db.Index.SortedSet.exist(bucketId); !exist {
 		return nil, ErrBucket
 	}
 
@@ -195,7 +195,7 @@ func (tx *Tx) ZPopMin(bucket string, key []byte) (*SortedSetMember, error) {
 		exist     bool
 	)
 
-	if sortedSet, exist = tx.db.Index.sortedSet.exist(bucketId); !exist {
+	if sortedSet, exist = tx.db.Index.SortedSet.exist(bucketId); !exist {
 		return nil, ErrBucket
 	}
 
@@ -229,7 +229,7 @@ func (tx *Tx) ZPeekMax(bucket string, key []byte) (*SortedSetMember, error) {
 		exist     bool
 	)
 
-	if sortedSet, exist = tx.db.Index.sortedSet.exist(bucketId); !exist {
+	if sortedSet, exist = tx.db.Index.SortedSet.exist(bucketId); !exist {
 		return nil, ErrBucket
 	}
 
@@ -263,7 +263,7 @@ func (tx *Tx) ZPeekMin(bucket string, key []byte) (*SortedSetMember, error) {
 		exist     bool
 	)
 
-	if sortedSet, exist = tx.db.Index.sortedSet.exist(bucketId); !exist {
+	if sortedSet, exist = tx.db.Index.SortedSet.exist(bucketId); !exist {
 		return nil, ErrBucket
 	}
 
@@ -298,7 +298,7 @@ func (tx *Tx) ZRangeByScore(bucket string, key []byte, start, end float64, opts 
 		exist     bool
 	)
 
-	if sortedSet, exist = tx.db.Index.sortedSet.exist(bucketId); !exist {
+	if sortedSet, exist = tx.db.Index.SortedSet.exist(bucketId); !exist {
 		return nil, ErrBucket
 	}
 
@@ -337,7 +337,7 @@ func (tx *Tx) ZRangeByRank(bucket string, key []byte, start, end int) ([]*Sorted
 		exist     bool
 	)
 
-	if sortedSet, exist = tx.db.Index.sortedSet.exist(bucketId); !exist {
+	if sortedSet, exist = tx.db.Index.SortedSet.exist(bucketId); !exist {
 		return nil, ErrBucket
 	}
 
@@ -375,7 +375,7 @@ func (tx *Tx) ZRem(bucket string, key []byte, value []byte) error {
 		exist     bool
 	)
 
-	if sortedSet, exist = tx.db.Index.sortedSet.exist(bucketId); !exist {
+	if sortedSet, exist = tx.db.Index.SortedSet.exist(bucketId); !exist {
 		return ErrBucket
 	}
 
@@ -420,7 +420,7 @@ func (tx *Tx) ZRank(bucket string, key, value []byte) (int, error) {
 		exist     bool
 	)
 
-	if sortedSet, exist = tx.db.Index.sortedSet.exist(bucketId); !exist {
+	if sortedSet, exist = tx.db.Index.SortedSet.exist(bucketId); !exist {
 		return 0, ErrBucket
 	}
 
@@ -444,7 +444,7 @@ func (tx *Tx) ZRevRank(bucket string, key, value []byte) (int, error) {
 		exist     bool
 	)
 
-	if sortedSet, exist = tx.db.Index.sortedSet.exist(bucketId); !exist {
+	if sortedSet, exist = tx.db.Index.SortedSet.exist(bucketId); !exist {
 		return 0, ErrBucket
 	}
 
@@ -468,7 +468,7 @@ func (tx *Tx) ZScore(bucket string, key, value []byte) (float64, error) {
 		exist     bool
 	)
 
-	if sortedSet, exist = tx.db.Index.sortedSet.exist(bucketId); !exist {
+	if sortedSet, exist = tx.db.Index.SortedSet.exist(bucketId); !exist {
 		return 0, ErrBucket
 	}
 
@@ -492,7 +492,7 @@ func (tx *Tx) ZKeys(bucket, pattern string, f func(key string) bool) error {
 		exist     bool
 	)
 
-	if sortedSet, exist = tx.db.Index.sortedSet.exist(bucketId); !exist {
+	if sortedSet, exist = tx.db.Index.SortedSet.exist(bucketId); !exist {
 		return ErrBucket
 	}
 
@@ -514,7 +514,7 @@ func (tx *Tx) ZCheck(bucket string) error {
 		return err
 	}
 	bucketId := b.Id
-	if _, ok := tx.db.Index.sortedSet.exist(bucketId); !ok {
+	if _, ok := tx.db.Index.SortedSet.exist(bucketId); !ok {
 		return ErrBucket
 	}
 	return nil

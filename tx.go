@@ -305,7 +305,7 @@ func (tx *Tx) getListEntryNewAddRecordCount(bucketId core.BucketId, entry *core.
 	var res int64
 	key := string(entry.Key)
 	value := string(entry.Value)
-	l := tx.db.Index.list.getWithDefault(bucketId)
+	l := tx.db.Index.List.Get(bucketId)
 
 	switch entry.Meta.Flag {
 	case core.DataLPushFlag, core.DataRPushFlag:
@@ -359,7 +359,7 @@ func (tx *Tx) getKvEntryNewAddRecordCount(bucketId core.BucketId, entry *core.En
 	case core.DataDeleteFlag:
 		res--
 	case core.DataSetFlag:
-		if idx, ok := tx.db.Index.bTree.exist(bucketId); ok {
+		if idx, ok := tx.db.Index.BTree.exist(bucketId); ok {
 			_, found := idx.Find(entry.Key)
 			if !found {
 				res++
@@ -400,7 +400,7 @@ func (tx *Tx) getSortedSetEntryNewAddRecordCount(bucketId core.BucketId, entry *
 		res--
 	case core.DataZRemRangeByRankFlag:
 		start, end := splitIntIntStr(value, SeparatorForZSetKey)
-		delNodes, err := tx.db.Index.sortedSet.getWithDefault(bucketId, tx.db).getZRemRangeByRankNodes(key, start, end)
+		delNodes, err := tx.db.Index.SortedSet.Get(bucketId).getZRemRangeByRankNodes(key, start, end)
 		if err != nil {
 			return res, err
 		}
@@ -413,14 +413,14 @@ func (tx *Tx) getSortedSetEntryNewAddRecordCount(bucketId core.BucketId, entry *
 }
 
 func (tx *Tx) keyExistsInSortedSet(bucketId core.BucketId, key, value string) bool {
-	if _, exist := tx.db.Index.sortedSet.exist(bucketId); !exist {
+	if _, exist := tx.db.Index.SortedSet.exist(bucketId); !exist {
 		return false
 	}
 	newKey := key
 	if strings.Contains(key, SeparatorForZSetKey) {
 		newKey, _ = splitStringFloat64Str(key, SeparatorForZSetKey)
 	}
-	exists, _ := tx.db.Index.sortedSet.idx[bucketId].ZExist(newKey, []byte(value))
+	exists, _ := tx.db.Index.SortedSet.Idx[bucketId].ZExist(newKey, []byte(value))
 	return exists
 }
 
@@ -698,26 +698,26 @@ func (tx *Tx) buildBucketInIndex() error {
 			case core.BucketInsertOperation:
 				switch bucket.Ds {
 				case core.DataStructureBTree:
-					tx.db.Index.bTree.getWithDefault(bucket.Id)
+					tx.db.Index.BTree.Get(bucket.Id)
 				case core.DataStructureList:
-					tx.db.Index.list.getWithDefault(bucket.Id)
+					tx.db.Index.List.Get(bucket.Id)
 				case core.DataStructureSet:
-					tx.db.Index.set.getWithDefault(bucket.Id)
+					tx.db.Index.Set.Get(bucket.Id)
 				case core.DataStructureSortedSet:
-					tx.db.Index.sortedSet.getWithDefault(bucket.Id, tx.db)
+					tx.db.Index.SortedSet.Get(bucket.Id)
 				default:
 					return ErrDataStructureNotSupported
 				}
 			case core.BucketDeleteOperation:
 				switch bucket.Ds {
 				case core.DataStructureBTree:
-					tx.db.Index.bTree.delete(bucket.Id)
+					tx.db.Index.BTree.delete(bucket.Id)
 				case core.DataStructureList:
-					tx.db.Index.list.delete(bucket.Id)
+					tx.db.Index.List.delete(bucket.Id)
 				case core.DataStructureSet:
-					tx.db.Index.set.delete(bucket.Id)
+					tx.db.Index.Set.delete(bucket.Id)
 				case core.DataStructureSortedSet:
-					tx.db.Index.sortedSet.delete(bucket.Id)
+					tx.db.Index.SortedSet.delete(bucket.Id)
 				default:
 					return ErrDataStructureNotSupported
 				}
@@ -759,24 +759,24 @@ func (tx *Tx) getChangeCountInBucketChanges() int64 {
 		if bucket.Meta.Op == core.BucketDeleteOperation {
 			switch bucket.Ds {
 			case core.DataStructureBTree:
-				if bTree, ok := tx.db.Index.bTree.idx[bucketId]; ok {
+				if bTree, ok := tx.db.Index.BTree.Idx[bucketId]; ok {
 					res -= int64(bTree.Count())
 				}
 			case core.DataStructureSet:
-				if set, ok := tx.db.Index.set.idx[bucketId]; ok {
+				if set, ok := tx.db.Index.Set.Idx[bucketId]; ok {
 					for key := range set.M {
 						res -= int64(set.SCard(key))
 					}
 				}
 			case core.DataStructureSortedSet:
-				if sortedSet, ok := tx.db.Index.sortedSet.idx[bucketId]; ok {
+				if sortedSet, ok := tx.db.Index.SortedSet.Idx[bucketId]; ok {
 					for key := range sortedSet.M {
 						curLen, _ := sortedSet.ZCard(key)
 						res -= int64(curLen)
 					}
 				}
 			case core.DataStructureList:
-				if list, ok := tx.db.Index.list.idx[bucketId]; ok {
+				if list, ok := tx.db.Index.List.Idx[bucketId]; ok {
 					for key := range list.Items {
 						curLen, _ := list.Size(key)
 						res -= int64(curLen)
