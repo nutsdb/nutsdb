@@ -434,20 +434,6 @@ func TestBTree_TTL_PopMinMax(t *testing.T) {
 	})
 }
 
-func TestBTree_TTL_NoChecker(t *testing.T) {
-	// Test that BTree works normally without TTL checker
-	btree := NewBTree()
-
-	// Insert a record that would be expired if TTL was enabled
-	record := createTestRecord("key", 10, 900000)
-	btree.InsertRecord(record.Key, record)
-
-	// Without TTL checker, record should be found
-	found, ok := btree.Find([]byte("key"))
-	require.True(t, ok)
-	assert.Equal(t, []byte("key"), found.Key)
-}
-
 func TestBTree_TTL_AllItems(t *testing.T) {
 	btree := NewBTree()
 	mockClock := clock.NewMockClock(1000000)
@@ -564,24 +550,6 @@ func TestBTree_GetTTL(t *testing.T) {
 	})
 }
 
-func TestBTree_GetTTL_NoChecker(t *testing.T) {
-	// Test GetTTL without TTL checker configured
-	btree := NewBTree()
-
-	record := createTestRecord("key", 100, 900000)
-	btree.InsertRecord(record.Key, record)
-
-	// Without TTL checker, should return -1 (persistent)
-	ttl, err := btree.GetTTL([]byte("key"))
-	require.NoError(t, err)
-	assert.Equal(t, int64(-1), ttl)
-
-	// Non-existent key should still return error
-	_, err = btree.GetTTL([]byte("non_existent"))
-	require.Error(t, err)
-	assert.Equal(t, ErrKeyNotFound, err)
-}
-
 func TestBTree_IsExpiredKey(t *testing.T) {
 	btree := NewBTree()
 	mockClock := clock.NewMockClock(1000000) // Current time: 1000 seconds in millis
@@ -612,17 +580,4 @@ func TestBTree_IsExpiredKey(t *testing.T) {
 	t.Run("non-existent key is not expired", func(t *testing.T) {
 		assert.False(t, btree.IsExpiredKey([]byte("non_existent")))
 	})
-}
-
-func TestBTree_IsExpiredKey_NoChecker(t *testing.T) {
-	// Test IsExpiredKey without TTL checker configured
-	btree := NewBTree()
-
-	// Insert a record that would be expired if TTL was enabled
-	record := createTestRecord("key", 10, 900000)
-	btree.InsertRecord(record.Key, record)
-
-	// Without TTL checker, should always return false
-	assert.False(t, btree.IsExpiredKey([]byte("key")))
-	assert.False(t, btree.IsExpiredKey([]byte("non_existent")))
 }
