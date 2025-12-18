@@ -35,6 +35,7 @@ import (
 	"github.com/nutsdb/nutsdb/internal/fileio"
 	"github.com/nutsdb/nutsdb/internal/ttl"
 	"github.com/nutsdb/nutsdb/internal/ttl/checker"
+	"github.com/nutsdb/nutsdb/internal/ttl/clock"
 	"github.com/nutsdb/nutsdb/internal/utils"
 	"github.com/xujiajun/utils/filesystem"
 	"github.com/xujiajun/utils/strconv2"
@@ -70,7 +71,7 @@ type (
 		mergeEndCh              chan error
 		mergeWorkCloseCh        chan struct{}
 		writeCh                 chan *request
-		ttlManager              *ttl.Manager
+		ttlManager              ttl.Manager
 		ttlChecker              *checker.Checker
 		RecordCount             int64 // current valid record count, exclude deleted, repeated
 		bucketManager           *BucketManager
@@ -112,10 +113,15 @@ func open(opt Options) (*DB, error) {
 		mergeEndCh:              make(chan error),
 		mergeWorkCloseCh:        make(chan struct{}),
 		writeCh:                 make(chan *request, KvWriteChCapacity),
-		ttlManager:              ttl.NewManager(ttl.ExpiredDeleteType(opt.ExpiredDeleteType)),
 		ttlChecker:              checker.NewChecker(opt.Clock),
 		hintKeyAndRAMIdxModeLru: utils.NewLruCache(opt.HintKeyAndRAMIdxCacheSize),
 		snowflakeManager:        NewSnowflakeManager(opt.NodeNum),
+	}
+
+	if mc, ok := opt.Clock.(*clock.MockClock); ok {
+		db.ttlManager = ttl.NewMockManager(mc)
+	} else {
+		db.ttlManager = ttl.NewTimerManager(ttl.ExpiredDeleteType(opt.ExpiredDeleteType))
 	}
 
 	db.ttlChecker.SetExpiredCallback(db.handleExpiredKey)

@@ -63,14 +63,23 @@ func (n nodes) delNode(bucketId BucketId, key string) {
 	}
 }
 
-// Manager handles TTL management using timer-based expiration
-type Manager struct {
+// Manager defines the interface for TTL management
+type Manager interface {
+	Run()
+	Exist(bucketId BucketId, key string) bool
+	Add(bucketId BucketId, key string, expire time.Duration, ds uint16, callback ExpireCallback)
+	Del(bucketId BucketId, key string)
+	Close()
+}
+
+// TimerManager handles TTL management using timer-based expiration
+type TimerManager struct {
 	t          timer.Timer
 	timerNodes nodes
 }
 
-// NewManager creates a new TTL manager with the specified expiration deletion type
-func NewManager(expiredDeleteType ExpiredDeleteType) *Manager {
+// NewTimerManager creates a new TTL manager with the specified expiration deletion type
+func NewTimerManager(expiredDeleteType ExpiredDeleteType) *TimerManager {
 	var t timer.Timer
 
 	switch expiredDeleteType {
@@ -82,19 +91,19 @@ func NewManager(expiredDeleteType ExpiredDeleteType) *Manager {
 		t = timer.NewTimer()
 	}
 
-	return &Manager{
+	return &TimerManager{
 		t:          t,
 		timerNodes: make(nodes),
 	}
 }
 
 // Run starts the TTL manager
-func (tm *Manager) Run() {
+func (tm *TimerManager) Run() {
 	tm.t.Run()
 }
 
 // Exist checks if a TTL entry exists for the given bucket and key
-func (tm *Manager) Exist(bucketId BucketId, key string) bool {
+func (tm *TimerManager) Exist(bucketId BucketId, key string) bool {
 	_, ok := tm.timerNodes.getNode(bucketId, key)
 	return ok
 }
@@ -104,7 +113,7 @@ type ExpireCallback func(bucketId BucketId, key []byte, ds uint16)
 
 // Add adds a TTL entry with the specified expiration duration.
 // When the timer expires, it triggers the callback with bucketId, key, and data structure type.
-func (tm *Manager) Add(bucketId BucketId, key string, expire time.Duration, ds uint16, callback ExpireCallback) {
+func (tm *TimerManager) Add(bucketId BucketId, key string, expire time.Duration, ds uint16, callback ExpireCallback) {
 	if node, ok := tm.timerNodes.getNode(bucketId, key); ok {
 		node.Stop()
 	}
@@ -118,12 +127,12 @@ func (tm *Manager) Add(bucketId BucketId, key string, expire time.Duration, ds u
 }
 
 // Del removes a TTL entry for the given bucket and key
-func (tm *Manager) Del(bucket BucketId, key string) {
+func (tm *TimerManager) Del(bucket BucketId, key string) {
 	tm.timerNodes.delNode(bucket, key)
 }
 
 // Close closes the TTL manager and stops all timers
-func (tm *Manager) Close() {
+func (tm *TimerManager) Close() {
 	tm.timerNodes = nil
 	tm.t.Stop()
 }

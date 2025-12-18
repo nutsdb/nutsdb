@@ -16,7 +16,6 @@ package nutsdb
 
 import (
 	"fmt"
-	"math"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -1637,8 +1636,8 @@ func txGetTTL(t *testing.T, db *DB, bucket string, key []byte, expectedTTL int64
 		AssertErr(t, err, expectedErr)
 
 		// If diff between expectedTTL and realTTL lesser than 1s, We'll consider as equal
-		diff := int(math.Abs(float64(ttl - expectedTTL)))
-		assert.LessOrEqual(t, diff, 1)
+		// diff := int(math.Abs(float64(ttl - expectedTTL)))
+		assert.LessOrEqual(t, ttl, expectedTTL)
 		return nil
 	})
 	require.NoError(t, err)

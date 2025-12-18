@@ -49,13 +49,21 @@ func (rc *RealClock) NowSeconds() int64 {
 
 // MockClock implements Clock with controllable time for testing.
 type MockClock struct {
-	mu   sync.RWMutex
-	time int64 // milliseconds since Unix epoch
+	mu        sync.RWMutex
+	time      int64 // milliseconds since Unix epoch
+	onAdvance func(newTimeMillis int64)
 }
 
 // NewMockClock creates a new MockClock instance with the specified initial time.
 func NewMockClock(initialTime int64) *MockClock {
 	return &MockClock{time: initialTime}
+}
+
+// SetOnAdvance sets a callback to be called when the clock time is advanced.
+func (mc *MockClock) SetOnAdvance(onAdvance func(newTimeMillis int64)) {
+	mc.mu.Lock()
+	defer mc.mu.Unlock()
+	mc.onAdvance = onAdvance
 }
 
 // NowMillis returns the current mock time in milliseconds since Unix epoch.
@@ -73,13 +81,25 @@ func (mc *MockClock) NowSeconds() int64 {
 // AdvanceTime moves the clock forward by the specified duration.
 func (mc *MockClock) AdvanceTime(duration time.Duration) {
 	mc.mu.Lock()
-	defer mc.mu.Unlock()
 	mc.time += duration.Milliseconds()
+	newTime := mc.time
+	onAdvance := mc.onAdvance
+	mc.mu.Unlock()
+
+	if onAdvance != nil {
+		onAdvance(newTime)
+	}
 }
 
 // SetTime sets the clock to a specific time in milliseconds since Unix epoch.
 func (mc *MockClock) SetTime(timeMillis int64) {
 	mc.mu.Lock()
-	defer mc.mu.Unlock()
 	mc.time = timeMillis
+	newTime := mc.time
+	onAdvance := mc.onAdvance
+	mc.mu.Unlock()
+
+	if onAdvance != nil {
+		onAdvance(newTime)
+	}
 }
