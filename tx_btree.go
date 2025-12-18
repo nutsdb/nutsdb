@@ -211,7 +211,7 @@ func (tx *Tx) getAllOrKeysOrValues(bucket string, typ uint8) ([][]byte, [][]byte
 		return nil, nil, err
 	}
 
-	bucketId, err := tx.db.bm.GetBucketID(core.DataStructureBTree, bucket)
+	bucketId, err := tx.db.bucketManager.GetBucketID(core.DataStructureBTree, bucket)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -356,13 +356,13 @@ func (tx *Tx) PrefixScanEntries(bucket string, prefix []byte, reg string, offset
 	if err := tx.checkTxIsClosed(); err != nil {
 		return nil, nil, err
 	}
-	b, err := tx.db.bm.GetBucket(core.DataStructureBTree, bucket)
+	b, err := tx.db.bucketManager.GetBucket(core.DataStructureBTree, bucket)
 	if err != nil {
 		return nil, nil, err
 	}
 	bucketId := b.Id
 
-	xerr := func(e error) error {
+	xerr := func() error {
 		// Return expected error types based on Scan/SearchScan.
 		if reg == "" {
 			return ErrPrefixScan
@@ -379,15 +379,15 @@ func (tx *Tx) PrefixScanEntries(bucket string, prefix []byte, reg string, offset
 		}
 		keys, values, err = tx.getHintIdxDataItemsWrapper(records, limitNum, bucketId, includeKeys, includeValues)
 		if err != nil {
-			return nil, nil, xerr(err)
+			return nil, nil, xerr()
 		}
 	}
 
 	if includeKeys && len(keys) == 0 {
-		return nil, nil, xerr(err)
+		return nil, nil, xerr()
 	}
 	if includeValues && len(values) == 0 {
-		return nil, nil, xerr(err)
+		return nil, nil, xerr()
 	}
 	return
 }
@@ -415,7 +415,7 @@ func (tx *Tx) Delete(bucket string, key []byte) error {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return err
 	}
-	b, err := tx.db.bm.GetBucket(core.DataStructureBTree, bucket)
+	b, err := tx.db.bucketManager.GetBucket(core.DataStructureBTree, bucket)
 	if err != nil {
 		return err
 	}
@@ -443,7 +443,7 @@ func (tx *Tx) Delete(bucket string, key []byte) error {
 
 // getHintIdxDataItemsWrapper returns keys and values when prefix scanning or range scanning.
 // Note: TTL filtering is handled at the index layer, so records passed here are already valid (non-expired).
-func (tx *Tx) getHintIdxDataItemsWrapper(records []*core.Record, limitNum int, bucketId core.BucketId, needKeys bool, needValues bool) (keys [][]byte, values [][]byte, err error) {
+func (tx *Tx) getHintIdxDataItemsWrapper(records []*core.Record, limitNum int, _ core.BucketId, needKeys bool, needValues bool) (keys [][]byte, values [][]byte, err error) {
 	// Pre-allocate capacity to reduce slice re-growth
 	estimatedSize := len(records)
 	if limitNum > 0 && limitNum < estimatedSize {
@@ -652,30 +652,21 @@ func (tx *Tx) GetTTL(bucket string, key []byte) (int64, error) {
 	}
 	bucketId := b.Id
 
-	idx, bucketExists := tx.db.Index.bTree.exist(bucketId)
-
+	// Check pending writes first
 	if pendingTTL, err := tx.pendingWrites.GetTTL(core.DataStructureBTree, bucket, key); err == nil {
 		return pendingTTL, nil
 	}
+
+	idx, bucketExists := tx.db.Index.bTree.exist(bucketId)
 	if !bucketExists {
 		return 0, ErrKeyNotFound
 	}
 
-	record, recordFound := idx.Find(key)
-	if !recordFound {
+	ttl, err := idx.GetTTL(key)
+	if err != nil {
 		return 0, ErrKeyNotFound
 	}
-
-	if record.TTL == core.Persistent {
-		return -1, nil
-	}
-
-	remTTL := expireTime(record.Timestamp, record.TTL)
-	if remTTL >= 0 {
-		return int64(remTTL.Seconds()), nil
-	} else {
-		return 0, ErrKeyNotFound
-	}
+	return ttl, nil
 }
 
 // Persist updates record's TTL as core.Persistent if the record exists.

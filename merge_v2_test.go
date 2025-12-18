@@ -14,6 +14,8 @@ import (
 
 	"github.com/nutsdb/nutsdb/internal/core"
 	"github.com/nutsdb/nutsdb/internal/data"
+	"github.com/nutsdb/nutsdb/internal/ttl/checker"
+	"github.com/nutsdb/nutsdb/internal/ttl/clock"
 	"github.com/nutsdb/nutsdb/internal/utils"
 )
 
@@ -670,7 +672,7 @@ func TestMergeV2CommitCollectorFailure(t *testing.T) {
 	db := &DB{
 		opt:   opts,
 		Index: newIndex(),
-		bm: &BucketManager{
+		bucketManager: &BucketManager{
 			BucketInfoMapper: map[core.BucketId]*core.Bucket{
 				bucketID: {Meta: &core.BucketMeta{}, Id: bucketID, Name: bucketName, Ds: uint16(core.DataStructureBTree)},
 			},
@@ -1312,7 +1314,7 @@ func TestMergeV2ApplyLookupUpdatesSecondaryIndexes(t *testing.T) {
 	db := &DB{
 		opt:   DefaultOptions,
 		Index: newIndex(),
-		bm: &BucketManager{
+		bucketManager: &BucketManager{
 			BucketInfoMapper: map[core.BucketId]*core.Bucket{},
 		},
 	}
@@ -1329,7 +1331,7 @@ func TestMergeV2ApplyLookupUpdatesSecondaryIndexes(t *testing.T) {
 	}
 
 	for _, b := range buckets {
-		db.bm.BucketInfoMapper[b.id] = &core.Bucket{Meta: &core.BucketMeta{}, Id: b.id, Ds: uint16(b.ds), Name: b.name}
+		db.bucketManager.BucketInfoMapper[b.id] = &core.Bucket{Meta: &core.BucketMeta{}, Id: b.id, Ds: uint16(b.ds), Name: b.name}
 	}
 
 	// Set bucket
@@ -2002,8 +2004,9 @@ func TestMergeV2RewriteFileSkipsCorruptedEntries(t *testing.T) {
 			BufferSizeOfRecovery: 4096,
 			SegmentSize:          1 << 16,
 		},
-		Index: newIndex(),
-		bm: &BucketManager{
+		Index:      newIndex(),
+		ttlChecker: checker.NewChecker(clock.NewRealClock()),
+		bucketManager: &BucketManager{
 			BucketInfoMapper: map[core.BucketId]*core.Bucket{
 				bucketID: {Meta: &core.BucketMeta{}, Id: bucketID, Ds: uint16(core.DataStructureBTree)},
 			},

@@ -14,10 +14,6 @@
 
 package core
 
-import (
-	"time"
-)
-
 const Persistent uint32 = 0
 
 // Record means item of indexes in memory
@@ -30,24 +26,6 @@ type Record struct {
 	Timestamp uint64
 	TTL       uint32
 	TxID      uint64
-}
-
-// IsExpired returns the record if expired or not.
-func (r *Record) IsExpired() bool {
-	return IsExpired(r.TTL, r.Timestamp)
-}
-
-// IsExpired checks the ttl if expired or not.
-func IsExpired(ttl uint32, timestamp uint64) bool {
-	if ttl == Persistent {
-		return false
-	}
-
-	now := time.UnixMilli(time.Now().UnixMilli())
-	expireTime := time.UnixMilli(int64(timestamp))
-	expireTime = expireTime.Add(time.Duration(ttl) * time.Second)
-
-	return expireTime.Before(now)
 }
 
 // NewRecord generate a record Obj

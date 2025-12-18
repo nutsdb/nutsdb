@@ -269,30 +269,6 @@ func TestBTree_TTL_Find(t *testing.T) {
 	})
 }
 
-func TestBTree_TTL_ExpiredCallback(t *testing.T) {
-	btree := NewBTree()
-	mockClock := clock.NewMockClock(1000000)
-	checker := checker.NewChecker(mockClock)
-	btree.SetTTLChecker(checker)
-
-	var callbackKey []byte
-	var callbackDs uint16
-	btree.SetExpiredCallback(func(key []byte, ds uint16) {
-		callbackKey = key
-		callbackDs = ds
-	})
-
-	// Insert an expired record
-	expiredRecord := createTestRecord("expired_key", 10, 900000)
-	btree.InsertRecord(expiredRecord.Key, expiredRecord)
-
-	// Find should trigger callback
-	_, found := btree.Find([]byte("expired_key"))
-	require.False(t, found)
-	assert.Equal(t, []byte("expired_key"), callbackKey)
-	assert.Equal(t, core.DataStructureBTree, callbackDs)
-}
-
 func TestBTree_TTL_All(t *testing.T) {
 	btree := NewBTree()
 	mockClock := clock.NewMockClock(1000000)

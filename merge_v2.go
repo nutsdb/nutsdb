@@ -415,7 +415,7 @@ func (job *mergeV2Job) rewriteFile(fid int64) error {
 			continue
 		}
 		// Skip expired entries
-		if core.IsExpired(entry.Meta.TTL, entry.Meta.Timestamp) {
+		if job.db.ttlChecker.IsExpired(entry.Meta.TTL, entry.Meta.Timestamp) {
 			continue
 		}
 

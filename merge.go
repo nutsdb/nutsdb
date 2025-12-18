@@ -140,7 +140,7 @@ func (db *DB) mergeLegacy() error {
 				err := db.Update(func(tx *Tx) error {
 					// check if we have a new entry with same key and bucket
 					if ok := db.isPendingMergeEntry(entry); ok {
-						bucket, err := db.bm.GetBucketById(entry.Meta.BucketId)
+						bucket, err := db.bucketManager.GetBucketById(entry.Meta.BucketId)
 						if err != nil {
 							return err
 						}
@@ -364,8 +364,8 @@ func (db *DB) isPendingBtreeEntry(entry *core.Entry) bool {
 		return false
 	}
 
-	if r.IsExpired() {
-		db.tm.Del(entry.Meta.BucketId, string(entry.Key))
+	if db.ttlChecker.IsExpired(r.TTL, r.Timestamp) {
+		db.ttlManager.Del(entry.Meta.BucketId, string(entry.Key))
 		idx.Delete(entry.Key)
 		return false
 	}

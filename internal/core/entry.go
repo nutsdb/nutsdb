@@ -19,8 +19,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"hash/crc32"
-	"sort"
-	"strings"
 
 	"github.com/nutsdb/nutsdb/internal/utils"
 	"github.com/xujiajun/utils/strconv2"
@@ -273,70 +271,6 @@ func (e *Entry) IsBelongsToSet() bool {
 
 func (e *Entry) IsBelongsToSortSet() bool {
 	return e.Meta.IsSortSet()
-}
-
-// Entries represents entries
-type Entries []*Entry
-
-func (e Entries) Len() int { return len(e) }
-
-func (e Entries) Less(i, j int) bool {
-	l := string(e[i].Key)
-	r := string(e[j].Key)
-
-	return strings.Compare(l, r) == -1
-}
-
-func (e Entries) Swap(i, j int) { e[i], e[j] = e[j], e[i] }
-
-func (e Entries) processEntriesScanOnDisk() (result []*Entry) {
-	sort.Sort(e)
-	for _, ele := range e {
-		curE := ele
-		if !IsExpired(curE.Meta.TTL, curE.Meta.Timestamp) && curE.Meta.Flag != DataDeleteFlag {
-			result = append(result, curE)
-		}
-	}
-
-	return result
-}
-
-func (e Entries) ToCEntries(lFunc func(l, r string) bool) CEntries {
-	return CEntries{
-		Entries:  e,
-		LessFunc: lFunc,
-	}
-}
-
-type CEntries struct {
-	Entries
-	LessFunc func(l, r string) bool
-}
-
-func (c CEntries) Len() int { return len(c.Entries) }
-
-func (c CEntries) Less(i, j int) bool {
-	l := string(c.Entries[i].Key)
-	r := string(c.Entries[j].Key)
-	if c.LessFunc != nil {
-		return c.LessFunc(l, r)
-	}
-
-	return c.Entries.Less(i, j)
-}
-
-func (c CEntries) Swap(i, j int) { c.Entries[i], c.Entries[j] = c.Entries[j], c.Entries[i] }
-
-func (c CEntries) processEntriesScanOnDisk() (result []*Entry) {
-	sort.Sort(c)
-	for _, ele := range c.Entries {
-		curE := ele
-		if !IsExpired(curE.Meta.TTL, curE.Meta.Timestamp) && curE.Meta.Flag != DataDeleteFlag {
-			result = append(result, curE)
-		}
-	}
-
-	return result
 }
 
 type EntryWhenRecovery struct {

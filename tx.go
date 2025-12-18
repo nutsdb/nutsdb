@@ -281,7 +281,7 @@ func (tx *Tx) Commit() (err error) {
 	}
 
 	// send updated entries to watch manager
-	if tx.db.wm != nil {
+	if tx.db.watchManager != nil {
 		tx.sendUpdatedEntries(pendingWriteList, tx.getDeletedBuckets())
 	}
 
@@ -428,7 +428,7 @@ func (tx *Tx) getEntryNewAddRecordCount(entry *core.Entry) (int64, error) {
 	var res int64
 	var err error
 
-	bucket, err := tx.db.bm.GetBucketById(entry.Meta.BucketId)
+	bucket, err := tx.db.bucketManager.GetBucketById(entry.Meta.BucketId)
 	if err != nil {
 		return 0, err
 	}
@@ -607,7 +607,7 @@ func (tx *Tx) put(bucket string, key, value []byte, ttl uint32, flag uint16, tim
 }
 
 func (tx *Tx) putDeleteLog(bucketId core.BucketId, key, value []byte, ttl uint32, flag uint16, timestamp uint64, ds uint16) {
-	bucket, err := tx.db.bm.GetBucketById(bucketId)
+	bucket, err := tx.db.bucketManager.GetBucketById(bucketId)
 	if err != nil {
 		return
 	}
@@ -700,7 +700,7 @@ func (tx *Tx) SubmitBucket() error {
 			bucketReqs = append(bucketReqs, req)
 		}
 	}
-	return tx.db.bm.SubmitPendingBucketChange(bucketReqs)
+	return tx.db.bucketManager.SubmitPendingBucketChange(bucketReqs)
 }
 
 // buildBucketInIndex build indexes on creation and deletion of buckets
@@ -822,7 +822,7 @@ func (tx *Tx) getBucketAndItsStatus(ds core.Ds, name core.BucketName) (BucketSta
 			}
 		}
 	}
-	if bucket, err := tx.db.bm.GetBucket(ds, name); err == nil {
+	if bucket, err := tx.db.bucketManager.GetBucket(ds, name); err == nil {
 		return BucketStatusExistAlready, bucket
 	}
 	return BucketStatusUnknown, nil
@@ -862,8 +862,8 @@ func (tx *Tx) findEntryAndItsStatus(ds core.Ds, bucket core.BucketName, key stri
  * @return: nil if success, error if any
  */
 func (tx *Tx) sendUpdatedEntries(pendingWriteList []*core.Entry, deletedBuckets map[core.BucketName]bool) {
-	err := tx.db.wm.sendUpdatedEntries(pendingWriteList, deletedBuckets, func(bucketId core.BucketId) (core.BucketName, error) {
-		bucket, err := tx.db.bm.GetBucketById(bucketId)
+	err := tx.db.watchManager.sendUpdatedEntries(pendingWriteList, deletedBuckets, func(bucketId core.BucketId) (core.BucketName, error) {
+		bucket, err := tx.db.bucketManager.GetBucketById(bucketId)
 		if err != nil {
 			return "", err
 		}
@@ -890,7 +890,7 @@ func (tx *Tx) getDeletedBuckets() (deletedBuckets map[core.BucketName]bool) {
 	deletedBuckets = make(map[core.BucketName]bool)
 	for _, mapper := range tx.pendingBucketList {
 		for name, bucket := range mapper {
-			isAllDsDeleted := len(tx.db.bm.BucketIDMarker[name]) == 0
+			isAllDsDeleted := len(tx.db.bucketManager.BucketIDMarker[name]) == 0
 			if _, ok := deletedBuckets[name]; !ok && bucket.Meta.Op == core.BucketDeleteOperation && isAllDsDeleted {
 				deletedBuckets[name] = true
 			}

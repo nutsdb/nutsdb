@@ -34,6 +34,7 @@ import (
 	"github.com/nutsdb/nutsdb/internal/data"
 	"github.com/nutsdb/nutsdb/internal/fileio"
 	"github.com/nutsdb/nutsdb/internal/ttl"
+	"github.com/nutsdb/nutsdb/internal/ttl/checker"
 	"github.com/nutsdb/nutsdb/internal/utils"
 	"github.com/xujiajun/utils/filesystem"
 	"github.com/xujiajun/utils/strconv2"
@@ -69,12 +70,13 @@ type (
 		mergeEndCh              chan error
 		mergeWorkCloseCh        chan struct{}
 		writeCh                 chan *request
-		tm                      *ttl.Manager
+		ttlManager              *ttl.Manager
+		ttlChecker              *checker.Checker
 		RecordCount             int64 // current valid record count, exclude deleted, repeated
-		bm                      *BucketManager
+		bucketManager           *BucketManager
 		hintKeyAndRAMIdxModeLru *utils.LRUCache // lru cache for HintKeyAndRAMIdxMode
-		sm                      *SnowflakeManager
-		wm                      *watchManager
+		snowflakeManager        *SnowflakeManager
+		watchManager            *watchManager
 	}
 )
 
@@ -111,9 +113,10 @@ func open(opt Options) (*DB, error) {
 		mergeEndCh:              make(chan error),
 		mergeWorkCloseCh:        make(chan struct{}),
 		writeCh:                 make(chan *request, KvWriteChCapacity),
-		tm:                      ttl.NewManager(ttl.ExpiredDeleteType(opt.ExpiredDeleteType)),
+		ttlManager:              ttl.NewManager(ttl.ExpiredDeleteType(opt.ExpiredDeleteType)),
+		ttlChecker:              checker.NewChecker(opt.Clock),
 		hintKeyAndRAMIdxModeLru: utils.NewLruCache(opt.HintKeyAndRAMIdxCacheSize),
-		sm:                      NewSnowflakeManager(opt.NodeNum),
+		snowflakeManager:        NewSnowflakeManager(opt.NodeNum),
 	}
 
 	db.commitBuffer = createNewBufferWithSize(int(db.opt.CommitBufferSize))
@@ -134,7 +137,7 @@ func open(opt Options) (*DB, error) {
 	db.flock = fileLock
 
 	if bm, err := NewBucketManager(opt.Dir); err == nil {
-		db.bm = bm
+		db.bucketManager = bm
 	} else {
 		return nil, err
 	}
@@ -152,15 +155,15 @@ func open(opt Options) (*DB, error) {
 	}
 
 	if db.opt.EnableWatch {
-		db.wm = NewWatchManager()
-		go db.wm.startDistributor()
+		db.watchManager = NewWatchManager()
+		go db.watchManager.startDistributor()
 	} else {
-		db.wm = nil
+		db.watchManager = nil
 	}
 
 	go db.mergeWorker()
 	go db.doWrites()
-	go db.tm.Run()
+	go db.ttlManager.Run()
 
 	return db, nil
 }
@@ -259,10 +262,10 @@ func (db *DB) release() error {
 
 	db.commitBuffer = nil
 
-	db.tm.Close()
+	db.ttlManager.Close()
 
-	if db.wm != nil {
-		if err := db.wm.close(); err != nil {
+	if db.watchManager != nil {
+		if err := db.watchManager.close(); err != nil {
 			log.Printf("watch manager closed already")
 		}
 	}
@@ -387,7 +390,7 @@ func (db *DB) getHintKeyAndRAMIdxCacheSize() int {
 
 // getSnowflakeNode returns a cached snowflake node, creating it once if needed.
 func (db *DB) getSnowflakeNode() *snowflake.Node {
-	return db.sm.GetNode()
+	return db.snowflakeManager.GetNode()
 }
 
 func (db *DB) doWrites() {
@@ -500,7 +503,7 @@ func (db *DB) parseDataFiles(dataFileIds []int64) (err error) {
 			// its because it already deleted in the feature WAL log.
 			// so we can just ignore here.
 			bucketId := entry.Meta.BucketId
-			if _, err := db.bm.GetBucketById(bucketId); errors.Is(err, ErrBucketNotExist) {
+			if _, err := db.bucketManager.GetBucketById(bucketId); errors.Is(err, ErrBucketNotExist) {
 				continue
 			}
 
@@ -641,7 +644,7 @@ func (db *DB) loadHintFile(fid int64) (bool, error) {
 
 		// Check if bucket exists
 		bucketId := hintEntry.BucketId
-		if _, err := db.bm.GetBucketById(bucketId); errors.Is(err, ErrBucketNotExist) {
+		if _, err := db.bucketManager.GetBucketById(bucketId); errors.Is(err, ErrBucketNotExist) {
 			continue // Skip if bucket doesn't exist
 		}
 
@@ -750,7 +753,7 @@ func (db *DB) getRecordCount() (int64, error) {
 func (db *DB) buildBTreeIdx(record *core.Record, entry *core.Entry) error {
 	key, meta := entry.Key, entry.Meta
 
-	bucket, err := db.bm.GetBucketById(meta.BucketId)
+	bucket, err := db.bucketManager.GetBucketById(meta.BucketId)
 	if err != nil {
 		return err
 	}
@@ -758,14 +761,14 @@ func (db *DB) buildBTreeIdx(record *core.Record, entry *core.Entry) error {
 
 	bTree := db.Index.bTree.getWithDefault(bucketId)
 
-	if record.IsExpired() || meta.Flag == core.DataDeleteFlag {
-		db.tm.Del(bucketId, string(key))
+	if db.ttlChecker.IsExpired(record.TTL, record.Timestamp) || meta.Flag == core.DataDeleteFlag {
+		db.ttlManager.Del(bucketId, string(key))
 		bTree.Delete(key)
 	} else {
 		if meta.TTL != core.Persistent {
-			db.tm.Add(bucketId, string(key), expireTime(meta.Timestamp, meta.TTL), db.buildExpireCallback(bucket.Name, key))
+			db.ttlManager.Add(bucketId, string(key), expireTime(meta.Timestamp, meta.TTL), db.buildExpireCallback(bucket.Name, key))
 		} else {
-			db.tm.Del(bucketId, string(key))
+			db.ttlManager.Del(bucketId, string(key))
 		}
 		bTree.InsertRecord(record.Key, record)
 	}
@@ -799,7 +802,7 @@ func (db *DB) buildIdxes(record *core.Record, entry *core.Entry) error {
 func (db *DB) buildSetIdx(record *core.Record, entry *core.Entry) error {
 	key, val, meta := entry.Key, entry.Value, entry.Meta
 
-	bucket, err := db.bm.GetBucketById(entry.Meta.BucketId)
+	bucket, err := db.bucketManager.GetBucketById(entry.Meta.BucketId)
 	if err != nil {
 		return err
 	}
@@ -825,7 +828,7 @@ func (db *DB) buildSetIdx(record *core.Record, entry *core.Entry) error {
 func (db *DB) buildSortedSetIdx(record *core.Record, entry *core.Entry) error {
 	key, val, meta := entry.Key, entry.Value, entry.Meta
 
-	bucket, err := db.bm.GetBucketById(entry.Meta.BucketId)
+	bucket, err := db.bucketManager.GetBucketById(entry.Meta.BucketId)
 	if err != nil {
 		return err
 	}
@@ -864,7 +867,7 @@ func (db *DB) buildSortedSetIdx(record *core.Record, entry *core.Entry) error {
 func (db *DB) buildListIdx(record *core.Record, entry *core.Entry) error {
 	key, val, meta := entry.Key, entry.Value, entry.Meta
 
-	bucket, err := db.bm.GetBucketById(entry.Meta.BucketId)
+	bucket, err := db.bucketManager.GetBucketById(entry.Meta.BucketId)
 	if err != nil {
 		return err
 	}
@@ -872,7 +875,7 @@ func (db *DB) buildListIdx(record *core.Record, entry *core.Entry) error {
 
 	l := db.Index.list.getWithDefault(bucketId)
 
-	if core.IsExpired(meta.TTL, meta.Timestamp) {
+	if db.ttlChecker.IsExpired(meta.TTL, meta.Timestamp) {
 		return nil
 	}
 
@@ -1021,12 +1024,12 @@ func (db *DB) IsClose() bool {
 func (db *DB) buildExpireCallback(bucket string, key []byte) func() {
 	return func() {
 		_ = db.Update(func(tx *Tx) error {
-			b, err := tx.db.bm.GetBucket(core.DataStructureBTree, bucket)
+			b, err := tx.db.bucketManager.GetBucket(core.DataStructureBTree, bucket)
 			if err != nil {
 				return err
 			}
 			bucketId := b.Id
-			if db.tm.Exist(bucketId, string(key)) {
+			if db.ttlManager.Exist(bucketId, string(key)) {
 				return tx.Delete(bucket, key)
 			}
 			return nil
@@ -1061,7 +1064,7 @@ func (db *DB) rebuildBucketManager() error {
 	}
 
 	if len(bucketRequest) > 0 {
-		err = db.bm.SubmitPendingBucketChange(bucketRequest)
+		err = db.bucketManager.SubmitPendingBucketChange(bucketRequest)
 		if err != nil {
 			return err
 		}
@@ -1088,11 +1091,11 @@ func (db *DB) Watch(bucket string, key []byte, cb func(message *Message) error, 
 		watchOpts = &opts[0]
 	}
 
-	if db.wm == nil {
+	if db.watchManager == nil {
 		return ErrWatchFeatureDisabled
 	}
 
-	subscriber, err := db.wm.subscribe(bucket, string(key))
+	subscriber, err := db.watchManager.subscribe(bucket, string(key))
 	if err != nil {
 		return err
 	}
@@ -1132,7 +1135,7 @@ func (db *DB) Watch(bucket string, key []byte, cb func(message *Message) error, 
 		ticker.Stop()
 
 		if subscriber != nil && subscriber.active.Load() {
-			if err := db.wm.unsubscribe(bucket, keyWatch, subscriber.id); err != nil {
+			if err := db.watchManager.unsubscribe(bucket, keyWatch, subscriber.id); err != nil {
 				// ignore the error
 			}
 		}
@@ -1140,7 +1143,7 @@ func (db *DB) Watch(bucket string, key []byte, cb func(message *Message) error, 
 
 	for {
 		select {
-		case <-db.wm.done():
+		case <-db.watchManager.done():
 			// drain the batch
 			if err := processBatch(batch); err != nil {
 				return err

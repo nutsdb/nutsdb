@@ -389,7 +389,7 @@ func TestDB_MergeForSet(t *testing.T) {
 			removeDir(opts.Dir)
 			opts.EntryIdxMode = idxMode
 			db, err := Open(opts)
-			if exist := db.bm.ExistBucket(core.DataStructureSet, bucket); !exist {
+			if exist := db.bucketManager.ExistBucket(core.DataStructureSet, bucket); !exist {
 				txCreateBucket(t, db, core.DataStructureSet, bucket, nil)
 			}
 
@@ -491,7 +491,7 @@ func TestDB_MergeForZSet(t *testing.T) {
 			removeDir(opts.Dir)
 			opts.EntryIdxMode = idxMode
 			db, err := Open(opts)
-			if exist := db.bm.ExistBucket(core.DataStructureSortedSet, bucket); !exist {
+			if exist := db.bucketManager.ExistBucket(core.DataStructureSortedSet, bucket); !exist {
 				txCreateBucket(t, db, core.DataStructureSortedSet, bucket, nil)
 			}
 			require.NoError(t, err)
@@ -597,7 +597,7 @@ func TestDB_MergeForList(t *testing.T) {
 			removeDir(opts.Dir)
 			opts.EntryIdxMode = idxMode
 			db, err := Open(opts)
-			if exist := db.bm.ExistBucket(core.DataStructureList, bucket); !exist {
+			if exist := db.bucketManager.ExistBucket(core.DataStructureList, bucket); !exist {
 				txCreateBucket(t, db, core.DataStructureList, bucket, nil)
 			}
 
