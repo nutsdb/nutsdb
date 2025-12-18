@@ -3061,10 +3061,10 @@ func TestDB_Watch(t *testing.T) {
 		bucket1 := "bucket1"
 		bucket2 := "bucket2"
 		score := 1.0
-		done := make(chan struct{})
 
 		// Iterate over EntryIdxMode options
 		for _, idxMode := range []EntryIdxMode{HintKeyValAndRAMIdxMode} {
+			done := make(chan struct{})
 			count := atomic.Int64{} // count the number of messages received
 			opts.EntryIdxMode = idxMode
 			opts.Dir = "/tmp/test-watch-and-txn-exceed-write-limit-mode-" + strconv.Itoa(int(idxMode)) + "/"
@@ -3088,9 +3088,9 @@ func TestDB_Watch(t *testing.T) {
 			key2 := []byte("key2")
 			countOfMessages := int64(107)
 
-			// Initialize the watcher for bucket2
+			// Initialize the watchers for bucket1
 			for i := 0; i < int(limitCount); i++ {
-				go func(i int, t *testing.T) {
+				go func(i int) {
 					key := []byte(strconv.Itoa(i))
 					err := db.Watch(bucket1, key, func(msg *Message) error {
 						count.Add(1)
@@ -3101,10 +3101,10 @@ func TestDB_Watch(t *testing.T) {
 					})
 
 					require.NoError(t, err)
-				}(i, t)
+				}(i)
 			}
 
-			go func(t *testing.T) {
+			go func() {
 				err := db.Watch(bucket1, key1, func(msg *Message) error {
 					count.Add(1)
 					if count.Load() == countOfMessages {
@@ -3113,7 +3113,7 @@ func TestDB_Watch(t *testing.T) {
 					return nil
 				})
 				require.NoError(t, err)
-			}(t)
+			}()
 
 			keys := [][]byte{key1, key2}
 			for _, key := range keys {
@@ -3174,7 +3174,8 @@ func TestDB_Watch(t *testing.T) {
 			// db.wm.close()
 			select {
 			case <-done:
-				require.Equal(t, count.Load(), countOfMessages, "the watch callback should be called 108 times")
+				time.Sleep(1 * time.Second)
+				require.Equal(t, count.Load(), countOfMessages, "the watch callback should be called 107 times")
 			case <-time.After(10 * time.Second):
 				t.Log("watch callback is called", count.Load(), "times")
 				t.Fatal("Timeout waiting for message")
@@ -3383,8 +3384,9 @@ func TestDB_WatchDeleteBucket(t *testing.T) {
 						}
 
 						count.Add(1)
-						if count.Load() == expectCount {
+						if done != nil && count.Load() == expectCount {
 							close(done)
+							done = nil
 						}
 						return nil
 					})
