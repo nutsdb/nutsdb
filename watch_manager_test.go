@@ -67,7 +67,6 @@ func wmSendMessagesWithDelay(t *testing.T, wm *watchManager, bucket, key string,
 		<-ticker.C
 		value := []byte(fmt.Sprintf("value_%d", i))
 		wmSendMessage(t, wm, bucket, key, value)
-
 	}
 }
 
@@ -682,6 +681,26 @@ func TestWatchManager_StartDistributor(t *testing.T) {
 		<-sendingDone
 		<-receivingDone
 		_ = wm.close()
+	})
+
+	t.Run("sendMessage returns ErrWatchManagerClosed when worker context is done", func(t *testing.T) {
+		wm := NewWatchManager()
+
+		for i := 0; i < watchChanBufferSize; i++ {
+			wm.watchChan <- NewMessage(
+				"bucket",
+				"key",
+				[]byte("value"),
+				DataSetFlag,
+				uint64(time.Now().Unix()),
+			)
+		}
+
+		wm.workerCancel()
+
+		msg := NewMessage("bucket", "key", []byte("value2"), DataSetFlag, uint64(time.Now().Unix()))
+		err := wm.sendMessage(msg)
+		require.ErrorIs(t, err, ErrWatchManagerClosed)
 	})
 }
 
