@@ -107,7 +107,6 @@ func open(opt Options) (*DB, error) {
 		opt:                     opt,
 		KeyCount:                0,
 		closed:                  false,
-		Index:                   newIndexWithOptions(opt),
 		fm:                      NewFileManager(opt.RWMode, opt.MaxFdNumsInCache, opt.CleanFdsCacheThreshold, opt.SegmentSize),
 		mergeStartCh:            make(chan struct{}),
 		mergeEndCh:              make(chan error),
@@ -118,6 +117,8 @@ func open(opt Options) (*DB, error) {
 		hintKeyAndRAMIdxModeLru: utils.NewLruCache(opt.HintKeyAndRAMIdxCacheSize),
 		snowflakeManager:        NewSnowflakeManager(opt.NodeNum),
 	}
+
+	db.Index = db.newIndex()
 
 	db.commitBuffer = createNewBufferWithSize(int(db.opt.CommitBufferSize))
 

@@ -17,6 +17,7 @@ package nutsdb
 import (
 	"github.com/nutsdb/nutsdb/internal/core"
 	"github.com/nutsdb/nutsdb/internal/data"
+	"github.com/nutsdb/nutsdb/internal/ttl/checker"
 )
 
 type IdxType interface {
@@ -68,11 +69,12 @@ func (idx ListIdx) getWithDefault(id core.BucketId) *data.List {
 
 type BTreeIdx struct {
 	*defaultOp[data.BTree]
+	ttlChecker *checker.Checker
 }
 
 func (idx BTreeIdx) getWithDefault(id core.BucketId) *data.BTree {
 	return idx.defaultOp.computeIfAbsent(id, func() *data.BTree {
-		return data.NewBTree()
+		return data.NewBTree(idx.ttlChecker)
 	})
 }
 
@@ -101,18 +103,12 @@ type index struct {
 	bTree     BTreeIdx
 	set       SetIdx
 	sortedSet SortedSetIdx
-	opts      Options // Store options for creating new data structures
 }
 
-func newIndex() *index {
-	return newIndexWithOptions(DefaultOptions)
-}
-
-func newIndexWithOptions(opts Options) *index {
+func (db *DB) newIndex() *index {
 	i := new(index)
-	i.opts = opts
-	i.list = ListIdx{defaultOp: &defaultOp[data.List]{idx: map[core.BucketId]*data.List{}}, opts: opts}
-	i.bTree = BTreeIdx{&defaultOp[data.BTree]{idx: map[core.BucketId]*data.BTree{}}}
+	i.list = ListIdx{defaultOp: &defaultOp[data.List]{idx: map[core.BucketId]*data.List{}}, opts: db.opt}
+	i.bTree = BTreeIdx{defaultOp: &defaultOp[data.BTree]{idx: map[core.BucketId]*data.BTree{}}, ttlChecker: db.ttlChecker}
 	i.set = SetIdx{&defaultOp[data.Set]{idx: map[core.BucketId]*data.Set{}}}
 	i.sortedSet = SortedSetIdx{&defaultOp[SortedSet]{idx: map[core.BucketId]*SortedSet{}}}
 	return i

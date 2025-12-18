@@ -21,6 +21,7 @@ import (
 
 	"github.com/nutsdb/nutsdb/internal/core"
 	"github.com/nutsdb/nutsdb/internal/ttl/checker"
+	"github.com/nutsdb/nutsdb/internal/ttl/clock"
 	"github.com/tidwall/btree"
 )
 
@@ -29,22 +30,23 @@ var ErrKeyNotFound = errors.New("key not found")
 
 // BTree represents a B-tree index with optional TTL support.
 type BTree struct {
-	btree      *btree.BTreeG[*core.Item[core.Record]]
+	index      *btree.BTreeG[*core.Item[core.Record]]
 	ttlChecker *checker.Checker
 }
 
 // NewBTree creates a new BTree instance without TTL support.
-func NewBTree() *BTree {
-	return &BTree{
-		btree: btree.NewBTreeG(func(a, b *core.Item[core.Record]) bool {
+func NewBTree(ttlCheckers ...*checker.Checker) *BTree {
+	btree := &BTree{
+		index: btree.NewBTreeG(func(a, b *core.Item[core.Record]) bool {
 			return bytes.Compare(a.Key, b.Key) == -1
 		}),
 	}
-}
-
-// SetTTLChecker injects the TTL checker for expiration logic.
-func (bt *BTree) SetTTLChecker(tc *checker.Checker) {
-	bt.ttlChecker = tc
+	if len(ttlCheckers) > 0 {
+		btree.ttlChecker = ttlCheckers[0]
+		return btree
+	}
+	btree.ttlChecker = checker.NewChecker(clock.NewRealClock())
+	return btree
 }
 
 // isValid checks if an item is valid (not expired) using the TTL checker.
@@ -54,7 +56,7 @@ func (bt *BTree) isValid(item *core.Item[core.Record]) bool {
 
 // getItem retrieves an item by key without TTL validation.
 func (bt *BTree) getItem(key []byte) (*core.Item[core.Record], bool) {
-	return bt.btree.Get(core.NewItem[core.Record](key, nil))
+	return bt.index.Get(core.NewItem[core.Record](key, nil))
 }
 
 // getValidItem retrieves an item by key with TTL validation.
@@ -80,12 +82,12 @@ func (bt *BTree) Find(key []byte) (*core.Record, bool) {
 }
 
 func (bt *BTree) InsertRecord(key []byte, record *core.Record) bool {
-	_, replaced := bt.btree.Set(core.NewItem(key, record))
+	_, replaced := bt.index.Set(core.NewItem(key, record))
 	return replaced
 }
 
 func (bt *BTree) Delete(key []byte) bool {
-	_, deleted := bt.btree.Delete(core.NewItem[core.Record](key, nil))
+	_, deleted := bt.index.Delete(core.NewItem[core.Record](key, nil))
 	return deleted
 }
 
@@ -115,17 +117,17 @@ func (bt *BTree) PrefixSearchScan(prefix []byte, reg string, offset, limitNum in
 }
 
 func (bt *BTree) Count() int {
-	return bt.btree.Len()
+	return bt.index.Len()
 }
 
 // PopMin removes and returns the minimum key record, filtering expired ones.
 func (bt *BTree) PopMin() (*core.Item[core.Record], bool) {
-	return bt.popUntilValid(bt.btree.PopMin)
+	return bt.popUntilValid(bt.index.PopMin)
 }
 
 // PopMax removes and returns the maximum key record, filtering expired ones.
 func (bt *BTree) PopMax() (*core.Item[core.Record], bool) {
-	return bt.popUntilValid(bt.btree.PopMax)
+	return bt.popUntilValid(bt.index.PopMax)
 }
 
 // popUntilValid pops items until finding a valid (non-expired) one.
@@ -152,7 +154,7 @@ func (bt *BTree) Max() (*core.Item[core.Record], bool) {
 }
 
 func (bt *BTree) Iter() btree.IterG[*core.Item[core.Record]] {
-	return bt.btree.Iter()
+	return bt.index.Iter()
 }
 
 // GetTTL returns the remaining TTL for a key in seconds.
@@ -425,19 +427,19 @@ func (b *BTreeScanner) buildIterator() func(func(*core.Item[core.Record]) bool) 
 	if b.direction == Reverse {
 		if pivot != nil {
 			return func(fn func(*core.Item[core.Record]) bool) {
-				b.bt.btree.Descend(&core.Item[core.Record]{Key: pivot}, fn)
+				b.bt.index.Descend(&core.Item[core.Record]{Key: pivot}, fn)
 			}
 		}
-		return b.bt.btree.Reverse
+		return b.bt.index.Reverse
 	}
 
 	// Forward
 	if pivot != nil {
 		return func(fn func(*core.Item[core.Record]) bool) {
-			b.bt.btree.Ascend(&core.Item[core.Record]{Key: pivot}, fn)
+			b.bt.index.Ascend(&core.Item[core.Record]{Key: pivot}, fn)
 		}
 	}
-	return b.bt.btree.Scan
+	return b.bt.index.Scan
 }
 
 // isValid checks if an item is not expired.

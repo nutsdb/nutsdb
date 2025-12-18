@@ -670,14 +670,14 @@ func TestMergeV2CommitCollectorFailure(t *testing.T) {
 	bt.InsertRecord(key, record)
 
 	db := &DB{
-		opt:   opts,
-		Index: newIndex(),
+		opt: opts,
 		bucketManager: &BucketManager{
 			BucketInfoMapper: map[core.BucketId]*core.Bucket{
 				bucketID: {Meta: &core.BucketMeta{}, Id: bucketID, Name: bucketName, Ds: uint16(core.DataStructureBTree)},
 			},
 		},
 	}
+	db.Index = db.newIndex()
 	db.Index.bTree.idx[bucketID] = bt
 
 	collector := NewHintCollector(1, &failingHintWriter{writeErr: errors.New("writer failed")}, 1)
@@ -1312,12 +1312,14 @@ func TestMergeV2WriteEntryHashesSetAndSortedSet(t *testing.T) {
 
 func TestMergeV2ApplyLookupUpdatesSecondaryIndexes(t *testing.T) {
 	db := &DB{
-		opt:   DefaultOptions,
-		Index: newIndex(),
+		opt:        DefaultOptions,
+		ttlChecker: checker.NewChecker(clock.NewRealClock()),
 		bucketManager: &BucketManager{
 			BucketInfoMapper: map[core.BucketId]*core.Bucket{},
 		},
 	}
+
+	db.Index = db.newIndex()
 
 	// Prepare buckets
 	buckets := []struct {
@@ -2004,7 +2006,6 @@ func TestMergeV2RewriteFileSkipsCorruptedEntries(t *testing.T) {
 			BufferSizeOfRecovery: 4096,
 			SegmentSize:          1 << 16,
 		},
-		Index:      newIndex(),
 		ttlChecker: checker.NewChecker(clock.NewRealClock()),
 		bucketManager: &BucketManager{
 			BucketInfoMapper: map[core.BucketId]*core.Bucket{
@@ -2012,6 +2013,7 @@ func TestMergeV2RewriteFileSkipsCorruptedEntries(t *testing.T) {
 			},
 		},
 	}
+	db.Index = db.newIndex()
 	db.Index.bTree.idx[bucketID] = bt
 
 	mock := &mockRWManager{}
