@@ -118,6 +118,8 @@ func open(opt Options) (*DB, error) {
 		snowflakeManager:        NewSnowflakeManager(opt.NodeNum),
 	}
 
+	db.ttlChecker.SetExpiredCallback(db.handleExpiredKey)
+
 	db.Index = db.newIndex()
 
 	db.commitBuffer = createNewBufferWithSize(int(db.opt.CommitBufferSize))
@@ -767,7 +769,7 @@ func (db *DB) buildBTreeIdx(record *core.Record, entry *core.Entry) error {
 		bTree.Delete(key)
 	} else {
 		if meta.TTL != core.Persistent {
-			db.ttlManager.Add(bucketId, string(key), expireTime(meta.Timestamp, meta.TTL), db.buildExpireCallback(bucket.Name, key))
+			db.ttlManager.Add(bucketId, string(key), expireTime(meta.Timestamp, meta.TTL), core.DataStructureBTree, db.handleExpiredKey)
 		} else {
 			db.ttlManager.Del(bucketId, string(key))
 		}
@@ -1022,20 +1024,24 @@ func (db *DB) IsClose() bool {
 	return db.closed
 }
 
-func (db *DB) buildExpireCallback(bucket string, key []byte) func() {
-	return func() {
+// handleExpiredKey is the unified callback for handling expired keys.
+// It is triggered by ttlChecker when a key is detected as expired.
+func (db *DB) handleExpiredKey(bucketId uint64, key []byte, ds uint16) {
+	// Run asynchronously to avoid blocking read operations
+	go func() {
 		_ = db.Update(func(tx *Tx) error {
-			b, err := tx.db.bucketManager.GetBucket(core.DataStructureBTree, bucket)
+			bucket, err := db.bucketManager.GetBucketById(bucketId)
 			if err != nil {
 				return err
 			}
-			bucketId := b.Id
+			// Only delete if the key still exists in ttlManager
+			// (it might have been updated or deleted by another operation)
 			if db.ttlManager.Exist(bucketId, string(key)) {
-				return tx.Delete(bucket, key)
+				return tx.Delete(bucket.Name, key)
 			}
 			return nil
 		})
-	}
+	}()
 }
 
 func (db *DB) rebuildBucketManager() error {

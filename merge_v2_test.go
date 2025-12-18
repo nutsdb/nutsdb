@@ -660,7 +660,7 @@ func TestMergeV2CommitCollectorFailure(t *testing.T) {
 	timestamp := uint64(time.Now().Unix())
 	oldFileID := int64(5)
 
-	bt := data.NewBTree()
+	bt := data.NewBTree(0) // bucketId 0 for test
 	record := (&core.Record{}).
 		WithKey(key).
 		WithFileId(oldFileID).
@@ -1350,7 +1350,7 @@ func TestMergeV2ApplyLookupUpdatesSecondaryIndexes(t *testing.T) {
 	listKey := []byte("list-key")
 	seq := uint64(42)
 	listRecord := &core.Record{FileID: 11, Timestamp: 2, TTL: core.Persistent, TxID: 1}
-	listIdx.Items[string(listKey)] = data.NewBTree()
+	listIdx.Items[string(listKey)] = data.NewBTree(0) // bucketId 0 for test
 	listIdx.Items[string(listKey)].InsertRecord(utils.ConvertUint64ToBigEndianBytes(seq), listRecord)
 
 	// Sorted set bucket
@@ -1991,7 +1991,7 @@ func TestMergeV2RewriteFileSkipsCorruptedEntries(t *testing.T) {
 		t.Fatalf("close test data file: %v", err)
 	}
 
-	bt := data.NewBTree()
+	bt := data.NewBTree(0) // bucketId 0 for test
 	bt.InsertRecord(goodEntry.Key, (&core.Record{}).
 		WithFileId(fid).
 		WithDataPos(0).

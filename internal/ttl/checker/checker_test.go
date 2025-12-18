@@ -78,11 +78,13 @@ func TestChecker_FilterExpiredRecord(t *testing.T) {
 	checker := NewChecker(clk)
 
 	// Track callback invocations
+	var callbackBucketId uint64
 	var callbackKey []byte
 	var callbackDs uint16
 	callbackInvoked := false
 
-	checker.SetExpiredCallback(func(key []byte, ds uint16) {
+	checker.SetExpiredCallback(func(bucketId uint64, key []byte, ds uint16) {
+		callbackBucketId = bucketId
 		callbackKey = key
 		callbackDs = ds
 		callbackInvoked = true
@@ -122,10 +124,13 @@ func TestChecker_FilterExpiredRecord(t *testing.T) {
 		},
 	}
 
+	testBucketId := uint64(1)
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Reset callback state
 			callbackInvoked = false
+			callbackBucketId = 0
 			callbackKey = nil
 			callbackDs = 0
 
@@ -134,7 +139,7 @@ func TestChecker_FilterExpiredRecord(t *testing.T) {
 				key = tt.record.Key
 			}
 
-			result := checker.FilterExpiredRecord(key, tt.record, DataStructureBTree)
+			result := checker.FilterExpiredRecord(testBucketId, key, tt.record, DataStructureBTree)
 
 			if result != tt.expectedValid {
 				t.Errorf("FilterExpiredRecord() = %v, want %v", result, tt.expectedValid)
@@ -149,6 +154,9 @@ func TestChecker_FilterExpiredRecord(t *testing.T) {
 			}
 
 			if tt.expectCallback && callbackInvoked {
+				if callbackBucketId != testBucketId {
+					t.Errorf("Callback bucketId = %d, want %d", callbackBucketId, testBucketId)
+				}
 				if string(callbackKey) != string(key) {
 					t.Errorf("Callback key = %s, want %s", string(callbackKey), string(key))
 				}
@@ -166,7 +174,7 @@ func TestChecker_FilterExpiredRecords(t *testing.T) {
 
 	// Track callback invocations
 	var callbackKeys [][]byte
-	checker.SetExpiredCallback(func(key []byte, ds uint16) {
+	checker.SetExpiredCallback(func(bucketId uint64, key []byte, ds uint16) {
 		callbackKeys = append(callbackKeys, key)
 	})
 
@@ -196,7 +204,8 @@ func TestChecker_FilterExpiredRecords(t *testing.T) {
 	// Reset callback state
 	callbackKeys = nil
 
-	result := checker.FilterExpiredRecords(records, DataStructureBTree)
+	testBucketId := uint64(1)
+	result := checker.FilterExpiredRecords(testBucketId, records, DataStructureBTree)
 
 	// Should have 2 valid records (persistent and valid)
 	if len(result) != 2 {
@@ -230,7 +239,7 @@ func TestChecker_FilterExpiredItems(t *testing.T) {
 
 	// Track callback invocations
 	var callbackKeys [][]byte
-	checker.SetExpiredCallback(func(key []byte, ds uint16) {
+	checker.SetExpiredCallback(func(bucketId uint64, key []byte, ds uint16) {
 		callbackKeys = append(callbackKeys, key)
 	})
 
@@ -268,7 +277,8 @@ func TestChecker_FilterExpiredItems(t *testing.T) {
 	// Reset callback state
 	callbackKeys = nil
 
-	result := checker.FilterExpiredItems(items, DataStructureBTree)
+	testBucketId := uint64(1)
+	result := checker.FilterExpiredItems(testBucketId, items, DataStructureBTree)
 
 	// Should have 2 valid items (persistent and valid)
 	if len(result) != 2 {

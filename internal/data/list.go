@@ -144,7 +144,7 @@ func NewList(listImpl ListImplementationType) *List {
 func (l *List) CreateListStructure() ListStructure {
 	switch l.ListImpl {
 	case ListImplBTree:
-		return NewBTree()
+		return NewBTree(0)
 	case ListImplDoublyLinkedList:
 		return NewDoublyLinkedList()
 	default:

@@ -33,7 +33,7 @@ var (
 )
 
 func runBTreeTest(t *testing.T, test func(t *testing.T, btree *BTree)) {
-	btree := NewBTree()
+	btree := NewBTree(0) // bucketId 0 for test
 
 	for i := 0; i < 100; i++ {
 		key := []byte(fmt.Sprintf(keyFormat, i))
@@ -227,7 +227,7 @@ func createTestRecord(key string, ttlVal uint32, timestamp uint64) *core.Record 
 func TestBTree_TTL_Find(t *testing.T) {
 	mockClock := clock.NewMockClock(1000000) // Current time: 1000 seconds in millis
 	checker := checker.NewChecker(mockClock)
-	btree := NewBTree(checker)
+	btree := NewBTree(1, checker) // bucketId 1 for test
 
 	// Insert a record that is not expired (TTL 100s, timestamp 999000ms = 999s)
 	// Expiration: 999s + 100s = 1099s = 1099000ms > 1000000ms (current)
@@ -271,7 +271,7 @@ func TestBTree_TTL_Find(t *testing.T) {
 func TestBTree_TTL_All(t *testing.T) {
 	mockClock := clock.NewMockClock(1000000)
 	checker := checker.NewChecker(mockClock)
-	btree := NewBTree(checker)
+	btree := NewBTree(1, checker) // bucketId 1 for test
 
 	// Insert mix of valid and expired records
 	for i := 0; i < 10; i++ {
@@ -303,7 +303,7 @@ func TestBTree_TTL_All(t *testing.T) {
 func TestBTree_TTL_Range(t *testing.T) {
 	mockClock := clock.NewMockClock(1000000)
 	checker := checker.NewChecker(mockClock)
-	btree := NewBTree(checker)
+	btree := NewBTree(1, checker) // bucketId 1 for test
 
 	// Insert records
 	for i := 0; i < 10; i++ {
@@ -329,7 +329,7 @@ func TestBTree_TTL_Range(t *testing.T) {
 func TestBTree_TTL_PrefixScan(t *testing.T) {
 	mockClock := clock.NewMockClock(1000000)
 	checker := checker.NewChecker(mockClock)
-	btree := NewBTree(checker)
+	btree := NewBTree(1, checker) // bucketId 1 for test
 
 	// Insert records with prefix
 	for i := 0; i < 10; i++ {
@@ -368,7 +368,7 @@ func TestBTree_TTL_PrefixScan(t *testing.T) {
 func TestBTree_TTL_MinMax(t *testing.T) {
 	mockClock := clock.NewMockClock(1000000)
 	checker := checker.NewChecker(mockClock)
-	btree := NewBTree(checker)
+	btree := NewBTree(1, checker) // bucketId 1 for test
 
 	// Insert records where min and max are expired
 	records := []struct {
@@ -403,7 +403,7 @@ func TestBTree_TTL_MinMax(t *testing.T) {
 func TestBTree_TTL_PopMinMax(t *testing.T) {
 	mockClock := clock.NewMockClock(1000000)
 	checker := checker.NewChecker(mockClock)
-	btree := NewBTree(checker)
+	btree := NewBTree(1, checker) // bucketId 1 for test
 
 	// Insert records where min is expired
 	records := []struct {
@@ -431,7 +431,7 @@ func TestBTree_TTL_PopMinMax(t *testing.T) {
 func TestBTree_TTL_AllItems(t *testing.T) {
 	mockClock := clock.NewMockClock(1000000)
 	checker := checker.NewChecker(mockClock)
-	btree := NewBTree(checker)
+	btree := NewBTree(1, checker) // bucketId 1 for test
 
 	// Insert mix of valid and expired records
 	validRecord := createTestRecord("valid", 100, 999000)
@@ -447,7 +447,7 @@ func TestBTree_TTL_AllItems(t *testing.T) {
 func TestBTree_TTL_TimeAdvancement(t *testing.T) {
 	mockClock := clock.NewMockClock(1000000) // Start at 1000 seconds
 	checker := checker.NewChecker(mockClock)
-	btree := NewBTree(checker)
+	btree := NewBTree(1, checker) // bucketId 1 for test
 
 	// Insert a record with TTL 100s, timestamp 1000000ms (current time)
 	// Expiration: 1000s + 100s = 1100s = 1100000ms
@@ -469,8 +469,8 @@ func TestBTree_TTL_TimeAdvancement(t *testing.T) {
 }
 
 func TestBTree_GetTTL(t *testing.T) {
-	mockClock := clock.NewMockClock(1000000) // Current time: 1000 seconds in millis
-	btree := NewBTree(checker.NewChecker(mockClock))
+	mockClock := clock.NewMockClock(1000000)            // Current time: 1000 seconds in millis
+	btree := NewBTree(1, checker.NewChecker(mockClock)) // bucketId 1 for test
 
 	t.Run("get TTL for valid record", func(t *testing.T) {
 		// Insert a record with TTL 100s, timestamp 1000000ms (current time)
@@ -543,7 +543,7 @@ func TestBTree_GetTTL(t *testing.T) {
 func TestBTree_IsExpiredKey(t *testing.T) {
 	mockClock := clock.NewMockClock(1000000) // Current time: 1000 seconds in millis
 	checker := checker.NewChecker(mockClock)
-	btree := NewBTree(checker)
+	btree := NewBTree(1, checker) // bucketId 1 for test
 
 	t.Run("valid record is not expired", func(t *testing.T) {
 		record := createTestRecord("valid_key", 100, 999000)

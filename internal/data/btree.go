@@ -21,7 +21,6 @@ import (
 
 	"github.com/nutsdb/nutsdb/internal/core"
 	"github.com/nutsdb/nutsdb/internal/ttl/checker"
-	"github.com/nutsdb/nutsdb/internal/ttl/clock"
 	"github.com/tidwall/btree"
 )
 
@@ -32,26 +31,32 @@ var ErrKeyNotFound = errors.New("key not found")
 type BTree struct {
 	index      *btree.BTreeG[*core.Item[core.Record]]
 	ttlChecker *checker.Checker
+	bucketId   uint64
 }
 
-// NewBTree creates a new BTree instance without TTL support.
-func NewBTree(ttlCheckers ...*checker.Checker) *BTree {
-	btree := &BTree{
+// NewBTree creates a new BTree instance with optional TTL support.
+// If no ttlChecker is provided, TTL checking is disabled (useful for internal use like List).
+func NewBTree(bucketId uint64, ttlCheckers ...*checker.Checker) *BTree {
+	bt := &BTree{
 		index: btree.NewBTreeG(func(a, b *core.Item[core.Record]) bool {
 			return bytes.Compare(a.Key, b.Key) == -1
 		}),
+		bucketId: bucketId,
 	}
 	if len(ttlCheckers) > 0 {
-		btree.ttlChecker = ttlCheckers[0]
-		return btree
+		bt.ttlChecker = ttlCheckers[0]
 	}
-	btree.ttlChecker = checker.NewChecker(clock.NewRealClock())
-	return btree
+	// If no ttlChecker provided, bt.ttlChecker remains nil (TTL checking disabled)
+	return bt
 }
 
 // isValid checks if an item is valid (not expired) using the TTL checker.
+// If no TTL checker is configured, all items are considered valid.
 func (bt *BTree) isValid(item *core.Item[core.Record]) bool {
-	return bt.ttlChecker.FilterExpiredRecord(item.Key, item.Record, core.DataStructureBTree)
+	if bt.ttlChecker == nil {
+		return item.Record != nil
+	}
+	return bt.ttlChecker.FilterExpiredRecord(bt.bucketId, item.Key, item.Record, core.DataStructureBTree)
 }
 
 // getItem retrieves an item by key without TTL validation.
@@ -159,7 +164,11 @@ func (bt *BTree) Iter() btree.IterG[*core.Item[core.Record]] {
 
 // GetTTL returns the remaining TTL for a key in seconds.
 // Returns (-1, nil) for persistent, (remaining, nil) for valid, (0, ErrKeyNotFound) for expired/missing.
+// Returns (0, ErrKeyNotFound) if TTL checking is disabled.
 func (bt *BTree) GetTTL(key []byte) (int64, error) {
+	if bt.ttlChecker == nil {
+		return 0, ErrKeyNotFound
+	}
 	if item, ok := bt.getValidItem(key); ok {
 		return bt.ttlChecker.CalculateRemainingTTL(item.Record.TTL, item.Record.Timestamp), nil
 	}
@@ -167,7 +176,11 @@ func (bt *BTree) GetTTL(key []byte) (int64, error) {
 }
 
 // IsExpiredKey checks if a key exists and is expired.
+// Returns false if TTL checking is disabled.
 func (bt *BTree) IsExpiredKey(key []byte) bool {
+	if bt.ttlChecker == nil {
+		return false
+	}
 	if item, ok := bt.getItem(key); ok {
 		return bt.ttlChecker.IsExpired(item.Record.TTL, item.Record.Timestamp)
 	}
@@ -447,7 +460,7 @@ func (b *BTreeScanner) isValid(item *core.Item[core.Record]) bool {
 	if b.ttlChecker == nil || item.Record == nil {
 		return true
 	}
-	return b.ttlChecker.FilterExpiredRecord(item.Key, item.Record, b.ds)
+	return b.ttlChecker.FilterExpiredRecord(b.bt.bucketId, item.Key, item.Record, b.ds)
 }
 
 // inRange checks if an item is within the specified key range.
