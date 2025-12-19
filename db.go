@@ -775,7 +775,7 @@ func (db *DB) buildBTreeIdx(record *core.Record, entry *core.Entry) error {
 		bTree.Delete(key)
 	} else {
 		if meta.TTL != core.Persistent {
-			db.ttlManager.Add(bucketId, string(key), expireTime(meta.Timestamp, meta.TTL), core.DataStructureBTree, db.handleExpiredKey)
+			db.ttlManager.Add(bucketId, string(key), expireTime(meta.Timestamp, meta.TTL), core.DataStructureBTree, record.Timestamp, db.handleExpiredKey)
 		} else {
 			db.ttlManager.Del(bucketId, string(key))
 		}
@@ -1031,20 +1031,36 @@ func (db *DB) IsClose() bool {
 }
 
 // handleExpiredKey is the unified callback for handling expired keys.
-// It is triggered by ttlChecker when a key is detected as expired.
-func (db *DB) handleExpiredKey(bucketId uint64, key []byte, ds uint16) {
-	// Run asynchronously to avoid blocking read operations
+// It validates the timestamp to prevent race conditions where a key is:
+// 1. Set with short TTL (timestamp T1)
+// 2. Expires and triggers async deletion
+// 3. Re-inserted with new TTL (timestamp T2)
+// 4. Async deletion from step 2 executes and mistakenly deletes the new key
+// By comparing timestamps, we ensure only the originally expired key is deleted.
+func (db *DB) handleExpiredKey(bucketId uint64, key []byte, ds uint16, expiredTimestamp uint64) {
 	go func() {
 		_ = db.Update(func(tx *Tx) error {
 			bucket, err := db.bucketManager.GetBucketById(bucketId)
 			if err != nil {
 				return err
 			}
-			// Only delete if the key still exists in ttlManager
-			// (it might have been updated or deleted by another operation)
-			if db.ttlManager.Exist(bucketId, string(key)) {
+
+			// Verify the key still exists and has the same timestamp
+			idx, ok := db.Index.BTree.exist(bucketId)
+			if !ok {
+				return nil
+			}
+
+			record, found := idx.Find(key)
+			if !found {
+				return nil
+			}
+
+			// Only delete if timestamp matches (same record that expired)
+			if record.Timestamp == expiredTimestamp {
 				return tx.Delete(bucket.Name, key)
 			}
+
 			return nil
 		})
 	}()

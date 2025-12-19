@@ -1067,7 +1067,7 @@ func TestTx_GetMaxOrMinKey(t *testing.T) {
 	})
 
 	t.Run("test expire", func(t *testing.T) {
-		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc *clock.MockClock) {
 			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
 			keya := []byte("A")
 			keyb := []byte("B")
@@ -1078,9 +1078,9 @@ func TestTx_GetMaxOrMinKey(t *testing.T) {
 
 			txGetMaxOrMinKey(t, db, bucket, false, keya, nil)
 			txGetMaxOrMinKey(t, db, bucket, true, keyc, nil)
-			<-time.After(1500 * time.Millisecond)
+			mc.AdvanceTime(1500 * time.Millisecond)
 			txGetMaxOrMinKey(t, db, bucket, false, keyb, nil)
-			<-time.After(2000 * time.Millisecond)
+			mc.AdvanceTime(2000 * time.Millisecond)
 			txGetMaxOrMinKey(t, db, bucket, true, keyb, nil)
 		})
 	})
@@ -2093,7 +2093,7 @@ func TestTx_TestBucketNotExists(t *testing.T) {
 
 func TestTx_RecordExpired(t *testing.T) {
 	t.Run("test PutIfExists", func(t *testing.T) {
-		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc *clock.MockClock) {
 			r := require.New(t)
 			bucket := `1`
 			key := []byte("k")
@@ -2101,18 +2101,18 @@ func TestTx_RecordExpired(t *testing.T) {
 			v2 := []byte("v2")
 			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
 			txPut(t, db, bucket, key, v1, 1, nil, nil)
-			<-time.After(100 * time.Millisecond)
+			mc.AdvanceTime(100 * time.Millisecond)
 			r.NoError(db.Update(func(tx *Tx) (err error) {
 				r.NoError(tx.PutIfExists(bucket, key, v2, 1))
 				return
 			}))
 			txGet(t, db, bucket, key, v2, nil)
-			<-time.After(100 * time.Millisecond)
+			mc.AdvanceTime(100 * time.Millisecond)
 			r.NoError(db.Update(func(tx *Tx) (err error) {
 				r.NoError(tx.PutIfExists(bucket, key, v2, 1))
 				return
 			}))
-			<-time.After(1200 * time.Millisecond)
+			mc.AdvanceTime(1200 * time.Millisecond)
 			r.NoError(db.Update(func(tx *Tx) (err error) {
 				r.Equal(ErrNotFoundKey, tx.PutIfExists(bucket, key, v2, 1))
 				return
@@ -2121,7 +2121,7 @@ func TestTx_RecordExpired(t *testing.T) {
 	})
 
 	t.Run("test PutIfNotExists", func(t *testing.T) {
-		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc *clock.MockClock) {
 			r := require.New(t)
 			bucket := `1`
 			key := []byte("k")
@@ -2129,13 +2129,13 @@ func TestTx_RecordExpired(t *testing.T) {
 			v2 := []byte("v2")
 			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
 			txPut(t, db, bucket, key, v1, 1, nil, nil)
-			<-time.After(100 * time.Millisecond)
+			mc.AdvanceTime(100 * time.Millisecond)
 			r.NoError(db.Update(func(tx *Tx) (err error) {
 				r.NoError(tx.PutIfNotExists(bucket, key, v2, 1))
 				return
 			}))
 			txGet(t, db, bucket, key, v1, nil)
-			<-time.After(1100 * time.Millisecond)
+			mc.AdvanceTime(1100 * time.Millisecond)
 			r.NoError(db.Update(func(tx *Tx) (err error) {
 				r.NoError(tx.PutIfNotExists(bucket, key, v2, 1))
 				return

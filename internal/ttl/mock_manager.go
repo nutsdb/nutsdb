@@ -26,6 +26,7 @@ type ttlTask struct {
 	key        string
 	expireTime int64 // milliseconds
 	ds         uint16
+	timestamp  uint64
 	callback   ExpireCallback
 	triggered  bool
 }
@@ -64,7 +65,7 @@ func (mm *MockManager) Exist(bucketId BucketId, key string) bool {
 }
 
 // Add adds a TTL entry with the specified expiration duration.
-func (mm *MockManager) Add(bucketId BucketId, key string, expire time.Duration, ds uint16, callback ExpireCallback) {
+func (mm *MockManager) Add(bucketId BucketId, key string, expire time.Duration, ds uint16, timestamp uint64, callback ExpireCallback) {
 	mm.mu.Lock()
 	defer mm.mu.Unlock()
 
@@ -78,6 +79,7 @@ func (mm *MockManager) Add(bucketId BucketId, key string, expire time.Duration, 
 		key:        key,
 		expireTime: expireTime,
 		ds:         ds,
+		timestamp:  timestamp,
 		callback:   callback,
 	}
 }
@@ -119,7 +121,7 @@ func (mm *MockManager) checkExpirations(nowMillis int64) {
 	// Execute callbacks outside of the lock to avoid deadlocks
 	for _, task := range expiredTasks {
 		if task.callback != nil {
-			task.callback(task.bucketId, []byte(task.key), task.ds)
+			task.callback(task.bucketId, []byte(task.key), task.ds, task.timestamp)
 		}
 	}
 }

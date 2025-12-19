@@ -83,7 +83,7 @@ func TestChecker_FilterExpiredRecord(t *testing.T) {
 	var callbackDs uint16
 	callbackInvoked := false
 
-	checker.SetExpiredCallback(func(bucketId uint64, key []byte, ds uint16) {
+	checker.SetExpiredCallback(func(bucketId uint64, key []byte, ds uint16, _ uint64) {
 		callbackBucketId = bucketId
 		callbackKey = key
 		callbackDs = ds
@@ -174,7 +174,7 @@ func TestChecker_FilterExpiredRecords(t *testing.T) {
 
 	// Track callback invocations
 	var callbackKeys [][]byte
-	checker.SetExpiredCallback(func(bucketId uint64, key []byte, ds uint16) {
+	checker.SetExpiredCallback(func(bucketId uint64, key []byte, ds uint16, timestamp uint64) {
 		callbackKeys = append(callbackKeys, key)
 	})
 
@@ -239,7 +239,7 @@ func TestChecker_FilterExpiredItems(t *testing.T) {
 
 	// Track callback invocations
 	var callbackKeys [][]byte
-	checker.SetExpiredCallback(func(bucketId uint64, key []byte, ds uint16) {
+	checker.SetExpiredCallback(func(bucketId uint64, key []byte, ds uint16, timestamp uint64) {
 		callbackKeys = append(callbackKeys, key)
 	})
 

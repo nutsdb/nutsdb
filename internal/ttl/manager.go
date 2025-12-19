@@ -67,7 +67,7 @@ func (n nodes) delNode(bucketId BucketId, key string) {
 type Manager interface {
 	Run()
 	Exist(bucketId BucketId, key string) bool
-	Add(bucketId BucketId, key string, expire time.Duration, ds uint16, callback ExpireCallback)
+	Add(bucketId BucketId, key string, expire time.Duration, ds uint16, timestamp uint64, callback ExpireCallback)
 	Del(bucketId BucketId, key string)
 	Close()
 }
@@ -109,18 +109,19 @@ func (tm *TimerManager) Exist(bucketId BucketId, key string) bool {
 }
 
 // ExpireCallback is a function type for timer expiration notifications.
-type ExpireCallback func(bucketId BucketId, key []byte, ds uint16)
+// timestamp is the record timestamp when the TTL was set, used for validation.
+type ExpireCallback func(bucketId BucketId, key []byte, ds uint16, timestamp uint64)
 
 // Add adds a TTL entry with the specified expiration duration.
-// When the timer expires, it triggers the callback with bucketId, key, and data structure type.
-func (tm *TimerManager) Add(bucketId BucketId, key string, expire time.Duration, ds uint16, callback ExpireCallback) {
+// When the timer expires, it triggers the callback with bucketId, key, data structure type, and timestamp.
+func (tm *TimerManager) Add(bucketId BucketId, key string, expire time.Duration, ds uint16, timestamp uint64, callback ExpireCallback) {
 	if node, ok := tm.timerNodes.getNode(bucketId, key); ok {
 		node.Stop()
 	}
 
 	node := tm.t.AfterFunc(expire, func() {
 		if callback != nil {
-			callback(bucketId, []byte(key), ds)
+			callback(bucketId, []byte(key), ds, timestamp)
 		}
 	})
 	tm.timerNodes.addNode(bucketId, key, node)

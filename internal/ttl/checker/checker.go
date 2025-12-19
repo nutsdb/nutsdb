@@ -22,7 +22,8 @@ import (
 const Persistent uint32 = 0
 
 // ExpiredCallback is a function type for handling expired record notifications.
-type ExpiredCallback func(bucketId uint64, key []byte, ds uint16)
+// timestamp is the record timestamp when expiration was detected, used for validation.
+type ExpiredCallback func(bucketId uint64, key []byte, ds uint16, timestamp uint64)
 
 // Checker handles TTL expiration logic using a unified clock.
 type Checker struct {
@@ -58,7 +59,7 @@ func (c *Checker) FilterExpiredRecord(bucketId uint64, key []byte, record *core.
 		return false
 	}
 	if c.IsExpired(record.TTL, record.Timestamp) {
-		c.triggerCallback(bucketId, key, ds)
+		c.triggerCallback(bucketId, key, ds, record.Timestamp)
 		return false
 	}
 	return true
@@ -72,7 +73,7 @@ func (c *Checker) FilterExpiredRecords(bucketId uint64, records []*core.Record, 
 		if !c.IsExpired(record.TTL, record.Timestamp) {
 			valid = append(valid, record)
 		} else {
-			c.triggerCallback(bucketId, record.Key, ds)
+			c.triggerCallback(bucketId, record.Key, ds, record.Timestamp)
 		}
 	}
 	return valid
@@ -86,7 +87,7 @@ func (c *Checker) FilterExpiredItems(bucketId uint64, items []*core.Item[core.Re
 		if item.Record != nil && !c.IsExpired(item.Record.TTL, item.Record.Timestamp) {
 			valid = append(valid, item)
 		} else if item.Record != nil {
-			c.triggerCallback(bucketId, item.Key, ds)
+			c.triggerCallback(bucketId, item.Key, ds, item.Record.Timestamp)
 		}
 	}
 	return valid
@@ -108,13 +109,13 @@ func (c *Checker) CalculateRemainingTTL(ttl uint32, timestamp uint64) int64 {
 }
 
 // triggerCallback invokes the expired callback if set.
-func (c *Checker) triggerCallback(bucketId uint64, key []byte, ds uint16) {
+func (c *Checker) triggerCallback(bucketId uint64, key []byte, ds uint16, timestamp uint64) {
 	if c.onExpired != nil {
-		c.onExpired(bucketId, key, ds)
+		c.onExpired(bucketId, key, ds, timestamp)
 	}
 }
 
 // TriggerExpired allows external components (like ttlManager) to trigger expiration callback.
-func (c *Checker) TriggerExpired(bucketId uint64, key []byte, ds uint16) {
-	c.triggerCallback(bucketId, key, ds)
+func (c *Checker) TriggerExpired(bucketId uint64, key []byte, ds uint16, timestamp uint64) {
+	c.triggerCallback(bucketId, key, ds, timestamp)
 }

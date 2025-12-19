@@ -29,17 +29,19 @@ func TestMockManager(t *testing.T) {
 	bucketId := BucketId(1)
 	key := "test-key"
 	ds := uint16(1)
+	timestamp := uint64(1000)
 	expired := false
 
-	callback := func(bid BucketId, k []byte, d uint16) {
+	callback := func(bid BucketId, k []byte, d uint16, ts uint64) {
 		assert.Equal(t, bucketId, bid)
 		assert.Equal(t, []byte(key), k)
 		assert.Equal(t, ds, d)
+		assert.Equal(t, timestamp, ts)
 		expired = true
 	}
 
 	// Add a task that expires in 100ms (at 1100ms)
-	mm.Add(bucketId, key, 100*time.Millisecond, ds, callback)
+	mm.Add(bucketId, key, 100*time.Millisecond, ds, timestamp, callback)
 
 	assert.True(t, mm.Exist(bucketId, key))
 
@@ -64,13 +66,14 @@ func TestMockManager_Del(t *testing.T) {
 	bucketId := BucketId(1)
 	key := "test-key"
 	ds := uint16(1)
+	timestamp := uint64(2000)
 	expired := false
 
-	callback := func(bid BucketId, k []byte, d uint16) {
+	callback := func(bid BucketId, k []byte, d uint16, ts uint64) {
 		expired = true
 	}
 
-	mm.Add(bucketId, key, 100*time.Millisecond, ds, callback)
+	mm.Add(bucketId, key, 100*time.Millisecond, ds, timestamp, callback)
 	assert.True(t, mm.Exist(bucketId, key))
 
 	mm.Del(bucketId, key)
