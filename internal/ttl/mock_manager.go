@@ -18,11 +18,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/nutsdb/nutsdb/internal/core"
 	"github.com/nutsdb/nutsdb/internal/ttl/clock"
 )
 
 type ttlTask struct {
-	bucketId   BucketId
+	bucketId   core.BucketId
 	key        string
 	expireTime int64 // milliseconds
 	ds         uint16
@@ -36,14 +37,14 @@ type ttlTask struct {
 type MockManager struct {
 	mu    sync.RWMutex
 	clock *clock.MockClock
-	tasks map[BucketId]map[string]*ttlTask
+	tasks map[core.BucketId]map[string]*ttlTask
 }
 
 // NewMockManager creates a new MockManager instance.
 func NewMockManager(mc *clock.MockClock) *MockManager {
 	mm := &MockManager{
 		clock: mc,
-		tasks: make(map[BucketId]map[string]*ttlTask),
+		tasks: make(map[core.BucketId]map[string]*ttlTask),
 	}
 	mc.SetOnAdvance(mm.checkExpirations)
 	return mm
@@ -53,7 +54,7 @@ func NewMockManager(mc *clock.MockClock) *MockManager {
 func (mm *MockManager) Run() {}
 
 // Exist checks if a TTL entry exists for the given bucket and key
-func (mm *MockManager) Exist(bucketId BucketId, key string) bool {
+func (mm *MockManager) Exist(bucketId core.BucketId, key string) bool {
 	mm.mu.RLock()
 	defer mm.mu.RUnlock()
 
@@ -65,7 +66,7 @@ func (mm *MockManager) Exist(bucketId BucketId, key string) bool {
 }
 
 // Add adds a TTL entry with the specified expiration duration.
-func (mm *MockManager) Add(bucketId BucketId, key string, expire time.Duration, ds uint16, timestamp uint64, callback ExpireCallback) {
+func (mm *MockManager) Add(bucketId core.BucketId, key string, expire time.Duration, ds uint16, timestamp uint64, callback ExpireCallback) {
 	mm.mu.Lock()
 	defer mm.mu.Unlock()
 
@@ -85,7 +86,7 @@ func (mm *MockManager) Add(bucketId BucketId, key string, expire time.Duration, 
 }
 
 // Del removes a TTL entry for the given bucket and key
-func (mm *MockManager) Del(bucketId BucketId, key string) {
+func (mm *MockManager) Del(bucketId core.BucketId, key string) {
 	mm.mu.Lock()
 	defer mm.mu.Unlock()
 

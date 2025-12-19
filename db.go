@@ -34,8 +34,6 @@ import (
 	"github.com/nutsdb/nutsdb/internal/data"
 	"github.com/nutsdb/nutsdb/internal/fileio"
 	"github.com/nutsdb/nutsdb/internal/ttl"
-	"github.com/nutsdb/nutsdb/internal/ttl/checker"
-	"github.com/nutsdb/nutsdb/internal/ttl/clock"
 	"github.com/nutsdb/nutsdb/internal/utils"
 	"github.com/xujiajun/utils/filesystem"
 	"github.com/xujiajun/utils/strconv2"
@@ -71,8 +69,7 @@ type (
 		mergeEndCh              chan error
 		mergeWorkCloseCh        chan struct{}
 		writeCh                 chan *request
-		ttlManager              ttl.Manager
-		ttlChecker              *checker.Checker
+		ttlService              *ttl.Service
 		RecordCount             int64 // current valid record count, exclude deleted, repeated
 		bucketManager           *BucketManager
 		hintKeyAndRAMIdxModeLru *utils.LRUCache // lru cache for HintKeyAndRAMIdxMode
@@ -113,18 +110,13 @@ func open(opt Options) (*DB, error) {
 		mergeEndCh:              make(chan error),
 		mergeWorkCloseCh:        make(chan struct{}),
 		writeCh:                 make(chan *request, KvWriteChCapacity),
-		ttlChecker:              checker.NewChecker(opt.Clock),
 		hintKeyAndRAMIdxModeLru: utils.NewLruCache(opt.HintKeyAndRAMIdxCacheSize),
 		snowflakeManager:        NewSnowflakeManager(opt.NodeNum),
 	}
 
-	if mc, ok := opt.Clock.(*clock.MockClock); ok {
-		db.ttlManager = ttl.NewMockManager(mc)
-	} else {
-		db.ttlManager = ttl.NewTimerManager(ttl.ExpiredDeleteType(opt.ExpiredDeleteType))
-	}
-
-	db.ttlChecker.SetExpiredCallback(db.handleExpiredKey)
+	// Initialize TTL service with unified management
+	db.ttlService = ttl.NewService(opt.Clock, opt.ExpiredDeleteType)
+	db.ttlService.SetExpiredCallback(db.handleExpiredKey)
 
 	db.Index = db.newIndex()
 
@@ -172,7 +164,7 @@ func open(opt Options) (*DB, error) {
 
 	go db.mergeWorker()
 	go db.doWrites()
-	go db.ttlManager.Run()
+	go db.ttlService.Run()
 
 	return db, nil
 }
@@ -271,7 +263,7 @@ func (db *DB) release() error {
 
 	db.commitBuffer = nil
 
-	db.ttlManager.Close()
+	db.ttlService.Close()
 
 	if db.watchManager != nil {
 		if err := db.watchManager.close(); err != nil {
@@ -770,14 +762,14 @@ func (db *DB) buildBTreeIdx(record *core.Record, entry *core.Entry) error {
 
 	bTree := db.Index.BTree.Get(bucketId)
 
-	if db.ttlChecker.IsExpired(record.TTL, record.Timestamp) || meta.Flag == core.DataDeleteFlag {
-		db.ttlManager.Del(bucketId, string(key))
+	if db.ttlService.GetChecker().IsExpired(record.TTL, record.Timestamp) || meta.Flag == core.DataDeleteFlag {
+		db.ttlService.UnregisterTTL(bucketId, string(key))
 		bTree.Delete(key)
 	} else {
 		if meta.TTL != core.Persistent {
-			db.ttlManager.Add(bucketId, string(key), expireTime(meta.Timestamp, meta.TTL), core.DataStructureBTree, record.Timestamp, db.handleExpiredKey)
+			db.ttlService.RegisterTTL(bucketId, string(key), expireTime(meta.Timestamp, meta.TTL), core.DataStructureBTree, record.Timestamp)
 		} else {
-			db.ttlManager.Del(bucketId, string(key))
+			db.ttlService.UnregisterTTL(bucketId, string(key))
 		}
 		bTree.InsertRecord(record.Key, record)
 	}
@@ -884,7 +876,7 @@ func (db *DB) buildListIdx(record *core.Record, entry *core.Entry) error {
 
 	l := db.Index.List.Get(bucketId)
 
-	if db.ttlChecker.IsExpired(meta.TTL, meta.Timestamp) {
+	if db.ttlService.GetChecker().IsExpired(meta.TTL, meta.Timestamp) {
 		return nil
 	}
 

@@ -19,6 +19,7 @@ import (
 
 	"github.com/nutsdb/nutsdb/internal/data"
 	"github.com/nutsdb/nutsdb/internal/fileio"
+	"github.com/nutsdb/nutsdb/internal/ttl"
 	"github.com/nutsdb/nutsdb/internal/ttl/clock"
 )
 
@@ -33,7 +34,7 @@ const (
 	HintKeyAndRAMIdxMode
 )
 
-type ExpiredDeleteType uint8
+type ExpiredDeleteType = ttl.ExpiredDeleteType
 
 const (
 	// TimeWheel represents use time wheel to do expired deletion
@@ -197,26 +198,6 @@ var DefaultOptions = func() Options {
 		EnableMergeV2:             false,
 		ListImpl:                  ListImplementationType(ListImplBTree),
 		EnableWatch:               false,
-		Clock:                     clock.NewRealClock(),
-	}
-}()
-
-var doublyLinkedListOptions = func() Options {
-	return Options{
-		EntryIdxMode:              HintKeyValAndRAMIdxMode,
-		SegmentSize:               defaultSegmentSize,
-		NodeNum:                   1,
-		RWMode:                    FileIO,
-		SyncEnable:                true,
-		CommitBufferSize:          4 * MB,
-		MergeInterval:             2 * time.Hour,
-		MaxBatchSize:              (15 * defaultSegmentSize / 4) / 100,
-		MaxBatchCount:             (15 * defaultSegmentSize / 4) / 100 / 100,
-		HintKeyAndRAMIdxCacheSize: 0,
-		ExpiredDeleteType:         TimeWheel,
-		EnableHintFile:            false,
-		EnableMergeV2:             false,
-		ListImpl:                  ListImplementationType(ListImplDoublyLinkedList),
 		Clock:                     clock.NewRealClock(),
 	}
 }()

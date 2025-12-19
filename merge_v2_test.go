@@ -14,7 +14,7 @@ import (
 
 	"github.com/nutsdb/nutsdb/internal/core"
 	"github.com/nutsdb/nutsdb/internal/data"
-	"github.com/nutsdb/nutsdb/internal/ttl/checker"
+	"github.com/nutsdb/nutsdb/internal/ttl"
 	"github.com/nutsdb/nutsdb/internal/ttl/clock"
 	"github.com/nutsdb/nutsdb/internal/utils"
 )
@@ -1311,9 +1311,10 @@ func TestMergeV2WriteEntryHashesSetAndSortedSet(t *testing.T) {
 }
 
 func TestMergeV2ApplyLookupUpdatesSecondaryIndexes(t *testing.T) {
+	clk := clock.NewRealClock()
 	db := &DB{
 		opt:        DefaultOptions,
-		ttlChecker: checker.NewChecker(clock.NewRealClock()),
+		ttlService: ttl.NewService(clk, ttl.TimeWheel),
 		bucketManager: &BucketManager{
 			BucketInfoMapper: map[core.BucketId]*core.Bucket{},
 		},
@@ -2000,13 +2001,14 @@ func TestMergeV2RewriteFileSkipsCorruptedEntries(t *testing.T) {
 		WithTxID(goodEntry.Meta.TxID).
 		WithKey(goodEntry.Key))
 
+	clk := clock.NewRealClock()
 	db := &DB{
 		opt: Options{
 			Dir:                  dir,
 			BufferSizeOfRecovery: 4096,
 			SegmentSize:          1 << 16,
 		},
-		ttlChecker: checker.NewChecker(clock.NewRealClock()),
+		ttlService: ttl.NewService(clk, ttl.TimeWheel),
 		bucketManager: &BucketManager{
 			BucketInfoMapper: map[core.BucketId]*core.Bucket{
 				bucketID: {Meta: &core.BucketMeta{}, Id: bucketID, Ds: uint16(core.DataStructureBTree)},

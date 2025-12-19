@@ -18,10 +18,8 @@ import (
 	"time"
 
 	"github.com/antlabs/timer"
+	"github.com/nutsdb/nutsdb/internal/core"
 )
-
-// BucketId represents the bucket identifier type
-type BucketId = uint64
 
 // ExpiredDeleteType represents the type of expired deletion strategy
 type ExpiredDeleteType int
@@ -37,9 +35,9 @@ func newNodesInBucket() nodesInBucket {
 	return make(map[string]timer.TimeNoder)
 }
 
-type nodes map[BucketId]nodesInBucket // bucket to nodes that in a bucket
+type nodes map[core.BucketId]nodesInBucket // bucket to nodes that in a bucket
 
-func (n nodes) getNode(bucketId BucketId, key string) (timer.TimeNoder, bool) {
+func (n nodes) getNode(bucketId core.BucketId, key string) (timer.TimeNoder, bool) {
 	nib, ok := n[bucketId]
 	if !ok {
 		return nil, false
@@ -48,7 +46,7 @@ func (n nodes) getNode(bucketId BucketId, key string) (timer.TimeNoder, bool) {
 	return node, ok
 }
 
-func (n nodes) addNode(bucketId BucketId, key string, node timer.TimeNoder) {
+func (n nodes) addNode(bucketId core.BucketId, key string, node timer.TimeNoder) {
 	nib, ok := n[bucketId]
 	if !ok {
 		nib = newNodesInBucket()
@@ -57,7 +55,7 @@ func (n nodes) addNode(bucketId BucketId, key string, node timer.TimeNoder) {
 	nib[key] = node
 }
 
-func (n nodes) delNode(bucketId BucketId, key string) {
+func (n nodes) delNode(bucketId core.BucketId, key string) {
 	if nib, ok := n[bucketId]; ok {
 		delete(nib, key)
 	}
@@ -66,9 +64,9 @@ func (n nodes) delNode(bucketId BucketId, key string) {
 // Manager defines the interface for TTL management
 type Manager interface {
 	Run()
-	Exist(bucketId BucketId, key string) bool
-	Add(bucketId BucketId, key string, expire time.Duration, ds uint16, timestamp uint64, callback ExpireCallback)
-	Del(bucketId BucketId, key string)
+	Exist(bucketId core.BucketId, key string) bool
+	Add(bucketId core.BucketId, key string, expire time.Duration, ds uint16, timestamp uint64, callback ExpireCallback)
+	Del(bucketId core.BucketId, key string)
 	Close()
 }
 
@@ -103,23 +101,26 @@ func (tm *TimerManager) Run() {
 }
 
 // Exist checks if a TTL entry exists for the given bucket and key
-func (tm *TimerManager) Exist(bucketId BucketId, key string) bool {
+func (tm *TimerManager) Exist(bucketId core.BucketId, key string) bool {
 	_, ok := tm.timerNodes.getNode(bucketId, key)
 	return ok
 }
 
 // ExpireCallback is a function type for timer expiration notifications.
 // timestamp is the record timestamp when the TTL was set, used for validation.
-type ExpireCallback func(bucketId BucketId, key []byte, ds uint16, timestamp uint64)
+type ExpireCallback func(bucketId core.BucketId, key []byte, ds uint16, timestamp uint64)
 
 // Add adds a TTL entry with the specified expiration duration.
 // When the timer expires, it triggers the callback with bucketId, key, data structure type, and timestamp.
-func (tm *TimerManager) Add(bucketId BucketId, key string, expire time.Duration, ds uint16, timestamp uint64, callback ExpireCallback) {
+// If a TTL entry already exists for the same bucket and key, it stops the old timer before creating a new one.
+func (tm *TimerManager) Add(bucketId core.BucketId, key string, expire time.Duration, ds uint16, timestamp uint64, callback ExpireCallback) {
 	if node, ok := tm.timerNodes.getNode(bucketId, key); ok {
 		node.Stop()
+		tm.timerNodes.delNode(bucketId, key)
 	}
 
 	node := tm.t.AfterFunc(expire, func() {
+		tm.timerNodes.delNode(bucketId, key)
 		if callback != nil {
 			callback(bucketId, []byte(key), ds, timestamp)
 		}
@@ -128,8 +129,11 @@ func (tm *TimerManager) Add(bucketId BucketId, key string, expire time.Duration,
 }
 
 // Del removes a TTL entry for the given bucket and key
-func (tm *TimerManager) Del(bucket BucketId, key string) {
-	tm.timerNodes.delNode(bucket, key)
+func (tm *TimerManager) Del(bucket core.BucketId, key string) {
+	if node, ok := tm.timerNodes.getNode(bucket, key); ok {
+		node.Stop()
+		tm.timerNodes.delNode(bucket, key)
+	}
 }
 
 // Close closes the TTL manager and stops all timers

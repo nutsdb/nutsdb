@@ -14,7 +14,9 @@
 
 package nutsdb
 
-import "github.com/nutsdb/nutsdb/internal/core"
+import (
+	"github.com/nutsdb/nutsdb/internal/core"
+)
 
 // Type Aliases to maintain compatibility after moving to internal/core
 

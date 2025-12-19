@@ -90,7 +90,7 @@ type BTreeIndex struct {
 
 func (idx *BTreeIndex) Get(id core.BucketId) *data.BTree {
 	return idx.computeIfAbsent(id, func() *data.BTree {
-		return data.NewBTree(id, idx.index.db.ttlChecker)
+		return data.NewBTree(id, idx.index.db.ttlService.GetChecker())
 	})
 }
 

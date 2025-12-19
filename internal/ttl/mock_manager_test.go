@@ -18,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nutsdb/nutsdb/internal/core"
 	"github.com/nutsdb/nutsdb/internal/ttl/clock"
 	"github.com/stretchr/testify/assert"
 )
@@ -26,13 +27,13 @@ func TestMockManager(t *testing.T) {
 	mc := clock.NewMockClock(1000) // Start at 1000ms
 	mm := NewMockManager(mc)
 
-	bucketId := BucketId(1)
+	bucketId := core.BucketId(1)
 	key := "test-key"
 	ds := uint16(1)
 	timestamp := uint64(1000)
 	expired := false
 
-	callback := func(bid BucketId, k []byte, d uint16, ts uint64) {
+	callback := func(bid core.BucketId, k []byte, d uint16, ts uint64) {
 		assert.Equal(t, bucketId, bid)
 		assert.Equal(t, []byte(key), k)
 		assert.Equal(t, ds, d)
@@ -63,13 +64,13 @@ func TestMockManager_Del(t *testing.T) {
 	mc := clock.NewMockClock(1000)
 	mm := NewMockManager(mc)
 
-	bucketId := BucketId(1)
+	bucketId := core.BucketId(1)
 	key := "test-key"
 	ds := uint16(1)
 	timestamp := uint64(2000)
 	expired := false
 
-	callback := func(bid BucketId, k []byte, d uint16, ts uint64) {
+	callback := func(bid core.BucketId, k []byte, d uint16, ts uint64) {
 		expired = true
 	}
 
