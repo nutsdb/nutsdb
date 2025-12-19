@@ -407,7 +407,7 @@ func (job *mergeV2Job) rewriteFile(fid int64) error {
 		off += sz
 
 		// Skip entries that are not committed
-		if entry.Meta.Status != core.Committed {
+		if entry.Meta.Status != Committed {
 			continue
 		}
 		// Skip filter entries
@@ -478,7 +478,7 @@ func (job *mergeV2Job) writeEntry(entry *core.Entry) error {
 	}
 
 	// For Set and SortedSet, compute value hash to handle duplicate detection
-	if entry.Meta.Ds == core.DataStructureSet || entry.Meta.Ds == core.DataStructureSortedSet {
+	if entry.Meta.Ds == DataStructureSet || entry.Meta.Ds == DataStructureSortedSet {
 		h := job.valueHasher
 		h.Reset()
 		if _, err := h.Write(entry.Value); err != nil {
@@ -637,7 +637,7 @@ func (job *mergeV2Job) applyLookup(entry *mergeLookupEntry) {
 	bucketID := core.BucketId(hint.BucketId)
 
 	switch hint.Ds {
-	case core.DataStructureBTree:
+	case DataStructureBTree:
 		// Update BTree index with new file location if hint is newer or same age
 		bt, exist := job.db.Index.BTree.exist(bucketID)
 		if !exist {
@@ -649,7 +649,7 @@ func (job *mergeV2Job) applyLookup(entry *mergeLookupEntry) {
 		}
 		updateRecordWithHintIfNewer(record, hint)
 
-	case core.DataStructureSet:
+	case DataStructureSet:
 		// Update Set index using value hash for duplicate detection
 		setIdx, exist := job.db.Index.Set.exist(bucketID)
 		if !exist {
@@ -669,9 +669,9 @@ func (job *mergeV2Job) applyLookup(entry *mergeLookupEntry) {
 		}
 		updateRecordWithHintIfNewer(record, hint)
 
-	case core.DataStructureList:
+	case DataStructureList:
 		// Update List index entries (only push operations are merged)
-		if hint.Flag != core.DataLPushFlag && hint.Flag != core.DataRPushFlag {
+		if hint.Flag != DataLPushFlag && hint.Flag != DataRPushFlag {
 			return
 		}
 		listIdx, exist := job.db.Index.List.exist(bucketID)
@@ -694,7 +694,7 @@ func (job *mergeV2Job) applyLookup(entry *mergeLookupEntry) {
 		}
 		updateRecordWithHintIfNewer(record, hint)
 
-	case core.DataStructureSortedSet:
+	case DataStructureSortedSet:
 		// Update SortedSet index using both key and value hash
 		sortedIdx, exist := job.db.Index.SortedSet.exist(bucketID)
 		if !exist {

@@ -21,7 +21,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nutsdb/nutsdb/internal/core"
 	"github.com/nutsdb/nutsdb/internal/utils"
 	"github.com/xujiajun/utils/strconv2"
 )
@@ -48,7 +47,7 @@ func (tx *Tx) ZAdd(bucket string, key []byte, score float64, val []byte) error {
 	buffer.Write(scoreBytes)
 	newKey := buffer.Bytes()
 
-	return tx.put(bucket, newKey, val, core.Persistent, core.DataZAddFlag, uint64(time.Now().Unix()), core.DataStructureSortedSet)
+	return tx.put(bucket, newKey, val, Persistent, DataZAddFlag, uint64(time.Now().Unix()), DataStructureSortedSet)
 }
 
 // ZMembers Returns all the members and scores of members of the set specified by key in a bucket.
@@ -57,7 +56,7 @@ func (tx *Tx) ZMembers(bucket string, key []byte) (map[*SortedSetMember]struct{}
 		return nil, err
 	}
 
-	b, err := tx.db.bucketManager.GetBucket(core.DataStructureSortedSet, bucket)
+	b, err := tx.db.bucketManager.GetBucket(DataStructureSortedSet, bucket)
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +97,7 @@ func (tx *Tx) ZCard(bucket string, key []byte) (int, error) {
 		return 0, err
 	}
 
-	b, err := tx.db.bucketManager.GetBucket(core.DataStructureSortedSet, bucket)
+	b, err := tx.db.bucketManager.GetBucket(DataStructureSortedSet, bucket)
 	if err != nil {
 		return 0, err
 	}
@@ -126,7 +125,7 @@ func (tx *Tx) ZCount(bucket string, key []byte, start, end float64, opts *GetByS
 		return 0, err
 	}
 
-	b, err := tx.db.bucketManager.GetBucket(core.DataStructureSortedSet, bucket)
+	b, err := tx.db.bucketManager.GetBucket(DataStructureSortedSet, bucket)
 	if err != nil {
 		return 0, err
 	}
@@ -150,7 +149,7 @@ func (tx *Tx) ZPopMax(bucket string, key []byte) (*SortedSetMember, error) {
 		return nil, err
 	}
 
-	b, err := tx.db.bucketManager.GetBucket(core.DataStructureSortedSet, bucket)
+	b, err := tx.db.bucketManager.GetBucket(DataStructureSortedSet, bucket)
 	if err != nil {
 		return nil, err
 	}
@@ -175,7 +174,7 @@ func (tx *Tx) ZPopMax(bucket string, key []byte) (*SortedSetMember, error) {
 		return nil, err
 	}
 
-	return &SortedSetMember{Value: value, Score: float64(score)}, tx.put(bucket, key, []byte(""), core.Persistent, core.DataZPopMaxFlag, uint64(time.Now().Unix()), core.DataStructureSortedSet)
+	return &SortedSetMember{Value: value, Score: float64(score)}, tx.put(bucket, key, []byte(""), Persistent, DataZPopMaxFlag, uint64(time.Now().Unix()), DataStructureSortedSet)
 }
 
 // ZPopMin Removes and returns the member with the lowest score in the sorted set specified by key in a bucket.
@@ -184,7 +183,7 @@ func (tx *Tx) ZPopMin(bucket string, key []byte) (*SortedSetMember, error) {
 		return nil, err
 	}
 
-	b, err := tx.db.bucketManager.GetBucket(core.DataStructureSortedSet, bucket)
+	b, err := tx.db.bucketManager.GetBucket(DataStructureSortedSet, bucket)
 	if err != nil {
 		return nil, err
 	}
@@ -209,7 +208,7 @@ func (tx *Tx) ZPopMin(bucket string, key []byte) (*SortedSetMember, error) {
 		return nil, err
 	}
 
-	return &SortedSetMember{Value: value, Score: float64(score)}, tx.put(bucket, key, []byte(""), core.Persistent, core.DataZPopMinFlag, uint64(time.Now().Unix()), core.DataStructureSortedSet)
+	return &SortedSetMember{Value: value, Score: float64(score)}, tx.put(bucket, key, []byte(""), Persistent, DataZPopMinFlag, uint64(time.Now().Unix()), DataStructureSortedSet)
 }
 
 // ZPeekMax Returns the member with the highest score in the sorted set specified by key in a bucket.
@@ -218,7 +217,7 @@ func (tx *Tx) ZPeekMax(bucket string, key []byte) (*SortedSetMember, error) {
 		return nil, err
 	}
 
-	b, err := tx.db.bucketManager.GetBucket(core.DataStructureSortedSet, bucket)
+	b, err := tx.db.bucketManager.GetBucket(DataStructureSortedSet, bucket)
 	if err != nil {
 		return nil, err
 	}
@@ -252,7 +251,7 @@ func (tx *Tx) ZPeekMin(bucket string, key []byte) (*SortedSetMember, error) {
 		return nil, err
 	}
 
-	b, err := tx.db.bucketManager.GetBucket(core.DataStructureSortedSet, bucket)
+	b, err := tx.db.bucketManager.GetBucket(DataStructureSortedSet, bucket)
 	if err != nil {
 		return nil, err
 	}
@@ -287,7 +286,7 @@ func (tx *Tx) ZRangeByScore(bucket string, key []byte, start, end float64, opts 
 		return nil, err
 	}
 
-	b, err := tx.db.bucketManager.GetBucket(core.DataStructureSortedSet, bucket)
+	b, err := tx.db.bucketManager.GetBucket(DataStructureSortedSet, bucket)
 	if err != nil {
 		return nil, err
 	}
@@ -326,7 +325,7 @@ func (tx *Tx) ZRangeByRank(bucket string, key []byte, start, end int) ([]*Sorted
 		return nil, err
 	}
 
-	b, err := tx.db.bucketManager.GetBucket(core.DataStructureSortedSet, bucket)
+	b, err := tx.db.bucketManager.GetBucket(DataStructureSortedSet, bucket)
 	if err != nil {
 		return nil, err
 	}
@@ -364,7 +363,7 @@ func (tx *Tx) ZRem(bucket string, key []byte, value []byte) error {
 		return err
 	}
 
-	b, err := tx.db.bucketManager.GetBucket(core.DataStructureSortedSet, bucket)
+	b, err := tx.db.bucketManager.GetBucket(DataStructureSortedSet, bucket)
 	if err != nil {
 		return err
 	}
@@ -388,7 +387,7 @@ func (tx *Tx) ZRem(bucket string, key []byte, value []byte) error {
 		return ErrSortedSetMemberNotExist
 	}
 
-	return tx.put(bucket, key, value, core.Persistent, core.DataZRemFlag, uint64(time.Now().Unix()), core.DataStructureSortedSet)
+	return tx.put(bucket, key, value, Persistent, DataZRemFlag, uint64(time.Now().Unix()), DataStructureSortedSet)
 }
 
 // ZRemRangeByRank removes all elements in the sorted set stored in one bucket at given bucket with rank between start and end.
@@ -400,7 +399,7 @@ func (tx *Tx) ZRemRangeByRank(bucket string, key []byte, start, end int) error {
 
 	startStr := strconv2.IntToStr(start)
 	endStr := strconv2.IntToStr(end)
-	return tx.put(bucket, key, []byte(startStr+SeparatorForZSetKey+endStr), core.Persistent, core.DataZRemRangeByRankFlag, uint64(time.Now().Unix()), core.DataStructureSortedSet)
+	return tx.put(bucket, key, []byte(startStr+SeparatorForZSetKey+endStr), Persistent, DataZRemRangeByRankFlag, uint64(time.Now().Unix()), DataStructureSortedSet)
 }
 
 // ZRank Returns the rank of member in the sorted set specified by key in a bucket, with the scores ordered from low to high.
@@ -409,7 +408,7 @@ func (tx *Tx) ZRank(bucket string, key, value []byte) (int, error) {
 		return 0, err
 	}
 
-	b, err := tx.db.bucketManager.GetBucket(core.DataStructureSortedSet, bucket)
+	b, err := tx.db.bucketManager.GetBucket(DataStructureSortedSet, bucket)
 	if err != nil {
 		return 0, err
 	}
@@ -433,7 +432,7 @@ func (tx *Tx) ZRevRank(bucket string, key, value []byte) (int, error) {
 		return 0, err
 	}
 
-	b, err := tx.db.bucketManager.GetBucket(core.DataStructureSortedSet, bucket)
+	b, err := tx.db.bucketManager.GetBucket(DataStructureSortedSet, bucket)
 	if err != nil {
 		return 0, err
 	}
@@ -457,7 +456,7 @@ func (tx *Tx) ZScore(bucket string, key, value []byte) (float64, error) {
 		return 0, err
 	}
 
-	b, err := tx.db.bucketManager.GetBucket(core.DataStructureSortedSet, bucket)
+	b, err := tx.db.bucketManager.GetBucket(DataStructureSortedSet, bucket)
 	if err != nil {
 		return 0.0, err
 	}
@@ -481,7 +480,7 @@ func (tx *Tx) ZKeys(bucket, pattern string, f func(key string) bool) error {
 		return err
 	}
 
-	b, err := tx.db.bucketManager.GetBucket(core.DataStructureSortedSet, bucket)
+	b, err := tx.db.bucketManager.GetBucket(DataStructureSortedSet, bucket)
 	if err != nil {
 		return err
 	}
@@ -509,7 +508,7 @@ func (tx *Tx) ZCheck(bucket string) error {
 		return err
 	}
 
-	b, err := tx.db.bucketManager.GetBucket(core.DataStructureSortedSet, bucket)
+	b, err := tx.db.bucketManager.GetBucket(DataStructureSortedSet, bucket)
 	if err != nil {
 		return err
 	}

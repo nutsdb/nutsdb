@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/nutsdb/nutsdb/internal/core"
 )
 
 func BenchmarkMergeVariants(b *testing.B) {
@@ -31,7 +30,7 @@ func BenchmarkMergeVariants(b *testing.B) {
 
 				bucket := "bench"
 				if err := db.Update(func(tx *Tx) error {
-					return tx.NewBucket(core.DataStructureBTree, bucket)
+					return tx.NewBucket(DataStructureBTree, bucket)
 				}); err != nil {
 					b.Fatalf("create bucket: %v", err)
 				}
@@ -41,7 +40,7 @@ func BenchmarkMergeVariants(b *testing.B) {
 					for j := 0; j < entries; j++ {
 						key := []byte(fmt.Sprintf("key-%06d", j))
 						value := []byte(fmt.Sprintf("value-%06d", j))
-						if err := tx.Put(bucket, key, value, core.Persistent); err != nil {
+						if err := tx.Put(bucket, key, value, Persistent); err != nil {
 							return err
 						}
 					}

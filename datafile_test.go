@@ -34,7 +34,7 @@ func init() {
 		Value: []byte("val_0001"),
 		Meta: core.NewMetaData().WithKeySize(uint32(len("key_0001"))).
 			WithValueSize(uint32(len("val_0001"))).WithTimeStamp(1547707905).
-			WithTTL(core.Persistent).WithFlag(core.DataSetFlag).WithBucketId(1),
+			WithTTL(Persistent).WithFlag(DataSetFlag).WithBucketId(1),
 	}
 }
 

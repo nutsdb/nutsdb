@@ -20,7 +20,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nutsdb/nutsdb/internal/core"
 	"github.com/nutsdb/nutsdb/internal/data"
 	"github.com/nutsdb/nutsdb/internal/utils"
 	"github.com/pkg/errors"
@@ -54,7 +53,7 @@ func (tx *Tx) RPop(bucket string, key []byte) (item []byte, err error) {
 		return
 	}
 
-	return item, tx.push(bucket, key, core.DataRPopFlag, item)
+	return item, tx.push(bucket, key, DataRPopFlag, item)
 }
 
 // RPeek returns the last element of the list stored in the bucket at given bucket and key.
@@ -63,7 +62,7 @@ func (tx *Tx) RPeek(bucket string, key []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	b, err := tx.db.bucketManager.GetBucket(core.DataStructureList, bucket)
+	b, err := tx.db.bucketManager.GetBucket(DataStructureList, bucket)
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +96,7 @@ func (tx *Tx) RPeek(bucket string, key []byte) ([]byte, error) {
 // push sets values for list stored in the bucket at given bucket, key, flag and values.
 func (tx *Tx) push(bucket string, key []byte, flag uint16, values ...[]byte) error {
 	for _, value := range values {
-		err := tx.put(bucket, key, value, core.Persistent, flag, uint64(time.Now().Unix()), core.DataStructureList)
+		err := tx.put(bucket, key, value, Persistent, flag, uint64(time.Now().Unix()), DataStructureList)
 		if err != nil {
 			return err
 		}
@@ -110,7 +109,7 @@ func (tx *Tx) push(bucket string, key []byte, flag uint16, values ...[]byte) err
 // this function will get list, if list not exists, will create
 // a new one.
 func (tx *Tx) getListWithDefault(bucket string) (*data.List, error) {
-	b, err := tx.db.bucketManager.GetBucket(core.DataStructureList, bucket)
+	b, err := tx.db.bucketManager.GetBucket(DataStructureList, bucket)
 	if err != nil {
 		return nil, err
 	}
@@ -136,7 +135,7 @@ func (tx *Tx) RPush(bucket string, key []byte, values ...[]byte) error {
 			return err
 		}
 		newKey := l.GeneratePushKey(key, false)
-		err = tx.push(bucket, newKey, core.DataRPushFlag, value)
+		err = tx.push(bucket, newKey, DataRPushFlag, value)
 		if err != nil {
 			return err
 		}
@@ -161,7 +160,7 @@ func (tx *Tx) LPush(bucket string, key []byte, values ...[]byte) error {
 			return err
 		}
 		newKey := l.GeneratePushKey(key, true)
-		err = tx.push(bucket, newKey, core.DataLPushFlag, value)
+		err = tx.push(bucket, newKey, DataLPushFlag, value)
 		if err != nil {
 			return err
 		}
@@ -187,7 +186,7 @@ func (tx *Tx) LPushRaw(bucket string, key []byte, values ...[]byte) error {
 		return err
 	}
 
-	return tx.push(bucket, key, core.DataLPushFlag, values...)
+	return tx.push(bucket, key, DataLPushFlag, values...)
 }
 
 func (tx *Tx) RPushRaw(bucket string, key []byte, values ...[]byte) error {
@@ -195,7 +194,7 @@ func (tx *Tx) RPushRaw(bucket string, key []byte, values ...[]byte) error {
 		return err
 	}
 
-	return tx.push(bucket, key, core.DataRPushFlag, values...)
+	return tx.push(bucket, key, DataRPushFlag, values...)
 }
 
 // LPop removes and returns the first element of the list stored in the bucket at given bucket and key.
@@ -205,7 +204,7 @@ func (tx *Tx) LPop(bucket string, key []byte) (item []byte, err error) {
 		return
 	}
 
-	return item, tx.push(bucket, key, core.DataLPopFlag, item)
+	return item, tx.push(bucket, key, DataLPopFlag, item)
 }
 
 // LPeek returns the first element of the list stored in the bucket at given bucket and key.
@@ -214,7 +213,7 @@ func (tx *Tx) LPeek(bucket string, key []byte) (item []byte, err error) {
 		return nil, err
 	}
 
-	b, err := tx.db.bucketManager.GetBucket(core.DataStructureList, bucket)
+	b, err := tx.db.bucketManager.GetBucket(DataStructureList, bucket)
 	if err != nil {
 		return nil, err
 	}
@@ -249,7 +248,7 @@ func (tx *Tx) LSize(bucket string, key []byte) (int, error) {
 		return 0, err
 	}
 
-	b, err := tx.db.bucketManager.GetBucket(core.DataStructureList, bucket)
+	b, err := tx.db.bucketManager.GetBucket(DataStructureList, bucket)
 	if err != nil {
 		return 0, err
 	}
@@ -279,7 +278,7 @@ func (tx *Tx) LRange(bucket string, key []byte, start, end int) ([][]byte, error
 		return nil, err
 	}
 
-	b, err := tx.db.bucketManager.GetBucket(core.DataStructureList, bucket)
+	b, err := tx.db.bucketManager.GetBucket(DataStructureList, bucket)
 	if err != nil {
 		return nil, err
 	}
@@ -338,7 +337,7 @@ func (tx *Tx) LRem(bucket string, key []byte, count int, value []byte) error {
 	buffer.Write(value)
 	newValue := buffer.Bytes()
 
-	err = tx.push(bucket, key, core.DataLRemFlag, newValue)
+	err = tx.push(bucket, key, DataLRemFlag, newValue)
 	if err != nil {
 		return err
 	}
@@ -361,7 +360,7 @@ func (tx *Tx) LTrim(bucket string, key []byte, start, end int) error {
 		return err
 	}
 
-	b, err := tx.db.bucketManager.GetBucket(core.DataStructureList, bucket)
+	b, err := tx.db.bucketManager.GetBucket(DataStructureList, bucket)
 	if err != nil {
 		return err
 	}
@@ -392,7 +391,7 @@ func (tx *Tx) LTrim(bucket string, key []byte, start, end int) error {
 	buffer.Write([]byte(strconv2.IntToStr(start)))
 	newKey := buffer.Bytes()
 
-	return tx.push(bucket, newKey, core.DataLTrimFlag, []byte(strconv2.IntToStr(end)))
+	return tx.push(bucket, newKey, DataLTrimFlag, []byte(strconv2.IntToStr(end)))
 }
 
 // LRemByIndex remove the list element at specified index
@@ -401,7 +400,7 @@ func (tx *Tx) LRemByIndex(bucket string, key []byte, indexes ...int) error {
 		return err
 	}
 
-	b, err := tx.db.bucketManager.GetBucket(core.DataStructureList, bucket)
+	b, err := tx.db.bucketManager.GetBucket(DataStructureList, bucket)
 	if err != nil {
 		return err
 	}
@@ -424,7 +423,7 @@ func (tx *Tx) LRemByIndex(bucket string, key []byte, indexes ...int) error {
 		return err
 	}
 
-	err = tx.push(bucket, key, core.DataLRemByIndex, data)
+	err = tx.push(bucket, key, DataLRemByIndex, data)
 	if err != nil {
 		return err
 	}
@@ -437,7 +436,7 @@ func (tx *Tx) LKeys(bucket, pattern string, f func(key string) bool) error {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return err
 	}
-	b, err := tx.db.bucketManager.GetBucket(core.DataStructureList, bucket)
+	b, err := tx.db.bucketManager.GetBucket(DataStructureList, bucket)
 	if err != nil {
 		return err
 	}
@@ -465,7 +464,7 @@ func (tx *Tx) ExpireList(bucket string, key []byte, ttl uint32) error {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return err
 	}
-	b, err := tx.db.bucketManager.GetBucket(core.DataStructureList, bucket)
+	b, err := tx.db.bucketManager.GetBucket(DataStructureList, bucket)
 	if err != nil {
 		return err
 	}
@@ -482,7 +481,7 @@ func (tx *Tx) ExpireList(bucket string, key []byte, ttl uint32) error {
 
 	l.ExpireList(key, ttl)
 	ttls := strconv2.Int64ToStr(int64(ttl))
-	err = tx.push(bucket, key, core.DataExpireListFlag, []byte(ttls))
+	err = tx.push(bucket, key, DataExpireListFlag, []byte(ttls))
 	if err != nil {
 		return err
 	}
@@ -490,7 +489,7 @@ func (tx *Tx) ExpireList(bucket string, key []byte, ttl uint32) error {
 }
 
 func (tx *Tx) CheckExpire(bucket string, key []byte) bool {
-	b, err := tx.db.bucketManager.GetBucket(core.DataStructureList, bucket)
+	b, err := tx.db.bucketManager.GetBucket(DataStructureList, bucket)
 	if err != nil {
 		return false
 	}
@@ -506,7 +505,7 @@ func (tx *Tx) CheckExpire(bucket string, key []byte) bool {
 	}
 
 	if l.IsExpire(string(key)) {
-		_ = tx.push(bucket, key, core.DataDeleteFlag)
+		_ = tx.push(bucket, key, DataDeleteFlag)
 		return true
 	}
 	return false
@@ -516,7 +515,7 @@ func (tx *Tx) GetListTTL(bucket string, key []byte) (uint32, error) {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return 0, err
 	}
-	b, err := tx.db.bucketManager.GetBucket(core.DataStructureList, bucket)
+	b, err := tx.db.bucketManager.GetBucket(DataStructureList, bucket)
 	if err != nil {
 		return 0, err
 	}

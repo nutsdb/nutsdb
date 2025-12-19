@@ -43,7 +43,7 @@ func wmUnsubscribe(t *testing.T, wm *watchManager, bucket, key string, id uint64
 
 // wmSendMessage sends a message and asserts no error
 func wmSendMessage(t *testing.T, wm *watchManager, bucket, key string, value []byte) {
-	message := NewMessage(bucket, key, value, core.DataFlag(0), uint64(time.Now().Unix()), MessageOptions{Priority: MessagePriorityMedium})
+	message := NewMessage(bucket, key, value, DataFlag(0), uint64(time.Now().Unix()), MessageOptions{Priority: MessagePriorityMedium})
 	err := wm.sendMessage(message)
 	assert.NoError(t, err)
 }
@@ -52,7 +52,7 @@ func wmSendMessage(t *testing.T, wm *watchManager, bucket, key string, value []b
 func wmSendMessages(t *testing.T, wm *watchManager, bucket, key string, count int) {
 	for i := 0; i < count; i++ {
 		value := []byte(fmt.Sprintf("value_%d", i))
-		message := NewMessage(bucket, key, value, core.DataFlag(0), uint64(time.Now().Unix()), MessageOptions{Priority: MessagePriorityMedium})
+		message := NewMessage(bucket, key, value, DataFlag(0), uint64(time.Now().Unix()), MessageOptions{Priority: MessagePriorityMedium})
 		err := wm.sendMessage(message)
 		assert.NoError(t, err)
 	}
@@ -172,7 +172,7 @@ func wmStartSender(wm *watchManager, bucket, key string, sent *int, stopChan <-c
 				return
 			case <-ticker.C:
 				value := []byte(fmt.Sprintf("value_%d", sent))
-				message := NewMessage(bucket, key, value, core.DataSetFlag, uint64(time.Now().Unix()), MessageOptions{Priority: MessagePriorityMedium})
+				message := NewMessage(bucket, key, value, DataSetFlag, uint64(time.Now().Unix()), MessageOptions{Priority: MessagePriorityMedium})
 				err := wm.sendMessage(message)
 				if err == nil {
 					*sent++
@@ -192,7 +192,7 @@ func wmStartReceiver(t *testing.T, receiveChan <-chan *Message, expectBucket, ex
 			assert.Equal(t, expectBucket, msg.BucketName)
 			assert.Equal(t, expectKey, msg.Key)
 			assert.NotNil(t, msg.Value)
-			assert.Equal(t, core.DataSetFlag, msg.Flag)
+			assert.Equal(t, DataSetFlag, msg.Flag)
 			*received++
 		}
 	}()
@@ -332,7 +332,7 @@ func TestWatchManager_SubscribeAndSendMessage(t *testing.T) {
 				key := fmt.Sprintf("key_test_%d", i)
 				value := fmt.Sprintf("value_test_%d_%d", i, j)
 
-				message := NewMessage(bucket, key, []byte(value), core.DataFlag(0), uint64(time.Now().Unix()), MessageOptions{Priority: MessagePriorityMedium})
+				message := NewMessage(bucket, key, []byte(value), DataFlag(0), uint64(time.Now().Unix()), MessageOptions{Priority: MessagePriorityMedium})
 				err := wm.sendMessage(message)
 				assert.NoError(t, err)
 			}
@@ -658,7 +658,7 @@ func TestWatchManager_StartDistributor(t *testing.T) {
 
 			for i := 0; i < totalMessages; i++ {
 				value := []byte(fmt.Sprintf("value_%d", i))
-				message := NewMessage(bucket, key, value, core.DataSetFlag, uint64(time.Now().Unix()))
+				message := NewMessage(bucket, key, value, DataSetFlag, uint64(time.Now().Unix()))
 				err := wm.sendMessage(message)
 				if err != nil {
 					t.Logf("channel buffer is full, send message error: %+v", err)
@@ -721,7 +721,7 @@ func TestWatchManager_DeleteBucket(t *testing.T) {
 		assert.Len(t, bucketMap, len(keys), "bucket should have correct number of keys")
 
 		// Send bucket delete message
-		deleteMsg := NewMessage(bucket, "", nil, core.DataBucketDeleteFlag,
+		deleteMsg := NewMessage(bucket, "", nil, DataBucketDeleteFlag,
 			uint64(time.Now().Unix()), MessageOptions{Priority: MessagePriorityHigh})
 		err := wm.sendMessage(deleteMsg)
 		require.NoError(t, err)
@@ -740,7 +740,7 @@ func TestWatchManager_DeleteBucket(t *testing.T) {
 			select {
 			case msg, ok := <-sub.ch:
 				if ok {
-					assert.Equal(t, core.DataBucketDeleteFlag, msg.Flag, "should receive delete flag")
+					assert.Equal(t, DataBucketDeleteFlag, msg.Flag, "should receive delete flag")
 					assert.Equal(t, bucket, msg.BucketName, "should match bucket name")
 					assert.Equal(t, sub.key, msg.Key, "should match subscriber key")
 				}
@@ -771,7 +771,7 @@ func TestWatchManager_DeleteBucket(t *testing.T) {
 		require.NoError(t, err)
 
 		// Send delete for an unrelated bucket
-		deleteMsg := NewMessage("otherBucket", "", nil, core.DataBucketDeleteFlag,
+		deleteMsg := NewMessage("otherBucket", "", nil, DataBucketDeleteFlag,
 			uint64(time.Now().Unix()), MessageOptions{Priority: MessagePriorityHigh})
 		err = wm.sendMessage(deleteMsg)
 		require.NoError(t, err)
@@ -806,7 +806,7 @@ func TestWatchManager_DeleteBucket(t *testing.T) {
 		time.Sleep(50 * time.Millisecond)
 
 		// Send delete for a bucket with no subscribers
-		deleteMsg := NewMessage("nonExistentBucket", "", nil, core.DataBucketDeleteFlag,
+		deleteMsg := NewMessage("nonExistentBucket", "", nil, DataBucketDeleteFlag,
 			uint64(time.Now().Unix()), MessageOptions{Priority: MessagePriorityHigh})
 		err := wm.sendMessage(deleteMsg)
 		require.NoError(t, err)
@@ -832,12 +832,12 @@ func TestWatchManager_DeleteBucket(t *testing.T) {
 		require.NoError(t, err)
 
 		// Delete both buckets
-		deleteMsg1 := NewMessage(bucket1, "", nil, core.DataBucketDeleteFlag,
+		deleteMsg1 := NewMessage(bucket1, "", nil, DataBucketDeleteFlag,
 			uint64(time.Now().Unix()), MessageOptions{Priority: MessagePriorityHigh})
 		err = wm.sendMessage(deleteMsg1)
 		require.NoError(t, err)
 
-		deleteMsg2 := NewMessage(bucket2, "", nil, core.DataBucketDeleteFlag,
+		deleteMsg2 := NewMessage(bucket2, "", nil, DataBucketDeleteFlag,
 			uint64(time.Now().Unix()), MessageOptions{Priority: MessagePriorityHigh})
 		err = wm.sendMessage(deleteMsg2)
 		require.NoError(t, err)
@@ -858,7 +858,7 @@ func TestWatchManager_DeleteBucket(t *testing.T) {
 			select {
 			case msg, ok := <-ch:
 				if ok {
-					assert.Equal(t, core.DataBucketDeleteFlag, msg.Flag)
+					assert.Equal(t, DataBucketDeleteFlag, msg.Flag)
 				}
 			case <-time.After(1 * time.Second):
 				t.Fatalf("timeout on bucket %d", i+1)
@@ -884,7 +884,7 @@ func TestWatchManager_DeleteBucket(t *testing.T) {
 		require.NoError(t, err)
 
 		// Delete bucket
-		deleteMsg := NewMessage(bucket, "", nil, core.DataBucketDeleteFlag,
+		deleteMsg := NewMessage(bucket, "", nil, DataBucketDeleteFlag,
 			uint64(time.Now().Unix()), MessageOptions{Priority: MessagePriorityHigh})
 		err = wm.sendMessage(deleteMsg)
 		require.NoError(t, err)
@@ -912,7 +912,7 @@ func TestWatchManager_DeleteBucket(t *testing.T) {
 		assert.True(t, sub.active.Load(), "new subscriber should be active")
 
 		// Send a regular update message to verify new subscription works
-		updateMsg := NewMessage(bucket, key, []byte("test_value"), core.DataSetFlag, uint64(time.Now().Unix()))
+		updateMsg := NewMessage(bucket, key, []byte("test_value"), DataSetFlag, uint64(time.Now().Unix()))
 		err = wm.sendMessage(updateMsg)
 		require.NoError(t, err)
 
@@ -920,7 +920,7 @@ func TestWatchManager_DeleteBucket(t *testing.T) {
 		select {
 		case msg, ok := <-subscriber2.receiveChan:
 			require.True(t, ok, "new subscriber should receive message")
-			assert.Equal(t, core.DataSetFlag, msg.Flag)
+			assert.Equal(t, DataSetFlag, msg.Flag)
 			assert.Equal(t, []byte("test_value"), msg.Value)
 		case <-time.After(1 * time.Second):
 			t.Fatal("timeout waiting for message on new subscription")

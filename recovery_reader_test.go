@@ -16,7 +16,7 @@ func Test_readEntry(t *testing.T) {
 	require.NoError(t, err)
 	meta := core.NewMetaData().WithKeySize(uint32(len("key"))).
 		WithValueSize(uint32(len("val"))).WithTimeStamp(1547707905).
-		WithTTL(core.Persistent).WithFlag(core.DataSetFlag).WithBucketId(1)
+		WithTTL(Persistent).WithFlag(DataSetFlag).WithBucketId(1)
 
 	expect := core.NewEntry().WithKey([]byte("key")).WithMeta(meta).WithValue([]byte("val"))
 
@@ -43,7 +43,7 @@ func Test_fileRecovery_readBucket(t *testing.T) {
 			Op: core.BucketInsertOperation,
 		},
 		Id:   1,
-		Ds:   core.DataStructureBTree,
+		Ds:   DataStructureBTree,
 		Name: "bucket_1",
 	}
 	bytes := bucket.Encode()

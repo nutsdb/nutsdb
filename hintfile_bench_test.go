@@ -20,7 +20,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nutsdb/nutsdb/internal/core"
 	"github.com/nutsdb/nutsdb/internal/testutils"
 )
 
@@ -32,9 +31,9 @@ func BenchmarkHintFileEncode(b *testing.B) {
 		ValueSize: 100,
 		Timestamp: uint64(time.Now().UnixMilli()),
 		TTL:       3600,
-		Flag:      core.DataSetFlag,
-		Status:    core.Committed,
-		Ds:        core.DataStructureBTree,
+		Flag:      DataSetFlag,
+		Status:    Committed,
+		Ds:        DataStructureBTree,
 		DataPos:   1000,
 		FileID:    1,
 		Key:       []byte("testkey123"),
@@ -54,9 +53,9 @@ func BenchmarkHintFileDecode(b *testing.B) {
 		ValueSize: 100,
 		Timestamp: uint64(time.Now().UnixMilli()),
 		TTL:       3600,
-		Flag:      core.DataSetFlag,
-		Status:    core.Committed,
-		Ds:        core.DataStructureBTree,
+		Flag:      DataSetFlag,
+		Status:    Committed,
+		Ds:        DataStructureBTree,
 		DataPos:   1000,
 		FileID:    1,
 		Key:       []byte("testkey123"),
@@ -93,9 +92,9 @@ func BenchmarkHintFileWrite(b *testing.B) {
 			ValueSize: 100,
 			Timestamp: uint64(time.Now().UnixMilli()),
 			TTL:       3600,
-			Flag:      core.DataSetFlag,
-			Status:    core.Committed,
-			Ds:        core.DataStructureBTree,
+			Flag:      DataSetFlag,
+			Status:    Committed,
+			Ds:        DataStructureBTree,
 			DataPos:   uint64(i * 10),
 			FileID:    1,
 			Key:       []byte(fmt.Sprintf("key%d", i)),
@@ -151,9 +150,9 @@ func BenchmarkHintFileRead(b *testing.B) {
 			ValueSize: 100,
 			Timestamp: uint64(time.Now().UnixMilli()),
 			TTL:       3600,
-			Flag:      core.DataSetFlag,
-			Status:    core.Committed,
-			Ds:        core.DataStructureBTree,
+			Flag:      DataSetFlag,
+			Status:    Committed,
+			Ds:        DataStructureBTree,
 			DataPos:   uint64(i * 10),
 			FileID:    1,
 			Key:       []byte(fmt.Sprintf("key%d", i)),
@@ -221,12 +220,12 @@ func BenchmarkDBStartupWithHintFile(b *testing.B) {
 	openTime := time.Since(start)
 
 	bucket := "bucket"
-	txCreateBucket(&testing.T{}, db, core.DataStructureBTree, bucket, nil)
+	txCreateBucket(&testing.T{}, db, DataStructureBTree, bucket, nil)
 
 	// Add enough data to trigger merge
 	start = time.Now()
 	for i := 0; i < 5000000; i++ {
-		txPut(&testing.T{}, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), core.Persistent, nil, nil)
+		txPut(&testing.T{}, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), Persistent, nil, nil)
 	}
 	insertTime := time.Since(start)
 	b.Logf("插入阶段耗时: %v", insertTime)
@@ -292,12 +291,12 @@ func BenchmarkDBStartupWithoutHintFile(b *testing.B) {
 	openTime := time.Since(start)
 
 	bucket := "bucket"
-	txCreateBucket(&testing.T{}, db, core.DataStructureBTree, bucket, nil)
+	txCreateBucket(&testing.T{}, db, DataStructureBTree, bucket, nil)
 
 	// Add enough data to trigger merge
 	start = time.Now()
 	for i := 0; i < 5000000; i++ {
-		txPut(&testing.T{}, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), core.Persistent, nil, nil)
+		txPut(&testing.T{}, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), Persistent, nil, nil)
 	}
 	insertTime := time.Since(start)
 	b.Logf("插入阶段耗时: %v", insertTime)
@@ -365,11 +364,11 @@ func BenchmarkMergeWithHintFile(b *testing.B) {
 		}
 
 		bucket := "bucket"
-		txCreateBucket(&testing.T{}, db, core.DataStructureBTree, bucket, nil)
+		txCreateBucket(&testing.T{}, db, DataStructureBTree, bucket, nil)
 
 		// Add data and delete some to trigger merge
 		for j := 0; j < 2000; j++ {
-			txPut(&testing.T{}, db, bucket, testutils.GetTestBytes(j), testutils.GetTestBytes(j), core.Persistent, nil, nil)
+			txPut(&testing.T{}, db, bucket, testutils.GetTestBytes(j), testutils.GetTestBytes(j), Persistent, nil, nil)
 		}
 
 		for j := 0; j < 500; j++ {
@@ -423,11 +422,11 @@ func BenchmarkMergeWithoutHintFile(b *testing.B) {
 		}
 
 		bucket := "bucket"
-		txCreateBucket(&testing.T{}, db, core.DataStructureBTree, bucket, nil)
+		txCreateBucket(&testing.T{}, db, DataStructureBTree, bucket, nil)
 
 		// Add data and delete some to trigger merge
 		for j := 0; j < 2000; j++ {
-			txPut(&testing.T{}, db, bucket, testutils.GetTestBytes(j), testutils.GetTestBytes(j), core.Persistent, nil, nil)
+			txPut(&testing.T{}, db, bucket, testutils.GetTestBytes(j), testutils.GetTestBytes(j), Persistent, nil, nil)
 		}
 
 		for j := 0; j < 500; j++ {
@@ -476,11 +475,11 @@ func BenchmarkHintFileLoad(b *testing.B) {
 	}
 
 	bucket := "bucket"
-	txCreateBucket(&testing.T{}, db, core.DataStructureBTree, bucket, nil)
+	txCreateBucket(&testing.T{}, db, DataStructureBTree, bucket, nil)
 
 	// Add enough data to create multiple files
 	for i := 0; i < 10000; i++ {
-		txPut(&testing.T{}, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), core.Persistent, nil, nil)
+		txPut(&testing.T{}, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), Persistent, nil, nil)
 	}
 
 	// Perform merge to create hint files

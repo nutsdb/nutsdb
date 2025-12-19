@@ -63,12 +63,12 @@ type Message struct {
 	BucketName core.BucketName
 	Key        string
 	Value      []byte
-	Flag       core.DataFlag
+	Flag       DataFlag
 	Timestamp  uint64
 	priority   MessagePriority
 }
 
-func NewMessage(bucketName core.BucketName, key string, value []byte, flag core.DataFlag, timestamp uint64, options ...MessageOptions) *Message {
+func NewMessage(bucketName core.BucketName, key string, value []byte, flag DataFlag, timestamp uint64, options ...MessageOptions) *Message {
 	var priority MessagePriority
 	// default priority is medium
 	priority = MessagePriorityMedium
@@ -192,7 +192,7 @@ func (wm *watchManager) sendUpdatedEntries(entries []*core.Entry, deletedbuckets
 
 	//
 	for bucketName := range deletedbuckets {
-		message := NewMessage(bucketName, "", nil, core.DataBucketDeleteFlag, uint64(time.Now().Unix()), MessageOptions{Priority: MessagePriorityHigh})
+		message := NewMessage(bucketName, "", nil, DataBucketDeleteFlag, uint64(time.Now().Unix()), MessageOptions{Priority: MessagePriorityHigh})
 		if err := wm.sendMessage(message); err != nil {
 			return err
 		}
@@ -346,7 +346,7 @@ func (wm *watchManager) runVictimCollector() {
 				for key, keyMap := range bucketMap {
 					for _, subscriber := range keyMap {
 						if subscriber.active.Load() {
-							message := NewMessage(subscriber.bucketName, subscriber.key, nil, core.DataBucketDeleteFlag, uint64(time.Now().Unix()))
+							message := NewMessage(subscriber.bucketName, subscriber.key, nil, DataBucketDeleteFlag, uint64(time.Now().Unix()))
 							select {
 							case subscriber.receiveChan <- message:
 							default:
@@ -403,7 +403,7 @@ func (wm *watchManager) distributeAllMessages(messages []*Message) error {
 			continue
 		}
 
-		if message.Flag == core.DataBucketDeleteFlag {
+		if message.Flag == DataBucketDeleteFlag {
 			// delete the bucket from the lookup
 			wm.deleteBucket(*message)
 			continue

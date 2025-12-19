@@ -553,7 +553,7 @@ func (db *DB) parseDataFiles(dataFileIds []int64) (err error) {
 				dataInTx.AppendEntry(entryWhenRecovery)
 			}
 
-			if entry.Meta.Status == core.Committed {
+			if entry.Meta.Status == Committed {
 				err := parseDataInTx()
 				if err != nil {
 					return err
@@ -690,7 +690,7 @@ func (db *DB) loadHintFile(fid int64) (bool, error) {
 		} else if db.opt.EntryIdxMode == HintKeyAndRAMIdxMode {
 			// In HintKeyAndRAMIdxMode, for Set data structure, we also need to load the value
 			// because Set uses value hash as the key in its internal map structure
-			if hintEntry.Ds == core.DataStructureSet || hintEntry.Ds == core.DataStructureSortedSet {
+			if hintEntry.Ds == DataStructureSet || hintEntry.Ds == DataStructureSortedSet {
 				value, err := db.getValueByRecord(record)
 				if err != nil {
 					continue
@@ -762,12 +762,12 @@ func (db *DB) buildBTreeIdx(record *core.Record, entry *core.Entry) error {
 
 	bTree := db.Index.BTree.Get(bucketId)
 
-	if db.ttlService.GetChecker().IsExpired(record.TTL, record.Timestamp) || meta.Flag == core.DataDeleteFlag {
+	if db.ttlService.GetChecker().IsExpired(record.TTL, record.Timestamp) || meta.Flag == DataDeleteFlag {
 		db.ttlService.UnregisterTTL(bucketId, string(key))
 		bTree.Delete(key)
 	} else {
-		if meta.TTL != core.Persistent {
-			db.ttlService.RegisterTTL(bucketId, string(key), expireTime(meta.Timestamp, meta.TTL), core.DataStructureBTree, record.Timestamp)
+		if meta.TTL != Persistent {
+			db.ttlService.RegisterTTL(bucketId, string(key), expireTime(meta.Timestamp, meta.TTL), DataStructureBTree, record.Timestamp)
 		} else {
 			db.ttlService.UnregisterTTL(bucketId, string(key))
 		}
@@ -779,17 +779,17 @@ func (db *DB) buildBTreeIdx(record *core.Record, entry *core.Entry) error {
 func (db *DB) buildIdxes(record *core.Record, entry *core.Entry) error {
 	meta := entry.Meta
 	switch meta.Ds {
-	case core.DataStructureBTree:
+	case DataStructureBTree:
 		return db.buildBTreeIdx(record, entry)
-	case core.DataStructureList:
+	case DataStructureList:
 		if err := db.buildListIdx(record, entry); err != nil {
 			return err
 		}
-	case core.DataStructureSet:
+	case DataStructureSet:
 		if err := db.buildSetIdx(record, entry); err != nil {
 			return err
 		}
-	case core.DataStructureSortedSet:
+	case DataStructureSortedSet:
 		if err := db.buildSortedSetIdx(record, entry); err != nil {
 			return err
 		}
@@ -812,11 +812,11 @@ func (db *DB) buildSetIdx(record *core.Record, entry *core.Entry) error {
 	s := db.Index.Set.Get(bucketId)
 
 	switch meta.Flag {
-	case core.DataSetFlag:
+	case DataSetFlag:
 		if err := s.SAdd(string(key), [][]byte{val}, []*core.Record{record}); err != nil {
 			return fmt.Errorf("when build SetIdx SAdd index err: %s", err)
 		}
-	case core.DataDeleteFlag:
+	case DataDeleteFlag:
 		if err := s.SRem(string(key), val); err != nil {
 			return fmt.Errorf("when build SetIdx SRem index err: %s", err)
 		}
@@ -838,21 +838,21 @@ func (db *DB) buildSortedSetIdx(record *core.Record, entry *core.Entry) error {
 	ss := db.Index.SortedSet.Get(bucketId)
 
 	switch meta.Flag {
-	case core.DataZAddFlag:
+	case DataZAddFlag:
 		keyAndScore := strings.Split(string(key), SeparatorForZSetKey)
 		if len(keyAndScore) == 2 {
 			key := keyAndScore[0]
 			score, _ := strconv2.StrToFloat64(keyAndScore[1])
 			err = ss.ZAdd(key, SCORE(score), val, record)
 		}
-	case core.DataZRemFlag:
+	case DataZRemFlag:
 		_, err = ss.ZRem(string(key), val)
-	case core.DataZRemRangeByRankFlag:
+	case DataZRemRangeByRankFlag:
 		start, end := splitIntIntStr(string(val), SeparatorForZSetKey)
 		err = ss.ZRemRangeByRank(string(key), start, end)
-	case core.DataZPopMaxFlag:
+	case DataZPopMaxFlag:
 		_, _, err = ss.ZPopMax(string(key))
-	case core.DataZPopMinFlag:
+	case DataZPopMinFlag:
 		_, _, err = ss.ZPopMin(string(key))
 	}
 
@@ -881,26 +881,26 @@ func (db *DB) buildListIdx(record *core.Record, entry *core.Entry) error {
 	}
 
 	switch meta.Flag {
-	case core.DataExpireListFlag:
+	case DataExpireListFlag:
 		t, _ := strconv2.StrToInt64(string(val))
 		ttl := uint32(t)
 		l.TTL[string(key)] = ttl
 		l.TimeStamp[string(key)] = meta.Timestamp
-	case core.DataLPushFlag:
+	case DataLPushFlag:
 		err = l.LPush(string(key), record)
-	case core.DataRPushFlag:
+	case DataRPushFlag:
 		err = l.RPush(string(key), record)
-	case core.DataLRemFlag:
+	case DataLRemFlag:
 		err = db.buildListLRemIdx(val, l, key)
-	case core.DataLPopFlag:
+	case DataLPopFlag:
 		_, err = l.LPop(string(key))
-	case core.DataRPopFlag:
+	case DataRPopFlag:
 		_, err = l.RPop(string(key))
-	case core.DataLTrimFlag:
+	case DataLTrimFlag:
 		newKey, start := splitStringIntStr(string(key), SeparatorForListKey)
 		end, _ := strconv2.StrToInt(string(val))
 		err = l.LTrim(newKey, start, end)
-	case core.DataLRemByIndex:
+	case DataLRemByIndex:
 		indexes, _ := utils.UnmarshalInts(val)
 		err = l.LRemByIndex(string(key), indexes)
 	}

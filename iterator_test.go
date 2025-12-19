@@ -17,7 +17,6 @@ package nutsdb
 import (
 	"testing"
 
-	"github.com/nutsdb/nutsdb/internal/core"
 	"github.com/nutsdb/nutsdb/internal/testutils"
 	"github.com/stretchr/testify/require"
 )
@@ -26,10 +25,10 @@ func TestIterator(t *testing.T) {
 	bucket := "bucket"
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 		for i := 0; i < 100; i++ {
-			txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), core.Persistent, nil, nil)
+			txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), Persistent, nil, nil)
 		}
 
 		_ = db.View(func(tx *Tx) error {
@@ -57,10 +56,10 @@ func TestIterator_Reverse(t *testing.T) {
 	bucket := "bucket"
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 		for i := 0; i < 100; i++ {
-			txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), core.Persistent, nil, nil)
+			txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), Persistent, nil, nil)
 		}
 
 		_ = db.View(func(tx *Tx) error {
@@ -87,10 +86,10 @@ func TestIterator_Seek(t *testing.T) {
 	bucket := "bucket"
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 		for i := 0; i < 100; i++ {
-			txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), core.Persistent, nil, nil)
+			txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), Persistent, nil, nil)
 		}
 
 		_ = db.View(func(tx *Tx) error {
@@ -112,10 +111,10 @@ func TestIterator_Release(t *testing.T) {
 	bucket := "bucket"
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 		for i := 0; i < 100; i++ {
-			txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), core.Persistent, nil, nil)
+			txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), Persistent, nil, nil)
 		}
 
 		_ = db.View(func(tx *Tx) error {
@@ -134,10 +133,10 @@ func TestIterator_Item(t *testing.T) {
 	bucket := "bucket"
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 		for i := 0; i < 100; i++ {
-			txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), core.Persistent, nil, nil)
+			txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), Persistent, nil, nil)
 		}
 
 		_ = db.View(func(tx *Tx) error {
@@ -168,10 +167,10 @@ func TestIterator_Rewind(t *testing.T) {
 	bucket := "bucket"
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 		for i := 0; i < 50; i++ {
-			txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), core.Persistent, nil, nil)
+			txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), Persistent, nil, nil)
 		}
 
 		_ = db.View(func(tx *Tx) error {
@@ -201,10 +200,10 @@ func TestIterator_Rewind_Reverse(t *testing.T) {
 	bucket := "bucket"
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 		for i := 0; i < 50; i++ {
-			txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), core.Persistent, nil, nil)
+			txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), Persistent, nil, nil)
 		}
 
 		_ = db.View(func(tx *Tx) error {
@@ -234,7 +233,7 @@ func TestIterator_EmptyBucket(t *testing.T) {
 	bucket := "empty_bucket"
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 		_ = db.View(func(tx *Tx) error {
 			iterator := NewIterator(tx, bucket, IteratorOptions{Reverse: false})
@@ -257,10 +256,10 @@ func TestIterator_NextAfterEnd(t *testing.T) {
 	bucket := "bucket"
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 		for i := 0; i < 10; i++ {
-			txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), core.Persistent, nil, nil)
+			txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), Persistent, nil, nil)
 		}
 
 		_ = db.View(func(tx *Tx) error {
@@ -295,10 +294,10 @@ func TestIterator_ValidConsistency(t *testing.T) {
 	bucket := "bucket"
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 		for i := 0; i < 10; i++ {
-			txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), core.Persistent, nil, nil)
+			txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), Persistent, nil, nil)
 		}
 
 		_ = db.View(func(tx *Tx) error {
@@ -327,10 +326,10 @@ func TestIterator_KeyValueAfterRelease(t *testing.T) {
 	bucket := "bucket"
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 		for i := 0; i < 10; i++ {
-			txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), core.Persistent, nil, nil)
+			txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), Persistent, nil, nil)
 		}
 
 		_ = db.View(func(tx *Tx) error {
@@ -359,11 +358,11 @@ func TestIterator_SeekNonExistent(t *testing.T) {
 	bucket := "bucket"
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 		// Insert keys 0, 2, 4, 6, 8 (even numbers only)
 		for i := 0; i < 10; i += 2 {
-			txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), core.Persistent, nil, nil)
+			txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), Persistent, nil, nil)
 		}
 
 		_ = db.View(func(tx *Tx) error {
@@ -387,10 +386,10 @@ func TestIterator_MultipleSeeks(t *testing.T) {
 	bucket := "bucket"
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 		for i := 0; i < 100; i++ {
-			txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), core.Persistent, nil, nil)
+			txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), Persistent, nil, nil)
 		}
 
 		_ = db.View(func(tx *Tx) error {
@@ -415,10 +414,10 @@ func TestIterator_CachedItemConsistency(t *testing.T) {
 	bucket := "bucket"
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 		for i := 0; i < 50; i++ {
-			txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), core.Persistent, nil, nil)
+			txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), Persistent, nil, nil)
 		}
 
 		_ = db.View(func(tx *Tx) error {

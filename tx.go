@@ -244,7 +244,7 @@ func (tx *Tx) Commit() (err error) {
 		offset := tx.db.ActiveFile.writeOff + int64(buff.Len())
 
 		if i == lastIndex {
-			entry.Meta.Status = core.Committed
+			entry.Meta.Status = Committed
 		}
 
 		if _, err := buff.Write(entry.Encode()); err != nil {
@@ -298,7 +298,7 @@ func (tx *Tx) getNewAddRecordCount() (int64, error) {
 }
 
 func (tx *Tx) getListEntryNewAddRecordCount(bucketId core.BucketId, entry *core.Entry) (int64, error) {
-	if entry.Meta.Flag == core.DataExpireListFlag {
+	if entry.Meta.Flag == DataExpireListFlag {
 		return 0, nil
 	}
 
@@ -308,14 +308,14 @@ func (tx *Tx) getListEntryNewAddRecordCount(bucketId core.BucketId, entry *core.
 	l := tx.db.Index.List.Get(bucketId)
 
 	switch entry.Meta.Flag {
-	case core.DataLPushFlag, core.DataRPushFlag:
+	case DataLPushFlag, DataRPushFlag:
 		res++
-	case core.DataLPopFlag, core.DataRPopFlag:
+	case DataLPopFlag, DataRPopFlag:
 		res--
-	case core.DataLRemByIndex:
+	case DataLRemByIndex:
 		indexes, _ := utils.UnmarshalInts([]byte(value))
 		res -= int64(len(l.GetValidIndexes(key, indexes)))
-	case core.DataLRemFlag:
+	case DataLRemFlag:
 		count, newValue := splitIntStringStr(value, SeparatorForListKey)
 		removeIndices, err := l.GetRemoveIndexes(key, count, func(r *core.Record) (bool, error) {
 			v, err := tx.db.getValueByRecord(r)
@@ -328,7 +328,7 @@ func (tx *Tx) getListEntryNewAddRecordCount(bucketId core.BucketId, entry *core.
 			return 0, err
 		}
 		res -= int64(len(removeIndices))
-	case core.DataLTrimFlag:
+	case DataLTrimFlag:
 		newKey, start := splitStringIntStr(key, SeparatorForListKey)
 		end, _ := strconv2.StrToInt(value)
 
@@ -356,9 +356,9 @@ func (tx *Tx) getKvEntryNewAddRecordCount(bucketId core.BucketId, entry *core.En
 	var res int64
 
 	switch entry.Meta.Flag {
-	case core.DataDeleteFlag:
+	case DataDeleteFlag:
 		res--
-	case core.DataSetFlag:
+	case DataSetFlag:
 		if idx, ok := tx.db.Index.BTree.exist(bucketId); ok {
 			_, found := idx.Find(entry.Key)
 			if !found {
@@ -375,11 +375,11 @@ func (tx *Tx) getKvEntryNewAddRecordCount(bucketId core.BucketId, entry *core.En
 func (tx *Tx) getSetEntryNewAddRecordCount(_ core.BucketId, entry *core.Entry) (int64, error) {
 	var res int64
 
-	if entry.Meta.Flag == core.DataDeleteFlag {
+	if entry.Meta.Flag == DataDeleteFlag {
 		res--
 	}
 
-	if entry.Meta.Flag == core.DataSetFlag {
+	if entry.Meta.Flag == DataSetFlag {
 		res++
 	}
 
@@ -392,20 +392,20 @@ func (tx *Tx) getSortedSetEntryNewAddRecordCount(bucketId core.BucketId, entry *
 	value := string(entry.Value)
 
 	switch entry.Meta.Flag {
-	case core.DataZAddFlag:
+	case DataZAddFlag:
 		if !tx.keyExistsInSortedSet(bucketId, key, value) {
 			res++
 		}
-	case core.DataZRemFlag:
+	case DataZRemFlag:
 		res--
-	case core.DataZRemRangeByRankFlag:
+	case DataZRemRangeByRankFlag:
 		start, end := splitIntIntStr(value, SeparatorForZSetKey)
 		delNodes, err := tx.db.Index.SortedSet.Get(bucketId).getZRemRangeByRankNodes(key, start, end)
 		if err != nil {
 			return res, err
 		}
 		res -= int64(len(delNodes))
-	case core.DataZPopMaxFlag, core.DataZPopMinFlag:
+	case DataZPopMaxFlag, DataZPopMinFlag:
 		res--
 	}
 
@@ -434,19 +434,19 @@ func (tx *Tx) getEntryNewAddRecordCount(entry *core.Entry) (int64, error) {
 	}
 	bucketId := bucket.Id
 
-	if entry.Meta.Ds == core.DataStructureBTree {
+	if entry.Meta.Ds == DataStructureBTree {
 		res, err = tx.getKvEntryNewAddRecordCount(bucketId, entry)
 	}
 
-	if entry.Meta.Ds == core.DataStructureList {
+	if entry.Meta.Ds == DataStructureList {
 		res, err = tx.getListEntryNewAddRecordCount(bucketId, entry)
 	}
 
-	if entry.Meta.Ds == core.DataStructureSet {
+	if entry.Meta.Ds == DataStructureSet {
 		res, err = tx.getSetEntryNewAddRecordCount(bucketId, entry)
 	}
 
-	if entry.Meta.Ds == core.DataStructureSortedSet {
+	if entry.Meta.Ds == DataStructureSortedSet {
 		res, err = tx.getSortedSetEntryNewAddRecordCount(bucketId, entry)
 	}
 
@@ -593,7 +593,7 @@ func (tx *Tx) put(bucket string, key, value []byte, ttl uint32, flag uint16, tim
 	bucketId := b.Id
 
 	meta := core.NewMetaData().WithTimeStamp(timestamp).WithKeySize(uint32(len(key))).WithValueSize(uint32(len(value))).WithFlag(flag).
-		WithTTL(ttl).WithStatus(core.UnCommitted).WithDs(ds).WithTxID(tx.id).WithBucketId(bucketId)
+		WithTTL(ttl).WithStatus(UnCommitted).WithDs(ds).WithTxID(tx.id).WithBucketId(bucketId)
 
 	e := core.NewEntry().WithKey(key).WithMeta(meta).WithValue(value)
 
@@ -647,13 +647,13 @@ func (tx *Tx) buildIdxes(records []*core.Record, entries []*core.Entry) error {
 		meta := entry.Meta
 		var err error
 		switch meta.Ds {
-		case core.DataStructureBTree:
+		case DataStructureBTree:
 			err = tx.db.buildBTreeIdx(records[i], entry)
-		case core.DataStructureList:
+		case DataStructureList:
 			err = tx.db.buildListIdx(records[i], entry)
-		case core.DataStructureSet:
+		case DataStructureSet:
 			err = tx.db.buildSetIdx(records[i], entry)
-		case core.DataStructureSortedSet:
+		case DataStructureSortedSet:
 			err = tx.db.buildSortedSetIdx(records[i], entry)
 		}
 
@@ -697,26 +697,26 @@ func (tx *Tx) buildBucketInIndex() error {
 			switch bucket.Meta.Op {
 			case core.BucketInsertOperation:
 				switch bucket.Ds {
-				case core.DataStructureBTree:
+				case DataStructureBTree:
 					tx.db.Index.BTree.Get(bucket.Id)
-				case core.DataStructureList:
+				case DataStructureList:
 					tx.db.Index.List.Get(bucket.Id)
-				case core.DataStructureSet:
+				case DataStructureSet:
 					tx.db.Index.Set.Get(bucket.Id)
-				case core.DataStructureSortedSet:
+				case DataStructureSortedSet:
 					tx.db.Index.SortedSet.Get(bucket.Id)
 				default:
 					return ErrDataStructureNotSupported
 				}
 			case core.BucketDeleteOperation:
 				switch bucket.Ds {
-				case core.DataStructureBTree:
+				case DataStructureBTree:
 					tx.db.Index.BTree.delete(bucket.Id)
-				case core.DataStructureList:
+				case DataStructureList:
 					tx.db.Index.List.delete(bucket.Id)
-				case core.DataStructureSet:
+				case DataStructureSet:
 					tx.db.Index.Set.delete(bucket.Id)
-				case core.DataStructureSortedSet:
+				case DataStructureSortedSet:
 					tx.db.Index.SortedSet.delete(bucket.Id)
 				default:
 					return ErrDataStructureNotSupported
@@ -758,24 +758,24 @@ func (tx *Tx) getChangeCountInBucketChanges() int64 {
 		bucketId := bucket.Id
 		if bucket.Meta.Op == core.BucketDeleteOperation {
 			switch bucket.Ds {
-			case core.DataStructureBTree:
+			case DataStructureBTree:
 				if bTree, ok := tx.db.Index.BTree.Idx[bucketId]; ok {
 					res -= int64(bTree.Count())
 				}
-			case core.DataStructureSet:
+			case DataStructureSet:
 				if set, ok := tx.db.Index.Set.Idx[bucketId]; ok {
 					for key := range set.M {
 						res -= int64(set.SCard(key))
 					}
 				}
-			case core.DataStructureSortedSet:
+			case DataStructureSortedSet:
 				if sortedSet, ok := tx.db.Index.SortedSet.Idx[bucketId]; ok {
 					for key := range sortedSet.M {
 						curLen, _ := sortedSet.ZCard(key)
 						res -= int64(curLen)
 					}
 				}
-			case core.DataStructureList:
+			case DataStructureList:
 				if list, ok := tx.db.Index.List.Idx[bucketId]; ok {
 					for key := range list.Items {
 						curLen, _ := list.Size(key)
@@ -830,7 +830,7 @@ func (tx *Tx) findEntryAndItsStatus(ds core.Ds, bucket core.BucketName, key stri
 	entries := pendingWriteEntries[bucket]
 	if entry, exist := entries[key]; exist {
 		switch entry.Meta.Flag {
-		case core.DataDeleteFlag:
+		case DataDeleteFlag:
 			return EntryDeleted, nil
 		default:
 			return EntryUpdated, entry

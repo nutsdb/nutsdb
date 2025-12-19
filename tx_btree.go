@@ -32,7 +32,7 @@ const (
 )
 
 func (tx *Tx) PutWithTimestamp(bucket string, key, value []byte, ttl uint32, timestamp uint64) error {
-	return tx.put(bucket, key, value, ttl, core.DataSetFlag, timestamp, core.DataStructureBTree)
+	return tx.put(bucket, key, value, ttl, DataSetFlag, timestamp, DataStructureBTree)
 }
 
 // Put sets the value for a key in the bucket.
@@ -41,7 +41,7 @@ func (tx *Tx) Put(bucket string, key, value []byte, ttl uint32) error {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return err
 	}
-	return tx.put(bucket, key, value, ttl, core.DataSetFlag, uint64(tx.db.opt.Clock.NowMillis()), core.DataStructureBTree)
+	return tx.put(bucket, key, value, ttl, DataSetFlag, uint64(tx.db.opt.Clock.NowMillis()), DataStructureBTree)
 }
 
 // PutIfNotExists set the value for a key in the bucket only if the key doesn't exist already.
@@ -50,12 +50,12 @@ func (tx *Tx) PutIfNotExists(bucket string, key, value []byte, ttl uint32) error
 		return err
 	}
 
-	status, b := tx.getBucketAndItsStatus(core.DataStructureBTree, bucket)
+	status, b := tx.getBucketAndItsStatus(DataStructureBTree, bucket)
 	if isBucketNotFoundStatus(status) {
 		return ErrNotFoundBucket
 	}
 	bucketId := b.Id
-	_, err := tx.pendingWrites.Get(core.DataStructureBTree, bucket, key)
+	_, err := tx.pendingWrites.Get(DataStructureBTree, bucket, key)
 	if err == nil {
 		// the key-value is exists.
 		return nil
@@ -63,14 +63,14 @@ func (tx *Tx) PutIfNotExists(bucket string, key, value []byte, ttl uint32) error
 
 	idx, bucketExists := tx.db.Index.BTree.exist(bucketId)
 	if !bucketExists {
-		return tx.put(bucket, key, value, ttl, core.DataSetFlag, uint64(tx.db.opt.Clock.NowMillis()), core.DataStructureBTree)
+		return tx.put(bucket, key, value, ttl, DataSetFlag, uint64(tx.db.opt.Clock.NowMillis()), DataStructureBTree)
 	}
 
 	if _, recordExists := idx.Find(key); recordExists {
 		return nil
 	}
 
-	return tx.put(bucket, key, value, ttl, core.DataSetFlag, uint64(tx.db.opt.Clock.NowMillis()), core.DataStructureBTree)
+	return tx.put(bucket, key, value, ttl, DataSetFlag, uint64(tx.db.opt.Clock.NowMillis()), DataStructureBTree)
 }
 
 // PutIfExists set the value for a key in the bucket only if the key already exits.
@@ -93,13 +93,13 @@ func (tx *Tx) get(bucket string, key []byte) (value []byte, err error) {
 		return nil, err
 	}
 
-	status, b := tx.getBucketAndItsStatus(core.DataStructureBTree, bucket)
+	status, b := tx.getBucketAndItsStatus(DataStructureBTree, bucket)
 	if isBucketNotFoundStatus(status) {
 		return nil, ErrNotFoundBucket
 	}
 	bucketId := b.Id
 
-	status, entry := tx.findEntryAndItsStatus(core.DataStructureBTree, bucket, string(key))
+	status, entry := tx.findEntryAndItsStatus(DataStructureBTree, bucket, string(key))
 	switch status {
 	case EntryDeleted:
 		return nil, ErrKeyNotFound
@@ -143,7 +143,7 @@ func (tx *Tx) getMaxOrMinKey(bucket string, isMax bool) ([]byte, error) {
 		return nil, err
 	}
 
-	status, b := tx.getBucketAndItsStatus(core.DataStructureBTree, bucket)
+	status, b := tx.getBucketAndItsStatus(DataStructureBTree, bucket)
 	if isBucketNotFoundStatus(status) {
 		return nil, ErrNotFoundBucket
 	}
@@ -211,7 +211,7 @@ func (tx *Tx) getAllOrKeysOrValues(bucket string, typ uint8) ([][]byte, [][]byte
 		return nil, nil, err
 	}
 
-	bucketId, err := tx.db.bucketManager.GetBucketID(core.DataStructureBTree, bucket)
+	bucketId, err := tx.db.bucketManager.GetBucketID(DataStructureBTree, bucket)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -262,13 +262,13 @@ func (tx *Tx) Has(bucket string, key []byte) (exists bool, err error) {
 		return false, err
 	}
 
-	status, b := tx.getBucketAndItsStatus(core.DataStructureBTree, bucket)
+	status, b := tx.getBucketAndItsStatus(DataStructureBTree, bucket)
 	if isBucketNotFoundStatus(status) {
 		return false, ErrNotFoundBucket
 	}
 	bucketId := b.Id
 
-	status, _ = tx.findEntryAndItsStatus(core.DataStructureBTree, bucket, string(key))
+	status, _ = tx.findEntryAndItsStatus(DataStructureBTree, bucket, string(key))
 	switch status {
 	case EntryDeleted:
 		return false, ErrKeyNotFound
@@ -294,7 +294,7 @@ func (tx *Tx) RangeScanEntries(bucket string, start, end []byte, includeKeys, in
 	if err := tx.checkTxIsClosed(); err != nil {
 		return nil, nil, err
 	}
-	status, b := tx.getBucketAndItsStatus(core.DataStructureBTree, bucket)
+	status, b := tx.getBucketAndItsStatus(DataStructureBTree, bucket)
 	if isBucketNotFoundStatus(status) {
 		return nil, nil, ErrNotFoundBucket
 	}
@@ -356,7 +356,7 @@ func (tx *Tx) PrefixScanEntries(bucket string, prefix []byte, reg string, offset
 	if err := tx.checkTxIsClosed(); err != nil {
 		return nil, nil, err
 	}
-	b, err := tx.db.bucketManager.GetBucket(core.DataStructureBTree, bucket)
+	b, err := tx.db.bucketManager.GetBucket(DataStructureBTree, bucket)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -415,19 +415,19 @@ func (tx *Tx) Delete(bucket string, key []byte) error {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return err
 	}
-	b, err := tx.db.bucketManager.GetBucket(core.DataStructureBTree, bucket)
+	b, err := tx.db.bucketManager.GetBucket(DataStructureBTree, bucket)
 	if err != nil {
 		return err
 	}
 	bucketId := b.Id
 
 	//Find the key in the transaction-local map (entriesInBTree)
-	status, _ := tx.findEntryAndItsStatus(core.DataStructureBTree, bucket, string(key))
+	status, _ := tx.findEntryAndItsStatus(DataStructureBTree, bucket, string(key))
 	switch status {
 	case EntryDeleted:
 		return ErrKeyNotFound
 	case EntryUpdated:
-		return tx.put(bucket, key, nil, core.Persistent, core.DataDeleteFlag, uint64(tx.db.opt.Clock.NowMillis()), core.DataStructureBTree)
+		return tx.put(bucket, key, nil, Persistent, DataDeleteFlag, uint64(tx.db.opt.Clock.NowMillis()), DataStructureBTree)
 	}
 
 	if idx, ok := tx.db.Index.BTree.exist(bucketId); ok {
@@ -438,7 +438,7 @@ func (tx *Tx) Delete(bucket string, key []byte) error {
 		return ErrKeyNotFound
 	}
 
-	return tx.put(bucket, key, nil, core.Persistent, core.DataDeleteFlag, uint64(tx.db.opt.Clock.NowMillis()), core.DataStructureBTree)
+	return tx.put(bucket, key, nil, Persistent, DataDeleteFlag, uint64(tx.db.opt.Clock.NowMillis()), DataStructureBTree)
 }
 
 // getHintIdxDataItemsWrapper returns keys and values when prefix scanning or range scanning.
@@ -488,7 +488,7 @@ func (tx *Tx) tryGet(bucket string, key []byte, solveRecord func(record *core.Re
 	if err := tx.checkTxIsClosed(); err != nil {
 		return err
 	}
-	status, b := tx.getBucketAndItsStatus(core.DataStructureBTree, bucket)
+	status, b := tx.getBucketAndItsStatus(DataStructureBTree, bucket)
 	if isBucketNotFoundStatus(status) {
 		return ErrNotFoundBucket
 	}
@@ -497,7 +497,7 @@ func (tx *Tx) tryGet(bucket string, key []byte, solveRecord func(record *core.Re
 		record *core.Record = nil
 		found  bool
 	)
-	entry, err := tx.pendingWrites.Get(core.DataStructureBTree, bucket, key)
+	entry, err := tx.pendingWrites.Get(DataStructureBTree, bucket, key)
 	found = err == nil
 	if idx, ok := tx.db.Index.BTree.exist(bucketId); ok {
 		record, ok = idx.Find(key)
@@ -528,14 +528,14 @@ func (tx *Tx) update(bucket string, key []byte, getNewValue func([]byte) ([]byte
 		if err != nil {
 			return err
 		}
-		return tx.put(bucket, key, newValue, newTTL, core.DataSetFlag, uint64(tx.db.opt.Clock.NowMillis()), core.DataStructureBTree)
+		return tx.put(bucket, key, newValue, newTTL, DataSetFlag, uint64(tx.db.opt.Clock.NowMillis()), DataStructureBTree)
 	})
 }
 
 func (tx *Tx) updateOrPut(bucket string, key, value []byte, getUpdatedValue func([]byte) ([]byte, error)) error {
 	return tx.tryGet(bucket, key, func(record *core.Record, pendingEntry *core.Entry, found bool, bucketId core.BucketId) error {
 		if !found {
-			return tx.put(bucket, key, value, core.Persistent, core.DataSetFlag, uint64(tx.db.opt.Clock.NowMillis()), core.DataStructureBTree)
+			return tx.put(bucket, key, value, Persistent, DataSetFlag, uint64(tx.db.opt.Clock.NowMillis()), DataStructureBTree)
 		}
 
 		value, ttl, err := tx.loadValue(record, pendingEntry)
@@ -547,7 +547,7 @@ func (tx *Tx) updateOrPut(bucket string, key, value []byte, getUpdatedValue func
 			return err
 		}
 
-		return tx.put(bucket, key, newValue, ttl, core.DataSetFlag, uint64(tx.db.opt.Clock.NowMillis()), core.DataStructureBTree)
+		return tx.put(bucket, key, newValue, ttl, DataSetFlag, uint64(tx.db.opt.Clock.NowMillis()), DataStructureBTree)
 	})
 }
 
@@ -636,7 +636,7 @@ func (tx *Tx) SetBit(bucket string, key []byte, offset int, bit byte) error {
 
 // GetTTL returns remaining TTL of a value by key.
 // It returns
-// (-1, nil) If TTL is core.Persistent
+// (-1, nil) If TTL is Persistent
 // (0, ErrBucketNotFound|ErrKeyNotFound) If expired or not found
 // (TTL, nil) If the record exists with a TTL
 // Note: The returned remaining TTL will be in seconds. For example,
@@ -646,14 +646,14 @@ func (tx *Tx) GetTTL(bucket string, key []byte) (int64, error) {
 		return 0, err
 	}
 
-	status, b := tx.getBucketAndItsStatus(core.DataStructureBTree, bucket)
+	status, b := tx.getBucketAndItsStatus(DataStructureBTree, bucket)
 	if isBucketNotFoundStatus(status) {
 		return 0, ErrBucketNotFound
 	}
 	bucketId := b.Id
 
 	// Check pending writes first
-	if pendingTTL, err := tx.pendingWrites.GetTTL(core.DataStructureBTree, bucket, key); err == nil {
+	if pendingTTL, err := tx.pendingWrites.GetTTL(DataStructureBTree, bucket, key); err == nil {
 		return pendingTTL, nil
 	}
 
@@ -669,12 +669,12 @@ func (tx *Tx) GetTTL(bucket string, key []byte) (int64, error) {
 	return ttl, nil
 }
 
-// Persist updates record's TTL as core.Persistent if the record exists.
+// Persist updates record's TTL as Persistent if the record exists.
 func (tx *Tx) Persist(bucket string, key []byte) error {
 	return tx.update(bucket, key, func(oldValue []byte) ([]byte, error) {
 		return oldValue, nil
 	}, func(_ uint32) (uint32, error) {
-		return core.Persistent, nil
+		return Persistent, nil
 	})
 }
 
@@ -688,7 +688,7 @@ func (tx *Tx) MSet(bucket string, ttl uint32, args ...[]byte) error {
 	}
 
 	for i := 0; i < len(args); i += 2 {
-		if err := tx.put(bucket, args[i], args[i+1], ttl, core.DataSetFlag, uint64(tx.db.opt.Clock.NowMillis()), core.DataStructureBTree); err != nil {
+		if err := tx.put(bucket, args[i], args[i+1], ttl, DataSetFlag, uint64(tx.db.opt.Clock.NowMillis()), DataStructureBTree); err != nil {
 			return err
 		}
 	}

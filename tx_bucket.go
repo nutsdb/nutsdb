@@ -25,7 +25,7 @@ func (tx *Tx) IterateBuckets(ds uint16, pattern string, f func(bucket string) bo
 		return err
 	}
 
-	if ds == core.DataStructureSet {
+	if ds == DataStructureSet {
 		for bucketId := range tx.db.Index.Set.Idx {
 			bucket, err := tx.db.bucketManager.GetBucketById(uint64(bucketId))
 			if err != nil {
@@ -36,7 +36,7 @@ func (tx *Tx) IterateBuckets(ds uint16, pattern string, f func(bucket string) bo
 			}
 		}
 	}
-	if ds == core.DataStructureSortedSet {
+	if ds == DataStructureSortedSet {
 		for bucketId := range tx.db.Index.SortedSet.Idx {
 			bucket, err := tx.db.bucketManager.GetBucketById(uint64(bucketId))
 			if err != nil {
@@ -47,7 +47,7 @@ func (tx *Tx) IterateBuckets(ds uint16, pattern string, f func(bucket string) bo
 			}
 		}
 	}
-	if ds == core.DataStructureList {
+	if ds == DataStructureList {
 		for bucketId := range tx.db.Index.List.Idx {
 			bucket, err := tx.db.bucketManager.GetBucketById(uint64(bucketId))
 			if err != nil {
@@ -58,7 +58,7 @@ func (tx *Tx) IterateBuckets(ds uint16, pattern string, f func(bucket string) bo
 			}
 		}
 	}
-	if ds == core.DataStructureBTree {
+	if ds == DataStructureBTree {
 		for bucketId := range tx.db.Index.BTree.Idx {
 			bucket, err := tx.db.bucketManager.GetBucketById(uint64(bucketId))
 			if err != nil {
@@ -73,19 +73,19 @@ func (tx *Tx) IterateBuckets(ds uint16, pattern string, f func(bucket string) bo
 }
 
 func (tx *Tx) NewKVBucket(name string) error {
-	return tx.NewBucket(core.DataStructureBTree, name)
+	return tx.NewBucket(DataStructureBTree, name)
 }
 
 func (tx *Tx) NewListBucket(name string) error {
-	return tx.NewBucket(core.DataStructureList, name)
+	return tx.NewBucket(DataStructureList, name)
 }
 
 func (tx *Tx) NewSetBucket(name string) error {
-	return tx.NewBucket(core.DataStructureSet, name)
+	return tx.NewBucket(DataStructureSet, name)
 }
 
 func (tx *Tx) NewSortSetBucket(name string) error {
-	return tx.NewBucket(core.DataStructureSortedSet, name)
+	return tx.NewBucket(DataStructureSortedSet, name)
 }
 
 func (tx *Tx) NewBucket(ds uint16, name string) (err error) {

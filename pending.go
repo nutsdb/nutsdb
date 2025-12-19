@@ -61,7 +61,7 @@ func newPendingEntriesList() *pendingEntryList {
 // submitEntry submit an entry into pendingEntryList
 func (pending *pendingEntryList) submitEntry(ds core.Ds, bucket string, e *core.Entry) {
 	switch ds {
-	case core.DataStructureBTree:
+	case DataStructureBTree:
 		if _, exist := pending.entriesInBTree[bucket]; !exist {
 			pending.entriesInBTree[bucket] = map[string]*core.Entry{}
 		}
@@ -82,7 +82,7 @@ func (pending *pendingEntryList) submitEntry(ds core.Ds, bucket string, e *core.
 
 func (pending *pendingEntryList) Get(ds core.Ds, bucket string, key []byte) (entry *core.Entry, err error) {
 	switch ds {
-	case core.DataStructureBTree:
+	case DataStructureBTree:
 		if _, exist := pending.entriesInBTree[bucket]; exist {
 			if rec, ok := pending.entriesInBTree[bucket][string(key)]; ok {
 				return rec, nil
@@ -113,7 +113,7 @@ func (pending *pendingEntryList) GetTTL(ds core.Ds, bucket string, key []byte) (
 	if err != nil {
 		return 0, err
 	}
-	if rec.Meta.TTL == core.Persistent {
+	if rec.Meta.TTL == Persistent {
 		return -1, nil
 	}
 	return int64(expireTime(rec.Meta.Timestamp, rec.Meta.TTL).Seconds()), nil
@@ -193,7 +193,7 @@ func (pending *pendingEntryList) MaxOrMinKey(bucketName string, isMax bool) (key
 	)
 
 	pending.rangeEntries(
-		core.DataStructureBTree,
+		DataStructureBTree,
 		bucketName,
 		func(entry *core.Entry) bool {
 			maxKey = compareAndReturn(maxKey, entry.Key, 1)

@@ -267,7 +267,7 @@ func TestMergeV2BasicFlow(t *testing.T) {
 
 	// Create bucket first
 	if err := db.Update(func(tx *Tx) error {
-		return tx.NewBucket(core.DataStructureBTree, bucket)
+		return tx.NewBucket(DataStructureBTree, bucket)
 	}); err != nil {
 		t.Fatalf("NewBucket failed: %v", err)
 	}
@@ -666,14 +666,14 @@ func TestMergeV2CommitCollectorFailure(t *testing.T) {
 		WithFileId(oldFileID).
 		WithDataPos(123).
 		WithTimestamp(timestamp).
-		WithTTL(core.Persistent)
+		WithTTL(Persistent)
 	bt.InsertRecord(key, record)
 
 	db := &DB{
 		opt: opts,
 		bucketManager: &BucketManager{
 			BucketInfoMapper: map[core.BucketId]*core.Bucket{
-				bucketID: {Meta: &core.BucketMeta{}, Id: bucketID, Name: bucketName, Ds: uint16(core.DataStructureBTree)},
+				bucketID: {Meta: &core.BucketMeta{}, Id: bucketID, Name: bucketName, Ds: uint16(DataStructureBTree)},
 			},
 		},
 	}
@@ -697,7 +697,7 @@ func TestMergeV2CommitCollectorFailure(t *testing.T) {
 		pending:     []int64{oldFileID},
 	}
 
-	entry := createTestEntry(bucketID, key, value, core.DataDeleteFlag, core.Committed, core.Persistent, timestamp, 1, core.DataStructureBTree)
+	entry := createTestEntry(bucketID, key, value, DataDeleteFlag, Committed, Persistent, timestamp, 1, DataStructureBTree)
 	if err := job.writeEntry(entry); err != nil {
 		t.Fatalf("writeEntry: %v", err)
 	}
@@ -790,14 +790,14 @@ func TestMergeV2MergeAndTxConcurrentWrites(t *testing.T) {
 	freshValue := []byte("fresh")
 
 	if err := db.Update(func(tx *Tx) error {
-		return tx.NewBucket(core.DataStructureBTree, bucket)
+		return tx.NewBucket(DataStructureBTree, bucket)
 	}); err != nil {
 		t.Fatalf("create bucket: %v", err)
 	}
 
 	putValue := func(val []byte) error {
 		return db.Update(func(tx *Tx) error {
-			return tx.Put(bucket, targetKey, val, core.Persistent)
+			return tx.Put(bucket, targetKey, val, Persistent)
 		})
 	}
 
@@ -809,7 +809,7 @@ func TestMergeV2MergeAndTxConcurrentWrites(t *testing.T) {
 	for i := 0; i < 16; i++ {
 		key := []byte(fmt.Sprintf("fill-%02d", i))
 		if err := db.Update(func(tx *Tx) error {
-			return tx.Put(bucket, key, fillerVal, core.Persistent)
+			return tx.Put(bucket, key, fillerVal, Persistent)
 		}); err != nil {
 			t.Fatalf("populate filler: %v", err)
 		}
@@ -827,7 +827,7 @@ func TestMergeV2MergeAndTxConcurrentWrites(t *testing.T) {
 		}
 		key := []byte(fmt.Sprintf("extra-%02d", attempts))
 		if err := db.Update(func(tx *Tx) error {
-			return tx.Put(bucket, key, fillerVal, core.Persistent)
+			return tx.Put(bucket, key, fillerVal, Persistent)
 		}); err != nil {
 			t.Fatalf("populate extra filler: %v", err)
 		}
@@ -964,7 +964,7 @@ func TestMergeV2MergeAndTxConcurrentWritesWithSet(t *testing.T) {
 	freshMember := []byte("fresh-member")
 
 	if err := db.Update(func(tx *Tx) error {
-		return tx.NewBucket(core.DataStructureSet, bucket)
+		return tx.NewBucket(DataStructureSet, bucket)
 	}); err != nil {
 		t.Fatalf("create bucket: %v", err)
 	}
@@ -1020,7 +1020,7 @@ func TestMergeV2MergeAndTxConcurrentWritesWithSet(t *testing.T) {
 
 	entrySignal := make(chan struct{}, 1)
 	job.onRewriteEntry = func(entry *core.Entry) {
-		if bytes.Equal(entry.Key, targetKey) && entry.Meta.Ds == core.DataStructureSet {
+		if bytes.Equal(entry.Key, targetKey) && entry.Meta.Ds == DataStructureSet {
 			select {
 			case entrySignal <- struct{}{}:
 			default:
@@ -1147,7 +1147,7 @@ func TestMergeV2CommitPhaseBlocking(t *testing.T) {
 	bucket := "bucket"
 
 	if err := db.Update(func(tx *Tx) error {
-		return tx.NewBucket(core.DataStructureBTree, bucket)
+		return tx.NewBucket(DataStructureBTree, bucket)
 	}); err != nil {
 		t.Fatalf("create bucket: %v", err)
 	}
@@ -1158,7 +1158,7 @@ func TestMergeV2CommitPhaseBlocking(t *testing.T) {
 	for i := 0; i < numEntries; i++ {
 		key := []byte(fmt.Sprintf("key-%03d", i))
 		if err := db.Update(func(tx *Tx) error {
-			return tx.Put(bucket, key, fillerVal, core.Persistent)
+			return tx.Put(bucket, key, fillerVal, Persistent)
 		}); err != nil {
 			t.Fatalf("populate entry %d: %v", i, err)
 		}
@@ -1177,7 +1177,7 @@ func TestMergeV2CommitPhaseBlocking(t *testing.T) {
 		}
 		extraKey := []byte(fmt.Sprintf("extra-%03d", attempts))
 		if err := db.Update(func(tx *Tx) error {
-			return tx.Put(bucket, extraKey, fillerVal, core.Persistent)
+			return tx.Put(bucket, extraKey, fillerVal, Persistent)
 		}); err != nil {
 			t.Fatalf("add extra entry: %v", err)
 		}
@@ -1223,7 +1223,7 @@ func TestMergeV2CommitPhaseBlocking(t *testing.T) {
 	updateDone := make(chan error, 1)
 	go func() {
 		updateDone <- db.Update(func(tx *Tx) error {
-			return tx.Put(bucket, []byte("concurrent-key"), []byte("concurrent-value"), core.Persistent)
+			return tx.Put(bucket, []byte("concurrent-key"), []byte("concurrent-value"), Persistent)
 		})
 	}()
 
@@ -1277,7 +1277,7 @@ func TestMergeV2WriteEntryHashesSetAndSortedSet(t *testing.T) {
 	job.outputs = []*mergeOutput{out}
 
 	setValue := []byte("set-value")
-	setEntry := createTestEntry(1, []byte("set-key"), setValue, core.DataSetFlag, core.Committed, core.Persistent, uint64(time.Now().Unix()), 1, core.DataStructureSet)
+	setEntry := createTestEntry(1, []byte("set-key"), setValue, DataSetFlag, Committed, Persistent, uint64(time.Now().Unix()), 1, DataStructureSet)
 	if err := job.writeEntry(setEntry); err != nil {
 		t.Fatalf("writeEntry set: %v", err)
 	}
@@ -1293,7 +1293,7 @@ func TestMergeV2WriteEntryHashesSetAndSortedSet(t *testing.T) {
 	}
 
 	sortedValue := []byte("sorted-value")
-	sortedEntry := createTestEntry(2, []byte("sorted-key"), sortedValue, core.DataZAddFlag, core.Committed, core.Persistent, uint64(time.Now().Unix()), 2, core.DataStructureSortedSet)
+	sortedEntry := createTestEntry(2, []byte("sorted-key"), sortedValue, DataZAddFlag, Committed, Persistent, uint64(time.Now().Unix()), 2, DataStructureSortedSet)
 	if err := job.writeEntry(sortedEntry); err != nil {
 		t.Fatalf("writeEntry sorted set: %v", err)
 	}
@@ -1328,9 +1328,9 @@ func TestMergeV2ApplyLookupUpdatesSecondaryIndexes(t *testing.T) {
 		ds   core.DataStructure
 		name string
 	}{
-		{1, core.DataStructureSet, "set"},
-		{2, core.DataStructureList, "list"},
-		{3, core.DataStructureSortedSet, "zset"},
+		{1, DataStructureSet, "set"},
+		{2, DataStructureList, "list"},
+		{3, DataStructureSortedSet, "zset"},
 	}
 
 	for _, b := range buckets {
@@ -1338,7 +1338,7 @@ func TestMergeV2ApplyLookupUpdatesSecondaryIndexes(t *testing.T) {
 	}
 
 	// Set bucket
-	setRecord := &core.Record{Value: []byte("member"), FileID: 10, Timestamp: 1, TTL: core.Persistent}
+	setRecord := &core.Record{Value: []byte("member"), FileID: 10, Timestamp: 1, TTL: Persistent}
 	setIdx := db.Index.Set.Get(buckets[0].id)
 	if err := setIdx.SAdd("set-key", [][]byte{setRecord.Value}, []*core.Record{setRecord}); err != nil {
 		t.Fatalf("SAdd: %v", err)
@@ -1350,14 +1350,14 @@ func TestMergeV2ApplyLookupUpdatesSecondaryIndexes(t *testing.T) {
 	listIdx := db.Index.List.Get(buckets[1].id)
 	listKey := []byte("list-key")
 	seq := uint64(42)
-	listRecord := &core.Record{FileID: 11, Timestamp: 2, TTL: core.Persistent, TxID: 1}
+	listRecord := &core.Record{FileID: 11, Timestamp: 2, TTL: Persistent, TxID: 1}
 	listIdx.Items[string(listKey)] = data.NewBTree(0) // bucketId 0 for test
 	listIdx.Items[string(listKey)].InsertRecord(utils.ConvertUint64ToBigEndianBytes(seq), listRecord)
 
 	// Sorted set bucket
 	sortedIdx := db.Index.SortedSet.Get(buckets[2].id)
 	sortedValue := []byte("sorted-member")
-	sortedRecord := &core.Record{Value: sortedValue, FileID: 12, Timestamp: 3, TTL: core.Persistent}
+	sortedRecord := &core.Record{Value: sortedValue, FileID: 12, Timestamp: 3, TTL: Persistent}
 	if err := sortedIdx.ZAdd("zset-key", SCORE(1.5), sortedValue, sortedRecord); err != nil {
 		t.Fatalf("ZAdd: %v", err)
 	}
@@ -1371,7 +1371,7 @@ func TestMergeV2ApplyLookupUpdatesSecondaryIndexes(t *testing.T) {
 		hint: &HintEntry{
 			BucketId:  uint64(buckets[0].id),
 			Key:       []byte("set-key"),
-			Ds:        uint16(core.DataStructureSet),
+			Ds:        uint16(DataStructureSet),
 			FileID:    100,
 			DataPos:   1000,
 			Timestamp: 100,
@@ -1392,8 +1392,8 @@ func TestMergeV2ApplyLookupUpdatesSecondaryIndexes(t *testing.T) {
 		hint: &HintEntry{
 			BucketId:  uint64(buckets[1].id),
 			Key:       listKeyEncoded,
-			Ds:        uint16(core.DataStructureList),
-			Flag:      core.DataLPushFlag,
+			Ds:        uint16(DataStructureList),
+			Flag:      DataLPushFlag,
 			FileID:    200,
 			DataPos:   2000,
 			Timestamp: 200,
@@ -1412,7 +1412,7 @@ func TestMergeV2ApplyLookupUpdatesSecondaryIndexes(t *testing.T) {
 		hint: &HintEntry{
 			BucketId:  uint64(buckets[2].id),
 			Key:       sortedKey,
-			Ds:        uint16(core.DataStructureSortedSet),
+			Ds:        uint16(DataStructureSortedSet),
 			FileID:    300,
 			DataPos:   3000,
 			Timestamp: 300,
@@ -1453,7 +1453,7 @@ func TestMergeV2ConcurrentWritesDuringFullMerge(t *testing.T) {
 
 	bucket := "test-bucket"
 	if err := db.Update(func(tx *Tx) error {
-		return tx.NewBucket(core.DataStructureBTree, bucket)
+		return tx.NewBucket(DataStructureBTree, bucket)
 	}); err != nil {
 		t.Fatalf("create bucket: %v", err)
 	}
@@ -1468,7 +1468,7 @@ func TestMergeV2ConcurrentWritesDuringFullMerge(t *testing.T) {
 		initialData[key] = value
 
 		if err := db.Update(func(tx *Tx) error {
-			return tx.Put(bucket, []byte(key), value, core.Persistent)
+			return tx.Put(bucket, []byte(key), value, Persistent)
 		}); err != nil {
 			t.Fatalf("put initial key %s: %v", key, err)
 		}
@@ -1510,7 +1510,7 @@ func TestMergeV2ConcurrentWritesDuringFullMerge(t *testing.T) {
 			value := []byte(fmt.Sprintf("concurrent-value-%04d", idx))
 
 			if err := db.Update(func(tx *Tx) error {
-				return tx.Put(bucket, []byte(key), value, core.Persistent)
+				return tx.Put(bucket, []byte(key), value, Persistent)
 			}); err != nil {
 				t.Errorf("concurrent write failed for key %s: %v", key, err)
 				return
@@ -1532,7 +1532,7 @@ func TestMergeV2ConcurrentWritesDuringFullMerge(t *testing.T) {
 				value := []byte(fmt.Sprintf("new-value-%04d", idx))
 
 				if err := db.Update(func(tx *Tx) error {
-					return tx.Put(bucket, []byte(key), value, core.Persistent)
+					return tx.Put(bucket, []byte(key), value, Persistent)
 				}); err != nil {
 					t.Errorf("concurrent new key write failed for %s: %v", key, err)
 					return
@@ -1617,7 +1617,7 @@ func TestMergeV2ReopenAfterConcurrentMerge(t *testing.T) {
 
 	bucket := "bucket"
 	if err := db.Update(func(tx *Tx) error {
-		return tx.NewBucket(core.DataStructureBTree, bucket)
+		return tx.NewBucket(DataStructureBTree, bucket)
 	}); err != nil {
 		t.Fatalf("create bucket: %v", err)
 	}
@@ -1628,7 +1628,7 @@ func TestMergeV2ReopenAfterConcurrentMerge(t *testing.T) {
 		key := fmt.Sprintf("key-%03d", i)
 		value := append([]byte(fmt.Sprintf("initial-%03d-", i)), valueSize...)
 		if err := db.Update(func(tx *Tx) error {
-			return tx.Put(bucket, []byte(key), value, core.Persistent)
+			return tx.Put(bucket, []byte(key), value, Persistent)
 		}); err != nil {
 			t.Fatalf("put: %v", err)
 		}
@@ -1650,7 +1650,7 @@ func TestMergeV2ReopenAfterConcurrentMerge(t *testing.T) {
 	freshValue := []byte("fresh-value-after-merge-started")
 
 	if err := db.Update(func(tx *Tx) error {
-		return tx.Put(bucket, []byte(staleCandidateKey), freshValue, core.Persistent)
+		return tx.Put(bucket, []byte(staleCandidateKey), freshValue, Persistent)
 	}); err != nil {
 		t.Fatalf("concurrent update: %v", err)
 	}
@@ -1764,19 +1764,19 @@ func TestMergeV2MultiDataStructuresConcurrent(t *testing.T) {
 	bucketZSet := "zset-bucket"
 
 	if err := db.Update(func(tx *Tx) error {
-		if err := tx.NewBucket(core.DataStructureBTree, bucketBTree); err != nil {
+		if err := tx.NewBucket(DataStructureBTree, bucketBTree); err != nil {
 			return err
 		}
 
-		if err := tx.NewBucket(core.DataStructureList, bucketList); err != nil {
+		if err := tx.NewBucket(DataStructureList, bucketList); err != nil {
 			return err
 		}
 
-		if err := tx.NewBucket(core.DataStructureSet, bucketSet); err != nil {
+		if err := tx.NewBucket(DataStructureSet, bucketSet); err != nil {
 			return err
 		}
 
-		if err := tx.NewBucket(core.DataStructureSortedSet, bucketZSet); err != nil {
+		if err := tx.NewBucket(DataStructureSortedSet, bucketZSet); err != nil {
 			return err
 		}
 
@@ -1794,7 +1794,7 @@ func TestMergeV2MultiDataStructuresConcurrent(t *testing.T) {
 			// BTree key-value
 			key := fmt.Sprintf("btree-key-%03d", i)
 			value := append([]byte(fmt.Sprintf("btree-val-%03d-", i)), valueSize...)
-			if err := tx.Put(bucketBTree, []byte(key), value, core.Persistent); err != nil {
+			if err := tx.Put(bucketBTree, []byte(key), value, Persistent); err != nil {
 				return err
 			}
 
@@ -1849,7 +1849,7 @@ func TestMergeV2MultiDataStructuresConcurrent(t *testing.T) {
 			key := fmt.Sprintf("btree-key-%03d", idx)
 			value := []byte(fmt.Sprintf("concurrent-btree-%03d", idx))
 			_ = db.Update(func(tx *Tx) error {
-				return tx.Put(bucketBTree, []byte(key), value, core.Persistent)
+				return tx.Put(bucketBTree, []byte(key), value, Persistent)
 			})
 		}(i)
 	}
@@ -1971,13 +1971,13 @@ func TestMergeV2RewriteFileSkipsCorruptedEntries(t *testing.T) {
 	now := uint64(time.Now().Unix())
 
 	entries := []*core.Entry{
-		createTestEntry(bucketID, []byte("uncommitted"), []byte("v1"), core.DataSetFlag, core.UnCommitted, core.Persistent, now, 1, core.DataStructureBTree),
-		createTestEntry(bucketID, []byte("deleted"), []byte("v2"), core.DataDeleteFlag, core.Committed, core.Persistent, now, 2, core.DataStructureBTree),
-		createTestEntry(bucketID, []byte("expired"), []byte("v3"), core.DataSetFlag, core.Committed, 1, uint64(time.Now().Add(-2*time.Second).Unix()), 3, core.DataStructureBTree),
-		createTestEntry(bucketID, []byte("nonpending"), []byte("v4"), core.DataSetFlag, core.Committed, core.Persistent, now, 4, core.DataStructureBTree),
+		createTestEntry(bucketID, []byte("uncommitted"), []byte("v1"), DataSetFlag, UnCommitted, Persistent, now, 1, DataStructureBTree),
+		createTestEntry(bucketID, []byte("deleted"), []byte("v2"), DataDeleteFlag, Committed, Persistent, now, 2, DataStructureBTree),
+		createTestEntry(bucketID, []byte("expired"), []byte("v3"), DataSetFlag, Committed, 1, uint64(time.Now().Add(-2*time.Second).Unix()), 3, DataStructureBTree),
+		createTestEntry(bucketID, []byte("nonpending"), []byte("v4"), DataSetFlag, Committed, Persistent, now, 4, DataStructureBTree),
 	}
 
-	goodEntry := createTestEntry(bucketID, []byte("good"), []byte("keep"), core.DataSetFlag, core.Committed, core.Persistent, now, 5, core.DataStructureBTree)
+	goodEntry := createTestEntry(bucketID, []byte("good"), []byte("keep"), DataSetFlag, Committed, Persistent, now, 5, DataStructureBTree)
 
 	for _, e := range append(entries, goodEntry) {
 		if _, err := f.Write(e.Encode()); err != nil {
@@ -2011,7 +2011,7 @@ func TestMergeV2RewriteFileSkipsCorruptedEntries(t *testing.T) {
 		ttlService: ttl.NewService(clk, ttl.TimeWheel),
 		bucketManager: &BucketManager{
 			BucketInfoMapper: map[core.BucketId]*core.Bucket{
-				bucketID: {Meta: &core.BucketMeta{}, Id: bucketID, Ds: uint16(core.DataStructureBTree)},
+				bucketID: {Meta: &core.BucketMeta{}, Id: bucketID, Ds: uint16(DataStructureBTree)},
 			},
 		},
 	}

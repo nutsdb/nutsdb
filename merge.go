@@ -147,11 +147,11 @@ func (db *DB) mergeLegacy() error {
 						bucketName := bucket.Name
 
 						switch entry.Meta.Flag {
-						case core.DataLPushFlag:
+						case DataLPushFlag:
 							if err := tx.LPushRaw(bucketName, entry.Key, entry.Value); err != nil {
 								return err
 							}
-						case core.DataRPushFlag:
+						case DataRPushFlag:
 							if err := tx.RPushRaw(bucketName, entry.Key, entry.Value); err != nil {
 								return err
 							}
@@ -410,7 +410,7 @@ func (db *DB) isPendingListEntry(entry *core.Entry) bool {
 	var curSeq uint64
 	var userKey []byte
 
-	if entry.Meta.Flag == core.DataExpireListFlag {
+	if entry.Meta.Flag == DataExpireListFlag {
 		userKeyStr = string(entry.Key)
 		list, exist := db.Index.List.exist(entry.Meta.BucketId)
 		if !exist {
@@ -434,7 +434,7 @@ func (db *DB) isPendingListEntry(entry *core.Entry) bool {
 		return true
 	}
 
-	if entry.Meta.Flag == core.DataLPushFlag || entry.Meta.Flag == core.DataRPushFlag {
+	if entry.Meta.Flag == DataLPushFlag || entry.Meta.Flag == DataRPushFlag {
 		userKey, curSeq = decodeListKey(entry.Key)
 		userKeyStr = string(userKey)
 

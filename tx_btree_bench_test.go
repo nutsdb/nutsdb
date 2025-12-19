@@ -22,7 +22,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nutsdb/nutsdb/internal/core"
 )
 
 // Benchmark suite for tx_btree.go functions
@@ -74,7 +73,7 @@ func BenchmarkTx_Put(b *testing.B) {
 		err := db.Update(func(tx *Tx) error {
 			key := []byte(fmt.Sprintf("key_%d", i))
 			value := []byte(fmt.Sprintf("value_%d", i))
-			return tx.Put("test_bucket", key, value, core.Persistent)
+			return tx.Put("test_bucket", key, value, Persistent)
 		})
 		if err != nil {
 			b.Fatalf("Put failed: %v", err)
@@ -94,7 +93,7 @@ func BenchmarkTx_Get(b *testing.B) {
 		err := db.Update(func(tx *Tx) error {
 			key := []byte(fmt.Sprintf("key_%d", i))
 			value := []byte(fmt.Sprintf("value_%d", i))
-			return tx.Put("test_bucket", key, value, core.Persistent)
+			return tx.Put("test_bucket", key, value, Persistent)
 		})
 		if err != nil {
 			b.Fatalf("Setup failed: %v", err)
@@ -128,7 +127,7 @@ func BenchmarkTx_RangeScan(b *testing.B) {
 		for i := 0; i < numKeys; i++ {
 			key := []byte(fmt.Sprintf("key_%07d", i))
 			value := []byte(fmt.Sprintf("value_%d", i))
-			if err := tx.Put("test_bucket", key, value, core.Persistent); err != nil {
+			if err := tx.Put("test_bucket", key, value, Persistent); err != nil {
 				return err
 			}
 		}
@@ -166,7 +165,7 @@ func BenchmarkTx_PrefixScan(b *testing.B) {
 		for i := 0; i < numKeys; i++ {
 			key := []byte(fmt.Sprintf("prefix_%07d", i))
 			value := []byte(fmt.Sprintf("value_%d", i))
-			if err := tx.Put("test_bucket", key, value, core.Persistent); err != nil {
+			if err := tx.Put("test_bucket", key, value, Persistent); err != nil {
 				return err
 			}
 		}
@@ -203,7 +202,7 @@ func BenchmarkTx_GetAll(b *testing.B) {
 		for i := 0; i < numKeys; i++ {
 			key := []byte(fmt.Sprintf("key_%d", i))
 			value := []byte(fmt.Sprintf("value_%d", i))
-			if err := tx.Put("test_bucket", key, value, core.Persistent); err != nil {
+			if err := tx.Put("test_bucket", key, value, Persistent); err != nil {
 				return err
 			}
 		}
@@ -239,7 +238,7 @@ func BenchmarkTx_Delete(b *testing.B) {
 		err := db.Update(func(tx *Tx) error {
 			key := []byte(fmt.Sprintf("key_%d", i))
 			value := []byte(fmt.Sprintf("value_%d", i))
-			return tx.Put("test_bucket", key, value, core.Persistent)
+			return tx.Put("test_bucket", key, value, Persistent)
 		})
 		if err != nil {
 			b.Fatalf("Setup failed: %v", err)
@@ -271,7 +270,7 @@ func BenchmarkTx_MixedOperations(b *testing.B) {
 		err := db.Update(func(tx *Tx) error {
 			key := []byte(fmt.Sprintf("key_%d", i))
 			value := []byte(fmt.Sprintf("value_%d", i))
-			return tx.Put("test_bucket", key, value, core.Persistent)
+			return tx.Put("test_bucket", key, value, Persistent)
 		})
 		if err != nil {
 			b.Fatalf("Setup failed: %v", err)
@@ -291,7 +290,7 @@ func BenchmarkTx_MixedOperations(b *testing.B) {
 		case 0: // Put
 			err := db.Update(func(tx *Tx) error {
 				value := []byte(fmt.Sprintf("value_%d", i))
-				return tx.Put("test_bucket", key, value, core.Persistent)
+				return tx.Put("test_bucket", key, value, Persistent)
 			})
 			if err != nil {
 				b.Fatalf("Put failed: %v", err)
@@ -343,7 +342,7 @@ func BenchmarkTx_ConcurrentOperations(b *testing.B) {
 			value := []byte(fmt.Sprintf("value_%d", r.Intn(1000)))
 
 			err := db.Update(func(tx *Tx) error {
-				return tx.Put("test_bucket", key, value, core.Persistent)
+				return tx.Put("test_bucket", key, value, Persistent)
 			})
 			if err != nil {
 				b.Errorf("Concurrent Put failed: %v", err)
@@ -401,7 +400,7 @@ func BenchmarkTx_LargeValues(b *testing.B) {
 		key := []byte(fmt.Sprintf("large_key_%d", i))
 
 		err := db.Update(func(tx *Tx) error {
-			return tx.Put("test_bucket", key, largeValue, core.Persistent)
+			return tx.Put("test_bucket", key, largeValue, Persistent)
 		})
 		if err != nil {
 			b.Fatalf("Large value Put failed: %v", err)
@@ -432,7 +431,7 @@ func BenchmarkTx_TransactionCommit(b *testing.B) {
 			for j := 0; j < 100; j++ {
 				key := []byte(fmt.Sprintf("key_%d_%d", i, j))
 				value := []byte(fmt.Sprintf("value_%d_%d", i, j))
-				if err := tx.Put("test_bucket", key, value, core.Persistent); err != nil {
+				if err := tx.Put("test_bucket", key, value, Persistent); err != nil {
 					return err
 				}
 			}
@@ -468,7 +467,7 @@ func BenchmarkTx_MemoryStress(b *testing.B) {
 					value[k] = byte(rand.Intn(256))
 				}
 
-				if err := tx.Put("test_bucket", key, value, core.Persistent); err != nil {
+				if err := tx.Put("test_bucket", key, value, Persistent); err != nil {
 					return err
 				}
 			}

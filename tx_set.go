@@ -36,11 +36,11 @@ var (
 
 func (tx *Tx) sPut(bucket string, key []byte, dataFlag uint16, values ...[]byte) error {
 
-	if dataFlag == core.DataSetFlag {
+	if dataFlag == DataSetFlag {
 
 		filter := make(map[uint32]struct{})
 
-		b1, err := tx.db.bucketManager.GetBucket(core.DataStructureSet, bucket)
+		b1, err := tx.db.bucketManager.GetBucket(DataStructureSet, bucket)
 		if err != nil {
 			return err
 		}
@@ -63,7 +63,7 @@ func (tx *Tx) sPut(bucket string, key []byte, dataFlag uint16, values ...[]byte)
 			}
 			if _, ok := filter[hash]; !ok {
 				filter[hash] = struct{}{}
-				err := tx.put(bucket, key, value, core.Persistent, dataFlag, uint64(time.Now().Unix()), core.DataStructureSet)
+				err := tx.put(bucket, key, value, Persistent, dataFlag, uint64(time.Now().Unix()), DataStructureSet)
 				if err != nil {
 					return err
 				}
@@ -73,7 +73,7 @@ func (tx *Tx) sPut(bucket string, key []byte, dataFlag uint16, values ...[]byte)
 	} else {
 		for _, value := range values {
 
-			err := tx.put(bucket, key, value, core.Persistent, dataFlag, uint64(time.Now().Unix()), core.DataStructureSet)
+			err := tx.put(bucket, key, value, Persistent, dataFlag, uint64(time.Now().Unix()), DataStructureSet)
 			if err != nil {
 				return err
 			}
@@ -89,7 +89,7 @@ func (tx *Tx) SAdd(bucket string, key []byte, items ...[]byte) error {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return err
 	}
-	return tx.sPut(bucket, key, core.DataSetFlag, items...)
+	return tx.sPut(bucket, key, DataSetFlag, items...)
 }
 
 // SRem removes the specified members from the set stored int the bucket at given bucket,key and items.
@@ -98,7 +98,7 @@ func (tx *Tx) SRem(bucket string, key []byte, items ...[]byte) error {
 		return err
 	}
 
-	b, err := tx.db.bucketManager.GetBucket(core.DataStructureSet, bucket)
+	b, err := tx.db.bucketManager.GetBucket(DataStructureSet, bucket)
 	if err != nil {
 		return err
 	}
@@ -111,7 +111,7 @@ func (tx *Tx) SRem(bucket string, key []byte, items ...[]byte) error {
 		if !ok {
 			return ErrSetMemberNotExist
 		}
-		return tx.sPut(bucket, key, core.DataDeleteFlag, items...)
+		return tx.sPut(bucket, key, DataDeleteFlag, items...)
 	}
 	return ErrBucketNotFound
 }
@@ -121,7 +121,7 @@ func (tx *Tx) SAreMembers(bucket string, key []byte, items ...[]byte) (bool, err
 	if err := tx.checkTxIsClosed(); err != nil {
 		return false, err
 	}
-	b, err := tx.db.bucketManager.GetBucket(core.DataStructureSet, bucket)
+	b, err := tx.db.bucketManager.GetBucket(DataStructureSet, bucket)
 	if err != nil {
 		return false, err
 	}
@@ -138,7 +138,7 @@ func (tx *Tx) SIsMember(bucket string, key, item []byte) (bool, error) {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return false, err
 	}
-	b, err := tx.db.bucketManager.GetBucket(core.DataStructureSet, bucket)
+	b, err := tx.db.bucketManager.GetBucket(DataStructureSet, bucket)
 	if err != nil {
 		return false, err
 	}
@@ -159,7 +159,7 @@ func (tx *Tx) SMembers(bucket string, key []byte) ([][]byte, error) {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return nil, err
 	}
-	b, err := tx.db.bucketManager.GetBucket(core.DataStructureSet, bucket)
+	b, err := tx.db.bucketManager.GetBucket(DataStructureSet, bucket)
 	if err != nil {
 		return nil, err
 	}
@@ -190,7 +190,7 @@ func (tx *Tx) SHasKey(bucket string, key []byte) (bool, error) {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return false, err
 	}
-	b, err := tx.db.bucketManager.GetBucket(core.DataStructureSet, bucket)
+	b, err := tx.db.bucketManager.GetBucket(DataStructureSet, bucket)
 	if err != nil {
 		return false, err
 	}
@@ -208,7 +208,7 @@ func (tx *Tx) SPop(bucket string, key []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	b, err := tx.db.bucketManager.GetBucket(core.DataStructureSet, bucket)
+	b, err := tx.db.bucketManager.GetBucket(DataStructureSet, bucket)
 	if err != nil {
 		return nil, err
 	}
@@ -220,7 +220,7 @@ func (tx *Tx) SPop(bucket string, key []byte) ([]byte, error) {
 			if err != nil {
 				return nil, err
 			}
-			err = tx.sPut(bucket, key, core.DataDeleteFlag, value)
+			err = tx.sPut(bucket, key, DataDeleteFlag, value)
 			if err != nil {
 				return nil, err
 			}
@@ -236,7 +236,7 @@ func (tx *Tx) SCard(bucket string, key []byte) (int, error) {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return 0, err
 	}
-	b, err := tx.db.bucketManager.GetBucket(core.DataStructureSet, bucket)
+	b, err := tx.db.bucketManager.GetBucket(DataStructureSet, bucket)
 	if err != nil {
 		return 0, err
 	}
@@ -254,7 +254,7 @@ func (tx *Tx) SDiffByOneBucket(bucket string, key1, key2 []byte) ([][]byte, erro
 	if err := tx.checkTxIsClosed(); err != nil {
 		return nil, err
 	}
-	b, err := tx.db.bucketManager.GetBucket(core.DataStructureSet, bucket)
+	b, err := tx.db.bucketManager.GetBucket(DataStructureSet, bucket)
 	if err != nil {
 		return nil, err
 	}
@@ -290,13 +290,13 @@ func (tx *Tx) SDiffByTwoBuckets(bucket1 string, key1 []byte, bucket2 string, key
 		ok         bool
 	)
 
-	b1, err := tx.db.bucketManager.GetBucket(core.DataStructureSet, bucket1)
+	b1, err := tx.db.bucketManager.GetBucket(DataStructureSet, bucket1)
 	if err != nil {
 		return nil, err
 	}
 	bucketId1 := b1.Id
 
-	b2, err := tx.db.bucketManager.GetBucket(core.DataStructureSet, bucket2)
+	b2, err := tx.db.bucketManager.GetBucket(DataStructureSet, bucket2)
 	if err != nil {
 		return nil, err
 	}
@@ -331,7 +331,7 @@ func (tx *Tx) SMoveByOneBucket(bucket string, key1, key2, item []byte) (bool, er
 		return false, err
 	}
 
-	b, err := tx.db.bucketManager.GetBucket(core.DataStructureSet, bucket)
+	b, err := tx.db.bucketManager.GetBucket(DataStructureSet, bucket)
 	if err != nil {
 		return false, err
 	}
@@ -354,13 +354,13 @@ func (tx *Tx) SMoveByTwoBuckets(bucket1 string, key1 []byte, bucket2 string, key
 		ok         bool
 	)
 
-	b1, err := tx.db.bucketManager.GetBucket(core.DataStructureSet, bucket1)
+	b1, err := tx.db.bucketManager.GetBucket(DataStructureSet, bucket1)
 	if err != nil {
 		return false, err
 	}
 	bucketId1 := b1.Id
 
-	b2, err := tx.db.bucketManager.GetBucket(core.DataStructureSet, bucket2)
+	b2, err := tx.db.bucketManager.GetBucket(DataStructureSet, bucket2)
 	if err != nil {
 		return false, err
 	}
@@ -407,7 +407,7 @@ func (tx *Tx) SUnionByOneBucket(bucket string, key1, key2 []byte) ([][]byte, err
 	if err := tx.checkTxIsClosed(); err != nil {
 		return nil, err
 	}
-	b1, err := tx.db.bucketManager.GetBucket(core.DataStructureSet, bucket)
+	b1, err := tx.db.bucketManager.GetBucket(DataStructureSet, bucket)
 	if err != nil {
 		return nil, err
 	}
@@ -444,13 +444,13 @@ func (tx *Tx) SUnionByTwoBuckets(bucket1 string, key1 []byte, bucket2 string, ke
 		set1, set2 *data.Set
 		ok         bool
 	)
-	b1, err := tx.db.bucketManager.GetBucket(core.DataStructureSet, bucket1)
+	b1, err := tx.db.bucketManager.GetBucket(DataStructureSet, bucket1)
 	if err != nil {
 		return nil, err
 	}
 	bucketId1 := b1.Id
 
-	b2, err := tx.db.bucketManager.GetBucket(core.DataStructureSet, bucket2)
+	b2, err := tx.db.bucketManager.GetBucket(DataStructureSet, bucket2)
 	if err != nil {
 		return nil, err
 	}
@@ -500,7 +500,7 @@ func (tx *Tx) SKeys(bucket, pattern string, f func(key string) bool) error {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return err
 	}
-	b, err := tx.db.bucketManager.GetBucket(core.DataStructureSet, bucket)
+	b, err := tx.db.bucketManager.GetBucket(DataStructureSet, bucket)
 	if err != nil {
 		return err
 	}

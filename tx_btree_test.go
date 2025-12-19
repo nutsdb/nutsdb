@@ -21,7 +21,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nutsdb/nutsdb/internal/core"
 	"github.com/nutsdb/nutsdb/internal/testutils"
 	"github.com/nutsdb/nutsdb/internal/ttl/clock"
 	"github.com/stretchr/testify/assert"
@@ -51,12 +50,12 @@ func TestTx_PutAndGet(t *testing.T) {
 	t.Run("put_and_get", func(t *testing.T) {
 		withDefaultDB(t, func(t *testing.T, db *DB) {
 			{
-				txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+				txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 				tx, err := db.Begin(true)
 				require.NoError(t, err)
 
-				err = tx.Put(bucket, key, val, core.Persistent)
+				err = tx.Put(bucket, key, val, Persistent)
 				assert.NoError(t, err)
 
 				assert.NoError(t, tx.Commit())
@@ -91,7 +90,7 @@ func TestTx_GetAll_GetKeys_GetValues(t *testing.T) {
 	bucket := "bucket"
 
 	runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc *clock.MockClock) {
-		txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 		txGetAll(t, db, bucket, nil, nil, nil)
 
@@ -101,14 +100,14 @@ func TestTx_GetAll_GetKeys_GetValues(t *testing.T) {
 		for i := 0; i < n; i++ {
 			keys[i] = testutils.GetTestBytes(i)
 			values[i] = testutils.GetRandomBytes(10)
-			txPut(t, db, bucket, keys[i], values[i], core.Persistent, nil, nil)
+			txPut(t, db, bucket, keys[i], values[i], Persistent, nil, nil)
 		}
 
 		txGetAll(t, db, bucket, keys, values, nil)
 
 		keys = append(keys, testutils.GetTestBytes(10))
 		values = append(values, testutils.GetRandomBytes(10))
-		txPut(t, db, bucket, keys[10], values[10], core.Persistent, nil, nil)
+		txPut(t, db, bucket, keys[10], values[10], Persistent, nil, nil)
 		txGetAll(t, db, bucket, keys, values, nil)
 
 		txDel(t, db, bucket, keys[0], nil)
@@ -139,14 +138,14 @@ func TestTx_GetAfterDelete(t *testing.T) {
 
 	t.Run("get key after delete in same transaction", func(t *testing.T) {
 		withDefaultDB(t, func(t *testing.T, db *DB) {
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 			tx, err := db.Begin(true)
 			require.NoError(t, err)
 
 			key := []byte("key_test")
 			val := []byte("value =_test")
 
-			require.NoError(t, tx.Put(bucket, key, val, core.Persistent))
+			require.NoError(t, tx.Put(bucket, key, val, Persistent))
 
 			value, err := tx.Get(bucket, key)
 			require.NoError(t, err)
@@ -163,12 +162,12 @@ func TestTx_GetAfterDelete(t *testing.T) {
 
 	t.Run("get persisted key in transaction", func(t *testing.T) {
 		withDefaultDB(t, func(t *testing.T, db *DB) {
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 			key := []byte("persisted_key")
 			val := []byte("persisted_value")
 
-			txPut(t, db, bucket, key, val, core.Persistent, nil, nil)
+			txPut(t, db, bucket, key, val, Persistent, nil, nil)
 			txGet(t, db, bucket, key, val, nil)
 
 			tx, err := db.Begin(true)
@@ -187,7 +186,7 @@ func TestTx_RangeScan_Err(t *testing.T) {
 
 		{
 			// setup the data
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 			tx, err := db.Begin(true)
 			require.NoError(t, err)
@@ -195,7 +194,7 @@ func TestTx_RangeScan_Err(t *testing.T) {
 			for i := 0; i < 10; i++ {
 				key := []byte("key_" + fmt.Sprintf("%07d", i))
 				val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", i))
-				err = tx.Put(bucket, key, val, core.Persistent)
+				err = tx.Put(bucket, key, val, Persistent)
 				assert.NoError(t, err)
 			}
 
@@ -224,7 +223,7 @@ func TestTx_RangeScan(t *testing.T) {
 	withDefaultDB(t, func(t *testing.T, db *DB) {
 		{
 			// setup the data
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 			tx, err := db.Begin(true)
 			require.NoError(t, err)
@@ -232,7 +231,7 @@ func TestTx_RangeScan(t *testing.T) {
 			for i := 0; i < 10; i++ {
 				key := []byte("key_" + fmt.Sprintf("%07d", i))
 				val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", i))
-				err = tx.Put(bucket, key, val, core.Persistent)
+				err = tx.Put(bucket, key, val, Persistent)
 				assert.NoError(t, err)
 			}
 
@@ -278,7 +277,7 @@ func TestTx_PrefixScan(t *testing.T) {
 	withDefaultDB(t, func(t *testing.T, db *DB) {
 		{
 			// setup the data
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 			tx, err := db.Begin(true)
 			require.NoError(t, err)
 
@@ -286,7 +285,7 @@ func TestTx_PrefixScan(t *testing.T) {
 				for j := 0; j < 10; j++ {
 					key := []byte(prefix + fmt.Sprintf("%07d", j))
 					val := []byte("foobar" + fmt.Sprintf("%d%07d", i+1, j))
-					err = tx.Put(bucket, key, val, core.Persistent)
+					err = tx.Put(bucket, key, val, Persistent)
 					assert.NoError(t, err)
 				}
 			}
@@ -354,7 +353,7 @@ func TestTx_PrefixSearchScanEntries(t *testing.T) {
 	bucket := "bucket_for_prefix_search_scan_entries"
 
 	withDefaultDB(t, func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 		regs := "1"
 
@@ -363,7 +362,7 @@ func TestTx_PrefixSearchScanEntries(t *testing.T) {
 
 		key := []byte("key_" + fmt.Sprintf("%07d", 0))
 		val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 0))
-		err = tx.Put(bucket, key, val, core.Persistent)
+		err = tx.Put(bucket, key, val, Persistent)
 		assert.NoError(t, err)
 
 		assert.NoError(t, tx.Commit()) // tx commit
@@ -373,7 +372,7 @@ func TestTx_PrefixSearchScanEntries(t *testing.T) {
 
 		key = []byte("key_" + fmt.Sprintf("%07d", 1))
 		val = []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 1))
-		err = tx.Put(bucket, key, val, core.Persistent)
+		err = tx.Put(bucket, key, val, Persistent)
 		assert.NoError(t, err)
 
 		assert.NoError(t, tx.Commit()) // tx commit
@@ -407,7 +406,7 @@ func TestTx_PrefixSearchScan(t *testing.T) {
 	bucket := "bucket_for_prefix_search_scan"
 
 	withDefaultDB(t, func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 		regs := "1"
 
@@ -416,7 +415,7 @@ func TestTx_PrefixSearchScan(t *testing.T) {
 
 		key := []byte("key_" + fmt.Sprintf("%07d", 0))
 		val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 0))
-		err = tx.Put(bucket, key, val, core.Persistent)
+		err = tx.Put(bucket, key, val, Persistent)
 		assert.NoError(t, err)
 
 		assert.NoError(t, tx.Commit()) // tx commit
@@ -426,7 +425,7 @@ func TestTx_PrefixSearchScan(t *testing.T) {
 
 		key = []byte("key_" + fmt.Sprintf("%07d", 1))
 		val = []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 1))
-		err = tx.Put(bucket, key, val, core.Persistent)
+		err = tx.Put(bucket, key, val, Persistent)
 		assert.NoError(t, err)
 
 		assert.NoError(t, tx.Commit()) // tx commit
@@ -457,14 +456,14 @@ func TestTx_DeleteAndGet(t *testing.T) {
 		bucket := "bucket_delete_test"
 
 		{
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 			tx, err := db.Begin(true)
 			require.NoError(t, err)
 
 			for i := 0; i <= 10; i++ {
 				key := []byte("key_" + fmt.Sprintf("%07d", i))
 				val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", i))
-				err := tx.Put(bucket, key, val, core.Persistent)
+				err := tx.Put(bucket, key, val, Persistent)
 				assert.NoError(t, err)
 			}
 
@@ -494,10 +493,10 @@ func TestTx_DeleteAndGet(t *testing.T) {
 func TestTx_DeleteFromMemory(t *testing.T) {
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		bucket := "bucket"
-		txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 		for i := 0; i < 10; i++ {
-			txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), core.Persistent, nil, nil)
+			txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), Persistent, nil, nil)
 		}
 
 		for i := 0; i < 10; i++ {
@@ -523,14 +522,14 @@ func TestTx_DeleteKeyDuringTransaction(t *testing.T) {
 
 	t.Run("delete key after put in same transaction", func(t *testing.T) {
 		withDefaultDB(t, func(t *testing.T, db *DB) {
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 			tx, err := db.Begin(true)
 			require.NoError(t, err)
 
 			key := []byte("key_test")
 			val := []byte("value to be deleted")
 
-			require.NoError(t, tx.Put(bucket, key, val, core.Persistent))
+			require.NoError(t, tx.Put(bucket, key, val, Persistent))
 
 			value, err := tx.Get(bucket, key)
 			require.NoError(t, err)
@@ -547,14 +546,14 @@ func TestTx_DeleteKeyDuringTransaction(t *testing.T) {
 
 	t.Run("delete same key twice in transaction", func(t *testing.T) {
 		withDefaultDB(t, func(t *testing.T, db *DB) {
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 			tx, err := db.Begin(true)
 			require.NoError(t, err)
 
 			key := []byte("key_test")
 			val := []byte("value")
 
-			require.NoError(t, tx.Put(bucket, key, val, core.Persistent))
+			require.NoError(t, tx.Put(bucket, key, val, Persistent))
 			require.NoError(t, tx.Delete(bucket, key))
 
 			// Second delete should return ErrKeyNotFound
@@ -567,12 +566,12 @@ func TestTx_DeleteKeyDuringTransaction(t *testing.T) {
 
 	t.Run("delete persisted key in transaction", func(t *testing.T) {
 		withDefaultDB(t, func(t *testing.T, db *DB) {
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 			key := []byte("persisted_key")
 			val := []byte("persisted_value")
 
-			txPut(t, db, bucket, key, val, core.Persistent, nil, nil)
+			txPut(t, db, bucket, key, val, Persistent, nil, nil)
 			txGet(t, db, bucket, key, val, nil)
 
 			tx, err := db.Begin(true)
@@ -588,7 +587,7 @@ func TestTx_DeleteKeyDuringTransaction(t *testing.T) {
 func TestTx_GetAndScansFromHintKey(t *testing.T) {
 	bucket := "bucket_get_test"
 	withRAMIdxDB(t, func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 		// write tx begin
 		tx, err := db.Begin(true)
@@ -597,7 +596,7 @@ func TestTx_GetAndScansFromHintKey(t *testing.T) {
 		for i := 0; i <= 10; i++ {
 			key := []byte("key_" + fmt.Sprintf("%07d", i))
 			val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", i))
-			err = tx.Put(bucket, key, val, core.Persistent)
+			err = tx.Put(bucket, key, val, Persistent)
 			assert.NoError(t, err)
 		}
 		assert.NoError(t, tx.Commit()) // tx commit
@@ -644,14 +643,14 @@ func TestTx_Put_Err(t *testing.T) {
 	t.Run("write with read only tx", func(t *testing.T) {
 		withDefaultDB(t, func(t *testing.T, db *DB) {
 			// write tx begin err setting here
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 			tx, err := db.Begin(false) // tx not writable
 			require.NoError(t, err)
 
 			key := []byte("key_" + fmt.Sprintf("%07d", 0))
 			val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 0))
-			err = tx.Put(bucket, key, val, core.Persistent)
+			err = tx.Put(bucket, key, val, Persistent)
 			assert.Error(t, err)
 
 			assert.NoError(t, tx.Rollback())
@@ -660,14 +659,14 @@ func TestTx_Put_Err(t *testing.T) {
 
 	t.Run("write with empty key", func(t *testing.T) {
 		withDefaultDB(t, func(t *testing.T, db *DB) {
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 			tx, err := db.Begin(true)
 			require.NoError(t, err)
 
 			key := []byte("") // key cannot be empty
 			val := []byte("valvalvalvalvalvalvalvalval" + fmt.Sprintf("%07d", 0))
-			err = tx.Put(bucket, key, val, core.Persistent)
+			err = tx.Put(bucket, key, val, Persistent)
 			assert.Error(t, err)
 
 			assert.NoError(t, tx.Rollback())
@@ -676,7 +675,7 @@ func TestTx_Put_Err(t *testing.T) {
 
 	t.Run("write with TOO big size", func(t *testing.T) {
 		withDefaultDB(t, func(t *testing.T, db *DB) {
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 			tx, err := db.Begin(true)
 			require.NoError(t, err)
 
@@ -686,7 +685,7 @@ func TestTx_Put_Err(t *testing.T) {
 				bigVal += "val" + strconv2.IntToStr(i)
 			}
 
-			err = tx.Put(bucket, key, []byte(bigVal), core.Persistent)
+			err = tx.Put(bucket, key, []byte(bigVal), Persistent)
 			assert.NoError(t, err)
 
 			assert.Error(t, tx.Commit()) // too big cannot commit by tx
@@ -697,7 +696,7 @@ func TestTx_Put_Err(t *testing.T) {
 func TestTx_PrefixScan_NotFound(t *testing.T) {
 	t.Run("prefix scan in empty bucket", func(t *testing.T) {
 		withDefaultDB(t, func(t *testing.T, db *DB) {
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 			tx, err := db.Begin(false)
 			assert.NoError(t, err)
@@ -716,7 +715,7 @@ func TestTx_PrefixScan_NotFound(t *testing.T) {
 
 		withDefaultDB(t, func(t *testing.T, db *DB) {
 			{ // write tx begin
-				txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+				txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 				tx, err := db.Begin(true)
 				require.NoError(t, err)
@@ -724,7 +723,7 @@ func TestTx_PrefixScan_NotFound(t *testing.T) {
 				for i := 0; i <= 10; i++ {
 					key := []byte("key_" + fmt.Sprintf("%07d", i))
 					val := []byte("val" + fmt.Sprintf("%07d", i))
-					err = tx.Put(bucket, key, val, core.Persistent)
+					err = tx.Put(bucket, key, val, Persistent)
 					assert.NoError(t, err)
 				}
 
@@ -772,7 +771,7 @@ func TestTx_PrefixSearchScan_NotFound(t *testing.T) {
 
 	t.Run("prefix search in empty bucket", func(t *testing.T) {
 		withDefaultDB(t, func(t *testing.T, db *DB) {
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 			tx, err := db.Begin(false)
 			require.NoError(t, err)
@@ -788,7 +787,7 @@ func TestTx_PrefixSearchScan_NotFound(t *testing.T) {
 	t.Run("prefix search scan", func(t *testing.T) {
 		withDefaultDB(t, func(t *testing.T, db *DB) {
 			{ // set up the data
-				txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+				txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 				tx, err = db.Begin(true) // write tx begin
 				require.NoError(t, err)
@@ -797,7 +796,7 @@ func TestTx_PrefixSearchScan_NotFound(t *testing.T) {
 					key := []byte("key_" + fmt.Sprintf("%07d", i))
 					val := []byte("val" + fmt.Sprintf("%07d", i))
 
-					err := tx.Put(bucket, key, val, core.Persistent)
+					err := tx.Put(bucket, key, val, Persistent)
 					assert.NoError(t, err)
 				}
 				// tx commit
@@ -832,7 +831,7 @@ func TestTx_RangeScan_NotFound(t *testing.T) {
 	bucket := "bucket_range_scan_test"
 
 	withDefaultDB(t, func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 		tx, err := db.Begin(true) // write tx begin
 		require.NoError(t, err)
@@ -840,7 +839,7 @@ func TestTx_RangeScan_NotFound(t *testing.T) {
 		for i := 0; i <= 10; i++ {
 			key := []byte("key_" + fmt.Sprintf("%03d", i))
 			val := []byte("val" + fmt.Sprintf("%03d", i))
-			err = tx.Put(bucket, key, val, core.Persistent)
+			err = tx.Put(bucket, key, val, Persistent)
 			assert.NoError(t, err)
 		}
 		assert.NoError(t, tx.Commit()) // tx commit
@@ -862,7 +861,7 @@ func TestTx_ExpiredDeletion(t *testing.T) {
 
 	t.Run("expired deletion", func(t *testing.T) {
 		runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc *clock.MockClock) {
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 			txPut(t, db, bucket, testutils.GetTestBytes(0), testutils.GetTestBytes(0), 1, nil, nil)
 			txPut(t, db, bucket, testutils.GetTestBytes(1), testutils.GetTestBytes(1), 2, nil, nil)
@@ -897,7 +896,7 @@ func TestTx_ExpiredDeletion(t *testing.T) {
 
 	t.Run("update expire time", func(t *testing.T) {
 		runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc *clock.MockClock) {
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 			txPut(t, db, bucket, testutils.GetTestBytes(0), testutils.GetTestBytes(0), 1, nil, nil)
 			mc.AdvanceTime(500 * time.Millisecond)
@@ -914,13 +913,13 @@ func TestTx_ExpiredDeletion(t *testing.T) {
 
 	t.Run("persist expire time", func(t *testing.T) {
 		runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc *clock.MockClock) {
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 			txPut(t, db, bucket, testutils.GetTestBytes(0), testutils.GetTestBytes(0), 1, nil, nil)
 			mc.AdvanceTime(500 * time.Millisecond)
 
 			// persist expire time
-			txPut(t, db, bucket, testutils.GetTestBytes(0), testutils.GetTestBytes(0), core.Persistent, nil, nil)
+			txPut(t, db, bucket, testutils.GetTestBytes(0), testutils.GetTestBytes(0), Persistent, nil, nil)
 			mc.AdvanceTime(1 * time.Second)
 			txGet(t, db, bucket, testutils.GetTestBytes(0), testutils.GetTestBytes(0), nil)
 
@@ -940,15 +939,15 @@ func TestTx_ExpiredDeletion(t *testing.T) {
 		db, err := Open(opts)
 		require.NoError(t, err)
 
-		txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 		txPut(t, db, bucket, testutils.GetTestBytes(0), testutils.GetTestBytes(0), 1, nil, nil)
 		txPut(t, db, bucket, testutils.GetTestBytes(1), testutils.GetTestBytes(1), 3, nil, nil)
 		txPut(t, db, bucket, testutils.GetTestBytes(2), testutils.GetTestBytes(2), 3, nil, nil)
-		txPut(t, db, bucket, testutils.GetTestBytes(3), testutils.GetTestBytes(3), core.Persistent, nil, nil)
-		txPut(t, db, bucket, testutils.GetTestBytes(4), testutils.GetTestBytes(4), core.Persistent, nil, nil)
+		txPut(t, db, bucket, testutils.GetTestBytes(3), testutils.GetTestBytes(3), Persistent, nil, nil)
+		txPut(t, db, bucket, testutils.GetTestBytes(4), testutils.GetTestBytes(4), Persistent, nil, nil)
 		txPut(t, db, bucket, testutils.GetTestBytes(5), testutils.GetTestBytes(5), 5, nil, nil)
-		txPut(t, db, bucket, testutils.GetTestBytes(1), testutils.GetTestBytes(1), core.Persistent, nil, nil)
+		txPut(t, db, bucket, testutils.GetTestBytes(1), testutils.GetTestBytes(1), Persistent, nil, nil)
 		txDel(t, db, bucket, testutils.GetTestBytes(5), nil)
 
 		require.NoError(t, db.Close())
@@ -986,10 +985,10 @@ func TestTx_ExpiredDeletion(t *testing.T) {
 		opts.SegmentSize = 1 * 100
 		runNutsDBTestWithMockClock(t, &opts, func(t *testing.T, db *DB, mc *clock.MockClock) {
 			bucket := "bucket"
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
-			txPut(t, db, bucket, testutils.GetTestBytes(0), testutils.GetTestBytes(0), core.Persistent, nil, nil)
-			txPut(t, db, bucket, testutils.GetTestBytes(1), testutils.GetTestBytes(1), core.Persistent, nil, nil)
+			txPut(t, db, bucket, testutils.GetTestBytes(0), testutils.GetTestBytes(0), Persistent, nil, nil)
+			txPut(t, db, bucket, testutils.GetTestBytes(1), testutils.GetTestBytes(1), Persistent, nil, nil)
 			txPut(t, db, bucket, testutils.GetTestBytes(2), testutils.GetTestBytes(2), 1, nil, nil)
 
 			mc.AdvanceTime(1100 * time.Millisecond)
@@ -1010,7 +1009,7 @@ func TestTx_ExpiredDeletion(t *testing.T) {
 		opts := DefaultOptions
 		opts.ExpiredDeleteType = TimeHeap
 		runNutsDBTestWithMockClock(t, &opts, func(t *testing.T, db *DB, mc *clock.MockClock) {
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 			txPut(t, db, bucket, testutils.GetTestBytes(0), testutils.GetTestBytes(0), 1, nil, nil)
 			txPut(t, db, bucket, testutils.GetTestBytes(1), testutils.GetTestBytes(1), 2, nil, nil)
 			txGet(t, db, bucket, testutils.GetTestBytes(0), testutils.GetTestBytes(0), nil)
@@ -1043,10 +1042,10 @@ func TestTx_GetMaxOrMinKey(t *testing.T) {
 	bucket := "bucket"
 	t.Run("general key test", func(t *testing.T) {
 		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 			for i := 0; i < 10; i++ {
-				txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetRandomBytes(24), core.Persistent, nil, nil)
+				txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetRandomBytes(24), Persistent, nil, nil)
 			}
 
 			txGetMaxOrMinKey(t, db, bucket, true, testutils.GetTestBytes(9), nil)
@@ -1058,8 +1057,8 @@ func TestTx_GetMaxOrMinKey(t *testing.T) {
 			txGetMaxOrMinKey(t, db, bucket, true, testutils.GetTestBytes(8), nil)
 			txGetMaxOrMinKey(t, db, bucket, false, testutils.GetTestBytes(1), nil)
 
-			txPut(t, db, bucket, testutils.GetTestBytes(-1), testutils.GetRandomBytes(24), core.Persistent, nil, nil)
-			txPut(t, db, bucket, testutils.GetTestBytes(100), testutils.GetRandomBytes(24), core.Persistent, nil, nil)
+			txPut(t, db, bucket, testutils.GetTestBytes(-1), testutils.GetRandomBytes(24), Persistent, nil, nil)
+			txPut(t, db, bucket, testutils.GetTestBytes(100), testutils.GetRandomBytes(24), Persistent, nil, nil)
 
 			txGetMaxOrMinKey(t, db, bucket, false, testutils.GetTestBytes(-1), nil)
 			txGetMaxOrMinKey(t, db, bucket, true, testutils.GetTestBytes(100), nil)
@@ -1068,12 +1067,12 @@ func TestTx_GetMaxOrMinKey(t *testing.T) {
 
 	t.Run("test expire", func(t *testing.T) {
 		runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc *clock.MockClock) {
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 			keya := []byte("A")
 			keyb := []byte("B")
 			keyc := []byte("C")
 			txPut(t, db, bucket, keya, keya, 1, nil, nil)
-			txPut(t, db, bucket, keyb, keyb, core.Persistent, nil, nil)
+			txPut(t, db, bucket, keyb, keyb, Persistent, nil, nil)
 			txPut(t, db, bucket, keyc, keyc, 3, nil, nil)
 
 			txGetMaxOrMinKey(t, db, bucket, false, keya, nil)
@@ -1090,8 +1089,8 @@ func TestTx_updateOrPut(t *testing.T) {
 	bucket := "bucket"
 	t.Run("updateOrPut will return the expected error when it do update", func(t *testing.T) {
 		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
-			txPut(t, db, bucket, []byte("any"), []byte("any"), core.Persistent, nil, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			txPut(t, db, bucket, []byte("any"), []byte("any"), Persistent, nil, nil)
 
 			tx, err := db.Begin(true)
 			require.NoError(t, err)
@@ -1111,7 +1110,7 @@ func TestTx_IncrementAndDecrement(t *testing.T) {
 
 	t.Run("increments and decrements on a non-exist key", func(t *testing.T) {
 		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 			txIncrement(t, db, bucket, key, ErrKeyNotFound, nil)
 			txIncrementBy(t, db, bucket, key, 12, ErrKeyNotFound, nil)
@@ -1122,9 +1121,9 @@ func TestTx_IncrementAndDecrement(t *testing.T) {
 
 	t.Run("increments and decrements on a non-integer value", func(t *testing.T) {
 		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
-			txPut(t, db, bucket, key, []byte("foo"), core.Persistent, nil, nil)
+			txPut(t, db, bucket, key, []byte("foo"), Persistent, nil, nil)
 
 			txIncrement(t, db, bucket, key, ErrValueNotInteger, nil)
 			txIncrementBy(t, db, bucket, key, 12, ErrValueNotInteger, nil)
@@ -1135,9 +1134,9 @@ func TestTx_IncrementAndDecrement(t *testing.T) {
 
 	t.Run("increments and decrements normally", func(t *testing.T) {
 		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
-			txPut(t, db, bucket, key, getIntegerValue(12), core.Persistent, nil, nil)
+			txPut(t, db, bucket, key, getIntegerValue(12), Persistent, nil, nil)
 			txIncrement(t, db, bucket, key, nil, nil)
 			txGet(t, db, bucket, key, getIntegerValue(13), nil)
 
@@ -1154,9 +1153,9 @@ func TestTx_IncrementAndDecrement(t *testing.T) {
 
 	t.Run("increments and decrements over range of int64", func(t *testing.T) {
 		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
-			txPut(t, db, bucket, key, []byte("9223372036854775818"), core.Persistent, nil, nil)
+			txPut(t, db, bucket, key, []byte("9223372036854775818"), Persistent, nil, nil)
 			txIncrement(t, db, bucket, key, nil, nil)
 			txGet(t, db, bucket, key, []byte("9223372036854775819"), nil)
 
@@ -1176,9 +1175,9 @@ func TestTx_IncrementAndDecrement(t *testing.T) {
 
 	t.Run("increments and decrements on value which will overflow after operation", func(t *testing.T) {
 		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
-			txPut(t, db, bucket, key, []byte("9223372036854775800"), core.Persistent, nil, nil)
+			txPut(t, db, bucket, key, []byte("9223372036854775800"), Persistent, nil, nil)
 			txIncrementBy(t, db, bucket, key, 100, nil, nil)
 			txGet(t, db, bucket, key, []byte("9223372036854775900"), nil)
 
@@ -1195,7 +1194,7 @@ func TestTx_IncrementAndDecrement(t *testing.T) {
 
 	t.Run("operations on expired key", func(t *testing.T) {
 		runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc *clock.MockClock) {
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 			txPut(t, db, bucket, key, []byte("1"), 1, nil, nil)
 
@@ -1215,7 +1214,7 @@ func TestTx_PutIfNotExistsAndPutIfExists(t *testing.T) {
 	updated_val := []byte("updated_value")
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 		for i := 0; i < 10; i++ {
 			txPutIfNotExists(t, db, bucket, testutils.GetTestBytes(i), val, nil, nil)
@@ -1241,7 +1240,7 @@ func TestTx_GetAndSetBit(t *testing.T) {
 
 	t.Run("get bit on a non-exist key", func(t *testing.T) {
 		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 			txGetBit(t, db, bucket, key, 0, 0, ErrKeyNotFound, nil)
 		})
@@ -1249,7 +1248,7 @@ func TestTx_GetAndSetBit(t *testing.T) {
 
 	t.Run("set bit on a non-exist key", func(t *testing.T) {
 		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 			txSetBit(t, db, bucket, key, 0, 1, nil, nil)
 			txGetBit(t, db, bucket, key, 0, 1, nil, nil)
@@ -1269,9 +1268,9 @@ func TestTx_GetAndSetBit(t *testing.T) {
 
 	t.Run("get and set bit on a exist string", func(t *testing.T) {
 		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
-			txPut(t, db, bucket, key, []byte("foober"), core.Persistent, nil, nil)
+			txPut(t, db, bucket, key, []byte("foober"), Persistent, nil, nil)
 			txGet(t, db, bucket, key, []byte("foober"), nil)
 			txGetBit(t, db, bucket, key, 0, 'f', nil, nil)
 
@@ -1296,7 +1295,7 @@ func TestTx_GetAndSetBit(t *testing.T) {
 
 	t.Run("give a invalid offset", func(t *testing.T) {
 		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 			txSetBit(t, db, bucket, key, math.MaxInt64, 0, ErrOffsetInvalid, nil)
 			txGetBit(t, db, bucket, key, math.MaxInt64, 0, ErrOffsetInvalid, nil)
@@ -1313,8 +1312,8 @@ func TestTx_ValueLen(t *testing.T) {
 
 	t.Run("match length", func(t *testing.T) {
 		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
-			txPut(t, db, bucket, testutils.GetTestBytes(1), val, core.Persistent, nil, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			txPut(t, db, bucket, testutils.GetTestBytes(1), val, Persistent, nil, nil)
 			txValueLen(t, db, bucket, testutils.GetTestBytes(1), 5, nil)
 		})
 	})
@@ -1327,15 +1326,15 @@ func TestTx_ValueLen(t *testing.T) {
 
 	t.Run("key not found", func(t *testing.T) {
 		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
-			txPut(t, db, bucket, testutils.GetTestBytes(1), val, core.Persistent, nil, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			txPut(t, db, bucket, testutils.GetTestBytes(1), val, Persistent, nil, nil)
 			txValueLen(t, db, bucket, testutils.GetTestBytes(2), 0, ErrKeyNotFound)
 		})
 	})
 
 	t.Run("expired test", func(t *testing.T) {
 		runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc *clock.MockClock) {
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 			txPut(t, db, bucket, testutils.GetTestBytes(1), val, 1, nil, nil)
 			mc.AdvanceTime(3 * time.Second)
 			txValueLen(t, db, bucket, testutils.GetTestBytes(1), 0, ErrKeyNotFound)
@@ -1350,8 +1349,8 @@ func TestTx_GetSet(t *testing.T) {
 
 	t.Run("match value", func(t *testing.T) {
 		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
-			txPut(t, db, bucket, testutils.GetTestBytes(1), val, core.Persistent, nil, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			txPut(t, db, bucket, testutils.GetTestBytes(1), val, Persistent, nil, nil)
 			txGetSet(t, db, bucket, testutils.GetTestBytes(1), newVal, val, nil)
 			txGet(t, db, bucket, testutils.GetTestBytes(1), newVal, nil)
 		})
@@ -1365,7 +1364,7 @@ func TestTx_GetSet(t *testing.T) {
 
 	t.Run("expired test", func(t *testing.T) {
 		runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc *clock.MockClock) {
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 			txPut(t, db, bucket, testutils.GetTestBytes(1), val, 1, nil, nil)
 			mc.AdvanceTime(3 * time.Second)
 			txGetSet(t, db, bucket, testutils.GetTestBytes(1), newVal, nil, ErrKeyNotFound)
@@ -1380,7 +1379,7 @@ func TestTx_GetTTLAndPersist(t *testing.T) {
 	runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc *clock.MockClock) {
 		txGetTTL(t, db, bucket, key, 0, ErrBucketNotExist)
 
-		txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 		txGetTTL(t, db, bucket, key, 0, ErrKeyNotFound)
 		txPersist(t, db, bucket, key, ErrKeyNotFound)
@@ -1402,30 +1401,30 @@ func TestTx_MSetMGet(t *testing.T) {
 
 	t.Run("use MSet and MGet with 0 args", func(t *testing.T) {
 		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
-			txMSet(t, db, bucket, nil, core.Persistent, nil, nil)
+			txMSet(t, db, bucket, nil, Persistent, nil, nil)
 			txMGet(t, db, bucket, nil, nil, nil, nil)
 		})
 	})
 
 	t.Run("use MSet by using odd number of args ", func(t *testing.T) {
 		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 			txMSet(t, db, bucket, [][]byte{
 				testutils.GetTestBytes(0), testutils.GetTestBytes(1), testutils.GetTestBytes(2),
-			}, core.Persistent, ErrKVArgsLenNotEven, nil)
+			}, Persistent, ErrKVArgsLenNotEven, nil)
 		})
 	})
 
 	t.Run("use MSet and MGet normally", func(t *testing.T) {
 		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 			txMSet(t, db, bucket, [][]byte{
 				testutils.GetTestBytes(0), testutils.GetTestBytes(1), testutils.GetTestBytes(2), testutils.GetTestBytes(3),
-			}, core.Persistent, nil, nil)
+			}, Persistent, nil, nil)
 			txMGet(t, db, bucket, [][]byte{
 				testutils.GetTestBytes(0), testutils.GetTestBytes(2),
 			}, [][]byte{
@@ -1441,7 +1440,7 @@ func TestTx_Append(t *testing.T) {
 
 	t.Run("use Append with a nil appendage", func(t *testing.T) {
 		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 			txAppend(t, db, bucket, key, []byte(""), nil, nil)
 			txAppend(t, db, bucket, key, nil, nil, nil)
@@ -1450,7 +1449,7 @@ func TestTx_Append(t *testing.T) {
 
 	t.Run("use Append on a non-exist key", func(t *testing.T) {
 		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 			txAppend(t, db, bucket, key, testutils.GetTestBytes(1), nil, nil)
 			txGet(t, db, bucket, key, testutils.GetTestBytes(1), nil)
@@ -1459,9 +1458,9 @@ func TestTx_Append(t *testing.T) {
 
 	t.Run("use append on an exist key", func(t *testing.T) {
 		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
-			txPut(t, db, bucket, key, []byte("test"), core.Persistent, nil, nil)
+			txPut(t, db, bucket, key, []byte("test"), Persistent, nil, nil)
 			txAppend(t, db, bucket, key, []byte("test"), nil, nil)
 			txGet(t, db, bucket, key, []byte("testtest"), nil)
 		})
@@ -1474,7 +1473,7 @@ func TestTx_GetRange(t *testing.T) {
 
 	t.Run("use GetRange with start greater than less", func(t *testing.T) {
 		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 			txGetRange(t, db, bucket, key, 5, 1, nil, ErrStartGreaterThanEnd, nil)
 		})
@@ -1482,27 +1481,27 @@ func TestTx_GetRange(t *testing.T) {
 
 	t.Run("use GetRange with start greater than size of value", func(t *testing.T) {
 		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
-			txPut(t, db, bucket, key, []byte("test"), core.Persistent, nil, nil)
+			txPut(t, db, bucket, key, []byte("test"), Persistent, nil, nil)
 			txGetRange(t, db, bucket, key, 5, 10, nil, nil, nil)
 		})
 	})
 
 	t.Run("use GetRange with end greater than size of value", func(t *testing.T) {
 		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
-			txPut(t, db, bucket, key, []byte("test"), core.Persistent, nil, nil)
+			txPut(t, db, bucket, key, []byte("test"), Persistent, nil, nil)
 			txGetRange(t, db, bucket, key, 2, 10, []byte("st"), nil, nil)
 		})
 	})
 
 	t.Run("use GetRange normally", func(t *testing.T) {
 		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
-			txPut(t, db, bucket, key, []byte("test"), core.Persistent, nil, nil)
+			txPut(t, db, bucket, key, []byte("test"), Persistent, nil, nil)
 			txGetRange(t, db, bucket, key, 1, 2, []byte("es"), nil, nil)
 			txGetRange(t, db, bucket, key, 1, 3, []byte("est"), nil, nil)
 			txGetRange(t, db, bucket, key, 1, 4, []byte("est"), nil, nil)
@@ -1515,17 +1514,17 @@ func TestBTreeInternalVisibility(t *testing.T) {
 	key := testutils.GetTestBytes(0)
 
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
-		txPut(t, db, bucket, key, []byte("test"), core.Persistent, nil, nil)
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+		txPut(t, db, bucket, key, []byte("test"), Persistent, nil, nil)
 		err := db.Update(func(tx *Tx) error {
-			err := tx.Put(bucket, key, []byte("test-updated"), core.Persistent)
+			err := tx.Put(bucket, key, []byte("test-updated"), Persistent)
 			assert.Nil(t, err)
 			value, err := tx.Get(bucket, key)
 			assert.Nil(t, err)
 			assert.Equal(t, "test-updated", string(value))
-			err = tx.DeleteBucket(core.DataStructureBTree, bucket)
+			err = tx.DeleteBucket(DataStructureBTree, bucket)
 			assert.Nil(t, err)
-			err = tx.Put(bucket, key, []byte("test-updated"), core.Persistent)
+			err = tx.Put(bucket, key, []byte("test-updated"), Persistent)
 			assert.Equal(t, ErrBucketNotFound, err)
 			return nil
 		})
@@ -1542,7 +1541,7 @@ func TestTx_EmptyBucketQuery(t *testing.T) {
 	t.Run("empty bucket query after creation", func(t *testing.T) {
 		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 			// Create empty bucket
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 			// Query empty bucket should return ErrKeyNotFound, not ErrBucketNotFound
 			txGet(t, db, bucket, key, nil, ErrKeyNotFound)
@@ -1555,7 +1554,7 @@ func TestTx_EmptyBucketQuery(t *testing.T) {
 
 		runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
 			// Create empty bucket
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 			// Close and reopen database to simulate restart
 			require.NoError(t, db.Close())
@@ -1577,7 +1576,7 @@ func TestTx_EmptyBucketQuery(t *testing.T) {
 	t.Run("other methods on empty bucket", func(t *testing.T) {
 		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 			// Create empty bucket
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 			// Test GetMaxKey and GetMinKey should return ErrKeyNotFound
 			txGetMaxOrMinKey(t, db, bucket, true, nil, ErrKeyNotFound)
@@ -1610,10 +1609,10 @@ func TestTx_EmptyBucketQuery(t *testing.T) {
 	t.Run("normal functionality after fix", func(t *testing.T) {
 		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 			// Create bucket and add data
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 			value := testutils.GetTestBytes(1)
-			txPut(t, db, bucket, key, value, core.Persistent, nil, nil)
+			txPut(t, db, bucket, key, value, Persistent, nil, nil)
 
 			// Verify normal get works
 			txGet(t, db, bucket, key, value, nil)
@@ -1637,16 +1636,16 @@ func TestTx_Has(t *testing.T) {
 
 	t.Run("match value", func(t *testing.T) {
 		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
-			txPut(t, db, bucket, testutils.GetTestBytes(1), val, core.Persistent, nil, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			txPut(t, db, bucket, testutils.GetTestBytes(1), val, Persistent, nil, nil)
 			txHas(t, db, bucket, testutils.GetTestBytes(1), true, nil)
 		})
 	})
 
 	t.Run("no match value", func(t *testing.T) {
 		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
-			txPut(t, db, bucket, testutils.GetTestBytes(1), val, core.Persistent, nil, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			txPut(t, db, bucket, testutils.GetTestBytes(1), val, Persistent, nil, nil)
 			nonExistingKey := testutils.GetTestBytes(999)
 			txHas(t, db, bucket, nonExistingKey, false, nil)
 		})
@@ -1660,7 +1659,7 @@ func TestTx_Has(t *testing.T) {
 
 	t.Run("expired test", func(t *testing.T) {
 		runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc *clock.MockClock) {
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 			txPut(t, db, bucket, testutils.GetTestBytes(1), val, 1, nil, nil)
 			mc.AdvanceTime(3 * time.Second)
 			txHas(t, db, bucket, testutils.GetTestBytes(1), false, nil)
@@ -1676,7 +1675,7 @@ func TestTx_ReadAndWriteInSameTransaction(t *testing.T) {
 			key := []byte(`k`)
 			v1 := []byte(`v1`)
 			v2 := []byte(`v2`)
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 			r.NoError(db.Update(func(tx *Tx) error {
 				r.NoError(tx.Put(bucket, key, v1, 0))
@@ -1725,7 +1724,7 @@ func TestTx_ReadAndWriteInSameTransaction(t *testing.T) {
 			key := []byte("k")
 			ttl := uint32(100)
 			val := []byte("V")
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 			r.NoError(db.Update(func(tx *Tx) (err error) {
 				r.NoError(tx.Put(bucket, key, val, ttl))
@@ -1747,10 +1746,10 @@ func TestTx_ReadAndWriteInSameTransaction(t *testing.T) {
 			bucket := `1`
 			key := []byte("k")
 			intVal := int64(10)
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 			r.NoError(db.Update(func(tx *Tx) (err error) {
-				r.NoError(tx.Put(bucket, key, getIntegerValue(intVal), core.Persistent))
+				r.NoError(tx.Put(bucket, key, getIntegerValue(intVal), Persistent))
 				validateEqual(r, tx, bucket, key, intVal)
 				r.NoError(tx.Incr(bucket, key))
 				validateEqual(r, tx, bucket, key, intVal+1)
@@ -1770,16 +1769,16 @@ func TestTx_ReadAndWriteInSameTransaction(t *testing.T) {
 			key := []byte("k")
 			v1 := []byte("v1")
 			v2 := []byte("v2")
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 			r.NoError(db.Update(func(tx *Tx) (err error) {
-				r.Equal(ErrKeyNotFound, tx.PutIfExists(bucket, key, v1, core.Persistent))
-				r.NoError(tx.Put(bucket, key, v1, core.Persistent))
+				r.Equal(ErrKeyNotFound, tx.PutIfExists(bucket, key, v1, Persistent))
+				r.NoError(tx.Put(bucket, key, v1, Persistent))
 				value, err := tx.Get(bucket, key)
 				r.NoError(err)
 				r.Equal(v1, value)
 
-				err = tx.PutIfExists(bucket, key, v2, core.Persistent)
+				err = tx.PutIfExists(bucket, key, v2, Persistent)
 				r.NoError(err)
 				value, err = tx.Get(bucket, key)
 				r.NoError(err)
@@ -1797,9 +1796,9 @@ func TestTx_ReadAndWriteInSameTransaction(t *testing.T) {
 			v1 := []byte("v1")
 			v2 := []byte("v2")
 			v3 := []byte("v3")
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 			db.Update(func(tx *Tx) error {
-				r.NoError(tx.Put(bucket, key, v1, core.Persistent))
+				r.NoError(tx.Put(bucket, key, v1, Persistent))
 				var (
 					v   []byte
 					err error
@@ -1929,7 +1928,7 @@ func TestTx_CreateBucketAndWriteInSameTransaction(t *testing.T) {
 			r := require.New(t)
 			bucket := "1"
 
-			txNewBucket(t, db, bucket, core.DataStructureBTree, nil, nil)
+			txNewBucket(t, db, bucket, DataStructureBTree, nil, nil)
 
 			txPut(t, db, bucket, []byte("k03"), []byte("old-v03"), 0, nil, nil)
 			txPut(t, db, bucket, []byte("k06"), []byte("old-v06"), 0, nil, nil)
@@ -1938,7 +1937,7 @@ func TestTx_CreateBucketAndWriteInSameTransaction(t *testing.T) {
 				for i := 0; i < 10; i++ {
 					key := []byte(fmt.Sprintf("k%02d", i))
 					val := []byte(fmt.Sprintf("v%02d", i))
-					tx.Put(bucket, key, val, core.Persistent)
+					tx.Put(bucket, key, val, Persistent)
 				}
 
 				keys, vals, err := tx.RangeScanEntries(bucket, []byte("k02"), []byte("k07"), true, true)
@@ -1976,7 +1975,7 @@ func TestTx_CreateBucketAndWriteInSameTransaction(t *testing.T) {
 				for i := 0; i < 10; i++ {
 					key := []byte(fmt.Sprintf("k%02d", i))
 					val := []byte(fmt.Sprintf("v%02d", i))
-					tx.Put(bucket, key, val, core.Persistent)
+					tx.Put(bucket, key, val, Persistent)
 				}
 
 				keys, vals, err := tx.RangeScanEntries(bucket, []byte("k02"), []byte("k07"), true, true)
@@ -2014,13 +2013,13 @@ func TestTx_CreateBucketAndWriteInSameTransaction(t *testing.T) {
 
 			r.NoError(db.Update(func(tx *Tx) (err error) {
 				r.NoError(tx.NewKVBucket(bucket))
-				r.Equal(ErrKeyNotFound, tx.PutIfExists(bucket, key, v1, core.Persistent))
-				r.NoError(tx.Put(bucket, key, v1, core.Persistent))
+				r.Equal(ErrKeyNotFound, tx.PutIfExists(bucket, key, v1, Persistent))
+				r.NoError(tx.Put(bucket, key, v1, Persistent))
 				value, err := tx.Get(bucket, key)
 				r.NoError(err)
 				r.Equal(v1, value)
 
-				err = tx.PutIfExists(bucket, key, v2, core.Persistent)
+				err = tx.PutIfExists(bucket, key, v2, Persistent)
 				r.NoError(err)
 				value, err = tx.Get(bucket, key)
 				r.NoError(err)
@@ -2041,7 +2040,7 @@ func TestTx_CreateBucketAndWriteInSameTransaction(t *testing.T) {
 
 			db.Update(func(tx *Tx) error {
 				r.NoError(tx.NewKVBucket(bucket))
-				r.NoError(tx.Put(bucket, key, v1, core.Persistent))
+				r.NoError(tx.Put(bucket, key, v1, Persistent))
 				var (
 					v   []byte
 					err error
@@ -2099,7 +2098,7 @@ func TestTx_RecordExpired(t *testing.T) {
 			key := []byte("k")
 			v1 := []byte("v1")
 			v2 := []byte("v2")
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 			txPut(t, db, bucket, key, v1, 1, nil, nil)
 			mc.AdvanceTime(100 * time.Millisecond)
 			r.NoError(db.Update(func(tx *Tx) (err error) {
@@ -2127,7 +2126,7 @@ func TestTx_RecordExpired(t *testing.T) {
 			key := []byte("k")
 			v1 := []byte("v1")
 			v2 := []byte("v2")
-			txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 			txPut(t, db, bucket, key, v1, 1, nil, nil)
 			mc.AdvanceTime(100 * time.Millisecond)
 			r.NoError(db.Update(func(tx *Tx) (err error) {
@@ -2151,7 +2150,7 @@ func TestTx_NewTTLReturnError(t *testing.T) {
 		bucket := `1`
 		key := []byte("k")
 		v := []byte("v")
-		txCreateBucket(t, db, core.DataStructureBTree, bucket, nil)
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 		txPut(t, db, bucket, key, v, 1, nil, nil)
 		expectErr := errors.New("test error")
 		err = db.Update(func(tx *Tx) error {
