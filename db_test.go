@@ -79,7 +79,7 @@ func runNutsDBTestWithWatch(t *testing.T, test func(t *testing.T, db *DB)) {
 // runNutsDBTestWithMockClock runs a test with a MockClock for deterministic TTL testing.
 // The MockClock is initialized with the current system time in milliseconds.
 // The test function receives both the DB and the MockClock to allow time manipulation.
-func runNutsDBTestWithMockClock(t *testing.T, opts *Options, test func(t *testing.T, db *DB, mc *clock.MockClock)) {
+func runNutsDBTestWithMockClock(t *testing.T, opts *Options, test func(t *testing.T, db *DB, mc clock.Clock)) {
 	mc := clock.NewMockClock(time.Now().UnixMilli())
 	if opts == nil {
 		defaultOpts := DefaultOptions
@@ -306,7 +306,7 @@ func TestDB_DeleteANonExistKey(t *testing.T) {
 }
 
 func TestDB_CheckListExpired(t *testing.T) {
-	runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc *clock.MockClock) {
+	runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc clock.Clock) {
 		testBucket := "test_bucket"
 		txCreateBucket(t, db, DataStructureBTree, testBucket, nil)
 

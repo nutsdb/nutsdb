@@ -43,7 +43,7 @@ func NewIterator(tx *Tx, bucket string, options IteratorOptions) *Iterator {
 	iterator := &Iterator{
 		tx:      tx,
 		options: options,
-		iter:    tx.db.Index.BTree.Get(b.Id).Iter(),
+		iter:    tx.db.Index.BTree.GetWithDefault(b.Id).Iter(),
 	}
 
 	// Initialize position and cache the first item

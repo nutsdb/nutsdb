@@ -27,13 +27,23 @@ type Clock interface {
 
 	// NowSeconds returns the current time in seconds since Unix epoch.
 	NowSeconds() int64
+
+	// SetOnAdvance sets a callback to be called when the clock time is advanced.
+	// This is primarily used by MockClock to notify TTL managers of time changes.
+	SetOnAdvance(onAdvance func(newTimeMillis int64))
+
+	// AdvanceTime moves the clock forward by the specified duration.
+	AdvanceTime(duration time.Duration)
+
+	// SetTime sets the clock to a specific time in milliseconds since Unix epoch.
+	SetTime(timeMillis int64)
 }
 
 // RealClock implements Clock using system time.
 type RealClock struct{}
 
 // NewRealClock creates a new RealClock instance.
-func NewRealClock() *RealClock {
+func NewRealClock() Clock {
 	return &RealClock{}
 }
 
@@ -47,6 +57,18 @@ func (rc *RealClock) NowSeconds() int64 {
 	return time.Now().Unix()
 }
 
+func (rc *RealClock) SetOnAdvance(onAdvance func(newTimeMillis int64)) {
+	// No-op for RealClock
+}
+
+func (rc *RealClock) AdvanceTime(duration time.Duration) {
+	// No-op for RealClock
+}
+
+func (rc *RealClock) SetTime(timeMillis int64) {
+	// No-op for RealClock
+}
+
 // MockClock implements Clock with controllable time for testing.
 type MockClock struct {
 	mu        sync.RWMutex
@@ -55,7 +77,7 @@ type MockClock struct {
 }
 
 // NewMockClock creates a new MockClock instance with the specified initial time.
-func NewMockClock(initialTime int64) *MockClock {
+func NewMockClock(initialTime int64) Clock {
 	return &MockClock{time: initialTime}
 }
 

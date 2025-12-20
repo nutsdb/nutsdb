@@ -19,11 +19,11 @@ import (
 	"github.com/nutsdb/nutsdb/internal/data"
 )
 
-type IdxType interface {
+type IndexType interface {
 	data.BTree | data.Set | SortedSet | data.List
 }
 
-type defaultOp[T IdxType] struct {
+type defaultOp[T IndexType] struct {
 	Idx map[core.BucketId]*T
 }
 
@@ -77,7 +77,7 @@ type ListIndex struct {
 	index *Index
 }
 
-func (idx *ListIndex) Get(id core.BucketId) *data.List {
+func (idx *ListIndex) GetWithDefault(id core.BucketId) *data.List {
 	return idx.computeIfAbsent(id, func() *data.List {
 		return data.NewList(idx.index.db.opt.ListImpl.toInternal())
 	})
@@ -88,7 +88,7 @@ type BTreeIndex struct {
 	index *Index
 }
 
-func (idx *BTreeIndex) Get(id core.BucketId) *data.BTree {
+func (idx *BTreeIndex) GetWithDefault(id core.BucketId) *data.BTree {
 	return idx.computeIfAbsent(id, func() *data.BTree {
 		return data.NewBTree(id, idx.index.db.ttlService.GetChecker())
 	})
@@ -99,7 +99,7 @@ type SetIndex struct {
 	index *Index
 }
 
-func (idx *SetIndex) Get(id core.BucketId) *data.Set {
+func (idx *SetIndex) GetWithDefault(id core.BucketId) *data.Set {
 	return idx.computeIfAbsent(id, func() *data.Set {
 		return data.NewSet()
 	})
@@ -110,7 +110,7 @@ type SortedSetIndex struct {
 	index *Index
 }
 
-func (idx *SortedSetIndex) Get(id core.BucketId) *SortedSet {
+func (idx *SortedSetIndex) GetWithDefault(id core.BucketId) *SortedSet {
 	return idx.computeIfAbsent(id, func() *SortedSet {
 		return NewSortedSet(idx.index.db)
 	})

@@ -89,7 +89,7 @@ func TestTx_PutAndGet(t *testing.T) {
 func TestTx_GetAll_GetKeys_GetValues(t *testing.T) {
 	bucket := "bucket"
 
-	runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc *clock.MockClock) {
+	runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc clock.Clock) {
 		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 		txGetAll(t, db, bucket, nil, nil, nil)
@@ -506,7 +506,7 @@ func TestTx_DeleteFromMemory(t *testing.T) {
 		txDel(t, db, bucket, testutils.GetTestBytes(3), nil)
 
 		err := db.View(func(tx *Tx) error {
-			r, ok := db.Index.BTree.Get(1).Find(testutils.GetTestBytes(3))
+			r, ok := db.Index.BTree.GetWithDefault(1).Find(testutils.GetTestBytes(3))
 			require.Nil(t, r)
 			require.False(t, ok)
 
@@ -860,7 +860,7 @@ func TestTx_ExpiredDeletion(t *testing.T) {
 	bucket := "bucket"
 
 	t.Run("expired deletion", func(t *testing.T) {
-		runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc *clock.MockClock) {
+		runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc clock.Clock) {
 			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 			txPut(t, db, bucket, testutils.GetTestBytes(0), testutils.GetTestBytes(0), 1, nil, nil)
@@ -884,18 +884,18 @@ func TestTx_ExpiredDeletion(t *testing.T) {
 			// this entry will be deleted
 			txGet(t, db, bucket, testutils.GetTestBytes(1), nil, ErrKeyNotFound)
 
-			r, ok := db.Index.BTree.Get(1).Find(testutils.GetTestBytes(0))
+			r, ok := db.Index.BTree.GetWithDefault(1).Find(testutils.GetTestBytes(0))
 			require.Nil(t, r)
 			require.False(t, ok)
 
-			r, ok = db.Index.BTree.Get(1).Find(testutils.GetTestBytes(1))
+			r, ok = db.Index.BTree.GetWithDefault(1).Find(testutils.GetTestBytes(1))
 			require.Nil(t, r)
 			require.False(t, ok)
 		})
 	})
 
 	t.Run("update expire time", func(t *testing.T) {
-		runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc *clock.MockClock) {
+		runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc clock.Clock) {
 			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 			txPut(t, db, bucket, testutils.GetTestBytes(0), testutils.GetTestBytes(0), 1, nil, nil)
@@ -912,7 +912,7 @@ func TestTx_ExpiredDeletion(t *testing.T) {
 	})
 
 	t.Run("persist expire time", func(t *testing.T) {
-		runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc *clock.MockClock) {
+		runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc clock.Clock) {
 			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 			txPut(t, db, bucket, testutils.GetTestBytes(0), testutils.GetTestBytes(0), 1, nil, nil)
@@ -983,7 +983,7 @@ func TestTx_ExpiredDeletion(t *testing.T) {
 	t.Run("expire deletion when merge", func(t *testing.T) {
 		opts := DefaultOptions
 		opts.SegmentSize = 1 * 100
-		runNutsDBTestWithMockClock(t, &opts, func(t *testing.T, db *DB, mc *clock.MockClock) {
+		runNutsDBTestWithMockClock(t, &opts, func(t *testing.T, db *DB, mc clock.Clock) {
 			bucket := "bucket"
 			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
@@ -999,7 +999,7 @@ func TestTx_ExpiredDeletion(t *testing.T) {
 			txGet(t, db, bucket, testutils.GetTestBytes(1), testutils.GetTestBytes(1), nil)
 			txGet(t, db, bucket, testutils.GetTestBytes(2), nil, ErrKeyNotFound)
 
-			r, ok := db.Index.BTree.Get(1).Find(testutils.GetTestBytes(2))
+			r, ok := db.Index.BTree.GetWithDefault(1).Find(testutils.GetTestBytes(2))
 			require.Nil(t, r)
 			require.False(t, ok)
 		})
@@ -1008,7 +1008,7 @@ func TestTx_ExpiredDeletion(t *testing.T) {
 	t.Run("expire deletion use time heap", func(t *testing.T) {
 		opts := DefaultOptions
 		opts.ExpiredDeleteType = TimeHeap
-		runNutsDBTestWithMockClock(t, &opts, func(t *testing.T, db *DB, mc *clock.MockClock) {
+		runNutsDBTestWithMockClock(t, &opts, func(t *testing.T, db *DB, mc clock.Clock) {
 			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 			txPut(t, db, bucket, testutils.GetTestBytes(0), testutils.GetTestBytes(0), 1, nil, nil)
 			txPut(t, db, bucket, testutils.GetTestBytes(1), testutils.GetTestBytes(1), 2, nil, nil)
@@ -1027,11 +1027,11 @@ func TestTx_ExpiredDeletion(t *testing.T) {
 			// this entry will be deleted
 			txGet(t, db, bucket, testutils.GetTestBytes(1), nil, ErrKeyNotFound)
 
-			r, ok := db.Index.BTree.Get(1).Find(testutils.GetTestBytes(0))
+			r, ok := db.Index.BTree.GetWithDefault(1).Find(testutils.GetTestBytes(0))
 			require.Nil(t, r)
 			require.False(t, ok)
 
-			r, ok = db.Index.BTree.Get(1).Find(testutils.GetTestBytes(1))
+			r, ok = db.Index.BTree.GetWithDefault(1).Find(testutils.GetTestBytes(1))
 			require.Nil(t, r)
 			require.False(t, ok)
 		})
@@ -1066,7 +1066,7 @@ func TestTx_GetMaxOrMinKey(t *testing.T) {
 	})
 
 	t.Run("test expire", func(t *testing.T) {
-		runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc *clock.MockClock) {
+		runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc clock.Clock) {
 			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 			keya := []byte("A")
 			keyb := []byte("B")
@@ -1193,7 +1193,7 @@ func TestTx_IncrementAndDecrement(t *testing.T) {
 	})
 
 	t.Run("operations on expired key", func(t *testing.T) {
-		runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc *clock.MockClock) {
+		runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc clock.Clock) {
 			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 			txPut(t, db, bucket, key, []byte("1"), 1, nil, nil)
@@ -1333,7 +1333,7 @@ func TestTx_ValueLen(t *testing.T) {
 	})
 
 	t.Run("expired test", func(t *testing.T) {
-		runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc *clock.MockClock) {
+		runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc clock.Clock) {
 			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 			txPut(t, db, bucket, testutils.GetTestBytes(1), val, 1, nil, nil)
 			mc.AdvanceTime(3 * time.Second)
@@ -1363,7 +1363,7 @@ func TestTx_GetSet(t *testing.T) {
 	})
 
 	t.Run("expired test", func(t *testing.T) {
-		runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc *clock.MockClock) {
+		runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc clock.Clock) {
 			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 			txPut(t, db, bucket, testutils.GetTestBytes(1), val, 1, nil, nil)
 			mc.AdvanceTime(3 * time.Second)
@@ -1376,7 +1376,7 @@ func TestTx_GetTTLAndPersist(t *testing.T) {
 	bucket := "bucket1"
 	key := []byte("key1")
 	value := []byte("value1")
-	runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc *clock.MockClock) {
+	runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc clock.Clock) {
 		txGetTTL(t, db, bucket, key, 0, ErrBucketNotExist)
 
 		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
@@ -1658,7 +1658,7 @@ func TestTx_Has(t *testing.T) {
 	})
 
 	t.Run("expired test", func(t *testing.T) {
-		runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc *clock.MockClock) {
+		runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc clock.Clock) {
 			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 			txPut(t, db, bucket, testutils.GetTestBytes(1), val, 1, nil, nil)
 			mc.AdvanceTime(3 * time.Second)
@@ -2092,7 +2092,7 @@ func TestTx_TestBucketNotExists(t *testing.T) {
 
 func TestTx_RecordExpired(t *testing.T) {
 	t.Run("test PutIfExists", func(t *testing.T) {
-		runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc *clock.MockClock) {
+		runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc clock.Clock) {
 			r := require.New(t)
 			bucket := `1`
 			key := []byte("k")
@@ -2120,7 +2120,7 @@ func TestTx_RecordExpired(t *testing.T) {
 	})
 
 	t.Run("test PutIfNotExists", func(t *testing.T) {
-		runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc *clock.MockClock) {
+		runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc clock.Clock) {
 			r := require.New(t)
 			bucket := `1`
 			key := []byte("k")

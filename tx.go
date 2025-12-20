@@ -305,7 +305,7 @@ func (tx *Tx) getListEntryNewAddRecordCount(bucketId core.BucketId, entry *core.
 	var res int64
 	key := string(entry.Key)
 	value := string(entry.Value)
-	l := tx.db.Index.List.Get(bucketId)
+	l := tx.db.Index.List.GetWithDefault(bucketId)
 
 	switch entry.Meta.Flag {
 	case DataLPushFlag, DataRPushFlag:
@@ -400,7 +400,7 @@ func (tx *Tx) getSortedSetEntryNewAddRecordCount(bucketId core.BucketId, entry *
 		res--
 	case DataZRemRangeByRankFlag:
 		start, end := splitIntIntStr(value, SeparatorForZSetKey)
-		delNodes, err := tx.db.Index.SortedSet.Get(bucketId).getZRemRangeByRankNodes(key, start, end)
+		delNodes, err := tx.db.Index.SortedSet.GetWithDefault(bucketId).getZRemRangeByRankNodes(key, start, end)
 		if err != nil {
 			return res, err
 		}
@@ -698,13 +698,13 @@ func (tx *Tx) buildBucketInIndex() error {
 			case core.BucketInsertOperation:
 				switch bucket.Ds {
 				case DataStructureBTree:
-					tx.db.Index.BTree.Get(bucket.Id)
+					tx.db.Index.BTree.GetWithDefault(bucket.Id)
 				case DataStructureList:
-					tx.db.Index.List.Get(bucket.Id)
+					tx.db.Index.List.GetWithDefault(bucket.Id)
 				case DataStructureSet:
-					tx.db.Index.Set.Get(bucket.Id)
+					tx.db.Index.Set.GetWithDefault(bucket.Id)
 				case DataStructureSortedSet:
-					tx.db.Index.SortedSet.Get(bucket.Id)
+					tx.db.Index.SortedSet.GetWithDefault(bucket.Id)
 				default:
 					return ErrDataStructureNotSupported
 				}

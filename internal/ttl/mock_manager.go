@@ -36,12 +36,12 @@ type ttlTask struct {
 // It is driven by a MockClock and executes callbacks synchronously when time advances.
 type MockManager struct {
 	mu    sync.RWMutex
-	clock *clock.MockClock
+	clock clock.Clock
 	tasks map[core.BucketId]map[string]*ttlTask
 }
 
 // NewMockManager creates a new MockManager instance.
-func NewMockManager(mc *clock.MockClock) *MockManager {
+func NewMockManager(mc clock.Clock) *MockManager {
 	mm := &MockManager{
 		clock: mc,
 		tasks: make(map[core.BucketId]map[string]*ttlTask),

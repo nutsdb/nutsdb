@@ -16,6 +16,7 @@ package nutsdb
 
 import (
 	"github.com/nutsdb/nutsdb/internal/core"
+	"github.com/nutsdb/nutsdb/internal/fileio"
 )
 
 // Type Aliases to maintain compatibility after moving to internal/core
@@ -108,4 +109,8 @@ const (
 
 	// Committed represents the tx committed status
 	Committed = core.Committed
+)
+
+var (
+	ErrIndexOutOfBound = fileio.ErrIndexOutOfBound
 )

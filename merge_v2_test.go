@@ -1339,7 +1339,7 @@ func TestMergeV2ApplyLookupUpdatesSecondaryIndexes(t *testing.T) {
 
 	// Set bucket
 	setRecord := &core.Record{Value: []byte("member"), FileID: 10, Timestamp: 1, TTL: Persistent}
-	setIdx := db.Index.Set.Get(buckets[0].id)
+	setIdx := db.Index.Set.GetWithDefault(buckets[0].id)
 	if err := setIdx.SAdd("set-key", [][]byte{setRecord.Value}, []*core.Record{setRecord}); err != nil {
 		t.Fatalf("SAdd: %v", err)
 	}
@@ -1347,7 +1347,7 @@ func TestMergeV2ApplyLookupUpdatesSecondaryIndexes(t *testing.T) {
 	_, _ = setHash.Write(setRecord.Value)
 
 	// List bucket
-	listIdx := db.Index.List.Get(buckets[1].id)
+	listIdx := db.Index.List.GetWithDefault(buckets[1].id)
 	listKey := []byte("list-key")
 	seq := uint64(42)
 	listRecord := &core.Record{FileID: 11, Timestamp: 2, TTL: Persistent, TxID: 1}
@@ -1355,7 +1355,7 @@ func TestMergeV2ApplyLookupUpdatesSecondaryIndexes(t *testing.T) {
 	listIdx.Items[string(listKey)].InsertRecord(utils.ConvertUint64ToBigEndianBytes(seq), listRecord)
 
 	// Sorted set bucket
-	sortedIdx := db.Index.SortedSet.Get(buckets[2].id)
+	sortedIdx := db.Index.SortedSet.GetWithDefault(buckets[2].id)
 	sortedValue := []byte("sorted-member")
 	sortedRecord := &core.Record{Value: sortedValue, FileID: 12, Timestamp: 3, TTL: Persistent}
 	if err := sortedIdx.ZAdd("zset-key", SCORE(1.5), sortedValue, sortedRecord); err != nil {

@@ -116,7 +116,7 @@ func (tx *Tx) getListWithDefault(bucket string) (*data.List, error) {
 	bucketId := b.Id
 
 	// 确保列表索引存在
-	return tx.db.Index.List.Get(bucketId), nil
+	return tx.db.Index.List.GetWithDefault(bucketId), nil
 }
 
 // RPush inserts the values at the tail of the list stored in the bucket at given bucket,key and values.

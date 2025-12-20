@@ -760,7 +760,7 @@ func (db *DB) buildBTreeIdx(record *core.Record, entry *core.Entry) error {
 	}
 	bucketId := bucket.Id
 
-	bTree := db.Index.BTree.Get(bucketId)
+	bTree := db.Index.BTree.GetWithDefault(bucketId)
 
 	if db.ttlService.GetChecker().IsExpired(record.TTL, record.Timestamp) || meta.Flag == DataDeleteFlag {
 		db.ttlService.UnregisterTTL(bucketId, string(key))
@@ -809,7 +809,7 @@ func (db *DB) buildSetIdx(record *core.Record, entry *core.Entry) error {
 	}
 	bucketId := bucket.Id
 
-	s := db.Index.Set.Get(bucketId)
+	s := db.Index.Set.GetWithDefault(bucketId)
 
 	switch meta.Flag {
 	case DataSetFlag:
@@ -835,7 +835,7 @@ func (db *DB) buildSortedSetIdx(record *core.Record, entry *core.Entry) error {
 	}
 	bucketId := bucket.Id
 
-	ss := db.Index.SortedSet.Get(bucketId)
+	ss := db.Index.SortedSet.GetWithDefault(bucketId)
 
 	switch meta.Flag {
 	case DataZAddFlag:
@@ -874,7 +874,7 @@ func (db *DB) buildListIdx(record *core.Record, entry *core.Entry) error {
 	}
 	bucketId := bucket.Id
 
-	l := db.Index.List.Get(bucketId)
+	l := db.Index.List.GetWithDefault(bucketId)
 
 	if db.ttlService.GetChecker().IsExpired(meta.TTL, meta.Timestamp) {
 		return nil
