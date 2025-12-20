@@ -371,7 +371,7 @@ func TestTx_LTrim(t *testing.T) {
 				testutils.GetTestBytes(1),
 			}, nil)
 
-		db.View(func(tx *Tx) error {
+		err = db.View(func(tx *Tx) error {
 			l, err := tx.LSize(bucket, testutils.GetTestBytes(n))
 			assert.NoError(t, err)
 			assert.Equal(t, 4, l)
@@ -381,6 +381,7 @@ func TestTx_LTrim(t *testing.T) {
 			assert.Equal(t, testutils.GetTestBytes(4), item)
 			return nil
 		})
+		assert.NoError(t, err)
 	})
 
 	// Calling LTrim on a list with added data and use LRange to validate it
