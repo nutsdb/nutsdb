@@ -20,13 +20,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nutsdb/nutsdb/internal/core"
 	"github.com/nutsdb/nutsdb/internal/data"
 	"github.com/nutsdb/nutsdb/internal/testutils"
 	"github.com/nutsdb/nutsdb/internal/utils"
 	"github.com/stretchr/testify/require"
 )
 
-func ListPush(t *testing.T, list *data.List, key string, r *data.Record, isLeft bool, expectError error) {
+func ListPush(t *testing.T, list *data.List, key string, r *core.Record, isLeft bool, expectError error) {
 	var e error
 	if isLeft {
 		e = list.LPush(key, r)
@@ -36,10 +37,10 @@ func ListPush(t *testing.T, list *data.List, key string, r *data.Record, isLeft 
 	testutils.AssertErr(t, e, expectError)
 }
 
-func ListPop(t *testing.T, list *data.List, key string, isLeft bool, expectVal *data.Record, expectError error) {
+func ListPop(t *testing.T, list *data.List, key string, isLeft bool, expectVal *core.Record, expectError error) {
 	var (
 		e error
-		r *data.Record
+		r *core.Record
 	)
 
 	if isLeft {
@@ -55,7 +56,7 @@ func ListPop(t *testing.T, list *data.List, key string, isLeft bool, expectVal *
 	}
 }
 
-func ListCmp(t *testing.T, list *data.List, key string, expectRecords []*data.Record, isReverse bool) {
+func ListCmp(t *testing.T, list *data.List, key string, expectRecords []*core.Record, isReverse bool) {
 	records, err := list.LRange(key, 0, -1)
 	require.NoError(t, err)
 
@@ -75,7 +76,7 @@ func TestList_LPush(t *testing.T) {
 		list := data.NewList(listImpl)
 		// Test LPush
 		key := string(testutils.GetTestBytes(0))
-		expectRecords := data.GenerateRecords(5)
+		expectRecords := testutils.GenerateRecords(5)
 		seqInfo := data.HeadTailSeq{Head: data.InitialListSeq, Tail: data.InitialListSeq + 1}
 
 		for i := 0; i < len(expectRecords); i++ {
@@ -94,7 +95,7 @@ func TestList_RPush(t *testing.T) {
 		list := data.NewList(listImpl)
 		// Test RPush
 		key := string(testutils.GetTestBytes(0))
-		expectRecords := data.GenerateRecords(5)
+		expectRecords := testutils.GenerateRecords(5)
 		seqInfo := data.HeadTailSeq{Head: data.InitialListSeq, Tail: data.InitialListSeq + 1}
 
 		for i := 0; i < len(expectRecords); i++ {
@@ -111,7 +112,7 @@ func TestList_RPush(t *testing.T) {
 func TestList_Pop(t *testing.T) {
 	for _, listImpl := range []data.ListImplementationType{data.ListImplDoublyLinkedList, data.ListImplBTree} {
 		list := data.NewList(listImpl)
-		expectRecords := data.GenerateRecords(5)
+		expectRecords := testutils.GenerateRecords(5)
 		key := string(testutils.GetTestBytes(0))
 
 		ListPop(t, list, key, true, nil, data.ErrListNotFound)
@@ -137,7 +138,7 @@ func TestList_Pop(t *testing.T) {
 func TestList_LRem(t *testing.T) {
 	for _, listImpl := range []data.ListImplementationType{data.ListImplDoublyLinkedList, data.ListImplBTree} {
 		list := data.NewList(listImpl)
-		records := data.GenerateRecords(2)
+		records := testutils.GenerateRecords(2)
 		key := string(testutils.GetTestBytes(0))
 		seqInfo := data.HeadTailSeq{Head: data.InitialListSeq, Tail: data.InitialListSeq + 1}
 
@@ -164,9 +165,9 @@ func TestList_LRem(t *testing.T) {
 		ListPush(t, list, string(newKey), records[1], false, nil)
 
 		// r1 r1 r1 r2 r1 r2
-		expectRecords := []*data.Record{records[0], records[0], records[0], records[1], records[0], records[1]}
+		expectRecords := []*core.Record{records[0], records[0], records[0], records[1], records[0], records[1]}
 
-		cmp := func(r *data.Record) (bool, error) {
+		cmp := func(r *core.Record) (bool, error) {
 			return bytes.Equal(r.Value, records[0].Value), nil
 		}
 
@@ -182,7 +183,7 @@ func TestList_LRem(t *testing.T) {
 		expectRecords = expectRecords[2:]
 		ListCmp(t, list, key, expectRecords, false)
 
-		cmp = func(r *data.Record) (bool, error) {
+		cmp = func(r *core.Record) (bool, error) {
 			return bytes.Equal(r.Value, records[1].Value), nil
 		}
 
@@ -197,7 +198,7 @@ func TestList_LRem(t *testing.T) {
 func TestList_LTrim(t *testing.T) {
 	for _, listImpl := range []data.ListImplementationType{data.ListImplDoublyLinkedList, data.ListImplBTree} {
 		list := data.NewList(listImpl)
-		expectRecords := data.GenerateRecords(5)
+		expectRecords := testutils.GenerateRecords(5)
 		key := string(testutils.GetTestBytes(0))
 		seqInfo := data.HeadTailSeq{Head: data.InitialListSeq, Tail: data.InitialListSeq + 1}
 
@@ -218,7 +219,7 @@ func TestList_LTrim(t *testing.T) {
 func TestList_LRemByIndex(t *testing.T) {
 	for _, listImpl := range []data.ListImplementationType{data.ListImplDoublyLinkedList, data.ListImplBTree} {
 		list := data.NewList(listImpl)
-		expectRecords := data.GenerateRecords(8)
+		expectRecords := testutils.GenerateRecords(8)
 		key := string(testutils.GetTestBytes(0))
 		seqInfo := data.HeadTailSeq{Head: data.InitialListSeq, Tail: data.InitialListSeq + 1}
 
@@ -261,7 +262,7 @@ func TestList_SequenceConsistency(t *testing.T) {
 		for i := 0; i < 5; i++ {
 			seq := seqInfo.GenerateSeq(false)
 			newKey := utils.EncodeListKey([]byte(key), seq)
-			record := &data.Record{Key: newKey, Value: testutils.GetTestBytes(i)}
+			record := &core.Record{Key: newKey, Value: testutils.GetTestBytes(i)}
 			ListPush(t, list, string(newKey), record, false, nil)
 		}
 
@@ -270,7 +271,7 @@ func TestList_SequenceConsistency(t *testing.T) {
 		require.Equal(t, uint64(data.InitialListSeq+6), seqInfo.Tail, "Tail should increment")
 
 		// Pop from left
-		ListPop(t, list, key, true, &data.Record{
+		ListPop(t, list, key, true, &core.Record{
 			Key:   utils.EncodeListKey([]byte(key), data.InitialListSeq+1),
 			Value: testutils.GetTestBytes(0),
 		}, nil)
@@ -278,7 +279,7 @@ func TestList_SequenceConsistency(t *testing.T) {
 		// Push again - should not reuse old sequence
 		seq := seqInfo.GenerateSeq(false)
 		newKey := utils.EncodeListKey([]byte(key), seq)
-		record := &data.Record{Key: newKey, Value: testutils.GetTestBytes(99)}
+		record := &core.Record{Key: newKey, Value: testutils.GetTestBytes(99)}
 		ListPush(t, list, string(newKey), record, false, nil)
 
 		// Verify final state
@@ -314,12 +315,12 @@ func TestList_MixedPushPop(t *testing.T) {
 			case "RPush":
 				seq := seqInfo.GenerateSeq(false)
 				newKey := utils.EncodeListKey([]byte(key), seq)
-				record := &data.Record{Key: newKey, Value: testutils.GetTestBytes(operation.value)}
+				record := &core.Record{Key: newKey, Value: testutils.GetTestBytes(operation.value)}
 				ListPush(t, list, string(newKey), record, false, nil)
 			case "LPush":
 				seq := seqInfo.GenerateSeq(true)
 				newKey := utils.EncodeListKey([]byte(key), seq)
-				record := &data.Record{Key: newKey, Value: testutils.GetTestBytes(operation.value)}
+				record := &core.Record{Key: newKey, Value: testutils.GetTestBytes(operation.value)}
 				ListPush(t, list, string(newKey), record, true, nil)
 			case "LPop":
 				_, err := list.LPop(key)
@@ -353,7 +354,7 @@ func TestList_HeadTailBoundary(t *testing.T) {
 		for i := 0; i < 3; i++ {
 			seq := seqInfo.GenerateSeq(false)
 			newKey := utils.EncodeListKey([]byte(key), seq)
-			record := &data.Record{Key: newKey, Value: testutils.GetTestBytes(i)}
+			record := &core.Record{Key: newKey, Value: testutils.GetTestBytes(i)}
 			ListPush(t, list, string(newKey), record, false, nil)
 		}
 
@@ -365,7 +366,7 @@ func TestList_HeadTailBoundary(t *testing.T) {
 		for i := 0; i < 3; i++ {
 			seq := seqInfo.GenerateSeq(true)
 			newKey := utils.EncodeListKey([]byte(key), seq)
-			record := &data.Record{Key: newKey, Value: testutils.GetTestBytes(100 + i)}
+			record := &core.Record{Key: newKey, Value: testutils.GetTestBytes(100 + i)}
 			ListPush(t, list, string(newKey), record, true, nil)
 		}
 
@@ -396,12 +397,12 @@ func TestList_ErrListNotFound(t *testing.T) {
 		l.ExpireList(key, 1)
 		r.False(l.IsExpire(string(key)))
 		newKey := l.GeneratePushKey(key, true)
-		r.NoError(l.Push(string(newKey), data.NewRecord().WithKey(newKey), true))
+		r.NoError(l.Push(string(newKey), core.NewRecord().WithKey(newKey), true))
 		<-time.After(1100 * time.Millisecond)
 		newKey = l.GeneratePushKey(key, true)
 		r.Equal(
 			data.ErrListNotFound,
-			l.Push(string(newKey), data.NewRecord().WithKey(newKey), true),
+			l.Push(string(newKey), core.NewRecord().WithKey(newKey), true),
 		)
 	}
 }
@@ -415,7 +416,7 @@ func TestList_Push_Success(t *testing.T) {
 			N := 10
 			for i := 0; i < N; i++ {
 				newKey := l.GeneratePushKey(key, false)
-				err := l.LPush(string(newKey), data.NewRecord().WithKey([]byte(strconv.Itoa(i))))
+				err := l.LPush(string(newKey), core.NewRecord().WithKey([]byte(strconv.Itoa(i))))
 				r.NoError(err)
 			}
 			n, err := l.Size(string(key))
@@ -432,7 +433,7 @@ func TestList_Push_Success(t *testing.T) {
 			for i := 0; i < N; i++ {
 				l.Seq = make(map[string]*data.HeadTailSeq)
 				newKey := l.GeneratePushKey(key, false)
-				err := l.LPush(string(newKey), data.NewRecord().WithKey([]byte(strconv.Itoa(i))))
+				err := l.LPush(string(newKey), core.NewRecord().WithKey([]byte(strconv.Itoa(i))))
 				r.NoError(err)
 			}
 			n, err := l.Size(string(key))

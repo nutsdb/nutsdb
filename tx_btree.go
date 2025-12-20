@@ -20,9 +20,8 @@ import (
 	"math/big"
 	"strconv"
 	"sync/atomic"
-	"time"
 
-	"github.com/nutsdb/nutsdb/internal/data"
+	"github.com/nutsdb/nutsdb/internal/core"
 	"github.com/xujiajun/utils/strconv2"
 )
 
@@ -39,7 +38,10 @@ func (tx *Tx) PutWithTimestamp(bucket string, key, value []byte, ttl uint32, tim
 // Put sets the value for a key in the bucket.
 // a wrapper of the function put.
 func (tx *Tx) Put(bucket string, key, value []byte, ttl uint32) error {
-	return tx.put(bucket, key, value, ttl, DataSetFlag, uint64(time.Now().UnixMilli()), DataStructureBTree)
+	if err := tx.checkTxIsClosed(); err != nil {
+		return err
+	}
+	return tx.put(bucket, key, value, ttl, DataSetFlag, uint64(tx.db.opt.Clock.NowMillis()), DataStructureBTree)
 }
 
 // PutIfNotExists set the value for a key in the bucket only if the key doesn't exist already.
@@ -59,17 +61,16 @@ func (tx *Tx) PutIfNotExists(bucket string, key, value []byte, ttl uint32) error
 		return nil
 	}
 
-	idx, bucketExists := tx.db.Index.bTree.exist(bucketId)
+	idx, bucketExists := tx.db.Index.BTree.exist(bucketId)
 	if !bucketExists {
-		return tx.put(bucket, key, value, ttl, DataSetFlag, uint64(time.Now().UnixMilli()), DataStructureBTree)
+		return tx.put(bucket, key, value, ttl, DataSetFlag, uint64(tx.db.opt.Clock.NowMillis()), DataStructureBTree)
 	}
-	record, recordExists := idx.Find(key)
 
-	if recordExists && !record.IsExpired() {
+	if _, recordExists := idx.Find(key); recordExists {
 		return nil
 	}
 
-	return tx.put(bucket, key, value, ttl, DataSetFlag, uint64(time.Now().UnixMilli()), DataStructureBTree)
+	return tx.put(bucket, key, value, ttl, DataSetFlag, uint64(tx.db.opt.Clock.NowMillis()), DataStructureBTree)
 }
 
 // PutIfExists set the value for a key in the bucket only if the key already exits.
@@ -106,15 +107,11 @@ func (tx *Tx) get(bucket string, key []byte) (value []byte, err error) {
 		return entry.Value, nil
 	}
 
-	if idx, ok := tx.db.Index.bTree.exist(bucketId); ok {
+	if idx, ok := tx.db.Index.BTree.exist(bucketId); ok {
+		// Index layer automatically filters expired records
 		record, found := idx.Find(key)
 		if !found {
 			return nil, ErrKeyNotFound
-		}
-
-		if record.IsExpired() {
-			tx.putDeleteLog(bucketId, key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureBTree)
-			return nil, ErrNotFoundKey
 		}
 
 		value, err = tx.db.getValueByRecord(record)
@@ -159,9 +156,9 @@ func (tx *Tx) getMaxOrMinKey(bucket string, isMax bool) ([]byte, error) {
 
 	key, actuallyFound = tx.pendingWrites.MaxOrMinKey(bucket, isMax)
 
-	if idx, ok := tx.db.Index.bTree.exist(bucketId); ok {
+	if idx, ok := tx.db.Index.BTree.exist(bucketId); ok {
 		var (
-			item  *data.Item[data.Record]
+			item  *core.Item[core.Record]
 			found bool
 		)
 
@@ -180,13 +177,6 @@ func (tx *Tx) getMaxOrMinKey(bucket string, isMax bool) ([]byte, error) {
 			actuallyFound = found
 		}
 
-		if item.Record.IsExpired() {
-			tx.putDeleteLog(bucketId, item.Key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureBTree)
-			if actuallyFound {
-				return key, nil
-			}
-			return nil, ErrKeyNotFound
-		}
 		if isMax {
 			key = compareAndReturn(key, item.Key, 1)
 		} else {
@@ -221,12 +211,12 @@ func (tx *Tx) getAllOrKeysOrValues(bucket string, typ uint8) ([][]byte, [][]byte
 		return nil, nil, err
 	}
 
-	bucketId, err := tx.db.bm.GetBucketID(DataStructureBTree, bucket)
+	bucketId, err := tx.db.bucketManager.GetBucketID(DataStructureBTree, bucket)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	idx, bucketExists := tx.db.Index.bTree.exist(bucketId)
+	idx, bucketExists := tx.db.Index.BTree.exist(bucketId)
 	if !bucketExists {
 		return [][]byte{}, [][]byte{}, nil
 	}
@@ -286,13 +276,12 @@ func (tx *Tx) Has(bucket string, key []byte) (exists bool, err error) {
 		return true, nil
 	}
 
-	idx, bucketExists := tx.db.Index.bTree.exist(bucketId)
+	idx, bucketExists := tx.db.Index.BTree.exist(bucketId)
 	if !bucketExists {
 		return false, ErrBucketNotExist
 	}
-	record, recordExists := idx.Find(key)
 
-	if recordExists && !record.IsExpired() {
+	if _, recordExists := idx.Find(key); recordExists {
 		return true, nil
 	}
 
@@ -311,11 +300,9 @@ func (tx *Tx) RangeScanEntries(bucket string, start, end []byte, includeKeys, in
 	}
 	bucketId := b.Id
 	pendingKeys, pendingValues := tx.pendingWrites.getDataByRange(start, end, b.Name)
-	if index, ok := tx.db.Index.bTree.exist(bucketId); ok {
+	if index, ok := tx.db.Index.BTree.exist(bucketId); ok {
 		records := index.Range(start, end)
 
-		// 如果需要合并 pending，则必须拿到 keys 进行有序 merge；
-		// 否则可以按需提取，避免不必要的 keys 分配。
 		needKeysForMerge := includeKeys || len(pendingKeys) > 0
 
 		keys, values, err = tx.getHintIdxDataItemsWrapper(
@@ -328,7 +315,6 @@ func (tx *Tx) RangeScanEntries(bucket string, start, end []byte, includeKeys, in
 		}
 	}
 
-	// 仅当存在 pending 时才进行 merge，避免 values-only 且无 pending 的场景强制构建 keys。
 	if len(pendingKeys) > 0 || len(pendingValues) > 0 {
 		keys, values = mergeKeyValues(pendingKeys, pendingValues, keys, values)
 	}
@@ -370,13 +356,13 @@ func (tx *Tx) PrefixScanEntries(bucket string, prefix []byte, reg string, offset
 	if err := tx.checkTxIsClosed(); err != nil {
 		return nil, nil, err
 	}
-	b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
+	b, err := tx.db.bucketManager.GetBucket(DataStructureBTree, bucket)
 	if err != nil {
 		return nil, nil, err
 	}
 	bucketId := b.Id
 
-	xerr := func(e error) error {
+	xerr := func() error {
 		// Return expected error types based on Scan/SearchScan.
 		if reg == "" {
 			return ErrPrefixScan
@@ -384,8 +370,8 @@ func (tx *Tx) PrefixScanEntries(bucket string, prefix []byte, reg string, offset
 		return ErrPrefixSearchScan
 	}
 
-	if idx, ok := tx.db.Index.bTree.exist(bucketId); ok {
-		var records []*data.Record
+	if idx, ok := tx.db.Index.BTree.exist(bucketId); ok {
+		var records []*core.Record
 		if reg == "" {
 			records = idx.PrefixScan(prefix, offsetNum, limitNum)
 		} else {
@@ -393,15 +379,15 @@ func (tx *Tx) PrefixScanEntries(bucket string, prefix []byte, reg string, offset
 		}
 		keys, values, err = tx.getHintIdxDataItemsWrapper(records, limitNum, bucketId, includeKeys, includeValues)
 		if err != nil {
-			return nil, nil, xerr(err)
+			return nil, nil, xerr()
 		}
 	}
 
 	if includeKeys && len(keys) == 0 {
-		return nil, nil, xerr(err)
+		return nil, nil, xerr()
 	}
 	if includeValues && len(values) == 0 {
-		return nil, nil, xerr(err)
+		return nil, nil, xerr()
 	}
 	return
 }
@@ -429,7 +415,7 @@ func (tx *Tx) Delete(bucket string, key []byte) error {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return err
 	}
-	b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
+	b, err := tx.db.bucketManager.GetBucket(DataStructureBTree, bucket)
 	if err != nil {
 		return err
 	}
@@ -441,10 +427,10 @@ func (tx *Tx) Delete(bucket string, key []byte) error {
 	case EntryDeleted:
 		return ErrKeyNotFound
 	case EntryUpdated:
-		return tx.put(bucket, key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureBTree)
+		return tx.put(bucket, key, nil, Persistent, DataDeleteFlag, uint64(tx.db.opt.Clock.NowMillis()), DataStructureBTree)
 	}
 
-	if idx, ok := tx.db.Index.bTree.exist(bucketId); ok {
+	if idx, ok := tx.db.Index.BTree.exist(bucketId); ok {
 		if _, found := idx.Find(key); !found {
 			return ErrKeyNotFound
 		}
@@ -452,11 +438,12 @@ func (tx *Tx) Delete(bucket string, key []byte) error {
 		return ErrKeyNotFound
 	}
 
-	return tx.put(bucket, key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureBTree)
+	return tx.put(bucket, key, nil, Persistent, DataDeleteFlag, uint64(tx.db.opt.Clock.NowMillis()), DataStructureBTree)
 }
 
 // getHintIdxDataItemsWrapper returns keys and values when prefix scanning or range scanning.
-func (tx *Tx) getHintIdxDataItemsWrapper(records []*data.Record, limitNum int, bucketId BucketId, needKeys bool, needValues bool) (keys [][]byte, values [][]byte, err error) {
+// Note: TTL filtering is handled at the index layer, so records passed here are already valid (non-expired).
+func (tx *Tx) getHintIdxDataItemsWrapper(records []*core.Record, limitNum int, _ core.BucketId, needKeys bool, needValues bool) (keys [][]byte, values [][]byte, err error) {
 	// Pre-allocate capacity to reduce slice re-growth
 	estimatedSize := len(records)
 	if limitNum > 0 && limitNum < estimatedSize {
@@ -474,12 +461,6 @@ func (tx *Tx) getHintIdxDataItemsWrapper(records []*data.Record, limitNum int, b
 	needAny := needKeys || needValues
 
 	for _, record := range records {
-		if record.IsExpired() {
-			tx.putDeleteLog(bucketId, record.Key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureBTree)
-			continue
-		}
-
-		// 正确的 limit 控制：与是否需要 keys/values 无关
 		if limitNum > 0 && needAny && processedCount >= limitNum {
 			break
 		}
@@ -503,7 +484,7 @@ func (tx *Tx) getHintIdxDataItemsWrapper(records []*data.Record, limitNum int, b
 	return keys, values, nil
 }
 
-func (tx *Tx) tryGet(bucket string, key []byte, solveRecord func(record *data.Record, entry *Entry, found bool, bucketId BucketId) error) error {
+func (tx *Tx) tryGet(bucket string, key []byte, solveRecord func(record *core.Record, entry *core.Entry, found bool, bucketId core.BucketId) error) error {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return err
 	}
@@ -513,12 +494,12 @@ func (tx *Tx) tryGet(bucket string, key []byte, solveRecord func(record *data.Re
 	}
 	bucketId := b.Id
 	var (
-		record *data.Record = nil
+		record *core.Record = nil
 		found  bool
 	)
 	entry, err := tx.pendingWrites.Get(DataStructureBTree, bucket, key)
 	found = err == nil
-	if idx, ok := tx.db.Index.bTree.exist(bucketId); ok {
+	if idx, ok := tx.db.Index.BTree.exist(bucketId); ok {
 		record, ok = idx.Find(key)
 		if ok {
 			found = true
@@ -528,16 +509,9 @@ func (tx *Tx) tryGet(bucket string, key []byte, solveRecord func(record *data.Re
 }
 
 func (tx *Tx) update(bucket string, key []byte, getNewValue func([]byte) ([]byte, error), getNewTTL func(uint32) (uint32, error)) error {
-	return tx.tryGet(bucket, key, func(record *data.Record, pendingEntry *Entry, found bool, bucketId BucketId) error {
+	return tx.tryGet(bucket, key, func(record *core.Record, pendingEntry *core.Entry, found bool, bucketId core.BucketId) error {
 		if !found {
 			return ErrKeyNotFound
-		}
-
-		if record != nil {
-			// If record is timeout, this entry should not be update to table.
-			if err := tx.revertExpiredTTLRecord(bucketId, record); err != nil {
-				return err
-			}
 		}
 
 		value, ttl, err := tx.loadValue(record, pendingEntry)
@@ -554,21 +528,16 @@ func (tx *Tx) update(bucket string, key []byte, getNewValue func([]byte) ([]byte
 		if err != nil {
 			return err
 		}
-		return tx.put(bucket, key, newValue, newTTL, DataSetFlag, uint64(time.Now().UnixMilli()), DataStructureBTree)
+		return tx.put(bucket, key, newValue, newTTL, DataSetFlag, uint64(tx.db.opt.Clock.NowMillis()), DataStructureBTree)
 	})
 }
 
 func (tx *Tx) updateOrPut(bucket string, key, value []byte, getUpdatedValue func([]byte) ([]byte, error)) error {
-	return tx.tryGet(bucket, key, func(record *data.Record, pendingEntry *Entry, found bool, bucketId BucketId) error {
+	return tx.tryGet(bucket, key, func(record *core.Record, pendingEntry *core.Entry, found bool, bucketId core.BucketId) error {
 		if !found {
-			return tx.put(bucket, key, value, Persistent, DataSetFlag, uint64(time.Now().Unix()), DataStructureBTree)
+			return tx.put(bucket, key, value, Persistent, DataSetFlag, uint64(tx.db.opt.Clock.NowMillis()), DataStructureBTree)
 		}
 
-		if record != nil {
-			if err := tx.revertExpiredTTLRecord(bucketId, record); err != nil {
-				return err
-			}
-		}
 		value, ttl, err := tx.loadValue(record, pendingEntry)
 		if err != nil {
 			return err
@@ -578,7 +547,7 @@ func (tx *Tx) updateOrPut(bucket string, key, value []byte, getUpdatedValue func
 			return err
 		}
 
-		return tx.put(bucket, key, newValue, ttl, DataSetFlag, uint64(time.Now().Unix()), DataStructureBTree)
+		return tx.put(bucket, key, newValue, ttl, DataSetFlag, uint64(tx.db.opt.Clock.NowMillis()), DataStructureBTree)
 	})
 }
 
@@ -683,32 +652,21 @@ func (tx *Tx) GetTTL(bucket string, key []byte) (int64, error) {
 	}
 	bucketId := b.Id
 
-	idx, bucketExists := tx.db.Index.bTree.exist(bucketId)
-
-	var (
-		record      *data.Record = nil
-		recordFound bool         = false
-	)
+	// Check pending writes first
 	if pendingTTL, err := tx.pendingWrites.GetTTL(DataStructureBTree, bucket, key); err == nil {
 		return pendingTTL, nil
 	}
-	if bucketExists {
-		record, recordFound = idx.Find(key)
-	}
-	if !recordFound || record.IsExpired() {
+
+	idx, bucketExists := tx.db.Index.BTree.exist(bucketId)
+	if !bucketExists {
 		return 0, ErrKeyNotFound
 	}
 
-	if record.TTL == Persistent {
-		return -1, nil
-	}
-
-	remTTL := expireTime(record.Timestamp, record.TTL)
-	if remTTL >= 0 {
-		return int64(remTTL.Seconds()), nil
-	} else {
+	ttl, err := idx.GetTTL(key)
+	if err != nil {
 		return 0, ErrKeyNotFound
 	}
+	return ttl, nil
 }
 
 // Persist updates record's TTL as Persistent if the record exists.
@@ -730,7 +688,7 @@ func (tx *Tx) MSet(bucket string, ttl uint32, args ...[]byte) error {
 	}
 
 	for i := 0; i < len(args); i += 2 {
-		if err := tx.put(bucket, args[i], args[i+1], ttl, DataSetFlag, uint64(time.Now().Unix()), DataStructureBTree); err != nil {
+		if err := tx.put(bucket, args[i], args[i+1], ttl, DataSetFlag, uint64(tx.db.opt.Clock.NowMillis()), DataStructureBTree); err != nil {
 			return err
 		}
 	}
@@ -790,8 +748,8 @@ func (tx *Tx) GetRange(bucket string, key []byte, start, end int) ([]byte, error
 // stored items, we need this function to load value and
 // TTL.
 func (tx *Tx) loadValue(
-	rec *data.Record,
-	pendingEntry *Entry,
+	rec *core.Record,
+	pendingEntry *core.Entry,
 ) (value []byte, ttl uint32, err error) {
 
 	if rec == nil && pendingEntry == nil {
@@ -801,16 +759,4 @@ func (tx *Tx) loadValue(
 		return pendingEntry.Value, pendingEntry.Meta.TTL, nil
 	}
 	return rec.Value, rec.TTL, nil
-}
-
-// revertExpiredTTLRecord revert record if it is expired.
-func (tx *Tx) revertExpiredTTLRecord(
-	bucketId BucketId,
-	rec *data.Record,
-) (err error) {
-	if rec.IsExpired() {
-		tx.putDeleteLog(bucketId, rec.Key, nil, Persistent, DataDeleteFlag, uint64(time.Now().Unix()), DataStructureBTree)
-		return ErrNotFoundKey
-	}
-	return nil
 }

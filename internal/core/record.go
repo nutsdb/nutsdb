@@ -12,14 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package data
-
-import (
-	"math/rand"
-	"time"
-
-	"github.com/nutsdb/nutsdb/internal/testutils"
-)
+package core
 
 const Persistent uint32 = 0
 
@@ -33,24 +26,6 @@ type Record struct {
 	Timestamp uint64
 	TTL       uint32
 	TxID      uint64
-}
-
-// IsExpired returns the record if expired or not.
-func (r *Record) IsExpired() bool {
-	return IsExpired(r.TTL, r.Timestamp)
-}
-
-// IsExpired checks the ttl if expired or not.
-func IsExpired(ttl uint32, timestamp uint64) bool {
-	if ttl == Persistent {
-		return false
-	}
-
-	now := time.UnixMilli(time.Now().UnixMilli())
-	expireTime := time.UnixMilli(int64(timestamp))
-	expireTime = expireTime.Add(time.Duration(ttl) * time.Second)
-
-	return expireTime.Before(now)
 }
 
 // NewRecord generate a record Obj
@@ -99,26 +74,4 @@ func (r *Record) WithTTL(ttl uint32) *Record {
 func (r *Record) WithTxID(txID uint64) *Record {
 	r.TxID = txID
 	return r
-}
-
-func GenerateRecords(count int) []*Record {
-	rand.Seed(time.Now().UnixNano())
-	records := make([]*Record, count)
-	for i := 0; i < count; i++ {
-		key := testutils.GetTestBytes(i)
-		val := testutils.GetRandomBytes(24)
-
-		record := &Record{
-			Key:       key,
-			Value:     val,
-			FileID:    int64(i),
-			DataPos:   uint64(rand.Uint32()),
-			ValueSize: uint32(len(val)),
-			Timestamp: uint64(time.Now().Unix()),
-			TTL:       uint32(rand.Intn(3600)),
-			TxID:      uint64(rand.Intn(1000)),
-		}
-		records[i] = record
-	}
-	return records
 }

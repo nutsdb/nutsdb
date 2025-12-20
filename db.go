@@ -30,8 +30,10 @@ import (
 
 	"github.com/bwmarrin/snowflake"
 	"github.com/gofrs/flock"
+	"github.com/nutsdb/nutsdb/internal/core"
 	"github.com/nutsdb/nutsdb/internal/data"
 	"github.com/nutsdb/nutsdb/internal/fileio"
+	"github.com/nutsdb/nutsdb/internal/ttl"
 	"github.com/nutsdb/nutsdb/internal/utils"
 	"github.com/xujiajun/utils/filesystem"
 	"github.com/xujiajun/utils/strconv2"
@@ -53,7 +55,7 @@ type (
 	// DB represents a collection of buckets that persist on disk.
 	DB struct {
 		opt                     Options // the database options
-		Index                   *index
+		Index                   *Index
 		ActiveFile              *DataFile
 		MaxFileID               int64
 		mu                      sync.RWMutex
@@ -67,12 +69,12 @@ type (
 		mergeEndCh              chan error
 		mergeWorkCloseCh        chan struct{}
 		writeCh                 chan *request
-		tm                      *ttlManager
+		ttlService              *ttl.Service
 		RecordCount             int64 // current valid record count, exclude deleted, repeated
-		bm                      *BucketManager
+		bucketManager           *BucketManager
 		hintKeyAndRAMIdxModeLru *utils.LRUCache // lru cache for HintKeyAndRAMIdxMode
-		sm                      *SnowflakeManager
-		wm                      *watchManager
+		snowflakeManager        *SnowflakeManager
+		watchManager            *watchManager
 	}
 )
 
@@ -103,16 +105,20 @@ func open(opt Options) (*DB, error) {
 		opt:                     opt,
 		KeyCount:                0,
 		closed:                  false,
-		Index:                   newIndexWithOptions(opt),
 		fm:                      NewFileManager(opt.RWMode, opt.MaxFdNumsInCache, opt.CleanFdsCacheThreshold, opt.SegmentSize),
 		mergeStartCh:            make(chan struct{}),
 		mergeEndCh:              make(chan error),
 		mergeWorkCloseCh:        make(chan struct{}),
 		writeCh:                 make(chan *request, KvWriteChCapacity),
-		tm:                      newTTLManager(opt.ExpiredDeleteType),
 		hintKeyAndRAMIdxModeLru: utils.NewLruCache(opt.HintKeyAndRAMIdxCacheSize),
-		sm:                      NewSnowflakeManager(opt.NodeNum),
+		snowflakeManager:        NewSnowflakeManager(opt.NodeNum),
 	}
+
+	// Initialize TTL service with unified management
+	db.ttlService = ttl.NewService(opt.Clock, opt.ExpiredDeleteType)
+	db.ttlService.SetExpiredCallback(db.handleExpiredKey)
+
+	db.Index = db.newIndex()
 
 	db.commitBuffer = createNewBufferWithSize(int(db.opt.CommitBufferSize))
 
@@ -132,7 +138,7 @@ func open(opt Options) (*DB, error) {
 	db.flock = fileLock
 
 	if bm, err := NewBucketManager(opt.Dir); err == nil {
-		db.bm = bm
+		db.bucketManager = bm
 	} else {
 		return nil, err
 	}
@@ -150,15 +156,15 @@ func open(opt Options) (*DB, error) {
 	}
 
 	if db.opt.EnableWatch {
-		db.wm = NewWatchManager()
-		go db.wm.startDistributor()
+		db.watchManager = NewWatchManager()
+		go db.watchManager.startDistributor()
 	} else {
-		db.wm = nil
+		db.watchManager = nil
 	}
 
 	go db.mergeWorker()
 	go db.doWrites()
-	go db.tm.run()
+	go db.ttlService.Run()
 
 	return db, nil
 }
@@ -257,10 +263,10 @@ func (db *DB) release() error {
 
 	db.commitBuffer = nil
 
-	db.tm.close()
+	db.ttlService.Close()
 
-	if db.wm != nil {
-		if err := db.wm.close(); err != nil {
+	if db.watchManager != nil {
+		if err := db.watchManager.close(); err != nil {
 			log.Printf("watch manager closed already")
 		}
 	}
@@ -272,7 +278,7 @@ func (db *DB) release() error {
 	return nil
 }
 
-func (db *DB) getValueByRecord(record *data.Record) ([]byte, error) {
+func (db *DB) getValueByRecord(record *core.Record) ([]byte, error) {
 	if record == nil {
 		return nil, ErrRecordIsNil
 	}
@@ -284,7 +290,7 @@ func (db *DB) getValueByRecord(record *data.Record) ([]byte, error) {
 	// firstly we find data in cache
 	if db.getHintKeyAndRAMIdxCacheSize() > 0 {
 		if value := db.hintKeyAndRAMIdxModeLru.Get(record); value != nil {
-			return value.(*Entry).Value, nil
+			return value.(*core.Entry).Value, nil
 		}
 	}
 
@@ -385,7 +391,7 @@ func (db *DB) getHintKeyAndRAMIdxCacheSize() int {
 
 // getSnowflakeNode returns a cached snowflake node, creating it once if needed.
 func (db *DB) getSnowflakeNode() *snowflake.Node {
-	return db.sm.GetNode()
+	return db.snowflakeManager.GetNode()
 }
 
 func (db *DB) doWrites() {
@@ -489,20 +495,20 @@ func (db *DB) parseDataFiles(dataFileIds []int64) (err error) {
 		off      int64
 		f        *fileRecovery
 		fID      int64
-		dataInTx dataInTx
+		dataInTx core.DataInTx
 	)
 
 	parseDataInTx := func() error {
-		for _, entry := range dataInTx.es {
+		for _, entry := range dataInTx.Es {
 			// if this bucket is not existed in bucket manager right now
 			// its because it already deleted in the feature WAL log.
 			// so we can just ignore here.
 			bucketId := entry.Meta.BucketId
-			if _, err := db.bm.GetBucketById(bucketId); errors.Is(err, ErrBucketNotExist) {
+			if _, err := db.bucketManager.GetBucketById(bucketId); errors.Is(err, ErrBucketNotExist) {
 				continue
 			}
 
-			record := db.createRecordByModeWithFidAndOff(entry.fid, uint64(entry.off), &entry.Entry)
+			record := db.createRecordByModeWithFidAndOff(entry.Fid, uint64(entry.Off), &entry.Entry)
 
 			if err = db.buildIdxes(record, &entry.Entry); err != nil {
 				return err
@@ -520,7 +526,7 @@ func (db *DB) parseDataFiles(dataFileIds []int64) (err error) {
 			if err != nil {
 				// whatever which logic branch it will choose, we will release the fd.
 				_ = f.release()
-				if errors.Is(err, io.EOF) || errors.Is(err, ErrIndexOutOfBound) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, ErrEntryZero) || errors.Is(err, ErrHeaderSizeOutOfBounds) {
+				if errors.Is(err, io.EOF) || errors.Is(err, ErrIndexOutOfBound) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, ErrEntryZero) || errors.Is(err, core.ErrHeaderSizeOutOfBounds) {
 					break
 				}
 				if off >= db.opt.SegmentSize {
@@ -534,17 +540,17 @@ func (db *DB) parseDataFiles(dataFileIds []int64) (err error) {
 				break
 			}
 
-			entryWhenRecovery := &EntryWhenRecovery{
+			entryWhenRecovery := &core.EntryWhenRecovery{
 				Entry: *entry,
-				fid:   fID,
-				off:   off,
+				Fid:   fID,
+				Off:   off,
 			}
-			if dataInTx.txId == 0 {
-				dataInTx.appendEntry(entryWhenRecovery)
-				dataInTx.txId = entry.Meta.TxID
-				dataInTx.startOff = off
-			} else if dataInTx.isSameTx(entryWhenRecovery) {
-				dataInTx.appendEntry(entryWhenRecovery)
+			if dataInTx.TxId == 0 {
+				dataInTx.AppendEntry(entryWhenRecovery)
+				dataInTx.TxId = entry.Meta.TxID
+				dataInTx.StartOff = off
+			} else if dataInTx.IsSameTx(entryWhenRecovery) {
+				dataInTx.AppendEntry(entryWhenRecovery)
 			}
 
 			if entry.Meta.Status == Committed {
@@ -552,13 +558,13 @@ func (db *DB) parseDataFiles(dataFileIds []int64) (err error) {
 				if err != nil {
 					return err
 				}
-				dataInTx.reset()
-				dataInTx.startOff = off
+				dataInTx.Reset()
+				dataInTx.StartOff = off
 			}
 
-			if !dataInTx.isSameTx(entryWhenRecovery) {
-				dataInTx.reset()
-				dataInTx.startOff = off
+			if !dataInTx.IsSameTx(entryWhenRecovery) {
+				dataInTx.Reset()
+				dataInTx.StartOff = off
 			}
 
 			off += entry.Size()
@@ -639,12 +645,12 @@ func (db *DB) loadHintFile(fid int64) (bool, error) {
 
 		// Check if bucket exists
 		bucketId := hintEntry.BucketId
-		if _, err := db.bm.GetBucketById(bucketId); errors.Is(err, ErrBucketNotExist) {
+		if _, err := db.bucketManager.GetBucketById(bucketId); errors.Is(err, ErrBucketNotExist) {
 			continue // Skip if bucket doesn't exist
 		}
 
 		// Create a record from hint entry
-		record := data.NewRecord()
+		record := core.NewRecord()
 		record.WithKey(hintEntry.Key).
 			WithFileId(hintEntry.FileID).
 			WithDataPos(hintEntry.DataPos).
@@ -654,11 +660,11 @@ func (db *DB) loadHintFile(fid int64) (bool, error) {
 			WithTxID(0) // TxID is not stored in hint file
 
 		// Create an entry from hint entry
-		entry := NewEntry()
+		entry := core.NewEntry()
 		entry.WithKey(hintEntry.Key)
 
 		// Create metadata
-		meta := NewMetaData()
+		meta := core.NewMetaData()
 		meta.WithBucketId(hintEntry.BucketId).
 			WithKeySize(hintEntry.KeySize).
 			WithValueSize(hintEntry.ValueSize).
@@ -709,12 +715,12 @@ func (db *DB) getRecordCount() (int64, error) {
 	var res int64
 
 	// Iterate through the BTree indices
-	for _, btree := range db.Index.bTree.idx {
+	for _, btree := range db.Index.BTree.Idx {
 		res += int64(btree.Count())
 	}
 
 	// Iterate through the List indices
-	for _, listItem := range db.Index.list.idx {
+	for _, listItem := range db.Index.List.Idx {
 		for key := range listItem.Items {
 			curLen, err := listItem.Size(key)
 			if err != nil {
@@ -725,14 +731,14 @@ func (db *DB) getRecordCount() (int64, error) {
 	}
 
 	// Iterate through the Set indices
-	for _, setItem := range db.Index.set.idx {
+	for _, setItem := range db.Index.Set.Idx {
 		for key := range setItem.M {
 			res += int64(setItem.SCard(key))
 		}
 	}
 
 	// Iterate through the SortedSet indices
-	for _, zsetItem := range db.Index.sortedSet.idx {
+	for _, zsetItem := range db.Index.SortedSet.Idx {
 		for key := range zsetItem.M {
 			curLen, err := zsetItem.ZCard(key)
 			if err != nil {
@@ -745,32 +751,32 @@ func (db *DB) getRecordCount() (int64, error) {
 	return res, nil
 }
 
-func (db *DB) buildBTreeIdx(record *data.Record, entry *Entry) error {
+func (db *DB) buildBTreeIdx(record *core.Record, entry *core.Entry) error {
 	key, meta := entry.Key, entry.Meta
 
-	bucket, err := db.bm.GetBucketById(meta.BucketId)
+	bucket, err := db.bucketManager.GetBucketById(meta.BucketId)
 	if err != nil {
 		return err
 	}
 	bucketId := bucket.Id
 
-	bTree := db.Index.bTree.getWithDefault(bucketId)
+	bTree := db.Index.BTree.GetWithDefault(bucketId)
 
-	if record.IsExpired() || meta.Flag == DataDeleteFlag {
-		db.tm.del(bucketId, string(key))
+	if db.ttlService.GetChecker().IsExpired(record.TTL, record.Timestamp) || meta.Flag == DataDeleteFlag {
+		db.ttlService.UnregisterTTL(bucketId, string(key))
 		bTree.Delete(key)
 	} else {
 		if meta.TTL != Persistent {
-			db.tm.add(bucketId, string(key), expireTime(meta.Timestamp, meta.TTL), db.buildExpireCallback(bucket.Name, key))
+			db.ttlService.RegisterTTL(bucketId, string(key), expireTime(meta.Timestamp, meta.TTL), DataStructureBTree, record.Timestamp)
 		} else {
-			db.tm.del(bucketId, string(key))
+			db.ttlService.UnregisterTTL(bucketId, string(key))
 		}
 		bTree.InsertRecord(record.Key, record)
 	}
 	return nil
 }
 
-func (db *DB) buildIdxes(record *data.Record, entry *Entry) error {
+func (db *DB) buildIdxes(record *core.Record, entry *core.Entry) error {
 	meta := entry.Meta
 	switch meta.Ds {
 	case DataStructureBTree:
@@ -794,20 +800,20 @@ func (db *DB) buildIdxes(record *data.Record, entry *Entry) error {
 }
 
 // buildSetIdx builds set index when opening the DB.
-func (db *DB) buildSetIdx(record *data.Record, entry *Entry) error {
+func (db *DB) buildSetIdx(record *core.Record, entry *core.Entry) error {
 	key, val, meta := entry.Key, entry.Value, entry.Meta
 
-	bucket, err := db.bm.GetBucketById(entry.Meta.BucketId)
+	bucket, err := db.bucketManager.GetBucketById(entry.Meta.BucketId)
 	if err != nil {
 		return err
 	}
 	bucketId := bucket.Id
 
-	s := db.Index.set.getWithDefault(bucketId)
+	s := db.Index.Set.GetWithDefault(bucketId)
 
 	switch meta.Flag {
 	case DataSetFlag:
-		if err := s.SAdd(string(key), [][]byte{val}, []*data.Record{record}); err != nil {
+		if err := s.SAdd(string(key), [][]byte{val}, []*core.Record{record}); err != nil {
 			return fmt.Errorf("when build SetIdx SAdd index err: %s", err)
 		}
 	case DataDeleteFlag:
@@ -820,16 +826,16 @@ func (db *DB) buildSetIdx(record *data.Record, entry *Entry) error {
 }
 
 // buildSortedSetIdx builds sorted set index when opening the DB.
-func (db *DB) buildSortedSetIdx(record *data.Record, entry *Entry) error {
+func (db *DB) buildSortedSetIdx(record *core.Record, entry *core.Entry) error {
 	key, val, meta := entry.Key, entry.Value, entry.Meta
 
-	bucket, err := db.bm.GetBucketById(entry.Meta.BucketId)
+	bucket, err := db.bucketManager.GetBucketById(entry.Meta.BucketId)
 	if err != nil {
 		return err
 	}
 	bucketId := bucket.Id
 
-	ss := db.Index.sortedSet.getWithDefault(bucketId, db)
+	ss := db.Index.SortedSet.GetWithDefault(bucketId)
 
 	switch meta.Flag {
 	case DataZAddFlag:
@@ -859,18 +865,18 @@ func (db *DB) buildSortedSetIdx(record *data.Record, entry *Entry) error {
 }
 
 // buildListIdx builds List index when opening the DB.
-func (db *DB) buildListIdx(record *data.Record, entry *Entry) error {
+func (db *DB) buildListIdx(record *core.Record, entry *core.Entry) error {
 	key, val, meta := entry.Key, entry.Value, entry.Meta
 
-	bucket, err := db.bm.GetBucketById(entry.Meta.BucketId)
+	bucket, err := db.bucketManager.GetBucketById(entry.Meta.BucketId)
 	if err != nil {
 		return err
 	}
 	bucketId := bucket.Id
 
-	l := db.Index.list.getWithDefault(bucketId)
+	l := db.Index.List.GetWithDefault(bucketId)
 
-	if data.IsExpired(meta.TTL, meta.Timestamp) {
+	if db.ttlService.GetChecker().IsExpired(meta.TTL, meta.Timestamp) {
 		return nil
 	}
 
@@ -909,7 +915,7 @@ func (db *DB) buildListIdx(record *data.Record, entry *Entry) error {
 func (db *DB) buildListLRemIdx(value []byte, l *data.List, key []byte) error {
 	count, newValue := splitIntStringStr(string(value), SeparatorForListKey)
 
-	return l.LRem(string(key), count, func(r *data.Record) (bool, error) {
+	return l.LRem(string(key), count, func(r *core.Record) (bool, error) {
 		v, err := db.getValueByRecord(r)
 		if err != nil {
 			return false, err
@@ -943,8 +949,8 @@ func (db *DB) buildIndexes() (err error) {
 	return db.parseDataFiles(dataFileIds)
 }
 
-func (db *DB) createRecordByModeWithFidAndOff(fid int64, off uint64, entry *Entry) *data.Record {
-	record := data.NewRecord()
+func (db *DB) createRecordByModeWithFidAndOff(fid int64, off uint64, entry *core.Entry) *core.Record {
+	record := core.NewRecord()
 
 	record.WithKey(entry.Key).
 		WithTimestamp(entry.Meta.Timestamp).
@@ -1004,7 +1010,7 @@ func (db *DB) sendToWriteCh(tx *Tx) (*request, error) {
 }
 
 func (db *DB) checkListExpired() {
-	db.Index.list.rangeIdx(func(l *data.List) {
+	db.Index.List.rangeIdx(func(l *data.List) {
 		for key := range l.TTL {
 			l.IsExpire(key)
 		}
@@ -1016,20 +1022,40 @@ func (db *DB) IsClose() bool {
 	return db.closed
 }
 
-func (db *DB) buildExpireCallback(bucket string, key []byte) func() {
-	return func() {
+// handleExpiredKey is the unified callback for handling expired keys.
+// It validates the timestamp to prevent race conditions where a key is:
+// 1. Set with short TTL (timestamp T1)
+// 2. Expires and triggers async deletion
+// 3. Re-inserted with new TTL (timestamp T2)
+// 4. Async deletion from step 2 executes and mistakenly deletes the new key
+// By comparing timestamps, we ensure only the originally expired key is deleted.
+func (db *DB) handleExpiredKey(bucketId uint64, key []byte, ds uint16, expiredTimestamp uint64) {
+	go func() {
 		_ = db.Update(func(tx *Tx) error {
-			b, err := tx.db.bm.GetBucket(DataStructureBTree, bucket)
+			bucket, err := db.bucketManager.GetBucketById(bucketId)
 			if err != nil {
 				return err
 			}
-			bucketId := b.Id
-			if db.tm.exist(bucketId, string(key)) {
-				return tx.Delete(bucket, key)
+
+			// Verify the key still exists and has the same timestamp
+			idx, ok := db.Index.BTree.exist(bucketId)
+			if !ok {
+				return nil
 			}
+
+			record, found := idx.Find(key)
+			if !found {
+				return nil
+			}
+
+			// Only delete if timestamp matches (same record that expired)
+			if record.Timestamp == expiredTimestamp {
+				return tx.Delete(bucket.Name, key)
+			}
+
 			return nil
 		})
-	}
+	}()
 }
 
 func (db *DB) rebuildBucketManager() error {
@@ -1053,13 +1079,13 @@ func (db *DB) rebuildBucketManager() error {
 		}
 		bucketRequest = append(bucketRequest, &bucketSubmitRequest{
 			ds:     bucket.Ds,
-			name:   BucketName(bucket.Name),
+			name:   core.BucketName(bucket.Name),
 			bucket: bucket,
 		})
 	}
 
 	if len(bucketRequest) > 0 {
-		err = db.bm.SubmitPendingBucketChange(bucketRequest)
+		err = db.bucketManager.SubmitPendingBucketChange(bucketRequest)
 		if err != nil {
 			return err
 		}
@@ -1086,11 +1112,11 @@ func (db *DB) Watch(bucket string, key []byte, cb func(message *Message) error, 
 		watchOpts = &opts[0]
 	}
 
-	if db.wm == nil {
+	if db.watchManager == nil {
 		return ErrWatchFeatureDisabled
 	}
 
-	subscriber, err := db.wm.subscribe(bucket, string(key))
+	subscriber, err := db.watchManager.subscribe(bucket, string(key))
 	if err != nil {
 		return err
 	}
@@ -1130,7 +1156,7 @@ func (db *DB) Watch(bucket string, key []byte, cb func(message *Message) error, 
 		ticker.Stop()
 
 		if subscriber != nil && subscriber.active.Load() {
-			if err := db.wm.unsubscribe(bucket, keyWatch, subscriber.id); err != nil {
+			if err := db.watchManager.unsubscribe(bucket, keyWatch, subscriber.id); err != nil {
 				// ignore the error
 			}
 		}
@@ -1138,7 +1164,7 @@ func (db *DB) Watch(bucket string, key []byte, cb func(message *Message) error, 
 
 	for {
 		select {
-		case <-db.wm.done():
+		case <-db.watchManager.done():
 			// drain the batch
 			if err := processBatch(batch); err != nil {
 				return err

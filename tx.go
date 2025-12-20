@@ -22,7 +22,7 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/nutsdb/nutsdb/internal/data"
+	"github.com/nutsdb/nutsdb/internal/core"
 	"github.com/nutsdb/nutsdb/internal/utils"
 	"github.com/xujiajun/utils/strconv2"
 )
@@ -53,7 +53,7 @@ type txnCb struct {
 	err    error
 }
 
-func (tx *Tx) submitEntry(ds uint16, bucket string, e *Entry) {
+func (tx *Tx) submitEntry(ds uint16, bucket string, e *core.Entry) {
 	tx.pendingWrites.submitEntry(ds, bucket, e)
 }
 
@@ -102,7 +102,7 @@ func newTx(db *DB, writable bool) (tx *Tx, err error) {
 		db:                db,
 		writable:          writable,
 		pendingWrites:     newPendingEntriesList(),
-		pendingBucketList: make(map[Ds]map[BucketName]*Bucket),
+		pendingBucketList: make(map[core.Ds]map[core.BucketName]*core.Bucket),
 	}
 
 	tx.id = tx.getTxID()
@@ -219,7 +219,7 @@ func (tx *Tx) Commit() (err error) {
 	buff := tx.allocCommitBuffer()
 	defer tx.db.commitBuffer.Reset()
 
-	var records []*data.Record
+	var records []*core.Record
 
 	pendingWriteList := tx.pendingWrites.toList()
 	lastIndex := len(pendingWriteList) - 1
@@ -281,7 +281,7 @@ func (tx *Tx) Commit() (err error) {
 	}
 
 	// send updated entries to watch manager
-	if tx.db.wm != nil {
+	if tx.db.watchManager != nil {
 		tx.sendUpdatedEntries(pendingWriteList, tx.getDeletedBuckets())
 	}
 
@@ -297,7 +297,7 @@ func (tx *Tx) getNewAddRecordCount() (int64, error) {
 	return res, err
 }
 
-func (tx *Tx) getListEntryNewAddRecordCount(bucketId BucketId, entry *Entry) (int64, error) {
+func (tx *Tx) getListEntryNewAddRecordCount(bucketId core.BucketId, entry *core.Entry) (int64, error) {
 	if entry.Meta.Flag == DataExpireListFlag {
 		return 0, nil
 	}
@@ -305,7 +305,7 @@ func (tx *Tx) getListEntryNewAddRecordCount(bucketId BucketId, entry *Entry) (in
 	var res int64
 	key := string(entry.Key)
 	value := string(entry.Value)
-	l := tx.db.Index.list.getWithDefault(bucketId)
+	l := tx.db.Index.List.GetWithDefault(bucketId)
 
 	switch entry.Meta.Flag {
 	case DataLPushFlag, DataRPushFlag:
@@ -317,7 +317,7 @@ func (tx *Tx) getListEntryNewAddRecordCount(bucketId BucketId, entry *Entry) (in
 		res -= int64(len(l.GetValidIndexes(key, indexes)))
 	case DataLRemFlag:
 		count, newValue := splitIntStringStr(value, SeparatorForListKey)
-		removeIndices, err := l.GetRemoveIndexes(key, count, func(r *data.Record) (bool, error) {
+		removeIndices, err := l.GetRemoveIndexes(key, count, func(r *core.Record) (bool, error) {
 			v, err := tx.db.getValueByRecord(r)
 			if err != nil {
 				return false, err
@@ -352,14 +352,14 @@ func (tx *Tx) getListEntryNewAddRecordCount(bucketId BucketId, entry *Entry) (in
 	return res, nil
 }
 
-func (tx *Tx) getKvEntryNewAddRecordCount(bucketId BucketId, entry *Entry) (int64, error) {
+func (tx *Tx) getKvEntryNewAddRecordCount(bucketId core.BucketId, entry *core.Entry) (int64, error) {
 	var res int64
 
 	switch entry.Meta.Flag {
 	case DataDeleteFlag:
 		res--
 	case DataSetFlag:
-		if idx, ok := tx.db.Index.bTree.exist(bucketId); ok {
+		if idx, ok := tx.db.Index.BTree.exist(bucketId); ok {
 			_, found := idx.Find(entry.Key)
 			if !found {
 				res++
@@ -372,7 +372,7 @@ func (tx *Tx) getKvEntryNewAddRecordCount(bucketId BucketId, entry *Entry) (int6
 	return res, nil
 }
 
-func (tx *Tx) getSetEntryNewAddRecordCount(_ BucketId, entry *Entry) (int64, error) {
+func (tx *Tx) getSetEntryNewAddRecordCount(_ core.BucketId, entry *core.Entry) (int64, error) {
 	var res int64
 
 	if entry.Meta.Flag == DataDeleteFlag {
@@ -386,7 +386,7 @@ func (tx *Tx) getSetEntryNewAddRecordCount(_ BucketId, entry *Entry) (int64, err
 	return res, nil
 }
 
-func (tx *Tx) getSortedSetEntryNewAddRecordCount(bucketId BucketId, entry *Entry) (int64, error) {
+func (tx *Tx) getSortedSetEntryNewAddRecordCount(bucketId core.BucketId, entry *core.Entry) (int64, error) {
 	var res int64
 	key := string(entry.Key)
 	value := string(entry.Value)
@@ -400,7 +400,7 @@ func (tx *Tx) getSortedSetEntryNewAddRecordCount(bucketId BucketId, entry *Entry
 		res--
 	case DataZRemRangeByRankFlag:
 		start, end := splitIntIntStr(value, SeparatorForZSetKey)
-		delNodes, err := tx.db.Index.sortedSet.getWithDefault(bucketId, tx.db).getZRemRangeByRankNodes(key, start, end)
+		delNodes, err := tx.db.Index.SortedSet.GetWithDefault(bucketId).getZRemRangeByRankNodes(key, start, end)
 		if err != nil {
 			return res, err
 		}
@@ -412,23 +412,23 @@ func (tx *Tx) getSortedSetEntryNewAddRecordCount(bucketId BucketId, entry *Entry
 	return res, nil
 }
 
-func (tx *Tx) keyExistsInSortedSet(bucketId BucketId, key, value string) bool {
-	if _, exist := tx.db.Index.sortedSet.exist(bucketId); !exist {
+func (tx *Tx) keyExistsInSortedSet(bucketId core.BucketId, key, value string) bool {
+	if _, exist := tx.db.Index.SortedSet.exist(bucketId); !exist {
 		return false
 	}
 	newKey := key
 	if strings.Contains(key, SeparatorForZSetKey) {
 		newKey, _ = splitStringFloat64Str(key, SeparatorForZSetKey)
 	}
-	exists, _ := tx.db.Index.sortedSet.idx[bucketId].ZExist(newKey, []byte(value))
+	exists, _ := tx.db.Index.SortedSet.Idx[bucketId].ZExist(newKey, []byte(value))
 	return exists
 }
 
-func (tx *Tx) getEntryNewAddRecordCount(entry *Entry) (int64, error) {
+func (tx *Tx) getEntryNewAddRecordCount(entry *core.Entry) (int64, error) {
 	var res int64
 	var err error
 
-	bucket, err := tx.db.bm.GetBucketById(entry.Meta.BucketId)
+	bucket, err := tx.db.bucketManager.GetBucketById(entry.Meta.BucketId)
 	if err != nil {
 		return 0, err
 	}
@@ -592,31 +592,18 @@ func (tx *Tx) put(bucket string, key, value []byte, ttl uint32, flag uint16, tim
 	}
 	bucketId := b.Id
 
-	meta := NewMetaData().WithTimeStamp(timestamp).WithKeySize(uint32(len(key))).WithValueSize(uint32(len(value))).WithFlag(flag).
+	meta := core.NewMetaData().WithTimeStamp(timestamp).WithKeySize(uint32(len(key))).WithValueSize(uint32(len(value))).WithFlag(flag).
 		WithTTL(ttl).WithStatus(UnCommitted).WithDs(ds).WithTxID(tx.id).WithBucketId(bucketId)
 
-	e := NewEntry().WithKey(key).WithMeta(meta).WithValue(value)
+	e := core.NewEntry().WithKey(key).WithMeta(meta).WithValue(value)
 
-	err = e.valid()
+	err = e.Valid()
 	if err != nil {
 		return err
 	}
 	tx.submitEntry(ds, bucket, e)
 	tx.size += e.Size()
 	return nil
-}
-
-func (tx *Tx) putDeleteLog(bucketId BucketId, key, value []byte, ttl uint32, flag uint16, timestamp uint64, ds uint16) {
-	bucket, err := tx.db.bm.GetBucketById(bucketId)
-	if err != nil {
-		return
-	}
-	meta := NewMetaData().WithTimeStamp(timestamp).WithKeySize(uint32(len(key))).WithValueSize(uint32(len(value))).WithFlag(flag).
-		WithTTL(ttl).WithStatus(UnCommitted).WithDs(ds).WithTxID(tx.id).WithBucketId(bucket.Id)
-
-	e := NewEntry().WithKey(key).WithMeta(meta).WithValue(value)
-	tx.submitEntry(ds, bucket.Name, e)
-	tx.size += e.Size()
 }
 
 // setStatusCommitting will change the tx status to txStatusCommitting
@@ -655,7 +642,7 @@ func (tx *Tx) isClosed() bool {
 	return status == txStatusClosed
 }
 
-func (tx *Tx) buildIdxes(records []*data.Record, entries []*Entry) error {
+func (tx *Tx) buildIdxes(records []*core.Record, entries []*core.Entry) error {
 	for i, entry := range entries {
 		meta := entry.Meta
 		var err error
@@ -679,9 +666,9 @@ func (tx *Tx) buildIdxes(records []*data.Record, entries []*Entry) error {
 	return nil
 }
 
-func (tx *Tx) putBucket(b *Bucket) error {
+func (tx *Tx) putBucket(b *core.Bucket) error {
 	if _, exist := tx.pendingBucketList[b.Ds]; !exist {
-		tx.pendingBucketList[b.Ds] = map[BucketName]*Bucket{}
+		tx.pendingBucketList[b.Ds] = map[core.BucketName]*core.Bucket{}
 	}
 	bucketInDs := tx.pendingBucketList[b.Ds]
 	bucketInDs[b.Name] = b
@@ -700,7 +687,7 @@ func (tx *Tx) SubmitBucket() error {
 			bucketReqs = append(bucketReqs, req)
 		}
 	}
-	return tx.db.bm.SubmitPendingBucketChange(bucketReqs)
+	return tx.db.bucketManager.SubmitPendingBucketChange(bucketReqs)
 }
 
 // buildBucketInIndex build indexes on creation and deletion of buckets
@@ -708,29 +695,29 @@ func (tx *Tx) buildBucketInIndex() error {
 	for _, mapper := range tx.pendingBucketList {
 		for _, bucket := range mapper {
 			switch bucket.Meta.Op {
-			case BucketInsertOperation:
+			case core.BucketInsertOperation:
 				switch bucket.Ds {
 				case DataStructureBTree:
-					tx.db.Index.bTree.getWithDefault(bucket.Id)
+					tx.db.Index.BTree.GetWithDefault(bucket.Id)
 				case DataStructureList:
-					tx.db.Index.list.getWithDefault(bucket.Id)
+					tx.db.Index.List.GetWithDefault(bucket.Id)
 				case DataStructureSet:
-					tx.db.Index.set.getWithDefault(bucket.Id)
+					tx.db.Index.Set.GetWithDefault(bucket.Id)
 				case DataStructureSortedSet:
-					tx.db.Index.sortedSet.getWithDefault(bucket.Id, tx.db)
+					tx.db.Index.SortedSet.GetWithDefault(bucket.Id)
 				default:
 					return ErrDataStructureNotSupported
 				}
-			case BucketDeleteOperation:
+			case core.BucketDeleteOperation:
 				switch bucket.Ds {
 				case DataStructureBTree:
-					tx.db.Index.bTree.delete(bucket.Id)
+					tx.db.Index.BTree.delete(bucket.Id)
 				case DataStructureList:
-					tx.db.Index.list.delete(bucket.Id)
+					tx.db.Index.List.delete(bucket.Id)
 				case DataStructureSet:
-					tx.db.Index.set.delete(bucket.Id)
+					tx.db.Index.Set.delete(bucket.Id)
 				case DataStructureSortedSet:
-					tx.db.Index.sortedSet.delete(bucket.Id)
+					tx.db.Index.SortedSet.delete(bucket.Id)
 				default:
 					return ErrDataStructureNotSupported
 				}
@@ -767,29 +754,29 @@ func (tx *Tx) getChangeCountInEntriesChanges() (int64, error) {
 
 func (tx *Tx) getChangeCountInBucketChanges() int64 {
 	var res int64
-	f := func(bucket *Bucket) error {
+	f := func(bucket *core.Bucket) error {
 		bucketId := bucket.Id
-		if bucket.Meta.Op == BucketDeleteOperation {
+		if bucket.Meta.Op == core.BucketDeleteOperation {
 			switch bucket.Ds {
 			case DataStructureBTree:
-				if bTree, ok := tx.db.Index.bTree.idx[bucketId]; ok {
+				if bTree, ok := tx.db.Index.BTree.Idx[bucketId]; ok {
 					res -= int64(bTree.Count())
 				}
 			case DataStructureSet:
-				if set, ok := tx.db.Index.set.idx[bucketId]; ok {
+				if set, ok := tx.db.Index.Set.Idx[bucketId]; ok {
 					for key := range set.M {
 						res -= int64(set.SCard(key))
 					}
 				}
 			case DataStructureSortedSet:
-				if sortedSet, ok := tx.db.Index.sortedSet.idx[bucketId]; ok {
+				if sortedSet, ok := tx.db.Index.SortedSet.Idx[bucketId]; ok {
 					for key := range sortedSet.M {
 						curLen, _ := sortedSet.ZCard(key)
 						res -= int64(curLen)
 					}
 				}
 			case DataStructureList:
-				if list, ok := tx.db.Index.list.idx[bucketId]; ok {
+				if list, ok := tx.db.Index.List.Idx[bucketId]; ok {
 					for key := range list.Items {
 						curLen, _ := list.Size(key)
 						res -= int64(curLen)
@@ -807,29 +794,29 @@ func (tx *Tx) getChangeCountInBucketChanges() int64 {
 
 // getBucketAndItsStatus, get bucket and it is status in pendingBucketList,
 // if bucket is already in bucket manager but not in pendingList, will return BucketStatusExistAlready.
-func (tx *Tx) getBucketAndItsStatus(ds Ds, name BucketName) (BucketStatus, *Bucket) {
+func (tx *Tx) getBucketAndItsStatus(ds core.Ds, name core.BucketName) (BucketStatus, *core.Bucket) {
 	if len(tx.pendingBucketList) > 0 {
 		if bucketInDs, exist := tx.pendingBucketList[ds]; exist {
 			if bucket, exist := bucketInDs[name]; exist {
 				switch bucket.Meta.Op {
-				case BucketInsertOperation:
+				case core.BucketInsertOperation:
 					return BucketStatusNew, bucket
-				case BucketDeleteOperation:
+				case core.BucketDeleteOperation:
 					return BucketStatusDeleted, bucket
-				case BucketUpdateOperation:
+				case core.BucketUpdateOperation:
 					return BucketStatusUpdated, bucket
 				}
 			}
 		}
 	}
-	if bucket, err := tx.db.bm.GetBucket(ds, name); err == nil {
+	if bucket, err := tx.db.bucketManager.GetBucket(ds, name); err == nil {
 		return BucketStatusExistAlready, bucket
 	}
 	return BucketStatusUnknown, nil
 }
 
 // findEntryStatus finds the latest status for the certain Entry in Tx
-func (tx *Tx) findEntryAndItsStatus(ds Ds, bucket BucketName, key string) (EntryStatus, *Entry) {
+func (tx *Tx) findEntryAndItsStatus(ds core.Ds, bucket core.BucketName, key string) (EntryStatus, *core.Entry) {
 	if tx.pendingWrites.size == 0 {
 		return NotFoundEntry, nil
 	}
@@ -861,9 +848,9 @@ func (tx *Tx) findEntryAndItsStatus(ds Ds, bucket BucketName, key string) (Entry
  *
  * @return: nil if success, error if any
  */
-func (tx *Tx) sendUpdatedEntries(pendingWriteList []*Entry, deletedBuckets map[BucketName]bool) {
-	err := tx.db.wm.sendUpdatedEntries(pendingWriteList, deletedBuckets, func(bucketId BucketId) (BucketName, error) {
-		bucket, err := tx.db.bm.GetBucketById(bucketId)
+func (tx *Tx) sendUpdatedEntries(pendingWriteList []*core.Entry, deletedBuckets map[core.BucketName]bool) {
+	err := tx.db.watchManager.sendUpdatedEntries(pendingWriteList, deletedBuckets, func(bucketId core.BucketId) (core.BucketName, error) {
+		bucket, err := tx.db.bucketManager.GetBucketById(bucketId)
 		if err != nil {
 			return "", err
 		}
@@ -882,16 +869,16 @@ func (tx *Tx) sendUpdatedEntries(pendingWriteList []*Entry, deletedBuckets map[B
 * @param pendingWriteList: the list of entries to be sent
 * @return: nil if success, error if any
  */
-func (tx *Tx) getDeletedBuckets() (deletedBuckets map[BucketName]bool) {
+func (tx *Tx) getDeletedBuckets() (deletedBuckets map[core.BucketName]bool) {
 	if len(tx.pendingBucketList) == 0 {
 		return nil
 	}
 
-	deletedBuckets = make(map[BucketName]bool)
+	deletedBuckets = make(map[core.BucketName]bool)
 	for _, mapper := range tx.pendingBucketList {
 		for name, bucket := range mapper {
-			isAllDsDeleted := len(tx.db.bm.BucketIDMarker[name]) == 0
-			if _, ok := deletedBuckets[name]; !ok && bucket.Meta.Op == BucketDeleteOperation && isAllDsDeleted {
+			isAllDsDeleted := len(tx.db.bucketManager.BucketIDMarker[name]) == 0
+			if _, ok := deletedBuckets[name]; !ok && bucket.Meta.Op == core.BucketDeleteOperation && isAllDsDeleted {
 				deletedBuckets[name] = true
 			}
 

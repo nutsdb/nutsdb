@@ -12,7 +12,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nutsdb/nutsdb/internal/core"
 	"github.com/nutsdb/nutsdb/internal/data"
+	"github.com/nutsdb/nutsdb/internal/ttl"
+	"github.com/nutsdb/nutsdb/internal/ttl/clock"
 	"github.com/nutsdb/nutsdb/internal/utils"
 )
 
@@ -459,8 +462,8 @@ func (r *recordingHintWriter) Sync() error {
 
 func (r *recordingHintWriter) Close() error { return nil }
 
-func createTestEntry(bucketID BucketId, key, value []byte, flag uint16, status uint16, ttl uint32, ts uint64, txID uint64, ds DataStructure) *Entry {
-	meta := NewMetaData().
+func createTestEntry(bucketID core.BucketId, key, value []byte, flag uint16, status uint16, ttl uint32, ts uint64, txID uint64, ds core.DataStructure) *core.Entry {
+	meta := core.NewMetaData().
 		WithBucketId(uint64(bucketID)).
 		WithKeySize(uint32(len(key))).
 		WithValueSize(uint32(len(value))).
@@ -471,7 +474,7 @@ func createTestEntry(bucketID BucketId, key, value []byte, flag uint16, status u
 		WithTxID(txID).
 		WithDs(uint16(ds))
 
-	entry := &Entry{
+	entry := &core.Entry{
 		Key:   append([]byte(nil), key...),
 		Value: append([]byte(nil), value...),
 		Meta:  meta,
@@ -650,15 +653,15 @@ func TestMergeV2CommitCollectorFailure(t *testing.T) {
 	opts.Dir = dir
 	opts.SegmentSize = 1 << 16
 
-	bucketID := BucketId(1)
+	bucketID := core.BucketId(1)
 	bucketName := "b"
 	key := []byte("set-key")
 	value := []byte("value")
 	timestamp := uint64(time.Now().Unix())
 	oldFileID := int64(5)
 
-	bt := data.NewBTree()
-	record := (&data.Record{}).
+	bt := data.NewBTree(0) // bucketId 0 for test
+	record := (&core.Record{}).
 		WithKey(key).
 		WithFileId(oldFileID).
 		WithDataPos(123).
@@ -667,15 +670,15 @@ func TestMergeV2CommitCollectorFailure(t *testing.T) {
 	bt.InsertRecord(key, record)
 
 	db := &DB{
-		opt:   opts,
-		Index: newIndex(),
-		bm: &BucketManager{
-			BucketInfoMapper: map[BucketId]*Bucket{
-				bucketID: {Meta: &BucketMeta{}, Id: bucketID, Name: bucketName, Ds: uint16(DataStructureBTree)},
+		opt: opts,
+		bucketManager: &BucketManager{
+			BucketInfoMapper: map[core.BucketId]*core.Bucket{
+				bucketID: {Meta: &core.BucketMeta{}, Id: bucketID, Name: bucketName, Ds: uint16(DataStructureBTree)},
 			},
 		},
 	}
-	db.Index.bTree.idx[bucketID] = bt
+	db.Index = db.newIndex()
+	db.Index.BTree.Idx[bucketID] = bt
 
 	collector := NewHintCollector(1, &failingHintWriter{writeErr: errors.New("writer failed")}, 1)
 	mock := &mockRWManager{}
@@ -843,7 +846,7 @@ func TestMergeV2MergeAndTxConcurrentWrites(t *testing.T) {
 	}
 
 	entrySignal := make(chan struct{}, 1)
-	job.onRewriteEntry = func(entry *Entry) {
+	job.onRewriteEntry = func(entry *core.Entry) {
 		if bytes.Equal(entry.Key, targetKey) {
 			select {
 			case entrySignal <- struct{}{}:
@@ -1016,7 +1019,7 @@ func TestMergeV2MergeAndTxConcurrentWritesWithSet(t *testing.T) {
 	}
 
 	entrySignal := make(chan struct{}, 1)
-	job.onRewriteEntry = func(entry *Entry) {
+	job.onRewriteEntry = func(entry *core.Entry) {
 		if bytes.Equal(entry.Key, targetKey) && entry.Meta.Ds == DataStructureSet {
 			select {
 			case entrySignal <- struct{}{}:
@@ -1308,18 +1311,21 @@ func TestMergeV2WriteEntryHashesSetAndSortedSet(t *testing.T) {
 }
 
 func TestMergeV2ApplyLookupUpdatesSecondaryIndexes(t *testing.T) {
+	clk := clock.NewRealClock()
 	db := &DB{
-		opt:   DefaultOptions,
-		Index: newIndex(),
-		bm: &BucketManager{
-			BucketInfoMapper: map[BucketId]*Bucket{},
+		opt:        DefaultOptions,
+		ttlService: ttl.NewService(clk, ttl.TimeWheel),
+		bucketManager: &BucketManager{
+			BucketInfoMapper: map[core.BucketId]*core.Bucket{},
 		},
 	}
 
+	db.Index = db.newIndex()
+
 	// Prepare buckets
 	buckets := []struct {
-		id   BucketId
-		ds   DataStructure
+		id   core.BucketId
+		ds   core.DataStructure
 		name string
 	}{
 		{1, DataStructureSet, "set"},
@@ -1328,30 +1334,30 @@ func TestMergeV2ApplyLookupUpdatesSecondaryIndexes(t *testing.T) {
 	}
 
 	for _, b := range buckets {
-		db.bm.BucketInfoMapper[b.id] = &Bucket{Meta: &BucketMeta{}, Id: b.id, Ds: uint16(b.ds), Name: b.name}
+		db.bucketManager.BucketInfoMapper[b.id] = &core.Bucket{Meta: &core.BucketMeta{}, Id: b.id, Ds: uint16(b.ds), Name: b.name}
 	}
 
 	// Set bucket
-	setRecord := &data.Record{Value: []byte("member"), FileID: 10, Timestamp: 1, TTL: Persistent}
-	setIdx := db.Index.set.getWithDefault(buckets[0].id)
-	if err := setIdx.SAdd("set-key", [][]byte{setRecord.Value}, []*data.Record{setRecord}); err != nil {
+	setRecord := &core.Record{Value: []byte("member"), FileID: 10, Timestamp: 1, TTL: Persistent}
+	setIdx := db.Index.Set.GetWithDefault(buckets[0].id)
+	if err := setIdx.SAdd("set-key", [][]byte{setRecord.Value}, []*core.Record{setRecord}); err != nil {
 		t.Fatalf("SAdd: %v", err)
 	}
 	setHash := fnv.New32a()
 	_, _ = setHash.Write(setRecord.Value)
 
 	// List bucket
-	listIdx := db.Index.list.getWithDefault(buckets[1].id)
+	listIdx := db.Index.List.GetWithDefault(buckets[1].id)
 	listKey := []byte("list-key")
 	seq := uint64(42)
-	listRecord := &data.Record{FileID: 11, Timestamp: 2, TTL: Persistent, TxID: 1}
-	listIdx.Items[string(listKey)] = data.NewBTree()
+	listRecord := &core.Record{FileID: 11, Timestamp: 2, TTL: Persistent, TxID: 1}
+	listIdx.Items[string(listKey)] = data.NewBTree(0) // bucketId 0 for test
 	listIdx.Items[string(listKey)].InsertRecord(utils.ConvertUint64ToBigEndianBytes(seq), listRecord)
 
 	// Sorted set bucket
-	sortedIdx := db.Index.sortedSet.getWithDefault(buckets[2].id, db)
+	sortedIdx := db.Index.SortedSet.GetWithDefault(buckets[2].id)
 	sortedValue := []byte("sorted-member")
-	sortedRecord := &data.Record{Value: sortedValue, FileID: 12, Timestamp: 3, TTL: Persistent}
+	sortedRecord := &core.Record{Value: sortedValue, FileID: 12, Timestamp: 3, TTL: Persistent}
 	if err := sortedIdx.ZAdd("zset-key", SCORE(1.5), sortedValue, sortedRecord); err != nil {
 		t.Fatalf("ZAdd: %v", err)
 	}
@@ -1961,10 +1967,10 @@ func TestMergeV2RewriteFileSkipsCorruptedEntries(t *testing.T) {
 		t.Fatalf("create data file: %v", err)
 	}
 
-	bucketID := BucketId(1)
+	bucketID := core.BucketId(1)
 	now := uint64(time.Now().Unix())
 
-	entries := []*Entry{
+	entries := []*core.Entry{
 		createTestEntry(bucketID, []byte("uncommitted"), []byte("v1"), DataSetFlag, UnCommitted, Persistent, now, 1, DataStructureBTree),
 		createTestEntry(bucketID, []byte("deleted"), []byte("v2"), DataDeleteFlag, Committed, Persistent, now, 2, DataStructureBTree),
 		createTestEntry(bucketID, []byte("expired"), []byte("v3"), DataSetFlag, Committed, 1, uint64(time.Now().Add(-2*time.Second).Unix()), 3, DataStructureBTree),
@@ -1986,8 +1992,8 @@ func TestMergeV2RewriteFileSkipsCorruptedEntries(t *testing.T) {
 		t.Fatalf("close test data file: %v", err)
 	}
 
-	bt := data.NewBTree()
-	bt.InsertRecord(goodEntry.Key, (&data.Record{}).
+	bt := data.NewBTree(0) // bucketId 0 for test
+	bt.InsertRecord(goodEntry.Key, (&core.Record{}).
 		WithFileId(fid).
 		WithDataPos(0).
 		WithTimestamp(goodEntry.Meta.Timestamp).
@@ -1995,20 +2001,22 @@ func TestMergeV2RewriteFileSkipsCorruptedEntries(t *testing.T) {
 		WithTxID(goodEntry.Meta.TxID).
 		WithKey(goodEntry.Key))
 
+	clk := clock.NewRealClock()
 	db := &DB{
 		opt: Options{
 			Dir:                  dir,
 			BufferSizeOfRecovery: 4096,
 			SegmentSize:          1 << 16,
 		},
-		Index: newIndex(),
-		bm: &BucketManager{
-			BucketInfoMapper: map[BucketId]*Bucket{
-				bucketID: {Meta: &BucketMeta{}, Id: bucketID, Ds: uint16(DataStructureBTree)},
+		ttlService: ttl.NewService(clk, ttl.TimeWheel),
+		bucketManager: &BucketManager{
+			BucketInfoMapper: map[core.BucketId]*core.Bucket{
+				bucketID: {Meta: &core.BucketMeta{}, Id: bucketID, Ds: uint16(DataStructureBTree)},
 			},
 		},
 	}
-	db.Index.bTree.idx[bucketID] = bt
+	db.Index = db.newIndex()
+	db.Index.BTree.Idx[bucketID] = bt
 
 	mock := &mockRWManager{}
 	job := &mergeV2Job{

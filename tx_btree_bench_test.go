@@ -21,6 +21,7 @@ import (
 	"runtime"
 	"testing"
 	"time"
+
 )
 
 // Benchmark suite for tx_btree.go functions
@@ -30,7 +31,7 @@ func setupBenchmarkDB(b *testing.B, dir string) *DB {
 	opts := DefaultOptions
 	opts.Dir = dir
 	opts.SegmentSize = 128 * 1024 * 1024 // 128MB
-	opts.SyncEnable = false             // Disable sync for better performance
+	opts.SyncEnable = false              // Disable sync for better performance
 
 	// Clean up directory
 	os.RemoveAll(dir)

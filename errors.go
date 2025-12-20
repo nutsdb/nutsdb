@@ -2,8 +2,6 @@ package nutsdb
 
 import (
 	"errors"
-
-	"github.com/nutsdb/nutsdb/internal/fileio"
 )
 
 // IsDBClosed is true if the error indicates the db was closed.
@@ -40,7 +38,3 @@ func IsPrefixScan(err error) bool {
 func IsPrefixSearchScan(err error) bool {
 	return errors.Is(err, ErrPrefixSearchScan)
 }
-
-var (
-	ErrIndexOutOfBound = fileio.ErrIndexOutOfBound
-)

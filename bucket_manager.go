@@ -3,33 +3,27 @@ package nutsdb
 import (
 	"errors"
 	"os"
+
+	"github.com/nutsdb/nutsdb/internal/core"
 )
 
 var ErrBucketNotExist = errors.New("bucket not found")
 
 const BucketStoreFileName = "bucket.Meta"
 
-type Ds = uint16
-type BucketId = uint64
-type BucketName = string
-type IDMarkerInBucket map[BucketName]map[Ds]BucketId
-type InfoMapperInBucket map[BucketId]*Bucket
-
 type BucketManager struct {
 	fd *os.File
 	// BucketInfoMapper BucketID => Bucket itself
-	BucketInfoMapper InfoMapperInBucket
-
-	BucketIDMarker IDMarkerInBucket
-
+	BucketInfoMapper core.InfoMapperInBucket
+	BucketIDMarker   core.IDMarkerInBucket
 	// IDGenerator helps generates an ID for every single bucket
 	Gen *IDGenerator
 }
 
 func NewBucketManager(dir string) (*BucketManager, error) {
 	bm := &BucketManager{
-		BucketInfoMapper: map[BucketId]*Bucket{},
-		BucketIDMarker:   map[BucketName]map[Ds]BucketId{},
+		BucketInfoMapper: make(core.InfoMapperInBucket),
+		BucketIDMarker:   make(core.IDMarkerInBucket),
 	}
 	bucketFilePath := dir + "/" + BucketStoreFileName
 	_, err := os.Stat(bucketFilePath)
@@ -47,9 +41,9 @@ func NewBucketManager(dir string) (*BucketManager, error) {
 }
 
 type bucketSubmitRequest struct {
-	ds     Ds
-	name   BucketName
-	bucket *Bucket
+	ds     core.Ds
+	name   core.BucketName
+	bucket *core.Bucket
 }
 
 func (bm *BucketManager) SubmitPendingBucketChange(reqs []*bucketSubmitRequest) error {
@@ -59,15 +53,15 @@ func (bm *BucketManager) SubmitPendingBucketChange(reqs []*bucketSubmitRequest) 
 		bytes = append(bytes, bs...)
 		// update the marker info
 		if _, exist := bm.BucketIDMarker[req.name]; !exist {
-			bm.BucketIDMarker[req.name] = map[Ds]BucketId{}
+			bm.BucketIDMarker[req.name] = map[core.Ds]core.BucketId{}
 		}
 		// recover maxid otherwise new bucket start from 1 again
 		bm.Gen.CompareAndSetMaxId(req.bucket.Id)
 		switch req.bucket.Meta.Op {
-		case BucketInsertOperation:
+		case core.BucketInsertOperation:
 			bm.BucketInfoMapper[req.bucket.Id] = req.bucket
 			bm.BucketIDMarker[req.name][req.bucket.Ds] = req.bucket.Id
-		case BucketDeleteOperation:
+		case core.BucketDeleteOperation:
 			if len(bm.BucketIDMarker[req.name]) == 1 {
 				delete(bm.BucketIDMarker, req.name)
 			} else {
@@ -95,7 +89,7 @@ func (g *IDGenerator) CompareAndSetMaxId(id uint64) {
 	}
 }
 
-func (bm *BucketManager) ExistBucket(ds Ds, name BucketName) bool {
+func (bm *BucketManager) ExistBucket(ds core.Ds, name core.BucketName) bool {
 	bucket, err := bm.GetBucket(ds, name)
 	if bucket != nil && err == nil {
 		return true
@@ -103,7 +97,7 @@ func (bm *BucketManager) ExistBucket(ds Ds, name BucketName) bool {
 	return false
 }
 
-func (bm *BucketManager) GetBucket(ds Ds, name BucketName) (b *Bucket, err error) {
+func (bm *BucketManager) GetBucket(ds core.Ds, name core.BucketName) (b *core.Bucket, err error) {
 	ds2IdMapper := bm.BucketIDMarker[name]
 	if ds2IdMapper == nil {
 		return nil, ErrBucketNotExist
@@ -120,7 +114,7 @@ func (bm *BucketManager) GetBucket(ds Ds, name BucketName) (b *Bucket, err error
 	}
 }
 
-func (bm *BucketManager) GetBucketById(id BucketId) (*Bucket, error) {
+func (bm *BucketManager) GetBucketById(id core.BucketId) (*core.Bucket, error) {
 	if bucket, exist := bm.BucketInfoMapper[id]; exist {
 		return bucket, nil
 	} else {
@@ -128,7 +122,7 @@ func (bm *BucketManager) GetBucketById(id BucketId) (*Bucket, error) {
 	}
 }
 
-func (bm *BucketManager) GetBucketID(ds Ds, name BucketName) (BucketId, error) {
+func (bm *BucketManager) GetBucketID(ds core.Ds, name core.BucketName) (core.BucketId, error) {
 	if bucket, err := bm.GetBucket(ds, name); err != nil {
 		return 0, err
 	} else {

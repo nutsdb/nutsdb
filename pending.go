@@ -3,6 +3,8 @@ package nutsdb
 import (
 	"bytes"
 	"sort"
+
+	"github.com/nutsdb/nutsdb/internal/core"
 )
 
 // EntryStatus represents the Entry status in the current Tx
@@ -34,34 +36,34 @@ const (
 )
 
 // pendingBucketList the uncommitted bucket changes in this Tx
-type pendingBucketList map[Ds]map[BucketName]*Bucket
+type pendingBucketList map[core.Ds]map[core.BucketName]*core.Bucket
 
 // pendingEntriesInBTree means the changes Entries in DataStructureBTree in the Tx
-type pendingEntriesInBTree map[BucketName]map[string]*Entry
+type pendingEntriesInBTree map[core.BucketName]map[string]*core.Entry
 
 // pendingEntryList the uncommitted Entry changes in this Tx
 type pendingEntryList struct {
 	entriesInBTree pendingEntriesInBTree
-	entries        map[Ds]map[BucketName][]*Entry
+	entries        map[core.Ds]map[core.BucketName][]*core.Entry
 	size           int
 }
 
 // newPendingEntriesList create a new pendingEntryList object for a Tx
 func newPendingEntriesList() *pendingEntryList {
 	pending := &pendingEntryList{
-		entriesInBTree: map[BucketName]map[string]*Entry{},
-		entries:        map[Ds]map[BucketName][]*Entry{},
+		entriesInBTree: map[core.BucketName]map[string]*core.Entry{},
+		entries:        map[core.Ds]map[core.BucketName][]*core.Entry{},
 		size:           0,
 	}
 	return pending
 }
 
 // submitEntry submit an entry into pendingEntryList
-func (pending *pendingEntryList) submitEntry(ds Ds, bucket string, e *Entry) {
+func (pending *pendingEntryList) submitEntry(ds core.Ds, bucket string, e *core.Entry) {
 	switch ds {
 	case DataStructureBTree:
 		if _, exist := pending.entriesInBTree[bucket]; !exist {
-			pending.entriesInBTree[bucket] = map[string]*Entry{}
+			pending.entriesInBTree[bucket] = map[string]*core.Entry{}
 		}
 		if _, exist := pending.entriesInBTree[bucket][string(e.Key)]; !exist {
 			pending.size++
@@ -69,7 +71,7 @@ func (pending *pendingEntryList) submitEntry(ds Ds, bucket string, e *Entry) {
 		pending.entriesInBTree[bucket][string(e.Key)] = e
 	default:
 		if _, exist := pending.entries[ds]; !exist {
-			pending.entries[ds] = map[BucketName][]*Entry{}
+			pending.entries[ds] = map[core.BucketName][]*core.Entry{}
 		}
 		entries := pending.entries[ds][bucket]
 		entries = append(entries, e)
@@ -78,7 +80,7 @@ func (pending *pendingEntryList) submitEntry(ds Ds, bucket string, e *Entry) {
 	}
 }
 
-func (pending *pendingEntryList) Get(ds Ds, bucket string, key []byte) (entry *Entry, err error) {
+func (pending *pendingEntryList) Get(ds core.Ds, bucket string, key []byte) (entry *core.Entry, err error) {
 	switch ds {
 	case DataStructureBTree:
 		if _, exist := pending.entriesInBTree[bucket]; exist {
@@ -106,7 +108,7 @@ func (pending *pendingEntryList) Get(ds Ds, bucket string, key []byte) (entry *E
 	}
 }
 
-func (pending *pendingEntryList) GetTTL(ds Ds, bucket string, key []byte) (ttl int64, err error) {
+func (pending *pendingEntryList) GetTTL(ds core.Ds, bucket string, key []byte) (ttl int64, err error) {
 	rec, err := pending.Get(ds, bucket, key)
 	if err != nil {
 		return 0, err
@@ -118,7 +120,7 @@ func (pending *pendingEntryList) GetTTL(ds Ds, bucket string, key []byte) (ttl i
 }
 
 func (pending *pendingEntryList) getDataByRange(
-	start, end []byte, bucketName BucketName,
+	start, end []byte, bucketName core.BucketName,
 ) (keys, values [][]byte) {
 
 	mp, ok := pending.entriesInBTree[bucketName]
@@ -141,7 +143,7 @@ func (pending *pendingEntryList) getDataByRange(
 }
 
 // rangeBucket input a range handler function f and call it with every bucket in pendingBucketList
-func (p pendingBucketList) rangeBucket(f func(bucket *Bucket) error) error {
+func (p pendingBucketList) rangeBucket(f func(bucket *core.Bucket) error) error {
 	for _, bucketsInDs := range p {
 		for _, bucket := range bucketsInDs {
 			err := f(bucket)
@@ -154,8 +156,8 @@ func (p pendingBucketList) rangeBucket(f func(bucket *Bucket) error) error {
 }
 
 // toList collect all the entries in pendingEntryList to a list.
-func (pending *pendingEntryList) toList() []*Entry {
-	list := make([]*Entry, 0, pending.size)
+func (pending *pendingEntryList) toList() []*core.Entry {
+	list := make([]*core.Entry, 0, pending.size)
 	for _, entriesInBucket := range pending.entriesInBTree {
 		for _, entry := range entriesInBucket {
 			list = append(list, entry)
@@ -169,7 +171,7 @@ func (pending *pendingEntryList) toList() []*Entry {
 	return list
 }
 
-func (pending *pendingEntryList) rangeEntries(_ Ds, bucketName BucketName, rangeFunc func(entry *Entry) bool) {
+func (pending *pendingEntryList) rangeEntries(_ core.Ds, bucketName core.BucketName, rangeFunc func(entry *core.Entry) bool) {
 	pendingWriteEntries := pending.entriesInBTree
 	if pendingWriteEntries == nil {
 		return
@@ -193,7 +195,7 @@ func (pending *pendingEntryList) MaxOrMinKey(bucketName string, isMax bool) (key
 	pending.rangeEntries(
 		DataStructureBTree,
 		bucketName,
-		func(entry *Entry) bool {
+		func(entry *core.Entry) bool {
 			maxKey = compareAndReturn(maxKey, entry.Key, 1)
 			minKey = compareAndReturn(minKey, entry.Key, -1)
 			pendingFound = true

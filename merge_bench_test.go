@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
 )
 
 func BenchmarkMergeVariants(b *testing.B) {

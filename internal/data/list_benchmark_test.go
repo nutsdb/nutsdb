@@ -19,6 +19,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/nutsdb/nutsdb/internal/core"
 	"github.com/nutsdb/nutsdb/internal/data"
 	"github.com/nutsdb/nutsdb/internal/testutils"
 	"github.com/nutsdb/nutsdb/internal/utils"
@@ -37,7 +38,7 @@ func benchmarkListPush(b *testing.B, impl data.ListImplementationType, isLeft bo
 	testData := make([]struct {
 		seq    uint64
 		newKey []byte
-		record *data.Record
+		record *core.Record
 	}, b.N)
 
 	for i := 0; i < b.N; i++ {
@@ -45,7 +46,7 @@ func benchmarkListPush(b *testing.B, impl data.ListImplementationType, isLeft bo
 		newKey := utils.EncodeListKey(key, seq)
 		testData[i].seq = seq
 		testData[i].newKey = newKey
-		testData[i].record = &data.Record{Key: newKey, Value: testutils.GetTestBytes(i)}
+		testData[i].record = &core.Record{Key: newKey, Value: testutils.GetTestBytes(i)}
 	}
 
 	b.ResetTimer()
@@ -83,14 +84,14 @@ func benchmarkListPop(b *testing.B, impl data.ListImplementationType, isLeft boo
 	// Pre-generate test data
 	testData := make([]struct {
 		newKey []byte
-		record *data.Record
+		record *core.Record
 	}, b.N)
 
 	for i := 0; i < b.N; i++ {
 		seq := seqInfo.GenerateSeq(false)
 		newKey := utils.EncodeListKey(key, seq)
 		testData[i].newKey = newKey
-		testData[i].record = &data.Record{Key: newKey, Value: testutils.GetTestBytes(i)}
+		testData[i].record = &core.Record{Key: newKey, Value: testutils.GetTestBytes(i)}
 	}
 
 	// Pre-populate with pre-generated data
@@ -140,14 +141,14 @@ func benchmarkListRange(b *testing.B, impl data.ListImplementationType, size int
 	// Pre-generate test data
 	testData := make([]struct {
 		newKey []byte
-		record *data.Record
+		record *core.Record
 	}, size)
 
 	for i := 0; i < size; i++ {
 		seq := seqInfo.GenerateSeq(false)
 		newKey := utils.EncodeListKey(key, seq)
 		testData[i].newKey = newKey
-		testData[i].record = &data.Record{Key: newKey, Value: testutils.GetTestBytes(i)}
+		testData[i].record = &core.Record{Key: newKey, Value: testutils.GetTestBytes(i)}
 	}
 
 	// Pre-populate with pre-generated data
@@ -191,14 +192,14 @@ func benchmarkListPeek(b *testing.B, impl data.ListImplementationType, isLeft bo
 	// Pre-generate test data
 	testData := make([]struct {
 		newKey []byte
-		record *data.Record
+		record *core.Record
 	}, b.N)
 
 	for i := 0; i < b.N; i++ {
 		seq := seqInfo.GenerateSeq(false)
 		newKey := utils.EncodeListKey(key, seq)
 		testData[i].newKey = newKey
-		testData[i].record = &data.Record{Key: newKey, Value: testutils.GetTestBytes(i)}
+		testData[i].record = &core.Record{Key: newKey, Value: testutils.GetTestBytes(i)}
 	}
 
 	// Pre-populate with pre-generated data
@@ -248,14 +249,14 @@ func benchmarkListTrim(b *testing.B, impl data.ListImplementationType, size int,
 	// Pre-generate test data
 	testData := make([]struct {
 		newKey []byte
-		record *data.Record
+		record *core.Record
 	}, size)
 
 	for i := 0; i < size; i++ {
 		seq := seqInfo.GenerateSeq(false)
 		newKey := utils.EncodeListKey(key, seq)
 		testData[i].newKey = newKey
-		testData[i].record = &data.Record{Key: newKey, Value: testutils.GetTestBytes(i)}
+		testData[i].record = &core.Record{Key: newKey, Value: testutils.GetTestBytes(i)}
 	}
 
 	// Pre-populate with pre-generated data
@@ -313,14 +314,14 @@ func benchmarkListRem(b *testing.B, impl data.ListImplementationType, size int, 
 	// Pre-generate test data
 	testData := make([]struct {
 		newKey []byte
-		record *data.Record
+		record *core.Record
 	}, size)
 
 	for i := 0; i < size; i++ {
 		seq := seqInfo.GenerateSeq(false)
 		newKey := utils.EncodeListKey(key, seq)
 		testData[i].newKey = newKey
-		testData[i].record = &data.Record{Key: newKey, Value: testutils.GetTestBytes(i)}
+		testData[i].record = &core.Record{Key: newKey, Value: testutils.GetTestBytes(i)}
 	}
 
 	// Pre-populate with pre-generated data
@@ -332,7 +333,7 @@ func benchmarkListRem(b *testing.B, impl data.ListImplementationType, size int, 
 
 	// Create a comparison function that matches every nth element
 	targetIndex := size / 4 // Remove elements at 1/4 position
-	cmpFunc := func(r *data.Record) (bool, error) {
+	cmpFunc := func(r *core.Record) (bool, error) {
 		// Simple comparison based on value pattern
 		return bytes.Contains(r.Value, []byte(strconv.Itoa(targetIndex))), nil
 	}
@@ -386,14 +387,14 @@ func benchmarkListRemByIndex(b *testing.B, impl data.ListImplementationType, siz
 	// Pre-generate test data
 	testData := make([]struct {
 		newKey []byte
-		record *data.Record
+		record *core.Record
 	}, size)
 
 	for i := 0; i < size; i++ {
 		seq := seqInfo.GenerateSeq(false)
 		newKey := utils.EncodeListKey(key, seq)
 		testData[i].newKey = newKey
-		testData[i].record = &data.Record{Key: newKey, Value: testutils.GetTestBytes(i)}
+		testData[i].record = &core.Record{Key: newKey, Value: testutils.GetTestBytes(i)}
 	}
 
 	// Pre-populate with pre-generated data
@@ -459,14 +460,14 @@ func benchmarkListSize(b *testing.B, impl data.ListImplementationType, size int)
 	// Pre-generate test data
 	testData := make([]struct {
 		newKey []byte
-		record *data.Record
+		record *core.Record
 	}, size)
 
 	for i := 0; i < size; i++ {
 		seq := seqInfo.GenerateSeq(false)
 		newKey := utils.EncodeListKey(key, seq)
 		testData[i].newKey = newKey
-		testData[i].record = &data.Record{Key: newKey, Value: testutils.GetTestBytes(i)}
+		testData[i].record = &core.Record{Key: newKey, Value: testutils.GetTestBytes(i)}
 	}
 
 	// Pre-populate with pre-generated data

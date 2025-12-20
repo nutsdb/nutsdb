@@ -24,6 +24,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/nutsdb/nutsdb/internal/core"
 	"github.com/nutsdb/nutsdb/internal/utils"
 	"github.com/xujiajun/utils/strconv2"
 )
@@ -65,7 +66,7 @@ type HintEntry struct {
 	Key       []byte
 }
 
-func newHintEntryFromEntry(entry *Entry, fileID int64, offset uint64) *HintEntry {
+func newHintEntryFromEntry(entry *core.Entry, fileID int64, offset uint64) *HintEntry {
 	meta := entry.Meta
 	return &HintEntry{
 		BucketId:  meta.BucketId,

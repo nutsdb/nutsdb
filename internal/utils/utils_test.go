@@ -3,34 +3,9 @@ package utils_test
 import (
 	"testing"
 
-	"github.com/nutsdb/nutsdb"
 	"github.com/nutsdb/nutsdb/internal/utils"
 	"github.com/stretchr/testify/assert"
 )
-
-func TestGetDiskSizeFromSingleObject(t *testing.T) {
-	type args struct {
-		obj any
-	}
-	tests := []struct {
-		name string
-		args args
-		want int64
-	}{
-		{
-			name: "happy path for getting entry header size",
-			args: args{
-				obj: nutsdb.MetaData{},
-			},
-			want: 50,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equalf(t, tt.want, utils.GetDiskSizeFromSingleObject(tt.args.obj), "GetDiskSizeFromSingleObject(%v)", tt.args.obj)
-		})
-	}
-}
 
 func TestMarshalInts(t *testing.T) {
 	assertions := assert.New(t)

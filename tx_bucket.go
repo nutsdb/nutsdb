@@ -14,7 +14,10 @@
 
 package nutsdb
 
-import "github.com/nutsdb/nutsdb/internal/utils"
+import (
+	"github.com/nutsdb/nutsdb/internal/core"
+	"github.com/nutsdb/nutsdb/internal/utils"
+)
 
 // IterateBuckets iterate over all the bucket depends on ds (represents the data structure)
 func (tx *Tx) IterateBuckets(ds uint16, pattern string, f func(bucket string) bool) error {
@@ -23,8 +26,8 @@ func (tx *Tx) IterateBuckets(ds uint16, pattern string, f func(bucket string) bo
 	}
 
 	if ds == DataStructureSet {
-		for bucketId := range tx.db.Index.set.idx {
-			bucket, err := tx.db.bm.GetBucketById(uint64(bucketId))
+		for bucketId := range tx.db.Index.Set.Idx {
+			bucket, err := tx.db.bucketManager.GetBucketById(uint64(bucketId))
 			if err != nil {
 				return err
 			}
@@ -34,8 +37,8 @@ func (tx *Tx) IterateBuckets(ds uint16, pattern string, f func(bucket string) bo
 		}
 	}
 	if ds == DataStructureSortedSet {
-		for bucketId := range tx.db.Index.sortedSet.idx {
-			bucket, err := tx.db.bm.GetBucketById(uint64(bucketId))
+		for bucketId := range tx.db.Index.SortedSet.Idx {
+			bucket, err := tx.db.bucketManager.GetBucketById(uint64(bucketId))
 			if err != nil {
 				return err
 			}
@@ -45,8 +48,8 @@ func (tx *Tx) IterateBuckets(ds uint16, pattern string, f func(bucket string) bo
 		}
 	}
 	if ds == DataStructureList {
-		for bucketId := range tx.db.Index.list.idx {
-			bucket, err := tx.db.bm.GetBucketById(uint64(bucketId))
+		for bucketId := range tx.db.Index.List.Idx {
+			bucket, err := tx.db.bucketManager.GetBucketById(uint64(bucketId))
 			if err != nil {
 				return err
 			}
@@ -56,8 +59,8 @@ func (tx *Tx) IterateBuckets(ds uint16, pattern string, f func(bucket string) bo
 		}
 	}
 	if ds == DataStructureBTree {
-		for bucketId := range tx.db.Index.bTree.idx {
-			bucket, err := tx.db.bm.GetBucketById(uint64(bucketId))
+		for bucketId := range tx.db.Index.BTree.Idx {
+			bucket, err := tx.db.bucketManager.GetBucketById(uint64(bucketId))
 			if err != nil {
 				return err
 			}
@@ -89,16 +92,16 @@ func (tx *Tx) NewBucket(ds uint16, name string) (err error) {
 	if tx.ExistBucket(ds, name) {
 		return ErrBucketAlreadyExist
 	}
-	bucket := &Bucket{
-		Meta: &BucketMeta{
-			Op: BucketInsertOperation,
+	bucket := &core.Bucket{
+		Meta: &core.BucketMeta{
+			Op: core.BucketInsertOperation,
 		},
-		Id:   tx.db.bm.Gen.GenId(),
+		Id:   tx.db.bucketManager.Gen.GenId(),
 		Ds:   ds,
 		Name: name,
 	}
 	if _, exist := tx.pendingBucketList[ds]; !exist {
-		tx.pendingBucketList[ds] = map[BucketName]*Bucket{}
+		tx.pendingBucketList[ds] = map[core.BucketName]*core.Bucket{}
 	}
 	tx.pendingBucketList[ds][name] = bucket
 	return nil
@@ -110,14 +113,14 @@ func (tx *Tx) DeleteBucket(ds uint16, bucket string) error {
 		return err
 	}
 
-	b, err := tx.db.bm.GetBucket(ds, bucket)
+	b, err := tx.db.bucketManager.GetBucket(ds, bucket)
 	if err != nil {
 		return ErrBucketNotFound
 	}
 
-	deleteBucket := &Bucket{
-		Meta: &BucketMeta{
-			Op: BucketDeleteOperation,
+	deleteBucket := &core.Bucket{
+		Meta: &core.BucketMeta{
+			Op: core.BucketDeleteOperation,
 		},
 		Id:   b.Id,
 		Ds:   ds,
@@ -128,5 +131,5 @@ func (tx *Tx) DeleteBucket(ds uint16, bucket string) error {
 }
 
 func (tx *Tx) ExistBucket(ds uint16, bucket string) bool {
-	return tx.db.bm.ExistBucket(ds, bucket)
+	return tx.db.bucketManager.ExistBucket(ds, bucket)
 }

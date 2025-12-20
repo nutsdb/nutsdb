@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/nutsdb/nutsdb/internal/core"
 )
 
 func TestHintFileBasicOperations(t *testing.T) {
@@ -305,7 +307,7 @@ func TestHintFileWriterReader(t *testing.T) {
 	// Should get EOF at the end
 	_, err = reader.Read()
 	if err != nil {
-		if err != io.EOF && err != ErrIndexOutOfBound && err != ErrEntryZero && err != ErrHeaderSizeOutOfBounds {
+		if err != io.EOF && err != ErrIndexOutOfBound && err != ErrEntryZero && err != core.ErrHeaderSizeOutOfBounds {
 			t.Fatalf("Expected EOF or similar error, got: %v", err)
 		}
 	}

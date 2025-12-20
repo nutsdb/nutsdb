@@ -7,6 +7,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/nutsdb/nutsdb/internal/core"
 )
 
 // errors
@@ -43,7 +45,7 @@ const (
 )
 
 type (
-	bucketToSubscribers       map[BucketName]map[string]map[uint64]*subscriber
+	bucketToSubscribers       map[core.BucketName]map[string]map[uint64]*subscriber
 	victimBucketToSubscribers map[uint64]map[string]map[uint64]*subscriber
 	victimBucketChan          chan victimBucketToSubscribers
 	MessagePriority           int
@@ -58,7 +60,7 @@ type (
 )
 
 type Message struct {
-	BucketName BucketName
+	BucketName core.BucketName
 	Key        string
 	Value      []byte
 	Flag       DataFlag
@@ -66,7 +68,7 @@ type Message struct {
 	priority   MessagePriority
 }
 
-func NewMessage(bucketName BucketName, key string, value []byte, flag DataFlag, timestamp uint64, options ...MessageOptions) *Message {
+func NewMessage(bucketName core.BucketName, key string, value []byte, flag DataFlag, timestamp uint64, options ...MessageOptions) *Message {
 	var priority MessagePriority
 	// default priority is medium
 	priority = MessagePriorityMedium
@@ -98,7 +100,7 @@ func (opts *WatchOptions) WithCallbackTimeout(timeout time.Duration) {
 
 type subscriber struct {
 	id           uint64
-	bucketName   BucketName
+	bucketName   core.BucketName
 	key          string
 	receiveChan  chan *Message
 	deadMessages int
@@ -162,7 +164,7 @@ func (wm *watchManager) sendMessage(message *Message) error {
 	}
 }
 
-func (wm *watchManager) sendUpdatedEntries(entries []*Entry, deletedbuckets map[BucketName]bool, getBucketName func(bucketId BucketId) (BucketName, error)) error {
+func (wm *watchManager) sendUpdatedEntries(entries []*core.Entry, deletedbuckets map[core.BucketName]bool, getBucketName func(bucketId core.BucketId) (core.BucketName, error)) error {
 	if wm.closed.Load() {
 		return ErrWatchManagerClosed
 	}
@@ -175,7 +177,7 @@ func (wm *watchManager) sendUpdatedEntries(entries []*Entry, deletedbuckets map[
 				continue
 			}
 
-			rawKey, err := entry.getRawKey()
+			rawKey, err := entry.GetRawKey()
 			if err != nil {
 				log.Printf("get raw key %+v error: %+v", entry.Key, err)
 				continue
@@ -438,7 +440,7 @@ func (wm *watchManager) distributeAllMessages(messages []*Message) error {
 
 // subscribe to the key and bucket
 // each subscriber has a own channel to receive messages
-func (wm *watchManager) subscribe(bucketName BucketName, key string) (*subscriber, error) {
+func (wm *watchManager) subscribe(bucketName core.BucketName, key string) (*subscriber, error) {
 	if wm.isClosed() {
 		return nil, ErrWatchManagerClosed
 	}
@@ -471,7 +473,7 @@ func (wm *watchManager) subscribe(bucketName BucketName, key string) (*subscribe
 }
 
 // unsubscribe from the key and bucket
-func (wm *watchManager) unsubscribe(bucketName BucketName, key string, id BucketId) error {
+func (wm *watchManager) unsubscribe(bucketName core.BucketName, key string, id core.BucketId) error {
 	wm.mu.Lock()
 	defer wm.mu.Unlock()
 
@@ -528,7 +530,7 @@ func (wm *watchManager) close() error {
 	return nil
 }
 
-func (wm *watchManager) findSubscriber(bucketName BucketName, key string, id uint64) (*subscriber, error) {
+func (wm *watchManager) findSubscriber(bucketName core.BucketName, key string, id uint64) (*subscriber, error) {
 	if _, ok := wm.lookup[bucketName]; !ok {
 		return nil, ErrBucketSubscriberNotFound
 	}

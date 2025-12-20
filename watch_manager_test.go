@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nutsdb/nutsdb/internal/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -131,7 +132,7 @@ func wmDrainChannel(t *testing.T, receiveChan <-chan *Message, timeout time.Dura
 }
 
 // wmVerifySubscriberExists checks if a subscriber exists in the lookup table
-func wmVerifySubscriberExists(t *testing.T, wm *watchManager, bucket, key string, id BucketId) {
+func wmVerifySubscriberExists(t *testing.T, wm *watchManager, bucket, key string, id core.BucketId) {
 	wm.mu.Lock()
 	defer wm.mu.Unlock()
 	assert.Contains(t, wm.lookup, bucket)
@@ -438,7 +439,7 @@ func TestWatchManager_SubscribeAndUnsubscribe(t *testing.T) {
 		// subscribe all keys
 		receiveChans := make([]<-chan *Message, expectedSubscribers)
 		keys := make([]string, expectedSubscribers)
-		ids := make([]BucketId, expectedSubscribers)
+		ids := make([]core.BucketId, expectedSubscribers)
 
 		for i := 0; i < expectedSubscribers; i++ {
 			keys[i] = fmt.Sprintf("key_test_%d", i)
@@ -590,7 +591,7 @@ func TestWatchManager_StartDistributor(t *testing.T) {
 		// subscribe all keys
 		receiveChans := make([]<-chan *Message, expectedSubscribers)
 		keys := make([]string, expectedSubscribers)
-		ids := make([]BucketId, expectedSubscribers)
+		ids := make([]core.BucketId, expectedSubscribers)
 
 		for i := 0; i < expectedSubscribers; i++ {
 			keys[i] = fmt.Sprintf("key_test_%d", i)
@@ -693,7 +694,7 @@ func TestWatchManager_DeleteBucket(t *testing.T) {
 		// Give goroutines time to start
 		time.Sleep(50 * time.Millisecond)
 
-		bucket := BucketName("bucket_test")
+		bucket := core.BucketName("bucket_test")
 		keys := []string{"key1", "key2"}
 
 		type subscriberInfo struct {
@@ -764,7 +765,7 @@ func TestWatchManager_DeleteBucket(t *testing.T) {
 
 		time.Sleep(50 * time.Millisecond)
 
-		bucket := BucketName("bucket1")
+		bucket := core.BucketName("bucket1")
 		key := "key1"
 		subscriber, err := wm.subscribe(bucket, key)
 		require.NoError(t, err)
@@ -821,8 +822,8 @@ func TestWatchManager_DeleteBucket(t *testing.T) {
 
 		time.Sleep(50 * time.Millisecond)
 
-		bucket1 := BucketName("bucket1")
-		bucket2 := BucketName("bucket2")
+		bucket1 := core.BucketName("bucket1")
+		bucket2 := core.BucketName("bucket2")
 
 		// Subscribe to both buckets
 		subscriber1, err := wm.subscribe(bucket1, "key1")
@@ -875,7 +876,7 @@ func TestWatchManager_DeleteBucket(t *testing.T) {
 
 		time.Sleep(50 * time.Millisecond)
 
-		bucket := BucketName("reusable_bucket")
+		bucket := core.BucketName("reusable_bucket")
 		key := "key1"
 
 		// First subscription
