@@ -22,6 +22,7 @@ import (
 
 	"github.com/nutsdb/nutsdb/internal/testutils"
 	"github.com/nutsdb/nutsdb/internal/utils"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -338,6 +339,48 @@ func TestTx_LTrim(t *testing.T) {
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		txCreateBucket(t, db, DataStructureList, bucket, nil)
 		txLTrim(t, db, bucket, testutils.GetTestBytes(0), 0, 1, ErrListNotFound)
+	})
+
+	// test LTrim to clear list data
+	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		n := 20
+		txCreateBucket(t, db, DataStructureList, bucket, nil)
+		pushDataByStartEnd(t, db, bucket, n, 0, 6, true)
+		txLRange(
+			t, db, bucket,
+			testutils.GetTestBytes(n),
+			0, 8, 7,
+			[][]byte{
+				testutils.GetTestBytes(6),
+				testutils.GetTestBytes(5),
+				testutils.GetTestBytes(4),
+				testutils.GetTestBytes(3),
+				testutils.GetTestBytes(2),
+				testutils.GetTestBytes(1),
+				testutils.GetTestBytes(0),
+			}, nil)
+		txLTrim(t, db, bucket, testutils.GetTestBytes(n), 2, 5, nil)
+		txLRange(
+			t, db, bucket,
+			testutils.GetTestBytes(n),
+			0, 8, 4,
+			[][]byte{
+				testutils.GetTestBytes(4),
+				testutils.GetTestBytes(3),
+				testutils.GetTestBytes(2),
+				testutils.GetTestBytes(1),
+			}, nil)
+
+		db.View(func(tx *Tx) error {
+			l, err := tx.LSize(bucket, testutils.GetTestBytes(n))
+			assert.NoError(t, err)
+			assert.Equal(t, 4, l)
+
+			item, err := tx.LPeek(bucket, testutils.GetTestBytes(n))
+			assert.NoError(t, err)
+			assert.Equal(t, testutils.GetTestBytes(4), item)
+			return nil
+		})
 	})
 
 	// Calling LTrim on a list with added data and use LRange to validate it
