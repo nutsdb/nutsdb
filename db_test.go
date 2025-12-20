@@ -16,6 +16,7 @@ package nutsdb
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -2567,34 +2568,40 @@ func TestDB_Watch(t *testing.T) {
 			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 			key0 := testutils.GetTestBytes(0)
 			val0 := testutils.GetRandomBytes(24)
-
-			var err error
 			done := make(chan struct{})
 
-			go func(t *testing.T) {
-				err = db.Watch(bucket, key0, func(msg *Message) error {
-					defer close(done)
+			var err error
 
-					if bucket != msg.BucketName {
-						return fmt.Errorf("bucket name is not equal")
-					}
+			watcher, errWatch := db.WatchWithCTX(context.Background(), bucket, key0, func(msg *Message) error {
+				fmt.Println("received message: ", msg)
+				defer close(done)
 
-					if string(key0) != msg.Key {
-						return fmt.Errorf("key is not equal")
-					}
+				if bucket != msg.BucketName {
+					return fmt.Errorf("bucket name is not equal")
+				}
 
-					if !bytes.Equal(val0, msg.Value) {
-						return fmt.Errorf("value is not equal")
-					}
+				if string(key0) != msg.Key {
+					return fmt.Errorf("key is not equal")
+				}
 
-					return nil
-				})
-			}(t)
+				if !bytes.Equal(val0, msg.Value) {
+					return fmt.Errorf("value is not equal")
+				}
 
-			// Wait for the watching to be started
-			time.Sleep(100 * time.Millisecond)
+				return nil
+			})
+
+			require.NoError(t, errWatch)
+
+			go func() {
+				err = watcher.watchingFunc()
+			}()
+
+			err = watcher.WaitReady(10 * time.Second)
+			require.NoError(t, err)
 
 			// put
+			fmt.Println("putting message")
 			txPut(t, db, bucket, key0, val0, Persistent, nil, nil)
 			select {
 			case <-done:
@@ -2612,6 +2619,7 @@ func TestDB_Watch(t *testing.T) {
 	t.Run("db list watch key and receive message", func(t *testing.T) {
 		var err error
 		wg := sync.WaitGroup{}
+
 		runNutsDBTestWithWatch(t, func(t *testing.T, db *DB) {
 			bucket := "bucket"
 			txCreateBucket(t, db, DataStructureList, bucket, nil)
@@ -2622,27 +2630,37 @@ func TestDB_Watch(t *testing.T) {
 
 			done := make(chan struct{})
 
+			watcher, errWatch := db.WatchWithCTX(context.Background(), bucket, key0, func(msg *Message) error {
+				if bucket != msg.BucketName {
+					return fmt.Errorf("bucket name is not equal")
+				}
+				if string(key0) != msg.Key {
+					return fmt.Errorf("key is not equal")
+				}
+
+				if msg.Flag != DataLRemFlag && msg.Flag != DataLRemByIndex {
+					if !bytes.Equal(val0, msg.Value) {
+						return fmt.Errorf("value is not equal")
+					}
+				}
+				count++
+
+				if count == expectCount {
+					close(done)
+				}
+				return nil
+			})
+
+			require.NoError(t, errWatch)
+
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				err = db.Watch(bucket, key0, func(msg *Message) error {
-					assert.Equal(t, bucket, msg.BucketName)
-					assert.Equal(t, string(key0), msg.Key)
-					if msg.Flag != DataLRemFlag && msg.Flag != DataLRemByIndex {
-						assert.Equal(t, val0, msg.Value)
-					}
-					count++
-
-					if count == expectCount {
-						close(done)
-					}
-					return nil
-				})
-
+				err = watcher.watchingFunc()
 			}()
 
-			// Wait for the watching to be started
-			time.Sleep(100 * time.Millisecond)
+			errWait := watcher.WaitReady(10 * time.Second)
+			require.NoError(t, errWait)
 
 			// put head
 			txPush(t, db, bucket, key0, val0, false, nil, nil)
@@ -3044,6 +3062,7 @@ func TestDB_Watch(t *testing.T) {
 
 		require.NoError(t, errUpdate)
 		require.NoError(t, db.watchMgr.close())
+
 		wg.Wait()
 
 		require.NoError(t, err)
@@ -3363,9 +3382,12 @@ func TestDB_WatchDeleteBucket(t *testing.T) {
 			bucket := "bucket"
 			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 			keys := make([][]byte, countOfKeys)
-			count := atomic.Int64{}
-			expectCount := int64(200)
+
+			countL := sync.Mutex{}
+			count := 0
+			expectCount := 200
 			done := make(chan struct{})
+
 			for i := 0; i < countOfKeys; i++ {
 				keys[i] = testutils.GetTestBytes(i)
 			}
@@ -3383,11 +3405,13 @@ func TestDB_WatchDeleteBucket(t *testing.T) {
 							return fmt.Errorf("bucket name is not equal")
 						}
 
-						count.Add(1)
-						if done != nil && count.Load() == expectCount {
+						countL.Lock()
+						count++
+						if done != nil && count == expectCount {
 							close(done)
 							done = nil
 						}
+						countL.Unlock()
 						return nil
 					})
 
@@ -3405,7 +3429,7 @@ func TestDB_WatchDeleteBucket(t *testing.T) {
 			case <-done:
 				t.Log("Received message")
 			case <-time.After(10 * time.Second):
-				t.Log("Received message", count.Load(), "times")
+				t.Log("Received message", count, "times")
 				t.Fatal("Timeout waiting for message")
 			}
 		})
