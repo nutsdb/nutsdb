@@ -16,10 +16,6 @@ const (
 	N = 100
 )
 
-func init() {
-	bucket = "bucketForBatchWrite"
-}
-
 func TestBatchWrite(t *testing.T) {
 	TestFlushPanic := func(t *testing.T, db *DB) {
 		wb, err := db.NewWriteBatch()
