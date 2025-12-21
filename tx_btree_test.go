@@ -18,6 +18,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"path"
 	"testing"
 	"time"
 
@@ -932,7 +933,7 @@ func TestTx_ExpiredDeletion(t *testing.T) {
 		// This test uses MockClock to test TTL behavior across database restarts
 		mc := clock.NewMockClock(time.Now().UnixMilli())
 		opts := DefaultOptions
-		opts.Dir = NutsDBTestDirPath
+		opts.Dir = path.Join(t.TempDir(), "nutsdb-test")
 		opts.Clock = mc
 		defer removeDir(opts.Dir)
 
@@ -1550,7 +1551,8 @@ func TestTx_EmptyBucketQuery(t *testing.T) {
 
 	t.Run("empty bucket query after restart", func(t *testing.T) {
 		opts := DefaultOptions
-		opts.Dir = "/tmp/nutsdb_empty_bucket_restart_test"
+
+		opts.Dir = path.Join(t.TempDir(), "nutsdb_empty_bucket_restart_test")
 
 		runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
 			// Create empty bucket

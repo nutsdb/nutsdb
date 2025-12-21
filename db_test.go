@@ -17,6 +17,7 @@ package nutsdb
 import (
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -34,8 +35,6 @@ var (
 	opt Options
 	err error
 )
-
-const NutsDBTestDirPath = "/tmp/nutsdb-test"
 
 func AssertErr(t *testing.T, err error, expectErr error) {
 	if expectErr != nil {
@@ -56,7 +55,7 @@ func runNutsDBTest(t *testing.T, opts *Options, test func(t *testing.T, db *DB))
 		opts = &DefaultOptions
 	}
 	if opts.Dir == "" {
-		opts.Dir = NutsDBTestDirPath
+		opts.Dir = path.Join(t.TempDir(), "nutsdb-test")
 	}
 	defer removeDir(opts.Dir)
 	db, err := Open(*opts)
@@ -87,7 +86,7 @@ func runNutsDBTestWithMockClock(t *testing.T, opts *Options, test func(t *testin
 	}
 	opts.Clock = mc
 	if opts.Dir == "" {
-		opts.Dir = NutsDBTestDirPath
+		opts.Dir = path.Join(t.TempDir(), "nutsdb-test")
 	}
 	defer removeDir(opts.Dir)
 	db, err := Open(*opts)
@@ -246,7 +245,7 @@ func TestDB_Basic(t *testing.T) {
 func TestDB_ReopenWithDelete(t *testing.T) {
 	opts := &DefaultOptions
 	if opts.Dir == "" {
-		opts.Dir = NutsDBTestDirPath
+		opts.Dir = path.Join(t.TempDir(), "nutsdb-test")
 	}
 	db, err := Open(*opts)
 	require.NoError(t, err)
@@ -828,14 +827,14 @@ func TestDB_GetKeyNotFound(t *testing.T) {
 
 func TestDB_Backup(t *testing.T) {
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		backUpDir := "/tmp/nutsdb-backup"
+		backUpDir := path.Join(t.TempDir(), "nutsdb-backup")
 		require.NoError(t, db.Backup(backUpDir))
 	})
 }
 
 func TestDB_BackupTarGZ(t *testing.T) {
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		backUpFile := "/tmp/nutsdb-backup/backup.tar.gz"
+		backUpFile := path.Join(t.TempDir(), "nutsdb-backup", "backup.tar.gz")
 
 		os.MkdirAll(filepath.Dir(backUpFile), os.ModePerm)
 		f, err := os.Create(backUpFile)
@@ -1031,6 +1030,7 @@ func TestDB_HintKeyAndRAMIdxMode_RestartDB(t *testing.T) {
 	})
 }
 
+// this test case will cause many times.
 func TestDB_HintKeyAndRAMIdxMode_LruCache(t *testing.T) {
 	opts := DefaultOptions
 	opts.EntryIdxMode = HintKeyAndRAMIdxMode
@@ -1693,7 +1693,7 @@ func TestDB_HintFileFastRecovery(t *testing.T) {
 	bucket := "bucket"
 	opts := DefaultOptions
 	opts.SegmentSize = KB
-	opts.Dir = "/tmp/test-hintfile-recovery/"
+	opts.Dir = path.Join(t.TempDir(), "test-hintfile-recovery")
 	opts.EnableHintFile = true
 
 	// Clean the test directory at the start
@@ -1742,7 +1742,7 @@ func TestDB_HintFileMissingFallback(t *testing.T) {
 	bucket := "bucket"
 	opts := DefaultOptions
 	opts.SegmentSize = KB
-	opts.Dir = "/tmp/test-hintfile-missing/"
+	opts.Dir = path.Join(t.TempDir(), "test-hintfile-missing")
 	opts.EnableHintFile = true
 
 	// Clean the test directory at the start
@@ -1819,7 +1819,7 @@ func TestDB_HintFileCorruptedFallback(t *testing.T) {
 	bucket := "bucket"
 	opts := DefaultOptions
 	opts.SegmentSize = KB
-	opts.Dir = "/tmp/test-hintfile-corrupted"
+	opts.Dir = path.Join(t.TempDir(), "test-hintfile-corrupted")
 	opts.EnableHintFile = true
 
 	// Clean the test directory at the start
@@ -1907,7 +1907,7 @@ func TestDB_HintFileDifferentEntryIdxModes(t *testing.T) {
 	bucket := "bucket"
 	opts := DefaultOptions
 	opts.SegmentSize = KB
-	opts.Dir = "/tmp/test-hintfile-modes/"
+	opts.Dir = path.Join(t.TempDir(), "test-hintfile-modes")
 	opts.EnableHintFile = true
 
 	// Clean the test directory at the start
@@ -1978,7 +1978,7 @@ func TestDB_HintFileDifferentEntryIdxModes(t *testing.T) {
 func TestDB_HintFileWithDifferentDataStructures(t *testing.T) {
 	opts := DefaultOptions
 	opts.SegmentSize = KB
-	opts.Dir = "/tmp/test-hintfile-ds-recovery/"
+	opts.Dir = path.Join(t.TempDir(), "test-hintfile-ds-recovery")
 	opts.EnableHintFile = true
 
 	// Clean the test directory at the start
@@ -2054,7 +2054,7 @@ func TestDB_HintFileDisabled(t *testing.T) {
 	bucket := "bucket"
 	opts := DefaultOptions
 	opts.SegmentSize = KB
-	opts.Dir = "/tmp/test-hintfile-disabled-recovery/"
+	opts.Dir = path.Join(t.TempDir(), "test-hintfile-disabled-recovery")
 	opts.EnableHintFile = false // Disable hint file
 
 	// Clean the test directory at the start

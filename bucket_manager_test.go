@@ -1,6 +1,7 @@
 package nutsdb
 
 import (
+	"path"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -41,7 +42,7 @@ func TestBucketManager_ExistBucket(t *testing.T) {
 }
 
 func TestBucketManager_Recovery(t *testing.T) {
-	dir := "/tmp/nutsdb_test_data"
+	dir := path.Join(t.TempDir(), "nutsdb_test_data")
 	const bucket1 = "bucket_1"
 	const bucket2 = "bucket_2"
 	db, err := Open(DefaultOptions, WithDir(dir))

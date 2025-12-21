@@ -16,6 +16,7 @@ package nutsdb
 
 import (
 	"os"
+	"path"
 	"testing"
 
 	"github.com/nutsdb/nutsdb/internal/core"
@@ -81,8 +82,8 @@ func TestDataFile1(t *testing.T) {
 
 func TestDataFile2(t *testing.T) {
 	fm := NewFileManager(FileIO, 1024, 0.5, 256*MB)
-
-	filePath2 := "/tmp/foo2"
+	tmpdir := t.TempDir()
+	filePath2 := path.Join(tmpdir, "foo2")
 	df, err := fm.GetDataFile(filePath2, 64)
 	assert.Nil(t, err)
 	defer os.Remove(filePath2)
@@ -99,7 +100,7 @@ func TestDataFile2(t *testing.T) {
 		t.Error("err TestDataFile_All ReadAt")
 	}
 
-	filePath3 := "/tmp/foo3"
+	filePath3 := path.Join(tmpdir, "foo3")
 
 	df2, err := fm.GetDataFile(filePath3, 64)
 	defer os.Remove(filePath3)
@@ -125,7 +126,8 @@ func TestDataFile2(t *testing.T) {
 
 func TestDataFile_ReadRecord(t *testing.T) {
 	fm := NewFileManager(FileIO, 1024, 0.5, 256*MB)
-	filePath4 := "/tmp/foo4"
+	tmpdir := t.TempDir()
+	filePath4 := path.Join(tmpdir, "foo4")
 	df, err := fm.GetDataFile(filePath4, 1024)
 	defer func() {
 		err = df.Release()
@@ -162,9 +164,9 @@ func TestDataFile_Err_Path(t *testing.T) {
 
 func TestDataFile_Crc_Err(t *testing.T) {
 	fm := NewFileManager(FileIO, 1024, 0.5, 256*MB)
-	filePath4 := "/tmp/foo6"
+	filePath6 := path.Join(t.TempDir(), "foo6")
 
-	df, err := fm.GetDataFile(filePath4, entry.Size())
+	df, err := fm.GetDataFile(filePath6, entry.Size())
 	assert.Nil(t, err)
 	assert.NotNil(t, df)
 	defer func() {
@@ -172,7 +174,7 @@ func TestDataFile_Crc_Err(t *testing.T) {
 		assert.Nil(t, err)
 		err = fm.Close()
 		assert.Nil(t, err)
-		err = os.Remove(filePath4)
+		err = os.Remove(filePath6)
 		assert.Nil(t, err)
 	}()
 
@@ -192,8 +194,8 @@ func TestDataFile_Crc_Err(t *testing.T) {
 
 func TestFileManager1(t *testing.T) {
 	fm := NewFileManager(FileIO, 1024, 0.5, 256*MB)
-	filePath4 := "/tmp/foo6"
-	df, err := fm.GetDataFile(filePath4, entry.Size())
+	filePath6 := path.Join(t.TempDir(), "foo2")
+	df, err := fm.GetDataFile(filePath6, entry.Size())
 	assert.Nil(t, err)
 	defer func() {
 		err = df.Release()

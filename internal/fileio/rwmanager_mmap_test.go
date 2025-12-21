@@ -18,6 +18,7 @@ import (
 	"errors"
 	"os"
 	"path"
+	"path/filepath"
 	"testing"
 
 	"github.com/nutsdb/nutsdb"
@@ -28,7 +29,7 @@ import (
 )
 
 func TestRWManager_MMap_Release(t *testing.T) {
-	filePath := "/tmp/foo_rw_MMap"
+	filePath := filepath.Join(t.TempDir(), "foo_rw_MMap")
 	fdm := nutsdb.NewFileManager(nutsdb.MMap, 8*nutsdb.MB, 0.5, 8*nutsdb.MB)
 	rwmanager, err := fdm.GetMMapRWManager(filePath, 8*nutsdb.MB, 8*nutsdb.MB, false)
 	if err != nil {
@@ -61,7 +62,7 @@ func isActive(rwmanager *fileio.MMapRWManager) bool {
 }
 
 func TestRWManager_MMap_WriteAt(t *testing.T) {
-	filePath := "/tmp/foo_rw_filemmap"
+	filePath := filepath.Join(t.TempDir(), "foo_rw_filemmap")
 	maxFdNums := 1024
 	cleanThreshold := 0.5
 	var fdm = fileio.NewFdm(maxFdNums, cleanThreshold)
