@@ -1162,7 +1162,6 @@ func (db *DB) rebuildBucketManager() error {
  */
 func (db *DB) Watch(ctx context.Context, bucket string, key []byte, cb func(message *Message) error, opts ...WatchOptions) (*Watcher, error) {
 	watchOpts := NewWatchOptions()
-	ready := make(chan struct{})
 
 	if len(opts) > 0 {
 		watchOpts = &opts[0]
@@ -1219,7 +1218,6 @@ func (db *DB) Watch(ctx context.Context, bucket string, key []byte, cb func(mess
 			}
 		}()
 
-		close(ready)
 		for {
 			select {
 			case <-ctx.Done():
@@ -1263,8 +1261,9 @@ func (db *DB) Watch(ctx context.Context, bucket string, key []byte, cb func(mess
 	}
 
 	watcher := &Watcher{
-		ready:        ready,
+		readyCh:      make(chan struct{}),
 		watchingFunc: watchingFunc,
+		isReady:      false,
 	}
 
 	return watcher, nil

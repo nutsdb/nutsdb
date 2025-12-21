@@ -2594,14 +2594,13 @@ func TestDB_Watch(t *testing.T) {
 			require.NoError(t, errWatch)
 
 			go func() {
-				err = watcher.watchingFunc()
+				err = watcher.Run()
 			}()
 
-			err = watcher.WaitReady(10 * time.Second)
-			require.NoError(t, err)
+			errWait := watcher.WaitReady(10 * time.Second)
+			require.NoError(t, errWait)
 
 			// put
-			fmt.Println("putting message")
 			txPut(t, db, bucket, key0, val0, Persistent, nil, nil)
 			select {
 			case <-done:
@@ -2656,7 +2655,7 @@ func TestDB_Watch(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				err = watcher.watchingFunc()
+				err = watcher.Run()
 			}()
 
 			errWait := watcher.WaitReady(10 * time.Second)
@@ -2731,7 +2730,7 @@ func TestDB_Watch(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				err = watcher.watchingFunc()
+				err = watcher.Run()
 			}()
 
 			errWait := watcher.WaitReady(10 * time.Second)
@@ -2798,7 +2797,7 @@ func TestDB_Watch(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				err = watcher.watchingFunc()
+				err = watcher.Run()
 			}()
 
 			errWait := watcher.WaitReady(10 * time.Second)
@@ -2848,7 +2847,7 @@ func TestDB_Watch(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				err = watcher.watchingFunc()
+				err = watcher.Run()
 			}()
 
 			errWait := watcher.WaitReady(10 * time.Second)
@@ -2883,7 +2882,7 @@ func TestDB_Watch(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				err = watcher.watchingFunc()
+				err = watcher.Run()
 			}()
 
 			errWait := watcher.WaitReady(10 * time.Second)
@@ -2919,7 +2918,7 @@ func TestDB_Watch(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				err = watcher.watchingFunc()
+				err = watcher.Run()
 			}()
 
 			errWait := watcher.WaitReady(10 * time.Second)
@@ -2977,7 +2976,7 @@ func TestDB_Watch(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				err = watcher.watchingFunc()
+				err = watcher.Run()
 			}()
 
 			wg.Add(1)
@@ -3031,7 +3030,7 @@ func TestDB_Watch(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				err = watcher.watchingFunc()
+				err = watcher.Run()
 			}()
 
 			errWait := watcher.WaitReady(10 * time.Second)
@@ -3087,7 +3086,7 @@ func TestDB_Watch(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			err = watcher.watchingFunc()
+			err = watcher.Run()
 		}()
 
 		errWait := watcher.WaitReady(10 * time.Second)
@@ -3181,7 +3180,7 @@ func TestDB_Watch(t *testing.T) {
 
 				go func() {
 					//NOTE: make the chan of errors to test
-					watchFunc.watchingFunc()
+					watchFunc.Run()
 				}()
 
 				errWait := watchFunc.WaitReady(10 * time.Second)
@@ -3202,7 +3201,7 @@ func TestDB_Watch(t *testing.T) {
 
 			go func() {
 				//NOTE: make the chan of errors to test
-				watchFunc.watchingFunc()
+				watchFunc.Run()
 			}()
 
 			errWait := watchFunc.WaitReady(10 * time.Second)
@@ -3225,7 +3224,7 @@ func TestDB_Watch(t *testing.T) {
 
 				go func() {
 					//NOTE: make the chan of errors to test
-					watchFunc.watchingFunc()
+					watchFunc.Run()
 				}()
 
 				errWait := watchFunc.WaitReady(10 * time.Second)
@@ -3324,7 +3323,7 @@ func TestDB_WatchTTL(t *testing.T) {
 	// 		wg.Add(1)
 	// 		go func() {
 	// 			defer wg.Done()
-	// 			err = watchFunc.watchingFunc()
+	// 			err = watchFunc.Run()
 	// 		}()
 
 	// 		errWait := watchFunc.WaitReady(10 * time.Second)
@@ -3364,7 +3363,7 @@ func TestDB_WatchTTL(t *testing.T) {
 
 			go func() {
 				//NOTE: make the chan of errors to test
-				watchFunc.watchingFunc()
+				watchFunc.Run()
 			}()
 
 			errWait := watchFunc.WaitReady(10 * time.Second)
@@ -3407,7 +3406,7 @@ func TestDB_WatchDeleteBucket(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				err = watchFunc.watchingFunc()
+				err = watchFunc.Run()
 			}()
 
 			errWait := watchFunc.WaitReady(10 * time.Second)
@@ -3451,7 +3450,7 @@ func TestDB_WatchDeleteBucket(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				err = watchFunc.watchingFunc()
+				err = watchFunc.Run()
 			}()
 
 			errWait := watchFunc.WaitReady(10 * time.Second)
@@ -3516,7 +3515,7 @@ func TestDB_WatchDeleteBucket(t *testing.T) {
 				wg.Add(1)
 				go func(key []byte) {
 					defer wg.Done()
-					err := watchFunc.watchingFunc()
+					err := watchFunc.Run()
 					errCh <- err
 				}(key)
 
@@ -3596,7 +3595,7 @@ func TestDB_WatchDeleteBucket(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				err := btreeWatcher.watchingFunc()
+				err := btreeWatcher.Run()
 				errCh <- err
 			}()
 
@@ -3620,7 +3619,7 @@ func TestDB_WatchDeleteBucket(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				err := listWatcher.watchingFunc()
+				err := listWatcher.Run()
 				errCh <- err
 			}()
 
@@ -3644,7 +3643,7 @@ func TestDB_WatchDeleteBucket(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				err := setWatcher.watchingFunc()
+				err := setWatcher.Run()
 				errCh <- err
 			}()
 
@@ -3668,7 +3667,7 @@ func TestDB_WatchDeleteBucket(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				err := zsetWatcher.watchingFunc()
+				err := zsetWatcher.Run()
 				errCh <- err
 			}()
 
@@ -3767,7 +3766,7 @@ func TestDB_WatchDeleteBucket(t *testing.T) {
 				wg.Add(1)
 				go func() {
 					defer wg.Done()
-					err := watchFunc.watchingFunc()
+					err := watchFunc.Run()
 					errCh <- err
 				}()
 

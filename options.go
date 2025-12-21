@@ -333,3 +333,9 @@ func WithTTLConfig(config TTLConfig) Option {
 func DefaultTTLConfig() TTLConfig {
 	return ttl.DefaultConfig()
 }
+
+func WithEnableWatch(enable bool) Option {
+	return func(opt *Options) {
+		opt.EnableWatch = enable
+	}
+}
