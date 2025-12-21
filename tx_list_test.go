@@ -16,7 +16,7 @@ package nutsdb
 
 import (
 	"os"
-	"path"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -623,7 +623,7 @@ func TestTx_ListRecoveryAfterRestart(t *testing.T) {
 	bucket := "list_bucket"
 	key := testutils.GetTestBytes(0)
 
-	dir := path.Join(t.TempDir(), "test_nutsdb_list_recovery")
+	dir := filepath.Join(t.TempDir(), "test_nutsdb_list_recovery")
 	defer os.RemoveAll(dir)
 
 	// Step 1: Create DB and insert data
@@ -678,7 +678,7 @@ func TestTx_ListRecoveryWithMixedOperations(t *testing.T) {
 	bucket := "list_bucket"
 	key := testutils.GetTestBytes(0)
 
-	dir := path.Join(t.TempDir(), "test_nutsdb_list_recovery_mixed")
+	dir := filepath.Join(t.TempDir(), "test_nutsdb_list_recovery_mixed")
 	defer os.RemoveAll(dir)
 
 	opts := DefaultOptions
@@ -718,7 +718,7 @@ func TestTx_ListRecoveryWithMixedOperations(t *testing.T) {
 func TestTx_ListRecoveryMultipleLists(t *testing.T) {
 	bucket := "list_bucket"
 
-	dir := path.Join(t.TempDir(), "test_nutsdb_list_recovery_multiple")
+	dir := filepath.Join(t.TempDir(), "test_nutsdb_list_recovery_multiple")
 	defer os.RemoveAll(dir)
 
 	opts := DefaultOptions

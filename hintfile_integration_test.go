@@ -17,7 +17,7 @@ package nutsdb
 import (
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -32,7 +32,7 @@ func TestHintFileIntegration_WriteMergeRestartVerify(t *testing.T) {
 		bucket := "bucket"
 		opts := DefaultOptions
 		opts.SegmentSize = 64 * KB
-		opts.Dir = path.Join(t.TempDir(), "test-hintfile-integration-"+mode.name)
+		opts.Dir = filepath.Join(t.TempDir(), "test-hintfile-integration-"+mode.name)
 		opts.EnableHintFile = true
 		opts.EnableMergeV2 = mode.enableMergeV2
 
