@@ -22,17 +22,20 @@ import (
 	"github.com/nutsdb/nutsdb/internal/ttl/clock"
 )
 
-// ExpiredCallback is a function type for handling expired record notifications.
-// timestamp is the record timestamp when expiration was detected, used for validation.
-type ExpiredCallback func(bucketId uint64, key []byte, ds uint16, timestamp uint64)
+// ExpiredCallback is a function type for handling the actual deletion of expired keys.
+// It's called by the background worker to perform the deletion.
+type ExpiredCallback func(event ExpirationEvent)
 
 // Service provides a unified TTL management facade that coordinates both
 // active expiration (timer-based) and passive expiration (check-based).
 type Service struct {
-	manager  Manager          // Active expiration using timers
-	checker  *checker.Checker // Passive expiration checking
-	clock    clock.Clock      // Unified clock source
-	callback ExpiredCallback  // Callback for expired keys
+	manager         Manager          // Active expiration using timers
+	checker         *checker.Checker // Passive expiration checking
+	clock           clock.Clock      // Unified clock source
+	expiredCallback ExpiredCallback  // Handler for actual deletion
+	queue           *expirationQueue // Queue for expiration events
+	workerCloseCh   chan struct{}    // Channel to signal worker shutdown
+	workerDone      chan struct{}    // Channel to wait for worker completion
 }
 
 // NewService creates a new TTL service with the specified clock and expiration deletion type.
@@ -49,9 +52,12 @@ func NewService(clk clock.Clock, expiredDeleteType ExpiredDeleteType) *Service {
 	}
 
 	service := &Service{
-		manager: mgr,
-		checker: chk,
-		clock:   clk,
+		manager:       mgr,
+		checker:       chk,
+		clock:         clk,
+		queue:         newExpirationQueue(1000),
+		workerCloseCh: make(chan struct{}),
+		workerDone:    make(chan struct{}),
 	}
 
 	// Set up unified callback routing
@@ -60,20 +66,35 @@ func NewService(clk clock.Clock, expiredDeleteType ExpiredDeleteType) *Service {
 	return service
 }
 
-// Run starts the TTL service, initiating active expiration monitoring.
+// Run starts the TTL service, initiating active expiration monitoring and background worker.
 func (s *Service) Run() {
+	go s.processExpirationEvents()
 	s.manager.Run()
 }
 
 // Close stops the TTL service and releases all resources.
 func (s *Service) Close() {
 	s.manager.Close()
+
+	// Close queue first to stop accepting new events
+	s.queue.close()
+
+	// Signal worker to stop (non-blocking, check if already closed)
+	select {
+	case <-s.workerCloseCh:
+		// Already closed
+	default:
+		close(s.workerCloseCh)
+	}
+
+	// Don't wait for worker to finish - it may be blocked on DB operations
+	// Remaining events will be filtered on next startup
 }
 
-// SetExpiredCallback sets the callback function to be invoked when keys expire.
-// This callback is triggered by both active (timer) and passive (check) expiration.
+// SetExpiredCallback sets the handler function for deleting expired keys.
+// This handler is called by the background worker to perform actual deletion.
 func (s *Service) SetExpiredCallback(callback ExpiredCallback) {
-	s.callback = callback
+	s.expiredCallback = callback
 }
 
 // GetChecker returns the checker instance for use by data structures.
@@ -104,9 +125,36 @@ func (s *Service) ExistTTL(bucketId core.BucketId, key string) bool {
 }
 
 // onExpired is the internal unified callback handler for expired keys.
-// It routes expiration events from both manager and checker to the user-defined callback.
+// It routes expiration events from both manager and checker to the event queue.
 func (s *Service) onExpired(bucketId core.BucketId, key []byte, ds uint16, timestamp uint64) {
-	if s.callback != nil {
-		s.callback(bucketId, key, ds, timestamp)
+	event := ExpirationEvent{
+		BucketId:  bucketId,
+		Key:       key,
+		Ds:        ds,
+		Timestamp: timestamp,
+	}
+	s.queue.push(event)
+}
+
+// processExpirationEvents is a background worker that processes expiration events.
+// It runs in a separate goroutine and handles async deletion with proper verification.
+func (s *Service) processExpirationEvents() {
+	defer close(s.workerDone)
+
+	for {
+		select {
+		case <-s.workerCloseCh:
+			// Worker is shutting down, exit immediately
+			// Remaining events will be filtered on next startup
+			return
+		case event, ok := <-s.queue.events:
+			if !ok {
+				// Queue closed
+				return
+			}
+			if s.expiredCallback != nil {
+				s.expiredCallback(event)
+			}
+		}
 	}
 }

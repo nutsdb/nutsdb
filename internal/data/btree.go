@@ -52,6 +52,7 @@ func NewBTree(bucketId uint64, ttlCheckers ...*checker.Checker) *BTree {
 
 // isValid checks if an item is valid (not expired) using the TTL checker.
 // If no TTL checker is configured, all items are considered valid.
+// This method triggers expiration callbacks for expired items.
 func (bt *BTree) isValid(item *core.Item[core.Record]) bool {
 	if bt.ttlChecker == nil {
 		return item.Record != nil
@@ -65,8 +66,8 @@ func (bt *BTree) getItem(key []byte) (*core.Item[core.Record], bool) {
 }
 
 // getValidItem retrieves an item by key with TTL validation.
+// Triggers expiration callbacks for expired items.
 func (bt *BTree) getValidItem(key []byte) (*core.Item[core.Record], bool) {
-
 	if item, ok := bt.getItem(key); ok && bt.isValid(item) {
 		return item, true
 	}
@@ -79,11 +80,23 @@ func (bt *BTree) scan() Scanner {
 }
 
 // Find retrieves a record by key, automatically filtering expired records.
+// Triggers expiration callbacks for expired records.
 func (bt *BTree) Find(key []byte) (*core.Record, bool) {
 	if item, ok := bt.getValidItem(key); ok {
 		return item.Record, true
 	}
 	return nil, false
+}
+
+// FindForVerification retrieves a record by key WITHOUT triggering expiration callbacks.
+// This is used for internal verification (e.g., checking timestamps before deletion).
+// Returns the record even if expired, allowing caller to check timestamp.
+func (bt *BTree) FindForVerification(key []byte) (*core.Record, bool) {
+	item, ok := bt.getItem(key)
+	if !ok || item.Record == nil {
+		return nil, false
+	}
+	return item.Record, true
 }
 
 func (bt *BTree) InsertRecord(key []byte, record *core.Record) bool {
