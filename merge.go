@@ -365,7 +365,6 @@ func (db *DB) isPendingBtreeEntry(entry *core.Entry) bool {
 	}
 
 	if db.ttlService.GetChecker().IsExpired(r.TTL, r.Timestamp) {
-		db.ttlService.UnregisterTTL(entry.Meta.BucketId, string(entry.Key))
 		idx.Delete(entry.Key)
 		return false
 	}

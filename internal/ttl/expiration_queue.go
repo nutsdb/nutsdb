@@ -30,7 +30,7 @@ type ExpirationEvent struct {
 // expirationQueue manages a queue of expiration events with deduplication.
 // It prevents duplicate processing of the same key expiration.
 type expirationQueue struct {
-	events chan ExpirationEvent
+	events chan *ExpirationEvent
 	seen   sync.Map // map[string]uint64 - key -> timestamp
 	closed bool
 	mu     sync.RWMutex
@@ -39,7 +39,7 @@ type expirationQueue struct {
 // newExpirationQueue creates a new expiration queue with the specified buffer size.
 func newExpirationQueue(bufferSize int) *expirationQueue {
 	return &expirationQueue{
-		events: make(chan ExpirationEvent, bufferSize),
+		events: make(chan *ExpirationEvent, bufferSize),
 		seen:   sync.Map{},
 		closed: false,
 	}
@@ -47,7 +47,7 @@ func newExpirationQueue(bufferSize int) *expirationQueue {
 
 // push adds an expiration event to the queue with deduplication.
 // Returns true if the event was added, false if it was a duplicate or queue is closed.
-func (eq *expirationQueue) push(event ExpirationEvent) bool {
+func (eq *expirationQueue) push(event *ExpirationEvent) bool {
 	eq.mu.RLock()
 	if eq.closed {
 		eq.mu.RUnlock()
@@ -76,10 +76,10 @@ func (eq *expirationQueue) push(event ExpirationEvent) bool {
 
 // pop retrieves the next expiration event from the queue.
 // Returns the event and true if successful, or zero value and false if queue is closed.
-func (eq *expirationQueue) pop() (ExpirationEvent, bool) {
+func (eq *expirationQueue) pop() (*ExpirationEvent, bool) {
 	event, ok := <-eq.events
 	if !ok {
-		return ExpirationEvent{}, false
+		return &ExpirationEvent{}, false
 	}
 
 	// Remove from seen map after processing
