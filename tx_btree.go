@@ -431,7 +431,7 @@ func (tx *Tx) Delete(bucket string, key []byte) error {
 	}
 
 	if idx, ok := tx.db.Index.BTree.exist(bucketId); ok {
-		if _, found := idx.Find(key); !found {
+		if _, found := idx.FindForVerification(key); !found {
 			return ErrKeyNotFound
 		}
 	} else {

@@ -250,6 +250,8 @@ func (db *DB) release() error {
 
 	db.mergeWorkCloseCh <- struct{}{}
 
+	db.ttlService.Close()
+
 	if !db.flock.Locked() {
 		return ErrDirUnlocked
 	}
@@ -262,8 +264,6 @@ func (db *DB) release() error {
 	db.fm = nil
 
 	db.commitBuffer = nil
-
-	db.ttlService.Close()
 
 	if db.watchManager != nil {
 		if err := db.watchManager.close(); err != nil {
@@ -1022,40 +1022,40 @@ func (db *DB) IsClose() bool {
 	return db.closed
 }
 
-// handleExpiredKey is the unified callback for handling expired keys.
+// handleExpiredKey processes a single expiration event asynchronously.
 // It validates the timestamp to prevent race conditions where a key is:
 // 1. Set with short TTL (timestamp T1)
 // 2. Expires and triggers async deletion
 // 3. Re-inserted with new TTL (timestamp T2)
 // 4. Async deletion from step 2 executes and mistakenly deletes the new key
 // By comparing timestamps, we ensure only the originally expired key is deleted.
-func (db *DB) handleExpiredKey(bucketId uint64, key []byte, ds uint16, expiredTimestamp uint64) {
-	go func() {
-		_ = db.Update(func(tx *Tx) error {
-			bucket, err := db.bucketManager.GetBucketById(bucketId)
-			if err != nil {
-				return err
-			}
+func (db *DB) handleExpiredKey(event ttl.ExpirationEvent) {
+	_ = db.Update(func(tx *Tx) error {
+		bucket, err := db.bucketManager.GetBucketById(event.BucketId)
+		if err != nil {
+			return err
+		}
 
-			// Verify the key still exists and has the same timestamp
-			idx, ok := db.Index.BTree.exist(bucketId)
-			if !ok {
-				return nil
-			}
-
-			record, found := idx.Find(key)
-			if !found {
-				return nil
-			}
-
-			// Only delete if timestamp matches (same record that expired)
-			if record.Timestamp == expiredTimestamp {
-				return tx.Delete(bucket.Name, key)
-			}
-
+		// Verify the key still exists and has the same timestamp
+		// Use FindForVerification to get the record without triggering callbacks (avoid recursion)
+		idx, ok := db.Index.BTree.exist(event.BucketId)
+		if !ok {
 			return nil
-		})
-	}()
+		}
+
+		record, found := idx.FindForVerification(event.Key)
+		if !found {
+			return nil
+		}
+
+		// Only delete if timestamp matches (same record that expired)
+		// Also verify it's actually expired (in case it was updated)
+		if record.Timestamp == event.Timestamp && db.ttlService.GetChecker().IsExpired(record.TTL, record.Timestamp) {
+			return tx.Delete(bucket.Name, event.Key)
+		}
+
+		return nil
+	})
 }
 
 func (db *DB) rebuildBucketManager() error {

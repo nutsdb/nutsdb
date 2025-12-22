@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"math"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -2167,5 +2168,331 @@ func TestTx_NewTTLReturnError(t *testing.T) {
 				})
 		})
 		r.Equal(expectErr, err)
+	})
+}
+
+// TestTx_Delete_NoRecursiveCallback tests that Delete operation does not trigger recursive TTL callbacks
+// This test verifies the fix for the infinite recursion issue where:
+// 1. Timer expires and triggers callback
+// 2. Callback calls Delete which uses Find
+// 3. Find triggers another callback (infinite loop)
+// The fix uses FindForVerification in Delete to avoid triggering callbacks
+func TestTx_Delete_NoRecursiveCallback(t *testing.T) {
+	bucket := "bucket"
+	key := testutils.GetTestBytes(0)
+	value := []byte("value")
+
+	t.Run("delete expired key should not trigger recursive callback", func(t *testing.T) {
+		runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc clock.Clock) {
+			r := require.New(t)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+			// Track callback invocations
+			callbackCount := int32(0)
+
+			// Put a key with TTL
+			txPut(t, db, bucket, key, value, 1, nil, nil)
+
+			// Advance time to expire the key
+			mc.AdvanceTime(1100 * time.Millisecond)
+
+			// Manually trigger delete (simulating what handleExpiredKeyAsync does)
+			err := db.Update(func(tx *Tx) error {
+				// Get the index
+				idx, ok := db.Index.BTree.exist(1) // bucketId = 1
+				r.True(ok)
+
+				// Use FindForVerification - should NOT trigger callback
+				record, found := idx.FindForVerification(key)
+				r.True(found)
+				r.NotNil(record)
+
+				// Verify the record is actually expired
+				r.True(db.ttlService.GetChecker().IsExpired(record.TTL, record.Timestamp))
+
+				// Delete using Delete method (which uses FindForVerification internally)
+				return tx.Delete(bucket, key)
+			})
+			r.NoError(err)
+
+			// Verify callback was not triggered during delete
+			// In the old implementation, this would cause infinite recursion
+			r.Equal(int32(0), callbackCount)
+
+			// Verify key is actually deleted
+			txGet(t, db, bucket, key, nil, ErrKeyNotFound)
+		})
+	})
+
+	t.Run("delete non-expired key should work normally", func(t *testing.T) {
+		runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc clock.Clock) {
+			r := require.New(t)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+			txPut(t, db, bucket, key, value, 10, nil, nil)
+
+			// Delete before expiration
+			err := db.Update(func(tx *Tx) error {
+				idx, ok := db.Index.BTree.exist(1)
+				r.True(ok)
+
+				// FindForVerification should return the record
+				record, found := idx.FindForVerification(key)
+				r.True(found)
+				r.NotNil(record)
+
+				// Record should not be expired
+				r.False(db.ttlService.GetChecker().IsExpired(record.TTL, record.Timestamp))
+
+				return tx.Delete(bucket, key)
+			})
+			r.NoError(err)
+
+			txGet(t, db, bucket, key, nil, ErrKeyNotFound)
+		})
+	})
+
+	t.Run("timestamp verification prevents wrong deletion", func(t *testing.T) {
+		runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc clock.Clock) {
+			r := require.New(t)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+			// Put key with TTL=1s
+			txPut(t, db, bucket, key, []byte("value1"), 1, nil, nil)
+
+			// Get the original timestamp
+			var originalTimestamp uint64
+			err := db.View(func(tx *Tx) error {
+				idx, ok := db.Index.BTree.exist(1)
+				r.True(ok)
+				record, found := idx.FindForVerification(key)
+				r.True(found)
+				originalTimestamp = record.Timestamp
+				return nil
+			})
+			r.NoError(err)
+
+			// Advance time to expire
+			mc.AdvanceTime(1100 * time.Millisecond)
+
+			// Before async delete executes, key is updated with new value
+			txPut(t, db, bucket, key, []byte("value2"), 10, nil, nil)
+
+			// Get the new timestamp
+			var newTimestamp uint64
+			err = db.View(func(tx *Tx) error {
+				idx, ok := db.Index.BTree.exist(1)
+				r.True(ok)
+				record, found := idx.FindForVerification(key)
+				r.True(found)
+				newTimestamp = record.Timestamp
+				return nil
+			})
+			r.NoError(err)
+
+			// Timestamps should be different
+			r.NotEqual(originalTimestamp, newTimestamp)
+
+			// Simulate async delete with old timestamp
+			err = db.Update(func(tx *Tx) error {
+				idx, ok := db.Index.BTree.exist(1)
+				r.True(ok)
+
+				record, found := idx.FindForVerification(key)
+				r.True(found)
+
+				// Timestamp verification: should NOT delete because timestamps don't match
+				if record.Timestamp == originalTimestamp {
+					return tx.Delete(bucket, key)
+				}
+				return nil
+			})
+			r.NoError(err)
+
+			// Key should still exist with new value
+			txGet(t, db, bucket, key, []byte("value2"), nil)
+		})
+	})
+
+	t.Run("FindForVerification returns expired record without callback", func(t *testing.T) {
+		runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc clock.Clock) {
+			r := require.New(t)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+			txPut(t, db, bucket, key, value, 1, nil, nil)
+
+			// Advance time to expire
+			mc.AdvanceTime(1100 * time.Millisecond)
+
+			err := db.View(func(tx *Tx) error {
+				idx, ok := db.Index.BTree.exist(1)
+				r.True(ok)
+
+				// FindForVerification should return the expired record
+				record, found := idx.FindForVerification(key)
+				r.True(found, "FindForVerification should return expired record")
+				r.NotNil(record)
+
+				// Verify it's actually expired
+				r.True(db.ttlService.GetChecker().IsExpired(record.TTL, record.Timestamp))
+
+				// Compare with Find - should return nil (triggers callback and filters)
+				record2, found2 := idx.Find(key)
+				r.False(found2, "Find should not return expired record")
+				r.Nil(record2)
+
+				return nil
+			})
+			r.NoError(err)
+		})
+	})
+
+	t.Run("concurrent delete operations with FindForVerification", func(t *testing.T) {
+		runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc clock.Clock) {
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+			// Put multiple keys with TTL
+			for i := 0; i < 10; i++ {
+				k := testutils.GetTestBytes(i)
+				txPut(t, db, bucket, k, value, 1, nil, nil)
+			}
+
+			// Advance time to expire all keys
+			mc.AdvanceTime(1100 * time.Millisecond)
+
+			// Simulate concurrent delete operations
+			var wg sync.WaitGroup
+			for i := 0; i < 10; i++ {
+				wg.Add(1)
+				go func(index int) {
+					defer wg.Done()
+					k := testutils.GetTestBytes(index)
+
+					_ = db.Update(func(tx *Tx) error {
+						idx, ok := db.Index.BTree.exist(1)
+						if !ok {
+							return nil
+						}
+
+						// Use FindForVerification - no recursive callbacks
+						record, found := idx.FindForVerification(k)
+						if !found {
+							return nil
+						}
+
+						if db.ttlService.GetChecker().IsExpired(record.TTL, record.Timestamp) {
+							return tx.Delete(bucket, k)
+						}
+						return nil
+					})
+				}(i)
+			}
+
+			wg.Wait()
+
+			// Verify all keys are deleted
+			for i := 0; i < 10; i++ {
+				k := testutils.GetTestBytes(i)
+				txGet(t, db, bucket, k, nil, ErrKeyNotFound)
+			}
+		})
+	})
+}
+
+// TestTx_Delete_FindVsFindForVerification compares behavior of Find and FindForVerification
+func TestTx_Delete_FindVsFindForVerification(t *testing.T) {
+	bucket := "bucket"
+	key := testutils.GetTestBytes(0)
+	value := []byte("value")
+
+	t.Run("Find triggers callback, FindForVerification does not", func(t *testing.T) {
+		runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc clock.Clock) {
+			r := require.New(t)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+			txPut(t, db, bucket, key, value, 1, nil, nil)
+
+			// Advance time to expire
+			mc.AdvanceTime(1100 * time.Millisecond)
+
+			err := db.View(func(tx *Tx) error {
+				idx, ok := db.Index.BTree.exist(1)
+				r.True(ok)
+
+				// Test 1: FindForVerification returns expired record
+				record1, found1 := idx.FindForVerification(key)
+				r.True(found1, "FindForVerification should find expired key")
+				r.NotNil(record1)
+				r.Equal(value, record1.Value)
+
+				// Test 2: Find filters out expired record (and triggers callback)
+				record2, found2 := idx.Find(key)
+				r.False(found2, "Find should filter expired key")
+				r.Nil(record2)
+
+				// Test 3: FindForVerification still works after Find
+				record3, found3 := idx.FindForVerification(key)
+				r.True(found3, "FindForVerification should still find key after Find")
+				r.NotNil(record3)
+
+				return nil
+			})
+			r.NoError(err)
+		})
+	})
+
+	t.Run("both methods return same result for non-expired key", func(t *testing.T) {
+		runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc clock.Clock) {
+			r := require.New(t)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+			txPut(t, db, bucket, key, value, 10, nil, nil)
+
+			err := db.View(func(tx *Tx) error {
+				idx, ok := db.Index.BTree.exist(1)
+				r.True(ok)
+
+				// Both should return the record
+				record1, found1 := idx.FindForVerification(key)
+				r.True(found1)
+				r.NotNil(record1)
+
+				record2, found2 := idx.Find(key)
+				r.True(found2)
+				r.NotNil(record2)
+
+				// Should be the same record
+				r.Equal(record1.Value, record2.Value)
+				r.Equal(record1.Timestamp, record2.Timestamp)
+				r.Equal(record1.TTL, record2.TTL)
+
+				return nil
+			})
+			r.NoError(err)
+		})
+	})
+
+	t.Run("FindForVerification returns nil for non-existent key", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			r := require.New(t)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+			err := db.View(func(tx *Tx) error {
+				idx, ok := db.Index.BTree.exist(1)
+				r.True(ok)
+
+				// Both should return nil for non-existent key
+				record1, found1 := idx.FindForVerification(key)
+				r.False(found1)
+				r.Nil(record1)
+
+				record2, found2 := idx.Find(key)
+				r.False(found2)
+				r.Nil(record2)
+
+				return nil
+			})
+			r.NoError(err)
+		})
 	})
 }
