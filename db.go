@@ -114,9 +114,7 @@ func open(opt Options) (*DB, error) {
 		snowflakeManager:        NewSnowflakeManager(opt.NodeNum),
 	}
 
-	// Initialize TTL service with unified management
-	db.ttlService = ttl.NewService(opt.Clock, opt.ExpiredDeleteType)
-	db.ttlService.SetExpiredCallback(db.handleExpiredKey)
+	db.ttlService = ttl.NewService(opt.Clock, opt.TTLConfig, db.handleExpiredKeys)
 
 	db.Index = db.newIndex()
 
@@ -164,18 +162,18 @@ func open(opt Options) (*DB, error) {
 
 	go db.mergeWorker()
 	go db.doWrites()
-	go db.ttlService.Run()
+	go db.ttlService.Run(db.getIndexAccessor)
 
 	return db, nil
 }
 
 // Open returns a newly initialized DB object with Option.
-func Open(options Options, ops ...Option) (*DB, error) {
-	opts := &options
-	for _, do := range ops {
-		do(opts)
+func Open(opt Options, opts ...Option) (*DB, error) {
+	op := &opt
+	for _, do := range opts {
+		do(op)
 	}
-	return open(*opts)
+	return open(*op)
 }
 
 // Update executes a function within a managed read/write transaction.
@@ -763,14 +761,8 @@ func (db *DB) buildBTreeIdx(record *core.Record, entry *core.Entry) error {
 	bTree := db.Index.BTree.GetWithDefault(bucketId)
 
 	if db.ttlService.GetChecker().IsExpired(record.TTL, record.Timestamp) || meta.Flag == DataDeleteFlag {
-		db.ttlService.UnregisterTTL(bucketId, string(key))
 		bTree.Delete(key)
 	} else {
-		if meta.TTL != Persistent {
-			db.ttlService.RegisterTTL(bucketId, string(key), expireTime(meta.Timestamp, meta.TTL), DataStructureBTree, record.Timestamp)
-		} else {
-			db.ttlService.UnregisterTTL(bucketId, string(key))
-		}
 		bTree.InsertRecord(record.Key, record)
 	}
 	return nil
@@ -1022,40 +1014,96 @@ func (db *DB) IsClose() bool {
 	return db.closed
 }
 
-// handleExpiredKey processes a single expiration event asynchronously.
-// It validates the timestamp to prevent race conditions where a key is:
-// 1. Set with short TTL (timestamp T1)
+// handleExpiredKeys processes a batch of expiration events in a single transaction.
+// This batch processing approach significantly reduces transaction overhead compared
+// to processing each expired key individually.
+//
+// It validates timestamps to prevent race conditions where a key is:
+// 1. Set with TTL (timestamp T1)
 // 2. Expires and triggers async deletion
 // 3. Re-inserted with new TTL (timestamp T2)
 // 4. Async deletion from step 2 executes and mistakenly deletes the new key
+//
 // By comparing timestamps, we ensure only the originally expired key is deleted.
-func (db *DB) handleExpiredKey(event ttl.ExpirationEvent) {
+func (db *DB) handleExpiredKeys(events []*ttl.ExpirationEvent) {
+	if len(events) == 0 {
+		return
+	}
+
 	_ = db.Update(func(tx *Tx) error {
-		bucket, err := db.bucketManager.GetBucketById(event.BucketId)
-		if err != nil {
-			return err
-		}
+		for _, event := range events {
+			bucket, err := db.bucketManager.GetBucketById(event.BucketId)
+			if err != nil {
+				continue
+			}
 
-		// Verify the key still exists and has the same timestamp
-		// Use FindForVerification to get the record without triggering callbacks (avoid recursion)
-		idx, ok := db.Index.BTree.exist(event.BucketId)
-		if !ok {
-			return nil
-		}
+			// Verify the key still exists and has the same timestamp
+			// Use FindForVerification to get the record without triggering callbacks (avoid recursion)
+			idx, ok := db.Index.BTree.exist(event.BucketId)
+			if !ok {
+				continue
+			}
 
-		record, found := idx.FindForVerification(event.Key)
-		if !found {
-			return nil
-		}
+			record, found := idx.FindForVerification(event.Key)
+			if !found {
+				continue
+			}
 
-		// Only delete if timestamp matches (same record that expired)
-		// Also verify it's actually expired (in case it was updated)
-		if record.Timestamp == event.Timestamp && db.ttlService.GetChecker().IsExpired(record.TTL, record.Timestamp) {
-			return tx.Delete(bucket.Name, event.Key)
+			// Only delete if timestamp matches (same record that expired)
+			// Also verify it's actually expired (in case it was updated)
+			if record.Timestamp == event.Timestamp && db.ttlService.GetChecker().IsExpired(record.TTL, record.Timestamp) {
+				_ = tx.Delete(bucket.Name, event.Key)
+			}
 		}
 
 		return nil
 	})
+}
+
+// getIndexAccessor returns an IndexAccessor for the TTL scanner.
+// This allows the scanner to access bucket and key information for scanning.
+func (db *DB) getIndexAccessor() ttl.IndexAccessor {
+	return ttl.IndexAccessor{
+		RangeBuckets: func(f func(bucketId uint64) bool) {
+			if db.Index == nil {
+				return
+			}
+			// Use bucketManager as the source of truth for buckets
+			for bucketId := range db.bucketManager.BucketInfoMapper {
+				if !f(bucketId) {
+					return
+				}
+			}
+		},
+		SampleRecords: func(bucketId uint64, count int) ([]*core.Record, error) {
+			bucket, err := db.bucketManager.GetBucketById(bucketId)
+			if err != nil {
+				return nil, nil
+			}
+
+			switch bucket.Ds {
+			case DataStructureBTree:
+				if idx, ok := db.Index.BTree.exist(bucketId); ok {
+					return idx.SampleRandomRecords(count), nil
+				}
+			case DataStructureSet:
+				return nil, nil
+			case DataStructureSortedSet:
+				return nil, nil
+			case DataStructureList:
+				return nil, nil
+			}
+
+			return nil, nil
+		},
+		GetDataStructure: func(bucketId uint64) uint16 {
+			bucket, err := db.bucketManager.GetBucketById(bucketId)
+			if err != nil {
+				return DataStructureBTree // default
+			}
+			return bucket.Ds
+		},
+	}
 }
 
 func (db *DB) rebuildBucketManager() error {

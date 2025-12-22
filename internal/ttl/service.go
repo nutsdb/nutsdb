@@ -18,63 +18,95 @@ import (
 	"time"
 
 	"github.com/nutsdb/nutsdb/internal/core"
-	"github.com/nutsdb/nutsdb/internal/ttl/checker"
-	"github.com/nutsdb/nutsdb/internal/ttl/clock"
 )
 
-// ExpiredCallback is a function type for handling the actual deletion of expired keys.
-// It's called by the background worker to perform the deletion.
-type ExpiredCallback func(event ExpirationEvent)
+// IndexAccessor provides access to the index for scanning.
+// It uses function fields to decouple from the DB implementation.
+type IndexAccessor struct {
+	// RangeBuckets iterates over all buckets.
+	// Returns false from the callback to stop iteration.
+	RangeBuckets func(f func(bucketId uint64) bool)
 
-// Service provides a unified TTL management facade that coordinates both
-// active expiration (timer-based) and passive expiration (check-based).
-type Service struct {
-	manager         Manager          // Active expiration using timers
-	checker         *checker.Checker // Passive expiration checking
-	clock           clock.Clock      // Unified clock source
-	expiredCallback ExpiredCallback  // Handler for actual deletion
-	queue           *expirationQueue // Queue for expiration events
-	workerCloseCh   chan struct{}    // Channel to signal worker shutdown
-	workerDone      chan struct{}    // Channel to wait for worker completion
+	// SampleRecords returns a random sample of records from the specified bucket.
+	SampleRecords func(bucketId uint64, count int) ([]*core.Record, error)
+
+	// GetDataStructure returns the data structure type for a bucket.
+	GetDataStructure func(bucketId uint64) uint16
 }
 
-// NewService creates a new TTL service with the specified clock and expiration deletion type.
-// The service manages both active (timer-based) and passive (check-based) expiration strategies.
-// If a MockClock is provided, a MockManager will be used for testing purposes.
-func NewService(clk clock.Clock, expiredDeleteType ExpiredDeleteType) *Service {
-	chk := checker.NewChecker(clk)
+// BatchExpiredCallback is a function type for handling batch deletion of expired keys.
+// It receives a batch of expiration events to process together in a single transaction.
+type BatchExpiredCallback func(events []*ExpirationEvent)
 
-	var mgr Manager
-	if mc, ok := clk.(*clock.MockClock); ok {
-		mgr = NewMockManager(mc)
-	} else {
-		mgr = NewTimerManager(expiredDeleteType)
-	}
+// Service provides unified TTL management with passive and active expiration.
+// 1. Passive: Check TTL when reading a key
+// 2. Active: Periodic sampling to find expired keys
+//
+// Benefits:
+// - No timer per key (saves memory)
+// - Batch processing (reduces transaction overhead)
+// - Adaptive sampling algorithm
+type Service struct {
+	checker         *Checker             // Passive expiration
+	scanner         *Scanner             // Active expiration
+	clock           Clock                // Unified clock source
+	expiredCallback BatchExpiredCallback // Handler for actual batch deletion
+	queue           *expirationQueue     // Queue for expiration events
+	workerCloseCh   chan struct{}        // Channel to signal worker shutdown
+	workerDone      chan struct{}        // Channel to wait for worker completion
+	batchSize       int                  // Batch size for processing expiration events
+	batchTimeout    time.Duration        // Timeout for processing expiration events
+}
+
+// NewService creates a TTL service with the specified clock and configuration.
+func NewService(clk Clock, config Config, callback BatchExpiredCallback) *Service {
+	config.Validate()
+
+	chk := NewChecker(clk)
+
+	scanner := NewScanner(ScannerConfig{
+		ScanInterval:     config.ScanInterval,
+		SampleSize:       config.SampleSize,
+		ExpiredThreshold: config.ExpiredThreshold,
+		MaxScanKeys:      config.MaxScanKeys,
+	})
 
 	service := &Service{
-		manager:       mgr,
-		checker:       chk,
-		clock:         clk,
-		queue:         newExpirationQueue(1000),
-		workerCloseCh: make(chan struct{}),
-		workerDone:    make(chan struct{}),
+		checker:         chk,
+		scanner:         scanner,
+		clock:           clk,
+		expiredCallback: callback,
+		queue:           newExpirationQueue(config.QueueSize),
+		workerCloseCh:   make(chan struct{}),
+		workerDone:      make(chan struct{}),
+		batchSize:       config.BatchSize,
+		batchTimeout:    config.BatchTimeout,
 	}
 
-	// Set up unified callback routing
-	chk.SetExpiredCallback(service.onExpired)
+	// Set up callback routing from checker with adapter
+	chk.SetExpiredCallback(func(bucketId uint64, key []byte, ds uint16, timestamp uint64) {
+		service.onExpired(bucketId, key, ds, timestamp)
+	})
+
+	// Set up callback routing from scanner
+	scanner.SetCallback(service.onExpiredBatch)
+
+	// Inject checker into scanner so it can check expirations locally
+	scanner.SetChecker(chk)
 
 	return service
 }
 
-// Run starts the TTL service, initiating active expiration monitoring and background worker.
-func (s *Service) Run() {
+// Run starts the TTL service with periodic scanning.
+// The getIndex function is called each scan cycle to get current index state.
+func (s *Service) Run(getIndex func() IndexAccessor) {
 	go s.processExpirationEvents()
-	s.manager.Run()
+	go s.scanner.Run(getIndex)
 }
 
 // Close stops the TTL service and releases all resources.
 func (s *Service) Close() {
-	s.manager.Close()
+	s.scanner.Stop()
 
 	// Close queue first to stop accepting new events
 	s.queue.close()
@@ -87,47 +119,29 @@ func (s *Service) Close() {
 		close(s.workerCloseCh)
 	}
 
-	// Don't wait for worker to finish - it may be blocked on DB operations
-	// Remaining events will be filtered on next startup
-}
-
-// SetExpiredCallback sets the handler function for deleting expired keys.
-// This handler is called by the background worker to perform actual deletion.
-func (s *Service) SetExpiredCallback(callback ExpiredCallback) {
-	s.expiredCallback = callback
+	// Wait for worker to finish with timeout
+	select {
+	case <-s.workerDone:
+	case <-time.After(time.Second):
+		// Timeout, worker may be blocked
+	}
 }
 
 // GetChecker returns the checker instance for use by data structures.
 // Data structures use the checker for passive expiration validation during reads.
-func (s *Service) GetChecker() *checker.Checker {
+func (s *Service) GetChecker() *Checker {
 	return s.checker
 }
 
 // GetClock returns the unified clock instance.
-func (s *Service) GetClock() clock.Clock {
+func (s *Service) GetClock() Clock {
 	return s.clock
 }
 
-// RegisterTTL registers a key for active expiration monitoring.
-// When the TTL expires, the callback will be triggered with the provided parameters.
-func (s *Service) RegisterTTL(bucketId core.BucketId, key string, expire time.Duration, ds uint16, timestamp uint64) {
-	s.manager.Add(bucketId, key, expire, ds, timestamp, s.onExpired)
-}
-
-// UnregisterTTL removes a key from active expiration monitoring.
-func (s *Service) UnregisterTTL(bucketId core.BucketId, key string) {
-	s.manager.Del(bucketId, key)
-}
-
-// ExistTTL checks if a key is currently registered for active expiration.
-func (s *Service) ExistTTL(bucketId core.BucketId, key string) bool {
-	return s.manager.Exist(bucketId, key)
-}
-
-// onExpired is the internal unified callback handler for expired keys.
-// It routes expiration events from both manager and checker to the event queue.
-func (s *Service) onExpired(bucketId core.BucketId, key []byte, ds uint16, timestamp uint64) {
-	event := ExpirationEvent{
+// onExpired is the callback for single expiration events (from passive checking).
+// It routes expiration events to the queue for batch processing.
+func (s *Service) onExpired(bucketId uint64, key []byte, ds uint16, timestamp uint64) {
+	event := &ExpirationEvent{
 		BucketId:  bucketId,
 		Key:       key,
 		Ds:        ds,
@@ -136,25 +150,61 @@ func (s *Service) onExpired(bucketId core.BucketId, key []byte, ds uint16, times
 	s.queue.push(event)
 }
 
-// processExpirationEvents is a background worker that processes expiration events.
-// It runs in a separate goroutine and handles async deletion with proper verification.
+// onExpiredBatch is the callback for batch expiration events (from scanner).
+// It routes all events to the queue for batch processing by calling onExpired for each.
+func (s *Service) onExpiredBatch(events []*ExpirationEvent) {
+	for _, event := range events {
+		s.onExpired(event.BucketId, event.Key, event.Ds, event.Timestamp)
+	}
+}
+
+// processExpirationEvents processes expiration events in batches for efficient deletion.
 func (s *Service) processExpirationEvents() {
 	defer close(s.workerDone)
+
+	batch := make([]*ExpirationEvent, 0, s.batchSize)
+	timer := time.NewTimer(s.batchTimeout)
+	defer timer.Stop()
+
+	flushBatch := func() {
+		if len(batch) > 0 && s.expiredCallback != nil {
+			s.expiredCallback(batch)
+		}
+		batch = batch[:0]
+	}
 
 	for {
 		select {
 		case <-s.workerCloseCh:
-			// Worker is shutting down, exit immediately
-			// Remaining events will be filtered on next startup
+			// Worker is shutting down, flush remaining batch
+			flushBatch()
 			return
+
 		case event, ok := <-s.queue.events:
 			if !ok {
-				// Queue closed
+				// Queue closed, flush remaining batch
+				flushBatch()
 				return
 			}
-			if s.expiredCallback != nil {
-				s.expiredCallback(event)
+
+			batch = append(batch, event)
+
+			// Flush when batch is full
+			if len(batch) >= s.batchSize {
+				flushBatch()
+				// Reset timer
+				if !timer.Stop() {
+					select {
+					case <-timer.C:
+					default:
+					}
+				}
+				timer.Reset(s.batchTimeout)
 			}
+
+		case <-timer.C:
+			flushBatch()
+			timer.Reset(s.batchTimeout)
 		}
 	}
 }

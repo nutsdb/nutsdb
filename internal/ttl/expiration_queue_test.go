@@ -23,7 +23,7 @@ func TestExpirationQueue_PushPop(t *testing.T) {
 	eq := newExpirationQueue(10)
 	defer eq.close()
 
-	event := ExpirationEvent{
+	event := &ExpirationEvent{
 		BucketId:  1,
 		Key:       []byte("test-key"),
 		Ds:        2, // DataStructureBTree
@@ -53,7 +53,7 @@ func TestExpirationQueue_Deduplication(t *testing.T) {
 	eq := newExpirationQueue(10)
 	defer eq.close()
 
-	event := ExpirationEvent{
+	event := &ExpirationEvent{
 		BucketId:  1,
 		Key:       []byte("test-key"),
 		Ds:        2,
@@ -87,14 +87,14 @@ func TestExpirationQueue_DifferentTimestamps(t *testing.T) {
 	eq := newExpirationQueue(10)
 	defer eq.close()
 
-	event1 := ExpirationEvent{
+	event1 := &ExpirationEvent{
 		BucketId:  1,
 		Key:       []byte("test-key"),
 		Ds:        2,
 		Timestamp: 12345,
 	}
 
-	event2 := ExpirationEvent{
+	event2 := &ExpirationEvent{
 		BucketId:  1,
 		Key:       []byte("test-key"),
 		Ds:        2,
@@ -135,11 +135,11 @@ func TestExpirationQueue_Close(t *testing.T) {
 		Timestamp: 12345,
 	}
 
-	eq.push(event)
+	eq.push(&event)
 	eq.close()
 
 	// Should not be able to push after close
-	if eq.push(event) {
+	if eq.push(&event) {
 		t.Fatal("Should not push to closed queue")
 	}
 

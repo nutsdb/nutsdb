@@ -15,7 +15,6 @@ import (
 	"github.com/nutsdb/nutsdb/internal/core"
 	"github.com/nutsdb/nutsdb/internal/data"
 	"github.com/nutsdb/nutsdb/internal/ttl"
-	"github.com/nutsdb/nutsdb/internal/ttl/clock"
 	"github.com/nutsdb/nutsdb/internal/utils"
 )
 
@@ -1311,16 +1310,15 @@ func TestMergeV2WriteEntryHashesSetAndSortedSet(t *testing.T) {
 }
 
 func TestMergeV2ApplyLookupUpdatesSecondaryIndexes(t *testing.T) {
-	clk := clock.NewRealClock()
+	clk := ttl.NewRealClock()
 	db := &DB{
-		opt:        DefaultOptions,
-		ttlService: ttl.NewService(clk, ttl.TimeWheel),
+		opt: DefaultOptions,
 		bucketManager: &BucketManager{
 			BucketInfoMapper: map[core.BucketId]*core.Bucket{},
 		},
 	}
-
 	db.Index = db.newIndex()
+	db.ttlService = ttl.NewService(clk, ttl.DefaultConfig(), db.handleExpiredKeys)
 
 	// Prepare buckets
 	buckets := []struct {
@@ -2001,14 +1999,13 @@ func TestMergeV2RewriteFileSkipsCorruptedEntries(t *testing.T) {
 		WithTxID(goodEntry.Meta.TxID).
 		WithKey(goodEntry.Key))
 
-	clk := clock.NewRealClock()
+	clk := ttl.NewRealClock()
 	db := &DB{
 		opt: Options{
 			Dir:                  dir,
 			BufferSizeOfRecovery: 4096,
 			SegmentSize:          1 << 16,
 		},
-		ttlService: ttl.NewService(clk, ttl.TimeWheel),
 		bucketManager: &BucketManager{
 			BucketInfoMapper: map[core.BucketId]*core.Bucket{
 				bucketID: {Meta: &core.BucketMeta{}, Id: bucketID, Ds: uint16(DataStructureBTree)},
@@ -2017,6 +2014,7 @@ func TestMergeV2RewriteFileSkipsCorruptedEntries(t *testing.T) {
 	}
 	db.Index = db.newIndex()
 	db.Index.BTree.Idx[bucketID] = bt
+	db.ttlService = ttl.NewService(clk, ttl.DefaultConfig(), db.handleExpiredKeys)
 
 	mock := &mockRWManager{}
 	job := &mergeV2Job{
