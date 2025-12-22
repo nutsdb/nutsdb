@@ -17,10 +17,12 @@ package data
 import (
 	"bytes"
 	"errors"
+	"math/rand"
 	"regexp"
+	"time"
 
 	"github.com/nutsdb/nutsdb/internal/core"
-	"github.com/nutsdb/nutsdb/internal/ttl/checker"
+	"github.com/nutsdb/nutsdb/internal/ttl"
 	"github.com/tidwall/btree"
 )
 
@@ -30,18 +32,20 @@ var ErrKeyNotFound = errors.New("key not found")
 // BTree represents a B-tree index with optional TTL support.
 type BTree struct {
 	index      *btree.BTreeG[*core.Item[core.Record]]
-	ttlChecker *checker.Checker
+	ttlChecker *ttl.Checker
 	bucketId   uint64
+	rand       *rand.Rand
 }
 
 // NewBTree creates a new BTree instance with optional TTL support.
 // If no ttlChecker is provided, TTL checking is disabled (useful for internal use like List).
-func NewBTree(bucketId uint64, ttlCheckers ...*checker.Checker) *BTree {
+func NewBTree(bucketId uint64, ttlCheckers ...*ttl.Checker) *BTree {
 	bt := &BTree{
 		index: btree.NewBTreeG(func(a, b *core.Item[core.Record]) bool {
 			return bytes.Compare(a.Key, b.Key) == -1
 		}),
 		bucketId: bucketId,
+		rand:     rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 	if len(ttlCheckers) > 0 {
 		bt.ttlChecker = ttlCheckers[0]
@@ -52,6 +56,7 @@ func NewBTree(bucketId uint64, ttlCheckers ...*checker.Checker) *BTree {
 
 // isValid checks if an item is valid (not expired) using the TTL checker.
 // If no TTL checker is configured, all items are considered valid.
+// This method triggers expiration callbacks for expired items.
 func (bt *BTree) isValid(item *core.Item[core.Record]) bool {
 	if bt.ttlChecker == nil {
 		return item.Record != nil
@@ -65,8 +70,8 @@ func (bt *BTree) getItem(key []byte) (*core.Item[core.Record], bool) {
 }
 
 // getValidItem retrieves an item by key with TTL validation.
+// Triggers expiration callbacks for expired items.
 func (bt *BTree) getValidItem(key []byte) (*core.Item[core.Record], bool) {
-
 	if item, ok := bt.getItem(key); ok && bt.isValid(item) {
 		return item, true
 	}
@@ -79,11 +84,59 @@ func (bt *BTree) scan() Scanner {
 }
 
 // Find retrieves a record by key, automatically filtering expired records.
+// Triggers expiration callbacks for expired records.
 func (bt *BTree) Find(key []byte) (*core.Record, bool) {
 	if item, ok := bt.getValidItem(key); ok {
 		return item.Record, true
 	}
 	return nil, false
+}
+
+// FindForVerification retrieves a record by key WITHOUT triggering expiration callbacks.
+// This is used for internal verification (e.g., checking timestamps before deletion).
+// Returns the record even if expired, allowing caller to check timestamp.
+func (bt *BTree) FindForVerification(key []byte) (*core.Record, bool) {
+	item, ok := bt.getItem(key)
+	if !ok || item.Record == nil {
+		return nil, false
+	}
+	return item.Record, true
+}
+
+// SampleRandomRecords randomly samples 'count' records from the BTree.
+func (bt *BTree) SampleRandomRecords(count int) []*core.Record {
+	length := bt.index.Len()
+	if length == 0 {
+		return nil
+	}
+
+	if count > length {
+		count = length
+	}
+
+	records := make([]*core.Record, 0, count)
+	// Use a map to track visited indices to avoid duplicates
+	visited := make(map[int]struct{})
+
+	for len(records) < count {
+		// Safety break if we can't find new items (shouldn't happen with logic above but good practice)
+		if len(visited) >= length {
+			break
+		}
+
+		idx := bt.rand.Intn(length)
+		if _, exists := visited[idx]; exists {
+			continue
+		}
+		visited[idx] = struct{}{}
+
+		item, ok := bt.index.GetAt(idx)
+		if ok && item != nil {
+			records = append(records, item.Record)
+		}
+	}
+
+	return records
 }
 
 func (bt *BTree) InsertRecord(key []byte, record *core.Record) bool {
@@ -193,7 +246,7 @@ var _ Scanner = (*BTreeScanner)(nil)
 // BTreeScanner provides a fluent API for building BTree scan operations.
 type BTreeScanner struct {
 	bt         *BTree
-	ttlChecker *checker.Checker
+	ttlChecker *ttl.Checker
 	ds         uint16
 
 	// scan parameters
@@ -374,6 +427,10 @@ func (b *BTreeScanner) CollectItems() []*core.Item[core.Record] {
 		}
 		return true
 	})
+
+	if b.ttlChecker != nil && !b.skipTTL {
+		results = b.ttlChecker.FilterExpiredItems(b.bt.bucketId, results, b.ds)
+	}
 
 	return results
 }

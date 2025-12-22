@@ -16,97 +16,186 @@ package ttl
 
 import (
 	"time"
-
-	"github.com/nutsdb/nutsdb/internal/core"
-	"github.com/nutsdb/nutsdb/internal/ttl/checker"
-	"github.com/nutsdb/nutsdb/internal/ttl/clock"
 )
 
-// ExpiredCallback is a function type for handling expired record notifications.
-// timestamp is the record timestamp when expiration was detected, used for validation.
-type ExpiredCallback func(bucketId uint64, key []byte, ds uint16, timestamp uint64)
+// BatchExpiredCallback is a function type for handling batch deletion of expired keys.
+// It receives a batch of expiration events to process together in a single transaction.
+type BatchExpiredCallback func(events []*ExpirationEvent)
 
-// Service provides a unified TTL management facade that coordinates both
-// active expiration (timer-based) and passive expiration (check-based).
+// ScanFunc is the type for the scan function that performs expiration scanning.
+// It is called by the scanner in each tick and should perform the scan within a transaction.
+// This type is defined in ttl package to avoid circular dependencies.
+type ScanFunc func() ([]*ExpirationEvent, error)
+
+// Service provides unified TTL management with passive and active expiration.
+// 1. Passive: Check TTL when reading a key
+// 2. Active: Periodic sampling to find expired keys
+//
+// Benefits:
+// - No timer per key (saves memory)
+// - Batch processing (reduces transaction overhead)
+// - Adaptive sampling algorithm
 type Service struct {
-	manager  Manager          // Active expiration using timers
-	checker  *checker.Checker // Passive expiration checking
-	clock    clock.Clock      // Unified clock source
-	callback ExpiredCallback  // Callback for expired keys
+	checker         *Checker             // Passive expiration
+	scanner         *Scanner             // Active expiration
+	clock           Clock                // Unified clock source
+	scanFn          ScanFunc             // Scan function called each tick
+	expiredCallback BatchExpiredCallback // Handler for actual batch deletion
+	queue           *expirationQueue     // Queue for expiration events
+	workerCloseCh   chan struct{}        // Channel to signal worker shutdown
+	workerDone      chan struct{}        // Channel to wait for worker completion
+	batchSize       int                  // Batch size for processing expiration events
+	batchTimeout    time.Duration        // Timeout for processing expiration events
 }
 
-// NewService creates a new TTL service with the specified clock and expiration deletion type.
-// The service manages both active (timer-based) and passive (check-based) expiration strategies.
-// If a MockClock is provided, a MockManager will be used for testing purposes.
-func NewService(clk clock.Clock, expiredDeleteType ExpiredDeleteType) *Service {
-	chk := checker.NewChecker(clk)
+// NewService creates a TTL service with the specified clock and configuration.
+func NewService(clk Clock, config Config, callback BatchExpiredCallback, scanFn ScanFunc) *Service {
+	config.Validate()
 
-	var mgr Manager
-	if mc, ok := clk.(*clock.MockClock); ok {
-		mgr = NewMockManager(mc)
-	} else {
-		mgr = NewTimerManager(expiredDeleteType)
-	}
+	chk := NewChecker(clk)
+
+	scanner := NewScanner(ScannerConfig{
+		ScanInterval:     config.ScanInterval,
+		SampleSize:       config.SampleSize,
+		ExpiredThreshold: config.ExpiredThreshold,
+		MaxScanKeys:      config.MaxScanKeys,
+	})
 
 	service := &Service{
-		manager: mgr,
-		checker: chk,
-		clock:   clk,
+		checker:         chk,
+		scanner:         scanner,
+		clock:           clk,
+		expiredCallback: callback,
+		scanFn:          scanFn,
+		queue:           newExpirationQueue(config.QueueSize),
+		workerCloseCh:   make(chan struct{}),
+		workerDone:      make(chan struct{}),
+		batchSize:       config.BatchSize,
+		batchTimeout:    config.BatchTimeout,
 	}
 
-	// Set up unified callback routing
-	chk.SetExpiredCallback(service.onExpired)
+	// Set up callback routing from checker with adapter
+	chk.SetExpiredCallback(func(bucketId uint64, key []byte, ds uint16, timestamp uint64) {
+		service.onExpired(bucketId, key, ds, timestamp)
+	})
+
+	// Set up callback routing from scanner
+	scanner.SetCallback(service.onExpiredBatch)
+
+	// Inject checker into scanner so it can check expirations locally
+	scanner.SetChecker(chk)
 
 	return service
 }
 
-// Run starts the TTL service, initiating active expiration monitoring.
+// Run starts the TTL service with periodic scanning.
+// The scanFn is called each scan cycle to perform the scan within a transaction.
 func (s *Service) Run() {
-	s.manager.Run()
+	go s.processExpirationEvents()
+	go s.scanner.Run(s.scanFn)
 }
 
 // Close stops the TTL service and releases all resources.
 func (s *Service) Close() {
-	s.manager.Close()
-}
+	s.scanner.Stop()
 
-// SetExpiredCallback sets the callback function to be invoked when keys expire.
-// This callback is triggered by both active (timer) and passive (check) expiration.
-func (s *Service) SetExpiredCallback(callback ExpiredCallback) {
-	s.callback = callback
+	// Close queue first to stop accepting new events
+	s.queue.close()
+
+	// Signal worker to stop (non-blocking, check if already closed)
+	select {
+	case <-s.workerCloseCh:
+		// Already closed
+	default:
+		close(s.workerCloseCh)
+	}
+
+	// Wait for worker to finish with timeout
+	select {
+	case <-s.workerDone:
+	case <-time.After(time.Second):
+		// Timeout, worker may be blocked
+	}
 }
 
 // GetChecker returns the checker instance for use by data structures.
 // Data structures use the checker for passive expiration validation during reads.
-func (s *Service) GetChecker() *checker.Checker {
+func (s *Service) GetChecker() *Checker {
 	return s.checker
 }
 
 // GetClock returns the unified clock instance.
-func (s *Service) GetClock() clock.Clock {
+func (s *Service) GetClock() Clock {
 	return s.clock
 }
 
-// RegisterTTL registers a key for active expiration monitoring.
-// When the TTL expires, the callback will be triggered with the provided parameters.
-func (s *Service) RegisterTTL(bucketId core.BucketId, key string, expire time.Duration, ds uint16, timestamp uint64) {
-	s.manager.Add(bucketId, key, expire, ds, timestamp, s.onExpired)
+// onExpired is the callback for single expiration events (from passive checking).
+// It routes expiration events to the queue for batch processing.
+func (s *Service) onExpired(bucketId uint64, key []byte, ds uint16, timestamp uint64) {
+	event := &ExpirationEvent{
+		BucketId:  bucketId,
+		Key:       key,
+		Ds:        ds,
+		Timestamp: timestamp,
+	}
+	s.queue.push(event)
 }
 
-// UnregisterTTL removes a key from active expiration monitoring.
-func (s *Service) UnregisterTTL(bucketId core.BucketId, key string) {
-	s.manager.Del(bucketId, key)
+// onExpiredBatch is the callback for batch expiration events (from scanner).
+// It routes all events to the queue for batch processing by calling onExpired for each.
+func (s *Service) onExpiredBatch(events []*ExpirationEvent) {
+	for _, event := range events {
+		s.onExpired(event.BucketId, event.Key, event.Ds, event.Timestamp)
+	}
 }
 
-// ExistTTL checks if a key is currently registered for active expiration.
-func (s *Service) ExistTTL(bucketId core.BucketId, key string) bool {
-	return s.manager.Exist(bucketId, key)
-}
+// processExpirationEvents processes expiration events in batches for efficient deletion.
+func (s *Service) processExpirationEvents() {
+	defer close(s.workerDone)
 
-// onExpired is the internal unified callback handler for expired keys.
-// It routes expiration events from both manager and checker to the user-defined callback.
-func (s *Service) onExpired(bucketId core.BucketId, key []byte, ds uint16, timestamp uint64) {
-	if s.callback != nil {
-		s.callback(bucketId, key, ds, timestamp)
+	batch := make([]*ExpirationEvent, 0, s.batchSize)
+	timer := time.NewTimer(s.batchTimeout)
+	defer timer.Stop()
+
+	flushBatch := func() {
+		if len(batch) > 0 && s.expiredCallback != nil {
+			s.expiredCallback(batch)
+		}
+		batch = batch[:0]
+	}
+
+	for {
+		select {
+		case <-s.workerCloseCh:
+			// Worker is shutting down, flush remaining batch
+			flushBatch()
+			return
+
+		case event, ok := <-s.queue.events:
+			if !ok {
+				// Queue closed, flush remaining batch
+				flushBatch()
+				return
+			}
+
+			batch = append(batch, event)
+
+			// Flush when batch is full
+			if len(batch) >= s.batchSize {
+				flushBatch()
+				// Reset timer
+				if !timer.Stop() {
+					select {
+					case <-timer.C:
+					default:
+					}
+				}
+				timer.Reset(s.batchTimeout)
+			}
+
+		case <-timer.C:
+			flushBatch()
+			timer.Reset(s.batchTimeout)
+		}
 	}
 }

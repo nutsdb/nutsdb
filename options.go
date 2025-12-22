@@ -20,7 +20,6 @@ import (
 	"github.com/nutsdb/nutsdb/internal/data"
 	"github.com/nutsdb/nutsdb/internal/fileio"
 	"github.com/nutsdb/nutsdb/internal/ttl"
-	"github.com/nutsdb/nutsdb/internal/ttl/clock"
 )
 
 // EntryIdxMode represents entry index mode.
@@ -34,15 +33,8 @@ const (
 	HintKeyAndRAMIdxMode
 )
 
-type ExpiredDeleteType = ttl.ExpiredDeleteType
-
-const (
-	// TimeWheel represents use time wheel to do expired deletion
-	TimeWheel ExpiredDeleteType = iota
-
-	// TimeHeap represents use time heap to do expired deletion
-	TimeHeap
-)
+// TTLConfig is an alias for ttl.Config for convenience.
+type TTLConfig = ttl.Config
 
 // ListImplementationType defines the implementation type for List data structure.
 type ListImplementationType data.ListImplementationType
@@ -137,16 +129,15 @@ type Options struct {
 	// MaxBatchSize represents max batch size in bytes
 	MaxBatchSize int64
 
-	// ExpiredDeleteType represents the data structure used for expired deletion
-	// TimeWheel means use the time wheel, You can use it when you need high performance or low memory usage
-	// TimeHeap means use the time heap, You can use it when you need to delete precisely or memory usage will be high
-	ExpiredDeleteType ExpiredDeleteType
-
 	// max write record num
 	MaxWriteRecordCount int64
 
 	// cache size for HintKeyAndRAMIdxMode
 	HintKeyAndRAMIdxCacheSize int
+
+	// TTLConfig contains configuration for TTL expiration handling.
+	// If not set, DefaultTTLConfig() will be used.
+	TTLConfig TTLConfig
 
 	// EnableHintFile represents if enable hint file feature.
 	// If EnableHintFile is true, hint files will be created and used for faster database startup.
@@ -167,7 +158,7 @@ type Options struct {
 
 	// Clock provides time operations for TTL calculations.
 	// If nil, a RealClock will be used by default.
-	Clock clock.Clock
+	Clock ttl.Clock
 }
 
 const (
@@ -193,12 +184,12 @@ var DefaultOptions = func() Options {
 		MaxBatchSize:              (15 * defaultSegmentSize / 4) / 100,
 		MaxBatchCount:             (15 * defaultSegmentSize / 4) / 100 / 100,
 		HintKeyAndRAMIdxCacheSize: 0,
-		ExpiredDeleteType:         TimeWheel,
+		TTLConfig:                 ttl.DefaultConfig(),
 		EnableHintFile:            false,
 		EnableMergeV2:             false,
 		ListImpl:                  ListImplementationType(ListImplBTree),
 		EnableWatch:               false,
-		Clock:                     clock.NewRealClock(),
+		Clock:                     ttl.NewRealClock(),
 	}
 }()
 
@@ -324,8 +315,21 @@ func WithListImpl(implType ListImplementationType) Option {
 	}
 }
 
-func WithClock(clock clock.Clock) Option {
+func WithClock(clock ttl.Clock) Option {
 	return func(opt *Options) {
 		opt.Clock = clock
 	}
+}
+
+// WithTTLConfig sets the TTL configuration.
+func WithTTLConfig(config TTLConfig) Option {
+	return func(opt *Options) {
+		opt.TTLConfig = config
+	}
+}
+
+// DefaultTTLConfig returns the default TTL configuration.
+// This is a convenience function that wraps ttl.DefaultConfig().
+func DefaultTTLConfig() TTLConfig {
+	return ttl.DefaultConfig()
 }

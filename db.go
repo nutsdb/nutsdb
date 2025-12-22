@@ -26,6 +26,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/bwmarrin/snowflake"
@@ -61,7 +62,7 @@ type (
 		mu                      sync.RWMutex
 		KeyCount                int // total key number ,include expired, deleted, repeated.
 		closed                  bool
-		isMerging               bool
+		isMerging               int32 // atomic flag to indicate merge is in progress
 		fm                      *FileManager
 		flock                   *flock.Flock
 		commitBuffer            *bytes.Buffer
@@ -107,16 +108,26 @@ func open(opt Options) (*DB, error) {
 		closed:                  false,
 		fm:                      NewFileManager(opt.RWMode, opt.MaxFdNumsInCache, opt.CleanFdsCacheThreshold, opt.SegmentSize),
 		mergeStartCh:            make(chan struct{}),
-		mergeEndCh:              make(chan error),
+		mergeEndCh:              make(chan error, 1),
 		mergeWorkCloseCh:        make(chan struct{}),
 		writeCh:                 make(chan *request, KvWriteChCapacity),
 		hintKeyAndRAMIdxModeLru: utils.NewLruCache(opt.HintKeyAndRAMIdxCacheSize),
 		snowflakeManager:        NewSnowflakeManager(opt.NodeNum),
 	}
 
-	// Initialize TTL service with unified management
-	db.ttlService = ttl.NewService(opt.Clock, opt.ExpiredDeleteType)
-	db.ttlService.SetExpiredCallback(db.handleExpiredKey)
+	scanFn := func() ([]*ttl.ExpirationEvent, error) {
+		// Check if db is closing (Index is nil) to avoid race
+		if db.Index == nil {
+			return nil, nil
+		}
+		var events []*ttl.ExpirationEvent
+		db.View(func(tx *Tx) error {
+			events = tx.doTTLExpireScan(opt.TTLConfig)
+			return nil
+		})
+		return events, nil
+	}
+	db.ttlService = ttl.NewService(opt.Clock, opt.TTLConfig, db.handleExpiredKeys, scanFn)
 
 	db.Index = db.newIndex()
 
@@ -170,12 +181,12 @@ func open(opt Options) (*DB, error) {
 }
 
 // Open returns a newly initialized DB object with Option.
-func Open(options Options, ops ...Option) (*DB, error) {
-	opts := &options
-	for _, do := range ops {
-		do(opts)
+func Open(opt Options, opts ...Option) (*DB, error) {
+	op := &opt
+	for _, do := range opts {
+		do(op)
 	}
-	return open(*opts)
+	return open(*op)
 }
 
 // Update executes a function within a managed read/write transaction.
@@ -196,6 +207,21 @@ func (db *DB) View(fn func(tx *Tx) error) error {
 	return db.managed(false, fn)
 }
 
+// IsMerging returns true if a merge operation is in progress.
+func (db *DB) IsMerging() bool {
+	return atomic.LoadInt32(&db.isMerging) != 0
+}
+
+// SetMerging atomically sets the merging state.
+// Returns true if the state was successfully set, false if already merging.
+func (db *DB) SetMerging(v bool) bool {
+	if v {
+		return atomic.CompareAndSwapInt32(&db.isMerging, 0, 1)
+	}
+	atomic.StoreInt32(&db.isMerging, 0)
+	return true
+}
+
 // Backup copies the database to file directory at the given dir.
 func (db *DB) Backup(dir string) error {
 	return db.View(func(tx *Tx) error {
@@ -213,13 +239,16 @@ func (db *DB) BackupTarGZ(w io.Writer) error {
 // Close releases all db resources.
 func (db *DB) Close() error {
 	db.mu.Lock()
-	defer db.mu.Unlock()
 
 	if db.closed {
+		db.mu.Unlock()
 		return ErrDBClosed
 	}
 
 	db.closed = true
+	// Release mutex before calling release() to avoid deadlock with merge worker
+	// which may be waiting for the mutex inside merge operations
+	db.mu.Unlock()
 
 	err := db.release()
 	if err != nil {
@@ -238,8 +267,6 @@ func (db *DB) release() error {
 		return err
 	}
 
-	db.Index = nil
-
 	db.ActiveFile = nil
 
 	err = db.fm.Close()
@@ -248,7 +275,14 @@ func (db *DB) release() error {
 		return err
 	}
 
+	// Close TTL service first to stop the scanner goroutine
+	db.ttlService.Close()
+
+	// Signal merge worker to stop after TTL service is closed
 	db.mergeWorkCloseCh <- struct{}{}
+
+	// Now safe to release Index as all background services are stopped
+	db.Index = nil
 
 	if !db.flock.Locked() {
 		return ErrDirUnlocked
@@ -262,8 +296,6 @@ func (db *DB) release() error {
 	db.fm = nil
 
 	db.commitBuffer = nil
-
-	db.ttlService.Close()
 
 	if db.watchManager != nil {
 		if err := db.watchManager.close(); err != nil {
@@ -763,14 +795,8 @@ func (db *DB) buildBTreeIdx(record *core.Record, entry *core.Entry) error {
 	bTree := db.Index.BTree.GetWithDefault(bucketId)
 
 	if db.ttlService.GetChecker().IsExpired(record.TTL, record.Timestamp) || meta.Flag == DataDeleteFlag {
-		db.ttlService.UnregisterTTL(bucketId, string(key))
 		bTree.Delete(key)
 	} else {
-		if meta.TTL != Persistent {
-			db.ttlService.RegisterTTL(bucketId, string(key), expireTime(meta.Timestamp, meta.TTL), DataStructureBTree, record.Timestamp)
-		} else {
-			db.ttlService.UnregisterTTL(bucketId, string(key))
-		}
 		bTree.InsertRecord(record.Key, record)
 	}
 	return nil
@@ -1022,40 +1048,57 @@ func (db *DB) IsClose() bool {
 	return db.closed
 }
 
-// handleExpiredKey is the unified callback for handling expired keys.
-// It validates the timestamp to prevent race conditions where a key is:
-// 1. Set with short TTL (timestamp T1)
+// handleExpiredKeys processes a batch of expiration events in a single transaction.
+// This batch processing approach significantly reduces transaction overhead compared
+// to processing each expired key individually.
+//
+// It validates timestamps to prevent race conditions where a key is:
+// 1. Set with TTL (timestamp T1)
 // 2. Expires and triggers async deletion
 // 3. Re-inserted with new TTL (timestamp T2)
 // 4. Async deletion from step 2 executes and mistakenly deletes the new key
+//
 // By comparing timestamps, we ensure only the originally expired key is deleted.
-func (db *DB) handleExpiredKey(bucketId uint64, key []byte, ds uint16, expiredTimestamp uint64) {
-	go func() {
-		_ = db.Update(func(tx *Tx) error {
+func (db *DB) handleExpiredKeys(events []*ttl.ExpirationEvent) {
+	if len(events) == 0 {
+		return
+	}
+
+	_ = db.Update(func(tx *Tx) error {
+		// Group events by bucket to avoid repeated bucket lookups
+		bucketEvents := make(map[uint64][]*ttl.ExpirationEvent)
+		for _, event := range events {
+			bucketEvents[event.BucketId] = append(bucketEvents[event.BucketId], event)
+		}
+
+		for bucketId, evs := range bucketEvents {
 			bucket, err := db.bucketManager.GetBucketById(bucketId)
 			if err != nil {
-				return err
+				continue
 			}
 
-			// Verify the key still exists and has the same timestamp
 			idx, ok := db.Index.BTree.exist(bucketId)
 			if !ok {
-				return nil
+				continue
 			}
 
-			record, found := idx.Find(key)
-			if !found {
-				return nil
-			}
+			for _, event := range evs {
+				// Use FindForVerification to get the record without triggering callbacks (avoid recursion)
+				record, found := idx.FindForVerification(event.Key)
+				if !found {
+					continue
+				}
 
-			// Only delete if timestamp matches (same record that expired)
-			if record.Timestamp == expiredTimestamp {
-				return tx.Delete(bucket.Name, key)
+				// Only delete if timestamp matches (same record that expired)
+				// Also verify it's actually expired (in case it was updated)
+				if record.Timestamp == event.Timestamp && db.ttlService.GetChecker().IsExpired(record.TTL, record.Timestamp) {
+					_ = tx.put(bucket.Name, event.Key, nil, Persistent, DataDeleteFlag, uint64(db.opt.Clock.NowMillis()), bucket.Ds)
+				}
 			}
+		}
 
-			return nil
-		})
-	}()
+		return nil
+	})
 }
 
 func (db *DB) rebuildBucketManager() error {

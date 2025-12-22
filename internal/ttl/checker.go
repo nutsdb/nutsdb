@@ -11,28 +11,26 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-package checker
+package ttl
 
 import (
 	"github.com/nutsdb/nutsdb/internal/core"
-	"github.com/nutsdb/nutsdb/internal/ttl/clock"
 )
 
 // Persistent represents the data persistent flag (TTL = 0 means never expire)
 const Persistent uint32 = 0
 
 // ExpiredCallback is a function type for handling expired record notifications.
-// timestamp is the record timestamp when expiration was detected, used for validation.
 type ExpiredCallback func(bucketId uint64, key []byte, ds uint16, timestamp uint64)
 
 // Checker handles TTL expiration logic using a unified clock.
 type Checker struct {
-	Clock     clock.Clock
+	Clock     Clock
 	onExpired ExpiredCallback
 }
 
 // NewChecker creates a new Checker with the specified clock.
-func NewChecker(clk clock.Clock) *Checker {
+func NewChecker(clk Clock) *Checker {
 	return &Checker{Clock: clk}
 }
 
@@ -113,9 +111,4 @@ func (c *Checker) triggerCallback(bucketId uint64, key []byte, ds uint16, timest
 	if c.onExpired != nil {
 		c.onExpired(bucketId, key, ds, timestamp)
 	}
-}
-
-// TriggerExpired allows external components (like ttlManager) to trigger expiration callback.
-func (c *Checker) TriggerExpired(bucketId uint64, key []byte, ds uint16, timestamp uint64) {
-	c.triggerCallback(bucketId, key, ds, timestamp)
 }

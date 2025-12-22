@@ -15,7 +15,6 @@ import (
 	"github.com/nutsdb/nutsdb/internal/core"
 	"github.com/nutsdb/nutsdb/internal/data"
 	"github.com/nutsdb/nutsdb/internal/ttl"
-	"github.com/nutsdb/nutsdb/internal/ttl/clock"
 	"github.com/nutsdb/nutsdb/internal/utils"
 )
 
@@ -502,19 +501,19 @@ func TestMergeV2PrepareWhileAlreadyMerging(t *testing.T) {
 		opt:        opts,
 		ActiveFile: &DataFile{rwManager: &mockRWManager{}},
 	}
-	db.isMerging = true
+	db.SetMerging(true)
 
 	job := &mergeV2Job{db: db}
 	if err := job.prepare(); !errors.Is(err, ErrIsMerging) {
 		t.Fatalf("expected ErrIsMerging, got %v", err)
 	}
 
-	if !db.isMerging {
+	if !db.IsMerging() {
 		t.Fatalf("isMerging should remain true until finish is called")
 	}
 
 	job.finish()
-	if db.isMerging {
+	if db.IsMerging() {
 		t.Fatalf("finish should reset isMerging flag")
 	}
 }
@@ -550,7 +549,7 @@ func TestMergeV2PrepareSyncError(t *testing.T) {
 	if mock.releaseCalls != 0 {
 		t.Fatalf("release should not be called on sync failure")
 	}
-	if db.isMerging {
+	if db.IsMerging() {
 		t.Fatalf("isMerging should be reset on error path")
 	}
 }
@@ -1311,16 +1310,17 @@ func TestMergeV2WriteEntryHashesSetAndSortedSet(t *testing.T) {
 }
 
 func TestMergeV2ApplyLookupUpdatesSecondaryIndexes(t *testing.T) {
-	clk := clock.NewRealClock()
+	clk := ttl.NewRealClock()
 	db := &DB{
-		opt:        DefaultOptions,
-		ttlService: ttl.NewService(clk, ttl.TimeWheel),
+		opt: DefaultOptions,
 		bucketManager: &BucketManager{
 			BucketInfoMapper: map[core.BucketId]*core.Bucket{},
 		},
 	}
-
 	db.Index = db.newIndex()
+	// Use a no-op scan function for merge tests (TTL scanning not relevant here)
+	noopScanFn := func() ([]*ttl.ExpirationEvent, error) { return nil, nil }
+	db.ttlService = ttl.NewService(clk, ttl.DefaultConfig(), db.handleExpiredKeys, noopScanFn)
 
 	// Prepare buckets
 	buckets := []struct {
@@ -2001,14 +2001,13 @@ func TestMergeV2RewriteFileSkipsCorruptedEntries(t *testing.T) {
 		WithTxID(goodEntry.Meta.TxID).
 		WithKey(goodEntry.Key))
 
-	clk := clock.NewRealClock()
+	clk := ttl.NewRealClock()
 	db := &DB{
 		opt: Options{
 			Dir:                  dir,
 			BufferSizeOfRecovery: 4096,
 			SegmentSize:          1 << 16,
 		},
-		ttlService: ttl.NewService(clk, ttl.TimeWheel),
 		bucketManager: &BucketManager{
 			BucketInfoMapper: map[core.BucketId]*core.Bucket{
 				bucketID: {Meta: &core.BucketMeta{}, Id: bucketID, Ds: uint16(DataStructureBTree)},
@@ -2017,6 +2016,9 @@ func TestMergeV2RewriteFileSkipsCorruptedEntries(t *testing.T) {
 	}
 	db.Index = db.newIndex()
 	db.Index.BTree.Idx[bucketID] = bt
+	// Use a no-op scan function for merge tests (TTL scanning not relevant here)
+	noopScanFn := func() ([]*ttl.ExpirationEvent, error) { return nil, nil }
+	db.ttlService = ttl.NewService(clk, ttl.DefaultConfig(), db.handleExpiredKeys, noopScanFn)
 
 	mock := &mockRWManager{}
 	job := &mergeV2Job{
