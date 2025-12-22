@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path"
+	"path/filepath"
 
 	"github.com/nutsdb/nutsdb/internal/core"
 	"github.com/nutsdb/nutsdb/internal/utils"
@@ -45,9 +45,9 @@ var (
 func getHintPath(fid int64, dir string) string {
 	if IsMergeFile(fid) {
 		seq := GetMergeSeq(fid)
-		return path.Join(dir, fmt.Sprintf("merge_%d%s", seq, HintSuffix))
+		return filepath.Join(dir, fmt.Sprintf("merge_%d%s", seq, HintSuffix))
 	}
-	return path.Join(dir, strconv2.Int64ToStr(fid)+HintSuffix)
+	return filepath.Join(dir, strconv2.Int64ToStr(fid)+HintSuffix)
 }
 
 // HintEntry represents an entry in the hint file

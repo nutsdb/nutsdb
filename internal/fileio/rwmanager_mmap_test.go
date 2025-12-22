@@ -17,7 +17,6 @@ package fileio_test
 import (
 	"errors"
 	"os"
-	"path"
 	"path/filepath"
 	"testing"
 
@@ -95,7 +94,7 @@ func TestRWManager_MMap_WriteAt(t *testing.T) {
 }
 
 func TestRWManager_MMap_WriteAt_NotEnoughData(t *testing.T) {
-	filePath := path.Join(t.TempDir(), "rw_mmap")
+	filePath := filepath.Join(t.TempDir(), "rw_mmap")
 	maxFdNums := 1024
 	cleanThreshold := 0.5
 	var fdm = fileio.NewFdm(maxFdNums, cleanThreshold)
@@ -127,7 +126,7 @@ func TestRWManager_MMap_WriteAt_NotEnoughData(t *testing.T) {
 }
 
 func TestRWManager_MMap_ReadAt_CrossBlock(t *testing.T) {
-	filePath := path.Join(t.TempDir(), "rw_mmap")
+	filePath := filepath.Join(t.TempDir(), "rw_mmap")
 	maxFdNums := 1024
 	cleanThreshold := 0.5
 	var fdm = fileio.NewFdm(maxFdNums, cleanThreshold)
@@ -157,7 +156,7 @@ func TestRWManager_MMap_ReadAt_CrossBlock(t *testing.T) {
 }
 
 func TestRWManager_MMap_ReadAt_NotEnoughBytes(t *testing.T) {
-	filePath := path.Join(t.TempDir(), "rw_mmap")
+	filePath := filepath.Join(t.TempDir(), "rw_mmap")
 	maxFdNums := 1024
 	cleanThreshold := 0.5
 	var fdm = fileio.NewFdm(maxFdNums, cleanThreshold)
@@ -187,7 +186,7 @@ func TestRWManager_MMap_ReadAt_NotEnoughBytes(t *testing.T) {
 }
 
 func TestRWManager_MMap_ReadAt_ErrIndexOutOfBound(t *testing.T) {
-	filePath := path.Join(t.TempDir(), "rw_mmap")
+	filePath := filepath.Join(t.TempDir(), "rw_mmap")
 	maxFdNums := 1024
 	cleanThreshold := 0.5
 	var fdm = fileio.NewFdm(maxFdNums, cleanThreshold)
@@ -209,7 +208,7 @@ func TestRWManager_MMap_ReadAt_ErrIndexOutOfBound(t *testing.T) {
 }
 
 func TestRWManager_MMap_Sync(t *testing.T) {
-	filePath := path.Join(t.TempDir(), t.Name())
+	filePath := filepath.Join(t.TempDir(), t.Name())
 	maxFdNums := 1024
 	cleanThreshold := 0.5
 	var fdm = fileio.NewFdm(maxFdNums, cleanThreshold)
@@ -240,7 +239,7 @@ func TestRWManager_MMap_Sync(t *testing.T) {
 }
 
 func TestRWManager_MMap_Close(t *testing.T) {
-	filePath := path.Join(t.TempDir(), t.Name())
+	filePath := filepath.Join(t.TempDir(), t.Name())
 	maxFdNums := 1024
 	cleanThreshold := 0.5
 	var fdm = fileio.NewFdm(maxFdNums, cleanThreshold)

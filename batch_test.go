@@ -3,7 +3,7 @@ package nutsdb
 import (
 	"fmt"
 	"log"
-	"path"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -101,35 +101,35 @@ func TestBatchWrite(t *testing.T) {
 	tmpdir := t.TempDir()
 	dbs[0], _ = Open(
 		DefaultOptions,
-		WithDir(path.Join(tmpdir, "nutsdb_batch_write1")),
+		WithDir(filepath.Join(tmpdir, "nutsdb_batch_write1")),
 		WithEntryIdxMode(HintKeyValAndRAMIdxMode),
 	)
 	dbs[1], _ = Open(
 		DefaultOptions,
-		WithDir(path.Join(tmpdir, "nutsdb_batch_write2")),
+		WithDir(filepath.Join(tmpdir, "nutsdb_batch_write2")),
 		WithEntryIdxMode(HintKeyAndRAMIdxMode),
 	)
 	dbs[2], _ = Open(
 		DefaultOptions,
-		WithDir(path.Join(tmpdir, "nutsdb_batch_write4")),
+		WithDir(filepath.Join(tmpdir, "nutsdb_batch_write4")),
 		WithEntryIdxMode(HintKeyValAndRAMIdxMode),
 		WithMaxBatchCount(35),
 	)
 	dbs[3], _ = Open(
 		DefaultOptions,
-		WithDir(path.Join(tmpdir, "nutsdb_batch_write5")),
+		WithDir(filepath.Join(tmpdir, "nutsdb_batch_write5")),
 		WithEntryIdxMode(HintKeyAndRAMIdxMode),
 		WithMaxBatchCount(35),
 	)
 	dbs[4], _ = Open(
 		DefaultOptions,
-		WithDir(path.Join(tmpdir, "nutsdb_batch_write7")),
+		WithDir(filepath.Join(tmpdir, "nutsdb_batch_write7")),
 		WithEntryIdxMode(HintKeyValAndRAMIdxMode),
 		WithMaxBatchSize(20), // change to 1000, unit test is not ok, 1000000 is ok
 	)
 	dbs[5], _ = Open(
 		DefaultOptions,
-		WithDir(path.Join(tmpdir, "nutsdb_batch_write8")),
+		WithDir(filepath.Join(tmpdir, "nutsdb_batch_write8")),
 		WithEntryIdxMode(HintKeyAndRAMIdxMode),
 		WithMaxBatchSize(20),
 	)

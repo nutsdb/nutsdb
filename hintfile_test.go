@@ -3,7 +3,7 @@ package nutsdb
 import (
 	"io"
 	"os"
-	"path"
+	"path/filepath"
 	"testing"
 
 	"github.com/nutsdb/nutsdb/internal/core"
@@ -215,7 +215,7 @@ func TestHintFileWriterReader(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	hintPath := path.Join(tmpDir, "1.hint")
+	hintPath := filepath.Join(tmpDir, "1.hint")
 
 	// Test writing
 	writer := &HintFileWriter{}
@@ -324,7 +324,7 @@ func TestHintFileWriterErrorHandling(t *testing.T) {
 
 	t.Run("Create file in non-existent directory", func(t *testing.T) {
 		writer := &HintFileWriter{}
-		writerPath := path.Join("non", "existent", "path", "test.hint")
+		writerPath := filepath.Join("non", "existent", "path", "test.hint")
 		err := writer.Create(writerPath)
 		if err == nil {
 			t.Error("Expected error when creating file in non-existent directory")
@@ -351,7 +351,7 @@ func TestHintFileWriterErrorHandling(t *testing.T) {
 func TestHintFileReaderErrorHandling(t *testing.T) {
 	t.Run("Open non-existent file", func(t *testing.T) {
 		reader := &HintFileReader{}
-		readerPath := path.Join("non", "existent", "path", "test.hint")
+		readerPath := filepath.Join("non", "existent", "path", "test.hint")
 		err := reader.Open(readerPath)
 		if err == nil {
 			t.Error("Expected error when opening non-existent file")
@@ -373,7 +373,7 @@ func TestHintFileReaderErrorHandling(t *testing.T) {
 		}
 		defer os.RemoveAll(tmpDir)
 
-		corruptedPath := path.Join(tmpDir, "corrupted.hint")
+		corruptedPath := filepath.Join(tmpDir, "corrupted.hint")
 		// Create a corrupted file with invalid data
 		err = os.WriteFile(corruptedPath, []byte{0xFF, 0xFF, 0xFF}, 0644)
 		if err != nil {
@@ -404,7 +404,7 @@ func TestHintFileReaderErrorHandling(t *testing.T) {
 		}
 		defer os.RemoveAll(tmpDir)
 
-		emptyPath := path.Join(tmpDir, "empty.hint")
+		emptyPath := filepath.Join(tmpDir, "empty.hint")
 		// Create an empty file
 		err = os.WriteFile(emptyPath, []byte{}, 0644)
 		if err != nil {
@@ -466,7 +466,7 @@ func TestHintFilePartialRead(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	hintPath := path.Join(tmpDir, "partial.hint")
+	hintPath := filepath.Join(tmpDir, "partial.hint")
 
 	// Create a hint file with multiple entries
 	writer := &HintFileWriter{}
@@ -566,9 +566,9 @@ func TestHintFilePartialRead(t *testing.T) {
 }
 
 func TestGetHintPath(t *testing.T) {
-	dir := path.Join(t.TempDir(), "nutsdb")
+	dir := filepath.Join(t.TempDir(), "nutsdb")
 	fid := int64(123)
-	expected := path.Join(dir, "123.hint")
+	expected := filepath.Join(dir, "123.hint")
 	actual := getHintPath(fid, dir)
 	if actual != expected {
 		t.Errorf("Expected %s, got %s", expected, actual)
