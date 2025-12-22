@@ -15,7 +15,6 @@
 package ttl
 
 import (
-	"fmt"
 	"sync"
 )
 
@@ -27,20 +26,27 @@ type ExpirationEvent struct {
 	Timestamp uint64
 }
 
+// dedupeKey is used as the key for the seen map to avoid string allocation.
+type dedupeKey struct {
+	bucketId  uint64
+	key       string
+	timestamp uint64
+}
+
 // expirationQueue manages a queue of expiration events with deduplication.
 // It prevents duplicate processing of the same key expiration.
 type expirationQueue struct {
 	events chan *ExpirationEvent
-	seen   sync.Map // map[string]uint64 - key -> timestamp
+	seen   map[dedupeKey]struct{}
 	closed bool
-	mu     sync.RWMutex
+	mu     sync.Mutex
 }
 
 // newExpirationQueue creates a new expiration queue with the specified buffer size.
 func newExpirationQueue(bufferSize int) *expirationQueue {
 	return &expirationQueue{
 		events: make(chan *ExpirationEvent, bufferSize),
-		seen:   sync.Map{},
+		seen:   make(map[dedupeKey]struct{}),
 		closed: false,
 	}
 }
@@ -48,20 +54,26 @@ func newExpirationQueue(bufferSize int) *expirationQueue {
 // push adds an expiration event to the queue with deduplication.
 // Returns true if the event was added, false if it was a duplicate or queue is closed.
 func (eq *expirationQueue) push(event *ExpirationEvent) bool {
-	eq.mu.RLock()
+	eq.mu.Lock()
 	if eq.closed {
-		eq.mu.RUnlock()
+		eq.mu.Unlock()
 		return false
 	}
-	eq.mu.RUnlock()
 
-	// Create a unique key for deduplication
-	dedupeKey := fmt.Sprintf("%d:%s:%d", event.BucketId, string(event.Key), event.Timestamp)
+	key := dedupeKey{
+		bucketId:  event.BucketId,
+		key:       string(event.Key),
+		timestamp: event.Timestamp,
+	}
 
-	// Check if we've already seen this exact expiration event
-	if _, exists := eq.seen.LoadOrStore(dedupeKey, event.Timestamp); exists {
+	if _, exists := eq.seen[key]; exists {
+		eq.mu.Unlock()
 		return false // Duplicate event, skip
 	}
+
+	// Optimistically add to map
+	eq.seen[key] = struct{}{}
+	eq.mu.Unlock()
 
 	// Try to send to channel (non-blocking)
 	select {
@@ -69,7 +81,9 @@ func (eq *expirationQueue) push(event *ExpirationEvent) bool {
 		return true
 	default:
 		// Channel full, remove from seen map and drop event
-		eq.seen.Delete(dedupeKey)
+		eq.mu.Lock()
+		delete(eq.seen, key)
+		eq.mu.Unlock()
 		return false
 	}
 }
@@ -83,8 +97,15 @@ func (eq *expirationQueue) pop() (*ExpirationEvent, bool) {
 	}
 
 	// Remove from seen map after processing
-	dedupeKey := fmt.Sprintf("%d:%s:%d", event.BucketId, string(event.Key), event.Timestamp)
-	eq.seen.Delete(dedupeKey)
+	key := dedupeKey{
+		bucketId:  event.BucketId,
+		key:       string(event.Key),
+		timestamp: event.Timestamp,
+	}
+
+	eq.mu.Lock()
+	delete(eq.seen, key)
+	eq.mu.Unlock()
 
 	return event, true
 }
