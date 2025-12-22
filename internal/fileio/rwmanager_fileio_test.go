@@ -1,7 +1,7 @@
 package fileio_test
 
 import (
-	"path"
+	"path/filepath"
 	"testing"
 
 	"github.com/nutsdb/nutsdb"
@@ -11,7 +11,7 @@ import (
 )
 
 func TestRWManager_FileIO_All(t *testing.T) {
-	filePath := path.Join(t.TempDir(), "foo_rw_fileio")
+	filePath := filepath.Join(t.TempDir(), "foo_rw_fileio")
 	maxFdNums := 20
 	cleanThreshold := 0.5
 	var fdm *fileio.FdManager
