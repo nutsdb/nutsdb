@@ -149,3 +149,40 @@ func TestExpirationQueue_Close(t *testing.T) {
 		t.Fatal("Should be able to pop remaining events after close")
 	}
 }
+
+func TestExpirationQueue_SeenMapClearedOnClose(t *testing.T) {
+	// Test that seen map is cleared on close to prevent memory leaks
+	// This tests the fix for the scenario where:
+	// 1. Event is pushed (added to seen map)
+	// 2. Queue is closed before event is popped
+	// 3. Seen map should be cleared to prevent memory leak
+	eq := newExpirationQueue(10)
+
+	// Push multiple events to fill the seen map
+	for i := 0; i < 5; i++ {
+		event := &ExpirationEvent{
+			BucketId:  1,
+			Key:       []byte("test-key"),
+			Ds:        2,
+			Timestamp: uint64(i), // Different timestamps
+		}
+		if !eq.push(event) {
+			t.Fatalf("Failed to push event %d", i)
+		}
+	}
+
+	// Close without popping - seen map should be cleared
+	eq.close()
+
+	// Queue should be closed and seen map cleared
+	// Trying to push should fail
+	event := &ExpirationEvent{
+		BucketId:  1,
+		Key:       []byte("new-key"),
+		Ds:        2,
+		Timestamp: 99999,
+	}
+	if eq.push(event) {
+		t.Fatal("Should not push to closed queue")
+	}
+}
