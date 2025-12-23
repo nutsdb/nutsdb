@@ -1033,29 +1033,35 @@ func (db *DB) handleExpiredKeys(events []*ttl.ExpirationEvent) {
 	}
 
 	_ = db.Update(func(tx *Tx) error {
+		// Group events by bucket to avoid repeated bucket lookups
+		bucketEvents := make(map[uint64][]*ttl.ExpirationEvent)
 		for _, event := range events {
-			bucket, err := db.bucketManager.GetBucketById(event.BucketId)
+			bucketEvents[event.BucketId] = append(bucketEvents[event.BucketId], event)
+		}
+
+		for bucketId, evs := range bucketEvents {
+			bucket, err := db.bucketManager.GetBucketById(bucketId)
 			if err != nil {
 				continue
 			}
 
-			// Verify the key still exists and has the same timestamp
-			// Use FindForVerification to get the record without triggering callbacks (avoid recursion)
-			// Todo Subsequent support is needed for other data structures to implement TTL in the same way.
-			idx, ok := db.Index.BTree.exist(event.BucketId)
+			idx, ok := db.Index.BTree.exist(bucketId)
 			if !ok {
 				continue
 			}
 
-			record, found := idx.FindForVerification(event.Key)
-			if !found {
-				continue
-			}
+			for _, event := range evs {
+				// Use FindForVerification to get the record without triggering callbacks (avoid recursion)
+				record, found := idx.FindForVerification(event.Key)
+				if !found {
+					continue
+				}
 
-			// Only delete if timestamp matches (same record that expired)
-			// Also verify it's actually expired (in case it was updated)
-			if record.Timestamp == event.Timestamp && db.ttlService.GetChecker().IsExpired(record.TTL, record.Timestamp) {
-				_ = tx.put(bucket.Name, event.Key, nil, Persistent, DataDeleteFlag, uint64(db.opt.Clock.NowMillis()), bucket.Ds)
+				// Only delete if timestamp matches (same record that expired)
+				// Also verify it's actually expired (in case it was updated)
+				if record.Timestamp == event.Timestamp && db.ttlService.GetChecker().IsExpired(record.TTL, record.Timestamp) {
+					_ = tx.put(bucket.Name, event.Key, nil, Persistent, DataDeleteFlag, uint64(db.opt.Clock.NowMillis()), bucket.Ds)
+				}
 			}
 		}
 
