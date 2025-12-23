@@ -236,8 +236,6 @@ func (db *DB) release() error {
 		return err
 	}
 
-	db.Index = nil
-
 	db.ActiveFile = nil
 
 	err = db.fm.Close()
@@ -248,7 +246,11 @@ func (db *DB) release() error {
 
 	db.mergeWorkCloseCh <- struct{}{}
 
+	// Close TTL service before setting Index to nil to avoid race conditions
 	db.ttlService.Close()
+
+	// Now safe to release Index as all background services are stopped
+	db.Index = nil
 
 	if !db.flock.Locked() {
 		return ErrDirUnlocked
@@ -1039,6 +1041,7 @@ func (db *DB) handleExpiredKeys(events []*ttl.ExpirationEvent) {
 
 			// Verify the key still exists and has the same timestamp
 			// Use FindForVerification to get the record without triggering callbacks (avoid recursion)
+			// Todo Subsequent support is needed for other data structures to implement TTL in the same way.
 			idx, ok := db.Index.BTree.exist(event.BucketId)
 			if !ok {
 				continue
@@ -1052,7 +1055,7 @@ func (db *DB) handleExpiredKeys(events []*ttl.ExpirationEvent) {
 			// Only delete if timestamp matches (same record that expired)
 			// Also verify it's actually expired (in case it was updated)
 			if record.Timestamp == event.Timestamp && db.ttlService.GetChecker().IsExpired(record.TTL, record.Timestamp) {
-				_ = tx.Delete(bucket.Name, event.Key)
+				_ = tx.put(bucket.Name, event.Key, nil, Persistent, DataDeleteFlag, uint64(db.opt.Clock.NowMillis()), bucket.Ds)
 			}
 		}
 
@@ -1063,27 +1066,34 @@ func (db *DB) handleExpiredKeys(events []*ttl.ExpirationEvent) {
 // getIndexAccessor returns an IndexAccessor for the TTL scanner.
 // This allows the scanner to access bucket and key information for scanning.
 func (db *DB) getIndexAccessor() ttl.IndexAccessor {
+	// Snapshot the values to avoid data races
+	db.mu.RLock()
+	index := db.Index
+	bucketMapper := db.bucketManager.BucketInfoMapper
+	bucketManager := db.bucketManager
+	db.mu.RUnlock()
+
 	return ttl.IndexAccessor{
 		RangeBuckets: func(f func(bucketId uint64) bool) {
-			if db.Index == nil {
+			if index == nil {
 				return
 			}
 			// Use bucketManager as the source of truth for buckets
-			for bucketId := range db.bucketManager.BucketInfoMapper {
+			for bucketId := range bucketMapper {
 				if !f(bucketId) {
 					return
 				}
 			}
 		},
 		SampleRecords: func(bucketId uint64, count int) ([]*core.Record, error) {
-			bucket, err := db.bucketManager.GetBucketById(bucketId)
+			bucket, err := bucketManager.GetBucketById(bucketId)
 			if err != nil {
 				return nil, nil
 			}
 
 			switch bucket.Ds {
 			case DataStructureBTree:
-				if idx, ok := db.Index.BTree.exist(bucketId); ok {
+				if idx, ok := index.BTree.exist(bucketId); ok {
 					return idx.SampleRandomRecords(count), nil
 				}
 			case DataStructureSet:
@@ -1097,7 +1107,7 @@ func (db *DB) getIndexAccessor() ttl.IndexAccessor {
 			return nil, nil
 		},
 		GetDataStructure: func(bucketId uint64) uint16 {
-			bucket, err := db.bucketManager.GetBucketById(bucketId)
+			bucket, err := bucketManager.GetBucketById(bucketId)
 			if err != nil {
 				return DataStructureBTree // default
 			}
