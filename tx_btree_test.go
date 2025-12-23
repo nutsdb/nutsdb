@@ -2587,7 +2587,7 @@ func TestTx_TTL_RestartCheck(t *testing.T) {
 		// This test uses MockClock to test TTL behavior across database restarts
 		mc := ttl.NewMockClock(time.Now().UnixMilli())
 		opts := DefaultOptions
-		opts.Dir = NutsDBTestDirPath
+		opts.Dir = filepath.Join(t.TempDir(), "nutsdb-test")
 		opts.Clock = mc
 		defer removeDir(opts.Dir)
 
@@ -2597,12 +2597,12 @@ func TestTx_TTL_RestartCheck(t *testing.T) {
 		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
 		// Insert keys with different TTLs
-		txPut(t, db, bucket, testutils.GetTestBytes(0), testutils.GetTestBytes(0), 1, nil, nil)  // Will expire
-		txPut(t, db, bucket, testutils.GetTestBytes(1), testutils.GetTestBytes(1), 3, nil, nil)  // Will expire later
-		txPut(t, db, bucket, testutils.GetTestBytes(2), testutils.GetTestBytes(2), 3, nil, nil)  // Will expire later
+		txPut(t, db, bucket, testutils.GetTestBytes(0), testutils.GetTestBytes(0), 1, nil, nil)          // Will expire
+		txPut(t, db, bucket, testutils.GetTestBytes(1), testutils.GetTestBytes(1), 3, nil, nil)          // Will expire later
+		txPut(t, db, bucket, testutils.GetTestBytes(2), testutils.GetTestBytes(2), 3, nil, nil)          // Will expire later
 		txPut(t, db, bucket, testutils.GetTestBytes(3), testutils.GetTestBytes(3), Persistent, nil, nil) // Persistent
 		txPut(t, db, bucket, testutils.GetTestBytes(4), testutils.GetTestBytes(4), Persistent, nil, nil) // Persistent
-		txPut(t, db, bucket, testutils.GetTestBytes(5), testutils.GetTestBytes(5), 5, nil, nil)  // Will expire later
+		txPut(t, db, bucket, testutils.GetTestBytes(5), testutils.GetTestBytes(5), 5, nil, nil)          // Will expire later
 		// Update key 1 to be persistent
 		txPut(t, db, bucket, testutils.GetTestBytes(1), testutils.GetTestBytes(1), Persistent, nil, nil)
 		// Delete key 5
