@@ -3,7 +3,7 @@ package nutsdb
 import (
 	"fmt"
 	"log"
-	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -13,36 +13,8 @@ import (
 var bucket string
 
 const (
-	fileDir  = "/tmp/nutsdb/"
-	fileDir1 = "/tmp/nutsdb/nutsdb_batch_write1"
-	fileDir2 = "/tmp/nutsdb/nutsdb_batch_write2"
-	fileDir3 = "/tmp/nutsdb/nutsdb_batch_write3"
-	fileDir4 = "/tmp/nutsdb/nutsdb_batch_write4"
-	fileDir5 = "/tmp/nutsdb/nutsdb_batch_write5"
-	fileDir6 = "/tmp/nutsdb/nutsdb_batch_write6"
-	fileDir7 = "/tmp/nutsdb/nutsdb_batch_write7"
-	fileDir8 = "/tmp/nutsdb/nutsdb_batch_write8"
-	fileDir9 = "/tmp/nutsdb/nutsdb_batch_write9"
-	N        = 100
+	N = 100
 )
-
-func init() {
-	bucket = "bucketForBatchWrite"
-	files, err := os.ReadDir(fileDir)
-	if err != nil {
-		return
-	}
-	for _, f := range files {
-		name := f.Name()
-		if name != "" {
-			filePath := fmt.Sprintf("%s/%s", fileDir, name)
-			err := os.RemoveAll(filePath)
-			if err != nil {
-				log.Fatal(err)
-			}
-		}
-	}
-}
 
 func TestBatchWrite(t *testing.T) {
 	TestFlushPanic := func(t *testing.T, db *DB) {
@@ -126,37 +98,38 @@ func TestBatchWrite(t *testing.T) {
 	}
 
 	dbs := make([]*DB, 6)
+	tmpdir := t.TempDir()
 	dbs[0], _ = Open(
 		DefaultOptions,
-		WithDir(fileDir1),
+		WithDir(filepath.Join(tmpdir, "nutsdb_batch_write1")),
 		WithEntryIdxMode(HintKeyValAndRAMIdxMode),
 	)
 	dbs[1], _ = Open(
 		DefaultOptions,
-		WithDir(fileDir2),
+		WithDir(filepath.Join(tmpdir, "nutsdb_batch_write2")),
 		WithEntryIdxMode(HintKeyAndRAMIdxMode),
 	)
 	dbs[2], _ = Open(
 		DefaultOptions,
-		WithDir(fileDir4),
+		WithDir(filepath.Join(tmpdir, "nutsdb_batch_write4")),
 		WithEntryIdxMode(HintKeyValAndRAMIdxMode),
 		WithMaxBatchCount(35),
 	)
 	dbs[3], _ = Open(
 		DefaultOptions,
-		WithDir(fileDir5),
+		WithDir(filepath.Join(tmpdir, "nutsdb_batch_write5")),
 		WithEntryIdxMode(HintKeyAndRAMIdxMode),
 		WithMaxBatchCount(35),
 	)
 	dbs[4], _ = Open(
 		DefaultOptions,
-		WithDir(fileDir7),
+		WithDir(filepath.Join(tmpdir, "nutsdb_batch_write7")),
 		WithEntryIdxMode(HintKeyValAndRAMIdxMode),
 		WithMaxBatchSize(20), // change to 1000, unit test is not ok, 1000000 is ok
 	)
 	dbs[5], _ = Open(
 		DefaultOptions,
-		WithDir(fileDir8),
+		WithDir(filepath.Join(tmpdir, "nutsdb_batch_write8")),
 		WithEntryIdxMode(HintKeyAndRAMIdxMode),
 		WithMaxBatchSize(20),
 	)
@@ -173,7 +146,7 @@ func TestWriteBatch_SetMaxPendingTxns(t *testing.T) {
 	max := 10
 	db, err := Open(
 		DefaultOptions,
-		WithDir("/tmp"),
+		WithDir(t.TempDir()),
 	)
 	require.NoError(t, err)
 	wb, err := db.NewWriteBatch()

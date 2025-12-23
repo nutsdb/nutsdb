@@ -324,7 +324,8 @@ func TestHintFileWriterErrorHandling(t *testing.T) {
 
 	t.Run("Create file in non-existent directory", func(t *testing.T) {
 		writer := &HintFileWriter{}
-		err := writer.Create("/non/existent/path/test.hint")
+		writerPath := filepath.Join("non", "existent", "path", "test.hint")
+		err := writer.Create(writerPath)
 		if err == nil {
 			t.Error("Expected error when creating file in non-existent directory")
 		}
@@ -350,7 +351,8 @@ func TestHintFileWriterErrorHandling(t *testing.T) {
 func TestHintFileReaderErrorHandling(t *testing.T) {
 	t.Run("Open non-existent file", func(t *testing.T) {
 		reader := &HintFileReader{}
-		err := reader.Open("/non/existent/path/test.hint")
+		readerPath := filepath.Join("non", "existent", "path", "test.hint")
+		err := reader.Open(readerPath)
 		if err == nil {
 			t.Error("Expected error when opening non-existent file")
 		}
@@ -564,9 +566,9 @@ func TestHintFilePartialRead(t *testing.T) {
 }
 
 func TestGetHintPath(t *testing.T) {
-	dir := "/tmp/nutsdb"
+	dir := filepath.Join(t.TempDir(), "nutsdb")
 	fid := int64(123)
-	expected := "/tmp/nutsdb/123.hint"
+	expected := filepath.Join(dir, "123.hint")
 	actual := getHintPath(fid, dir)
 	if actual != expected {
 		t.Errorf("Expected %s, got %s", expected, actual)

@@ -2,6 +2,7 @@ package nutsdb
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/nutsdb/nutsdb/internal/core"
@@ -10,7 +11,7 @@ import (
 )
 
 func Test_readEntry(t *testing.T) {
-	path := "/tmp/test_read_entry"
+	path := filepath.Join(t.TempDir(), "test_read_entry")
 
 	fd, err := os.OpenFile(path, os.O_TRUNC|os.O_CREATE|os.O_RDWR, os.ModePerm)
 	require.NoError(t, err)
