@@ -111,6 +111,7 @@ func (eq *expirationQueue) pop() (*ExpirationEvent, bool) {
 }
 
 // close closes the expiration queue and releases resources.
+// It also clears the seen map to prevent memory leaks.
 func (eq *expirationQueue) close() {
 	eq.mu.Lock()
 	defer eq.mu.Unlock()
@@ -118,5 +119,8 @@ func (eq *expirationQueue) close() {
 	if !eq.closed {
 		eq.closed = true
 		close(eq.events)
+		// Clear seen map to prevent memory leaks for events that were
+		// added to seen but not yet popped (e.g., queue full, close called)
+		eq.seen = make(map[dedupeKey]struct{})
 	}
 }
