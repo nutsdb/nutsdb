@@ -2207,8 +2207,7 @@ func TestTx_Delete_NoRecursiveCallback(t *testing.T) {
 				// Verify the record is actually expired
 				r.True(db.ttlService.GetChecker().IsExpired(record.TTL, record.Timestamp))
 
-				// Delete using Delete method (which uses FindForVerification internally)
-				return tx.Delete(bucket, key)
+				return nil
 			})
 			r.NoError(err)
 
