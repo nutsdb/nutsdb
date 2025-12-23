@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"math"
 	"os"
 	"time"
@@ -219,6 +220,8 @@ func (db *DB) mergeLegacy() error {
 	defer db.mu.Unlock()
 
 	for i := 0; i < len(mergingPath); i++ {
+		log.Printf("remove merged file %s", mergingPath[i])
+
 		if err := db.fm.fdm.CloseByPath(mergingPath[i]); err != nil {
 			return fmt.Errorf("close merge path %s", err)
 		}
@@ -235,6 +238,7 @@ func (db *DB) mergeLegacy() error {
 			}
 		}
 	}
+	log.Printf("finished merge, merging path size %d", len(mergingPath))
 
 	return nil
 }
@@ -337,6 +341,7 @@ func (db *DB) mergeWorker() {
 		case <-ticker.C:
 			_ = db.merge()
 		case <-db.mergeWorkCloseCh:
+			log.Println("close merge work")
 			return
 		}
 	}
