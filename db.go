@@ -355,26 +355,12 @@ func (db *DB) getValueByRecord(record *core.Record) ([]byte, error) {
 func (db *DB) commitTransaction(tx *Tx) error {
 	var err error
 	defer func() {
-		var panicked bool
 		if r := recover(); r != nil {
-			// resume normal execution
-			panicked = true
-		}
-		if panicked || err != nil {
-			if errRollback := tx.Rollback(); errRollback != nil {
-				err = errRollback
-			}
+			err = fmt.Errorf("panic when committing tx, err is %+v", r)
 		}
 	}()
 
-	// commit current tx
-	tx.lock()
-	tx.setStatusRunning()
 	err = tx.Commit()
-	if err != nil {
-		return err
-	}
-
 	return err
 }
 

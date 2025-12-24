@@ -288,26 +288,33 @@ func TestTx_CommitWith_PendingWrites(t *testing.T) {
 		bucket := "test_bucket"
 		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
-		// Test CommitWith with pending writes
 		tx, err := db.Begin(true)
 		assert.NoError(t, err)
 
-		// Put some data
 		err = tx.Put(bucket, []byte("key1"), []byte("value1"), 0)
 		assert.NoError(t, err)
 
-		// Use CommitWith callback
-		callbackCalled := false
-		var callbackErr error
+		done := make(chan error, 1)
 		tx.CommitWith(func(err error) {
-			callbackCalled = true
-			callbackErr = err
+			done <- err
 		})
 
-		// Wait for callback (runs in goroutine)
-		time.Sleep(100 * time.Millisecond)
-		assert.True(t, callbackCalled)
-		assert.NoError(t, callbackErr)
+		select {
+		case err := <-done:
+			assert.NoError(t, err)
+		case <-time.After(2 * time.Second):
+			t.Fatal("timeout waiting for CommitWith callback")
+		}
+
+		err = db.View(func(tx *Tx) error {
+			v, err := tx.Get(bucket, []byte("key1"))
+			if err != nil {
+				return err
+			}
+			assert.Equal(t, []byte("value1"), v)
+			return nil
+		})
+		assert.NoError(t, err)
 	})
 }
 
@@ -316,22 +323,109 @@ func TestTx_CommitWith_NoPendingWrites(t *testing.T) {
 		bucket := "test_bucket"
 		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
-		// Test CommitWith without pending writes (read-only tx)
 		tx, err := db.Begin(false)
 		assert.NoError(t, err)
 
-		// Use CommitWith callback
-		callbackCalled := false
-		var callbackErr error
+		done := make(chan error, 1)
 		tx.CommitWith(func(err error) {
-			callbackCalled = true
-			callbackErr = err
+			done <- err
 		})
 
-		// Wait for callback (runs in goroutine)
-		time.Sleep(100 * time.Millisecond)
-		assert.True(t, callbackCalled)
-		assert.NoError(t, callbackErr)
+		select {
+		case err := <-done:
+			assert.NoError(t, err)
+		case <-time.After(2 * time.Second):
+			t.Fatal("timeout waiting for CommitWith callback")
+		}
+
+		err = db.View(func(tx *Tx) error { return nil })
+		assert.NoError(t, err)
+	})
+}
+
+func TestTx_CommitWith_NoPendingWrites_ReleasesReadLock(t *testing.T) {
+	withDefaultDB(t, func(t *testing.T, db *DB) {
+		tx, err := db.Begin(false)
+		assert.NoError(t, err)
+
+		cbDone := make(chan error, 1)
+		tx.CommitWith(func(err error) {
+			cbDone <- err
+		})
+
+		select {
+		case err := <-cbDone:
+			assert.NoError(t, err)
+		case <-time.After(2 * time.Second):
+			t.Fatal("timeout waiting for CommitWith callback")
+		}
+
+		updateDone := make(chan error, 1)
+		go func() {
+			updateDone <- db.Update(func(tx *Tx) error { return nil })
+		}()
+
+		select {
+		case err := <-updateDone:
+			assert.NoError(t, err)
+		case <-time.After(2 * time.Second):
+			t.Fatal("timeout waiting for Update after CommitWith")
+		}
+	})
+}
+
+func TestTx_CommitWith_PendingWrites_DoesNotDeadlockOtherWriters(t *testing.T) {
+	withDefaultDB(t, func(t *testing.T, db *DB) {
+		bucket := "test_bucket"
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+		tx, err := db.Begin(true)
+		assert.NoError(t, err)
+
+		err = tx.Put(bucket, []byte("key1"), []byte("value1"), 0)
+		assert.NoError(t, err)
+
+		cbDone := make(chan error, 1)
+		tx.CommitWith(func(err error) {
+			cbDone <- err
+		})
+
+		otherDone := make(chan error, 1)
+		go func() {
+			otherDone <- db.Update(func(tx *Tx) error {
+				return tx.Put(bucket, []byte("key2"), []byte("value2"), 0)
+			})
+		}()
+
+		select {
+		case err := <-cbDone:
+			assert.NoError(t, err)
+		case <-time.After(2 * time.Second):
+			t.Fatal("timeout waiting for CommitWith callback")
+		}
+
+		select {
+		case err := <-otherDone:
+			assert.NoError(t, err)
+		case <-time.After(2 * time.Second):
+			t.Fatal("timeout waiting for concurrent Update after CommitWith")
+		}
+
+		err = db.View(func(tx *Tx) error {
+			v1, err := tx.Get(bucket, []byte("key1"))
+			if err != nil {
+				return err
+			}
+			assert.Equal(t, []byte("value1"), v1)
+
+			v2, err := tx.Get(bucket, []byte("key2"))
+			if err != nil {
+				return err
+			}
+			assert.Equal(t, []byte("value2"), v2)
+			return nil
+		})
+		assert.NoError(t, err)
 	})
 }
 

@@ -116,16 +116,32 @@ func (tx *Tx) CommitWith(cb func(error)) {
 		panic("Nil callback provided to CommitWith")
 	}
 
-	if tx.pendingWrites.size == 0 {
-		// Do not run these callbacks from here, because the CommitWith and the
-		// callback might be acquiring the same locks. Instead run the callback
-		// from another goroutine.
-		go runTxnCallback(&txnCb{user: cb, err: nil})
+	if tx.isClosed() {
+		go runTxnCallback(&txnCb{user: cb, err: ErrCannotCommitAClosedTx})
 		return
 	}
-	// defer tx.setStatusClosed()  //must not add this code because another process is also accessing tx
+
+	if tx.db == nil {
+		tx.setStatusClosed()
+		go runTxnCallback(&txnCb{user: cb, err: ErrDBClosed})
+		return
+	}
+
+	if tx.pendingWrites.size == 0 && len(tx.pendingBucketList) == 0 {
+		err := tx.Commit()
+		go runTxnCallback(&txnCb{user: cb, err: err})
+		return
+	}
+
+	tx.setStatusCommitting()
+
 	commitCb, err := tx.commitAndSend()
 	if err != nil {
+		tx.handleErr(err)
+		tx.setStatusClosed()
+		tx.unlock()
+		tx.db = nil
+		tx.pendingWrites = nil
 		go runTxnCallback(&txnCb{user: cb, err: err})
 		return
 	}
