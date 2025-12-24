@@ -817,7 +817,7 @@ func (tx *Tx) getBucketAndItsStatus(ds core.Ds, name core.BucketName) (BucketSta
 }
 
 // findEntryStatus finds the latest status for the certain Entry in Tx
-func (tx *Tx) findEntryAndItsStatus(ds core.Ds, bucket core.BucketName, key string) (EntryStatus, *core.Entry) {
+func (tx *Tx) findEntryAndItsStatus(_ core.Ds, bucket core.BucketName, key string) (EntryStatus, *core.Entry) {
 	if tx.pendingWrites.size == 0 {
 		return NotFoundEntry, nil
 	}
@@ -892,18 +892,24 @@ func (tx *Tx) getDeletedBuckets() (deletedBuckets map[core.BucketName]bool) {
 // doTTLExpireScan performs TTL expiration scanning within a transaction.
 // It samples random keys from all buckets and returns expired events.
 func (tx *Tx) doTTLExpireScan(ttlConfig TTLConfig) []*ttl.ExpirationEvent {
+	if ttlConfig.MaxScanKeys <= 0 || ttlConfig.SampleSize <= 0 {
+		return []*ttl.ExpirationEvent{}
+	}
+
 	totalScanned := 0
 	allExpiredEvents := make([]*ttl.ExpirationEvent, 0)
 
 	// Adaptive loop: continue sampling if expired rate exceeds threshold
 	// Todo Add statistics for TTL and exit directly if it does not exceed a threshold
-	for {
-		if totalScanned >= ttlConfig.MaxScanKeys {
-			break
+	for totalScanned < ttlConfig.MaxScanKeys {
+		remaining := ttlConfig.MaxScanKeys - totalScanned
+		n := ttlConfig.SampleSize
+		if n > remaining {
+			n = remaining
 		}
 
 		// Random sample keys from all buckets (weighted by bucket size)
-		samples := randomSampleFromAllBuckets(tx.db.bucketManager.BucketInfoMapper, tx.db.Index, ttlConfig.SampleSize)
+		samples := randomSampleFromAllBuckets(tx.db.bucketManager.BucketInfoMapper, tx.db.Index, n)
 
 		if len(samples) == 0 {
 			break
@@ -940,6 +946,9 @@ func (tx *Tx) doTTLExpireScan(ttlConfig TTLConfig) []*ttl.ExpirationEvent {
 		var totalSampled int
 		for _, records := range samples {
 			totalSampled += len(records)
+		}
+		if totalSampled > remaining {
+			totalSampled = remaining
 		}
 		totalScanned += totalSampled
 
