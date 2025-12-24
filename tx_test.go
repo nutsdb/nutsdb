@@ -19,6 +19,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nutsdb/nutsdb/internal/core"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -206,4 +207,213 @@ func TestTx_Commit(t *testing.T) {
 		})
 	})
 
+}
+
+func TestRunTxnCallback(t *testing.T) {
+	t.Run("nil callback panics", func(t *testing.T) {
+		assert.Panics(t, func() {
+			runTxnCallback(nil)
+		})
+	})
+
+	t.Run("nil user callback panics", func(t *testing.T) {
+		assert.Panics(t, func() {
+			runTxnCallback(&txnCb{user: nil, commit: nil})
+		})
+	})
+
+	t.Run("error in callback", func(t *testing.T) {
+		testErr := fmt.Errorf("test error")
+		userCalled := false
+		var receivedErr error
+		runTxnCallback(&txnCb{
+			user: func(err error) {
+				userCalled = true
+				receivedErr = err
+			},
+			err: testErr,
+		})
+		assert.True(t, userCalled)
+		assert.Equal(t, testErr, receivedErr)
+	})
+
+	t.Run("commit callback with error", func(t *testing.T) {
+		testErr := fmt.Errorf("commit error")
+		userCalled := false
+		var receivedErr error
+		runTxnCallback(&txnCb{
+			user: func(err error) {
+				userCalled = true
+				receivedErr = err
+			},
+			commit: func() error {
+				return testErr
+			},
+		})
+		assert.True(t, userCalled)
+		assert.Equal(t, testErr, receivedErr)
+	})
+
+	t.Run("commit callback success", func(t *testing.T) {
+		userCalled := false
+		var receivedErr error
+		runTxnCallback(&txnCb{
+			user: func(err error) {
+				userCalled = true
+				receivedErr = err
+			},
+			commit: func() error {
+				return nil
+			},
+		})
+		assert.True(t, userCalled)
+		assert.Nil(t, receivedErr)
+	})
+
+	t.Run("default case with nil commit and nil error", func(t *testing.T) {
+		userCalled := false
+		var receivedErr error
+		runTxnCallback(&txnCb{
+			user:   func(err error) { userCalled = true; receivedErr = err },
+			err:    nil,
+			commit: nil,
+		})
+		assert.True(t, userCalled)
+		assert.Nil(t, receivedErr)
+	})
+}
+
+func TestTx_CommitWith_PendingWrites(t *testing.T) {
+	withDefaultDB(t, func(t *testing.T, db *DB) {
+		bucket := "test_bucket"
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+		// Test CommitWith with pending writes
+		tx, err := db.Begin(true)
+		assert.NoError(t, err)
+
+		// Put some data
+		err = tx.Put(bucket, []byte("key1"), []byte("value1"), 0)
+		assert.NoError(t, err)
+
+		// Use CommitWith callback
+		callbackCalled := false
+		var callbackErr error
+		tx.CommitWith(func(err error) {
+			callbackCalled = true
+			callbackErr = err
+		})
+
+		// Wait for callback (runs in goroutine)
+		time.Sleep(100 * time.Millisecond)
+		assert.True(t, callbackCalled)
+		assert.NoError(t, callbackErr)
+	})
+}
+
+func TestTx_CommitWith_NoPendingWrites(t *testing.T) {
+	withDefaultDB(t, func(t *testing.T, db *DB) {
+		bucket := "test_bucket"
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+		// Test CommitWith without pending writes (read-only tx)
+		tx, err := db.Begin(false)
+		assert.NoError(t, err)
+
+		// Use CommitWith callback
+		callbackCalled := false
+		var callbackErr error
+		tx.CommitWith(func(err error) {
+			callbackCalled = true
+			callbackErr = err
+		})
+
+		// Wait for callback (runs in goroutine)
+		time.Sleep(100 * time.Millisecond)
+		assert.True(t, callbackCalled)
+		assert.NoError(t, callbackErr)
+	})
+}
+
+func TestTx_allocCommitBuffer(t *testing.T) {
+	withDefaultDB(t, func(t *testing.T, db *DB) {
+		tx, err := db.Begin(true)
+		assert.NoError(t, err)
+
+		t.Run("small transaction uses shared buffer", func(t *testing.T) {
+			tx.size = 100 // Less than CommitBufferSize
+			buff := tx.allocCommitBuffer()
+			assert.Equal(t, db.commitBuffer, buff)
+		})
+
+		t.Run("large transaction creates new buffer", func(t *testing.T) {
+			// Set size larger than CommitBufferSize
+			tx.size = int64(db.opt.CommitBufferSize) + 1000
+			buff := tx.allocCommitBuffer()
+			assert.NotEqual(t, db.commitBuffer, buff)
+			assert.NotNil(t, buff)
+			assert.Equal(t, int(tx.size), buff.Cap())
+		})
+
+		tx.Rollback()
+	})
+}
+
+func TestTx_putBucket(t *testing.T) {
+	withDefaultDB(t, func(t *testing.T, db *DB) {
+		tx, err := db.Begin(true)
+		assert.NoError(t, err)
+
+		// Create a new bucket using the same structure as recovery_reader_test.go
+		bucket := &core.Bucket{
+			Meta: &core.BucketMeta{},
+			Id:   db.bucketManager.Gen.GenId(),
+			Ds:   core.DataStructureBTree,
+			Name: "new_bucket",
+		}
+
+		t.Run("put bucket in pending list", func(t *testing.T) {
+			err := tx.putBucket(bucket)
+			assert.NoError(t, err)
+
+			// Verify bucket is in pending list
+			assert.Contains(t, tx.pendingBucketList[core.DataStructureBTree], bucket.Name)
+			assert.Equal(t, bucket, tx.pendingBucketList[core.DataStructureBTree][bucket.Name])
+		})
+
+		t.Run("put multiple buckets in same DS", func(t *testing.T) {
+			bucket2 := &core.Bucket{
+				Meta: &core.BucketMeta{},
+				Id:   db.bucketManager.Gen.GenId(),
+				Ds:   core.DataStructureBTree,
+				Name: "new_bucket2",
+			}
+
+			err := tx.putBucket(bucket2)
+			assert.NoError(t, err)
+
+			// Verify both buckets are in pending list
+			assert.Len(t, tx.pendingBucketList[core.DataStructureBTree], 2)
+			assert.Contains(t, tx.pendingBucketList[core.DataStructureBTree], bucket.Name)
+			assert.Contains(t, tx.pendingBucketList[core.DataStructureBTree], bucket2.Name)
+		})
+
+		t.Run("put bucket in different DS", func(t *testing.T) {
+			bucket3 := &core.Bucket{
+				Meta: &core.BucketMeta{},
+				Id:   db.bucketManager.Gen.GenId(),
+				Ds:   core.DataStructureSortedSet,
+				Name: "new_bucket3",
+			}
+
+			err := tx.putBucket(bucket3)
+			assert.NoError(t, err)
+
+			// Verify bucket is in sorted set pending list
+			assert.Contains(t, tx.pendingBucketList[core.DataStructureSortedSet], bucket3.Name)
+			assert.Len(t, tx.pendingBucketList[core.DataStructureSortedSet], 1)
+		})
+
+		tx.Rollback()
+	})
 }
