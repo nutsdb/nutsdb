@@ -108,7 +108,7 @@ func open(opt Options) (*DB, error) {
 		closed:                  false,
 		fm:                      NewFileManager(opt.RWMode, opt.MaxFdNumsInCache, opt.CleanFdsCacheThreshold, opt.SegmentSize),
 		mergeStartCh:            make(chan struct{}),
-		mergeEndCh:              make(chan error),
+		mergeEndCh:              make(chan error, 1),
 		mergeWorkCloseCh:        make(chan struct{}),
 		writeCh:                 make(chan *request, KvWriteChCapacity),
 		hintKeyAndRAMIdxModeLru: utils.NewLruCache(opt.HintKeyAndRAMIdxCacheSize),
@@ -116,6 +116,10 @@ func open(opt Options) (*DB, error) {
 	}
 
 	scanFn := func() ([]*ttl.ExpirationEvent, error) {
+		// Check if db is closing (Index is nil) to avoid race
+		if db.Index == nil {
+			return nil, nil
+		}
 		var events []*ttl.ExpirationEvent
 		db.View(func(tx *Tx) error {
 			events = tx.doTTLExpireScan(opt.TTLConfig)
@@ -235,13 +239,16 @@ func (db *DB) BackupTarGZ(w io.Writer) error {
 // Close releases all db resources.
 func (db *DB) Close() error {
 	db.mu.Lock()
-	defer db.mu.Unlock()
 
 	if db.closed {
+		db.mu.Unlock()
 		return ErrDBClosed
 	}
 
 	db.closed = true
+	// Release mutex before calling release() to avoid deadlock with merge worker
+	// which may be waiting for the mutex inside merge operations
+	db.mu.Unlock()
 
 	err := db.release()
 	if err != nil {
@@ -268,10 +275,11 @@ func (db *DB) release() error {
 		return err
 	}
 
-	db.mergeWorkCloseCh <- struct{}{}
-
-	// Close TTL service before setting Index to nil to avoid race conditions
+	// Close TTL service first to stop the scanner goroutine
 	db.ttlService.Close()
+
+	// Signal merge worker to stop after TTL service is closed
+	db.mergeWorkCloseCh <- struct{}{}
 
 	// Now safe to release Index as all background services are stopped
 	db.Index = nil

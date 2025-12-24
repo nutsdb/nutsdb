@@ -321,13 +321,33 @@ func (db *DB) mergeWorker() {
 	for {
 		select {
 		case <-db.mergeStartCh:
-			db.mergeEndCh <- db.merge()
+			// Check for close signal before starting merge to avoid deadlock with db.Close()
+			select {
+			case <-db.mergeWorkCloseCh:
+				return
+			default:
+			}
+
+			err := db.merge()
+
+			// Non-blocking send to avoid blocking on close signal
+			select {
+			case db.mergeEndCh <- err:
+			default:
+			}
+
 			// if automatic merging is enabled, then after a manual merge
 			// the t needs to be reset.
 			if db.opt.MergeInterval != 0 {
 				ticker.Reset(db.opt.MergeInterval)
 			}
 		case <-ticker.C:
+			// Check for close signal before starting merge
+			select {
+			case <-db.mergeWorkCloseCh:
+				return
+			default:
+			}
 			_ = db.merge()
 		case <-db.mergeWorkCloseCh:
 			return
