@@ -19,8 +19,11 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sync"
 	"testing"
+	"time"
 
+	"github.com/nutsdb/nutsdb/internal/ttl"
 	"github.com/nutsdb/nutsdb/internal/testutils"
 	"github.com/stretchr/testify/require"
 	"github.com/xujiajun/utils/strconv2"
@@ -1165,4 +1168,148 @@ func TestDB_MergeModeSwitching(t *testing.T) {
 	require.NoError(t, db.Merge())
 	assertStage(db, 'C')
 	require.NoError(t, db.Close())
+}
+
+// TestDB_MergeWithTTLScanner tests that merge operations don't race with TTL scanner.
+// The TTL scanner periodically samples records to check for expiration, while merge
+// modifies record metadata. This test ensures no data race occurs when both run concurrently.
+func TestDB_MergeWithTTLScanner(t *testing.T) {
+	runForMergeModes(t, func(t *testing.T, mode mergeTestMode) {
+		bucket := "test_bucket"
+		opts := DefaultOptions
+		opts.SegmentSize = 64 * KB // Small segment size to trigger more frequent merges
+		opts.EnableMergeV2 = mode.enableMergeV2
+		opts.Dir = fmt.Sprintf("/tmp/test-merge-ttl-scanner-%s-%d/", mode.name, time.Now().UnixNano())
+		// Configure TTL with fast scanning to increase concurrent access chances
+		opts.TTLConfig = ttl.Config{
+			ScanInterval:     50 * time.Millisecond, // Fast scan interval
+			SampleSize:       100,                   // More samples per scan
+			ExpiredThreshold: 0.5,                   // Continue scanning if 50% expired
+			BatchSize:        50,
+			BatchTimeout:     10 * time.Millisecond,
+		}
+		// Enable automatic merging to increase merge frequency
+		opts.MergeInterval = 200 * time.Millisecond
+
+		removeDir(opts.Dir)
+		defer removeDir(opts.Dir)
+
+		db, err := Open(opts)
+		require.NoError(t, err)
+		defer db.Close()
+
+		// Create bucket
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+		// Insert initial data with TTL
+		const initialKeys = 500
+		for i := 0; i < initialKeys; i++ {
+			key := testutils.GetTestBytes(i)
+			// Set TTL to 1 second so scanner has expired keys to process
+			err := db.Update(func(tx *Tx) error {
+				return tx.Put(bucket, key, testutils.GetTestBytes(i), uint32(1000))
+			})
+			require.NoError(t, err)
+		}
+
+		// Create multiple files to ensure merge has work to do
+		for fileIdx := 0; fileIdx < 3; fileIdx++ {
+			require.NoError(t, db.Close())
+			db, err = Open(opts)
+			require.NoError(t, err)
+			if exist := db.bucketManager.ExistBucket(DataStructureBTree, bucket); !exist {
+				txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			}
+
+			// Add more data to create more data files
+			for i := initialKeys + fileIdx*200; i < initialKeys + (fileIdx+1)*200; i++ {
+				key := testutils.GetTestBytes(i)
+				err := db.Update(func(tx *Tx) error {
+					return tx.Put(bucket, key, testutils.GetTestBytes(i), uint32(5000))
+				})
+				require.NoError(t, err)
+			}
+		}
+
+		// Ensure we're back to the final db instance
+		require.NoError(t, db.Close())
+		db, err = Open(opts)
+		require.NoError(t, err)
+		defer db.Close()
+		if exist := db.bucketManager.ExistBucket(DataStructureBTree, bucket); !exist {
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+		}
+
+		// Run concurrent merge and writes
+		var wg sync.WaitGroup
+		stopCh := make(chan struct{})
+
+		// Writer goroutine: continuously write new data
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			ticker := time.NewTicker(20 * time.Millisecond)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-stopCh:
+					return
+				case <-ticker.C:
+					key := testutils.GetTestBytes(int(time.Now().UnixNano()))
+					_ = db.Update(func(tx *Tx) error {
+						return tx.Put(bucket, key, []byte("value"), uint32(5000))
+					})
+				}
+			}
+		}()
+
+		// Merger goroutine: continuously trigger merge
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			ticker := time.NewTicker(50 * time.Millisecond)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-stopCh:
+					return
+				case <-ticker.C:
+					_ = db.Merge()
+				}
+			}
+		}()
+
+		// Reader goroutine: continuously read data (triggers passive TTL check)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			ticker := time.NewTicker(30 * time.Millisecond)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-stopCh:
+					return
+				case <-ticker.C:
+					_ = db.View(func(tx *Tx) error {
+						it := NewIterator(tx, bucket, IteratorOptions{})
+						for it.Seek(nil); it.Valid(); it.Next() {
+							_, _ = it.Value()
+						}
+						it.Release()
+						return nil
+					})
+				}
+			}
+		}()
+
+		// Let them run for a while to increase chance of catching race
+		time.Sleep(2 * time.Second)
+
+		// Stop all goroutines
+		close(stopCh)
+		wg.Wait()
+
+		// Verify no errors occurred
+		require.NoError(t, db.Close())
+	})
 }

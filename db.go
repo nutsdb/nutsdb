@@ -26,6 +26,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/bwmarrin/snowflake"
@@ -61,7 +62,7 @@ type (
 		mu                      sync.RWMutex
 		KeyCount                int // total key number ,include expired, deleted, repeated.
 		closed                  bool
-		isMerging               bool
+		isMerging               int32 // atomic flag to indicate merge is in progress
 		fm                      *FileManager
 		flock                   *flock.Flock
 		commitBuffer            *bytes.Buffer
@@ -114,7 +115,15 @@ func open(opt Options) (*DB, error) {
 		snowflakeManager:        NewSnowflakeManager(opt.NodeNum),
 	}
 
-	db.ttlService = ttl.NewService(opt.Clock, opt.TTLConfig, db.handleExpiredKeys)
+	scanFn := func() ([]*ttl.ExpirationEvent, error) {
+		var events []*ttl.ExpirationEvent
+		db.View(func(tx *Tx) error {
+			events = doTTLExpireScan(tx, opt.TTLConfig)
+			return nil
+		})
+		return events, nil
+	}
+	db.ttlService = ttl.NewService(opt.Clock, opt.TTLConfig, db.handleExpiredKeys, scanFn)
 
 	db.Index = db.newIndex()
 
@@ -162,7 +171,7 @@ func open(opt Options) (*DB, error) {
 
 	go db.mergeWorker()
 	go db.doWrites()
-	go db.ttlService.Run(db.getIndexAccessor)
+	go db.ttlService.Run()
 
 	return db, nil
 }
@@ -192,6 +201,21 @@ func (db *DB) View(fn func(tx *Tx) error) error {
 	}
 
 	return db.managed(false, fn)
+}
+
+// IsMerging returns true if a merge operation is in progress.
+func (db *DB) IsMerging() bool {
+	return atomic.LoadInt32(&db.isMerging) != 0
+}
+
+// SetMerging atomically sets the merging state.
+// Returns true if the state was successfully set, false if already merging.
+func (db *DB) SetMerging(v bool) bool {
+	if v {
+		return atomic.CompareAndSwapInt32(&db.isMerging, 0, 1)
+	}
+	atomic.StoreInt32(&db.isMerging, 0)
+	return true
 }
 
 // Backup copies the database to file directory at the given dir.
@@ -1069,57 +1093,130 @@ func (db *DB) handleExpiredKeys(events []*ttl.ExpirationEvent) {
 	})
 }
 
-// getIndexAccessor returns an IndexAccessor for the TTL scanner.
-// This allows the scanner to access bucket and key information for scanning.
-func (db *DB) getIndexAccessor() ttl.IndexAccessor {
-	// Snapshot the values to avoid data races
-	db.mu.RLock()
-	index := db.Index
-	bucketMapper := db.bucketManager.BucketInfoMapper
-	bucketManager := db.bucketManager
-	db.mu.RUnlock()
+// doTTLExpireScan performs TTL expiration scanning within a transaction.
+// It samples random keys from all buckets and returns expired events.
+func doTTLExpireScan(tx *Tx, ttlConfig TTLConfig) []*ttl.ExpirationEvent {
+	totalScanned := 0
+	allExpiredEvents := make([]*ttl.ExpirationEvent, 0)
 
-	return ttl.IndexAccessor{
-		RangeBuckets: func(f func(bucketId uint64) bool) {
-			if index == nil {
-				return
+	// Adaptive loop: continue sampling if expired rate exceeds threshold
+	// Todo Add statistics for TTL and exit directly if it does not exceed a threshold
+	for {
+		if totalScanned >= ttlConfig.MaxScanKeys {
+			break
+		}
+
+		// Random sample keys from all buckets (weighted by bucket size)
+		samples := randomSampleFromAllBuckets(tx.db.bucketManager.BucketInfoMapper, tx.db.Index, ttlConfig.SampleSize)
+
+		if len(samples) == 0 {
+			break
+		}
+
+		// Check for expired keys (records already have TTL and Timestamp)
+		expiredCount := 0
+		batch := make([]*ttl.ExpirationEvent, 0)
+
+		for bucketId, records := range samples {
+			bucket := tx.db.bucketManager.BucketInfoMapper[bucketId]
+			if bucket == nil {
+				continue
 			}
-			// Use bucketManager as the source of truth for buckets
-			for bucketId := range bucketMapper {
-				if !f(bucketId) {
-					return
+			for _, record := range records {
+				if tx.db.ttlService.GetChecker().IsExpired(record.TTL, record.Timestamp) {
+					expiredCount++
+					batch = append(batch, &ttl.ExpirationEvent{
+						BucketId:  bucketId,
+						Key:       record.Key,
+						Ds:        bucket.Ds,
+						Timestamp: record.Timestamp,
+					})
 				}
 			}
-		},
-		SampleRecords: func(bucketId uint64, count int) ([]*core.Record, error) {
-			bucket, err := bucketManager.GetBucketById(bucketId)
-			if err != nil {
-				return nil, nil
-			}
+		}
 
-			switch bucket.Ds {
-			case DataStructureBTree:
-				if idx, ok := index.BTree.exist(bucketId); ok {
-					return idx.SampleRandomRecords(count), nil
-				}
-			case DataStructureSet:
-				return nil, nil
-			case DataStructureSortedSet:
-				return nil, nil
-			case DataStructureList:
-				return nil, nil
-			}
+		// Collect expired events
+		if len(batch) > 0 {
+			allExpiredEvents = append(allExpiredEvents, batch...)
+		}
 
-			return nil, nil
-		},
-		GetDataStructure: func(bucketId uint64) uint16 {
-			bucket, err := bucketManager.GetBucketById(bucketId)
-			if err != nil {
-				return DataStructureBTree // default
-			}
-			return bucket.Ds
-		},
+		// Calculate total sampled keys
+		var totalSampled int
+		for _, records := range samples {
+			totalSampled += len(records)
+		}
+		totalScanned += totalSampled
+
+		if totalSampled == 0 {
+			break
+		}
+
+		// Calculate expired rate
+		expiredRate := float64(expiredCount) / float64(totalSampled)
+
+		if expiredRate < ttlConfig.ExpiredThreshold {
+			break
+		}
+		// Continue sampling if many keys are expired
 	}
+
+	return allExpiredEvents
+}
+
+// randomSampleFromAllBuckets samples random keys from all buckets with weighted distribution.
+// Large buckets get proportionally more samples. Returns map[bucketId][]*core.Record.
+func randomSampleFromAllBuckets(bucketInfoMapper map[uint64]*core.Bucket, index *Index, n int) map[uint64][]*core.Record {
+	// Calculate total keys across all BTree buckets
+	// Todo support other data structures
+	var totalKeys int
+	for bucketId, bucket := range bucketInfoMapper {
+		if bucket.Ds != DataStructureBTree {
+			continue
+		}
+		if idx, ok := index.BTree.exist(bucketId); ok {
+			totalKeys += idx.Count()
+		}
+	}
+	if totalKeys == 0 {
+		return nil
+	}
+
+	// Distribute samples proportionally by bucket size
+	samples := make(map[uint64][]*core.Record)
+	remaining := n
+
+	for bucketId, bucket := range bucketInfoMapper {
+		if bucket.Ds != DataStructureBTree {
+			continue
+		}
+		idx, ok := index.BTree.exist(bucketId)
+		if !ok {
+			continue
+		}
+
+		bucketSize := idx.Count()
+		// Proportional sampling: bucketSize * n / totalKeys
+		sampleCount := (bucketSize * n) / totalKeys
+		// Ensure at least 1 sample if bucket is non-empty
+		if sampleCount == 0 && bucketSize > 0 {
+			sampleCount = 1
+		}
+		if sampleCount > bucketSize {
+			sampleCount = bucketSize
+		}
+		if sampleCount > remaining {
+			sampleCount = remaining
+		}
+
+		// Sample records directly (already have TTL and Timestamp)
+		samples[bucketId] = idx.SampleRandomRecords(sampleCount)
+		remaining -= sampleCount
+		if remaining <= 0 {
+			break
+		}
+	}
+
+	return samples
 }
 
 func (db *DB) rebuildBucketManager() error {

@@ -501,19 +501,19 @@ func TestMergeV2PrepareWhileAlreadyMerging(t *testing.T) {
 		opt:        opts,
 		ActiveFile: &DataFile{rwManager: &mockRWManager{}},
 	}
-	db.isMerging = true
+	db.SetMerging(true)
 
 	job := &mergeV2Job{db: db}
 	if err := job.prepare(); !errors.Is(err, ErrIsMerging) {
 		t.Fatalf("expected ErrIsMerging, got %v", err)
 	}
 
-	if !db.isMerging {
+	if !db.IsMerging() {
 		t.Fatalf("isMerging should remain true until finish is called")
 	}
 
 	job.finish()
-	if db.isMerging {
+	if db.IsMerging() {
 		t.Fatalf("finish should reset isMerging flag")
 	}
 }
@@ -549,7 +549,7 @@ func TestMergeV2PrepareSyncError(t *testing.T) {
 	if mock.releaseCalls != 0 {
 		t.Fatalf("release should not be called on sync failure")
 	}
-	if db.isMerging {
+	if db.IsMerging() {
 		t.Fatalf("isMerging should be reset on error path")
 	}
 }
@@ -1318,7 +1318,9 @@ func TestMergeV2ApplyLookupUpdatesSecondaryIndexes(t *testing.T) {
 		},
 	}
 	db.Index = db.newIndex()
-	db.ttlService = ttl.NewService(clk, ttl.DefaultConfig(), db.handleExpiredKeys)
+	// Use a no-op scan function for merge tests (TTL scanning not relevant here)
+	noopScanFn := func() ([]*ttl.ExpirationEvent, error) { return nil, nil }
+	db.ttlService = ttl.NewService(clk, ttl.DefaultConfig(), db.handleExpiredKeys, noopScanFn)
 
 	// Prepare buckets
 	buckets := []struct {
@@ -2014,7 +2016,9 @@ func TestMergeV2RewriteFileSkipsCorruptedEntries(t *testing.T) {
 	}
 	db.Index = db.newIndex()
 	db.Index.BTree.Idx[bucketID] = bt
-	db.ttlService = ttl.NewService(clk, ttl.DefaultConfig(), db.handleExpiredKeys)
+	// Use a no-op scan function for merge tests (TTL scanning not relevant here)
+	noopScanFn := func() ([]*ttl.ExpirationEvent, error) { return nil, nil }
+	db.ttlService = ttl.NewService(clk, ttl.DefaultConfig(), db.handleExpiredKeys, noopScanFn)
 
 	mock := &mockRWManager{}
 	job := &mergeV2Job{

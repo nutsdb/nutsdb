@@ -18,19 +18,11 @@ import (
 	"math/rand"
 	"sync"
 	"time"
-
-	"github.com/nutsdb/nutsdb/internal/core"
 )
 
 // ScanCallback is called when expired keys are found during scanning.
 // It receives a batch of expiration events to be processed together.
 type ScanCallback = BatchExpiredCallback
-
-// RecordSample represents a sampled record for scanning.
-type RecordSample struct {
-	BucketId uint64
-	Record   *core.Record
-}
 
 // Scanner periodically scans for expired keys using adaptive sampling.
 type Scanner struct {
@@ -94,8 +86,8 @@ func (s *Scanner) SetChecker(checker *Checker) {
 }
 
 // Run starts the scanner with periodic scanning.
-// The getIndex function is called each scan cycle to get current index state.
-func (s *Scanner) Run(getIndex func() IndexAccessor) {
+// The scanFn is called each scan cycle to perform the scan within a transaction.
+func (s *Scanner) Run(scanFn ScanFunc) {
 	s.mu.Lock()
 	if s.running {
 		s.mu.Unlock()
@@ -113,12 +105,18 @@ func (s *Scanner) Run(getIndex func() IndexAccessor) {
 		case <-s.stopCh:
 			return
 		case <-ticker.C:
-			indexAccessor := getIndex()
-			// Ensure IndexAccessor has all required functions
-			if indexAccessor.RangeBuckets != nil &&
-				indexAccessor.SampleRecords != nil &&
-				indexAccessor.GetDataStructure != nil {
-				s.scanWithAdaptiveLoop(indexAccessor)
+			events, err := scanFn()
+			if err != nil {
+				// Log error but continue scanning
+				continue
+			}
+			if len(events) > 0 {
+				s.mu.RLock()
+				callback := s.callback
+				s.mu.RUnlock()
+				if callback != nil {
+					callback(events)
+				}
 			}
 		}
 	}
@@ -132,101 +130,4 @@ func (s *Scanner) Stop() {
 		close(s.stopCh)
 		s.running = false
 	}
-}
-
-// scanWithAdaptiveLoop implements adaptive scanning.
-// It continues sampling if the expired rate exceeds the threshold.
-func (s *Scanner) scanWithAdaptiveLoop(indexAccessor IndexAccessor) {
-	s.mu.RLock()
-	callback := s.callback
-	checker := s.checker
-	s.mu.RUnlock()
-
-	if callback == nil || checker == nil {
-		return
-	}
-
-	totalScanned := 0
-
-	for {
-		// Check scan limit
-		if totalScanned >= s.maxScanKeys {
-			break
-		}
-
-		// Random sample keys from all buckets
-		samples := s.randomSampleFromAllBuckets(indexAccessor, s.sampleSize)
-		if len(samples) == 0 {
-			break
-		}
-
-		// Check for expired keys
-		expiredCount := 0
-		batch := make([]*ExpirationEvent, 0, len(samples))
-
-		for _, sample := range samples {
-			record := sample.Record
-			// Use local checker for expiration check
-			if checker.IsExpired(record.TTL, record.Timestamp) {
-				expiredCount++
-				batch = append(batch, &ExpirationEvent{
-					BucketId:  sample.BucketId,
-					Key:       record.Key,
-					Ds:        indexAccessor.GetDataStructure(sample.BucketId),
-					Timestamp: record.Timestamp,
-				})
-			}
-		}
-
-		// Push expired keys to callback
-		if len(batch) > 0 {
-			callback(batch)
-		}
-
-		totalScanned += len(samples)
-
-		// Calculate expired rate
-		expiredRate := float64(expiredCount) / float64(len(samples))
-
-		if expiredRate < s.expiredThreshold {
-			break
-		}
-
-		// Continue sampling if many keys are expired
-	}
-}
-
-// randomSampleFromAllBuckets samples random keys from all buckets.
-func (s *Scanner) randomSampleFromAllBuckets(indexAccessor IndexAccessor, n int) []RecordSample {
-	// Collect keys from all buckets
-	allSamples := make([]RecordSample, 0, n*10)
-
-	indexAccessor.RangeBuckets(func(bucketId uint64) bool {
-		// Sample records directly
-		records, err := indexAccessor.SampleRecords(bucketId, n)
-		if err != nil {
-			return true // Continue to next bucket
-		}
-
-		for _, record := range records {
-			allSamples = append(allSamples, RecordSample{
-				BucketId: bucketId,
-				Record:   record,
-			})
-		}
-		return true
-	})
-
-	// Shuffle and pick n samples
-	if len(allSamples) <= n {
-		return allSamples
-	}
-
-	// Fisher-Yates shuffle
-	for i := len(allSamples) - 1; i > 0; i-- {
-		j := s.rand.Intn(i + 1)
-		allSamples[i], allSamples[j] = allSamples[j], allSamples[i]
-	}
-
-	return allSamples[:n]
 }

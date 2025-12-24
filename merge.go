@@ -63,15 +63,11 @@ func (db *DB) mergeLegacy() error {
 	// to prevent the initiation of multiple merges simultaneously.
 	db.mu.Lock()
 
-	if db.isMerging {
+	if !db.SetMerging(true) {
 		db.mu.Unlock()
 		return ErrIsMerging
 	}
-
-	db.isMerging = true
-	defer func() {
-		db.isMerging = false
-	}()
+	defer db.SetMerging(false)
 
 	_, pendingMergeFIds = db.getMaxFileIDAndFileIDs()
 	if len(pendingMergeFIds) < 2 {

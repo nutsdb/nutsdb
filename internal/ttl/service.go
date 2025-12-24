@@ -16,27 +16,16 @@ package ttl
 
 import (
 	"time"
-
-	"github.com/nutsdb/nutsdb/internal/core"
 )
-
-// IndexAccessor provides access to the index for scanning.
-// It uses function fields to decouple from the DB implementation.
-type IndexAccessor struct {
-	// RangeBuckets iterates over all buckets.
-	// Returns false from the callback to stop iteration.
-	RangeBuckets func(f func(bucketId uint64) bool)
-
-	// SampleRecords returns a random sample of records from the specified bucket.
-	SampleRecords func(bucketId uint64, count int) ([]*core.Record, error)
-
-	// GetDataStructure returns the data structure type for a bucket.
-	GetDataStructure func(bucketId uint64) uint16
-}
 
 // BatchExpiredCallback is a function type for handling batch deletion of expired keys.
 // It receives a batch of expiration events to process together in a single transaction.
 type BatchExpiredCallback func(events []*ExpirationEvent)
+
+// ScanFunc is the type for the scan function that performs expiration scanning.
+// It is called by the scanner in each tick and should perform the scan within a transaction.
+// This type is defined in ttl package to avoid circular dependencies.
+type ScanFunc func() ([]*ExpirationEvent, error)
 
 // Service provides unified TTL management with passive and active expiration.
 // 1. Passive: Check TTL when reading a key
@@ -50,6 +39,7 @@ type Service struct {
 	checker         *Checker             // Passive expiration
 	scanner         *Scanner             // Active expiration
 	clock           Clock                // Unified clock source
+	scanFn          ScanFunc             // Scan function called each tick
 	expiredCallback BatchExpiredCallback // Handler for actual batch deletion
 	queue           *expirationQueue     // Queue for expiration events
 	workerCloseCh   chan struct{}        // Channel to signal worker shutdown
@@ -59,7 +49,7 @@ type Service struct {
 }
 
 // NewService creates a TTL service with the specified clock and configuration.
-func NewService(clk Clock, config Config, callback BatchExpiredCallback) *Service {
+func NewService(clk Clock, config Config, callback BatchExpiredCallback, scanFn ScanFunc) *Service {
 	config.Validate()
 
 	chk := NewChecker(clk)
@@ -76,6 +66,7 @@ func NewService(clk Clock, config Config, callback BatchExpiredCallback) *Servic
 		scanner:         scanner,
 		clock:           clk,
 		expiredCallback: callback,
+		scanFn:          scanFn,
 		queue:           newExpirationQueue(config.QueueSize),
 		workerCloseCh:   make(chan struct{}),
 		workerDone:      make(chan struct{}),
@@ -98,10 +89,10 @@ func NewService(clk Clock, config Config, callback BatchExpiredCallback) *Servic
 }
 
 // Run starts the TTL service with periodic scanning.
-// The getIndex function is called each scan cycle to get current index state.
-func (s *Service) Run(getIndex func() IndexAccessor) {
+// The scanFn is called each scan cycle to perform the scan within a transaction.
+func (s *Service) Run() {
 	go s.processExpirationEvents()
-	go s.scanner.Run(getIndex)
+	go s.scanner.Run(s.scanFn)
 }
 
 // Close stops the TTL service and releases all resources.
