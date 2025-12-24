@@ -118,7 +118,7 @@ func open(opt Options) (*DB, error) {
 	scanFn := func() ([]*ttl.ExpirationEvent, error) {
 		var events []*ttl.ExpirationEvent
 		db.View(func(tx *Tx) error {
-			events = doTTLExpireScan(tx, opt.TTLConfig)
+			events = tx.doTTLExpireScan(opt.TTLConfig)
 			return nil
 		})
 		return events, nil
@@ -1091,132 +1091,6 @@ func (db *DB) handleExpiredKeys(events []*ttl.ExpirationEvent) {
 
 		return nil
 	})
-}
-
-// doTTLExpireScan performs TTL expiration scanning within a transaction.
-// It samples random keys from all buckets and returns expired events.
-func doTTLExpireScan(tx *Tx, ttlConfig TTLConfig) []*ttl.ExpirationEvent {
-	totalScanned := 0
-	allExpiredEvents := make([]*ttl.ExpirationEvent, 0)
-
-	// Adaptive loop: continue sampling if expired rate exceeds threshold
-	// Todo Add statistics for TTL and exit directly if it does not exceed a threshold
-	for {
-		if totalScanned >= ttlConfig.MaxScanKeys {
-			break
-		}
-
-		// Random sample keys from all buckets (weighted by bucket size)
-		samples := randomSampleFromAllBuckets(tx.db.bucketManager.BucketInfoMapper, tx.db.Index, ttlConfig.SampleSize)
-
-		if len(samples) == 0 {
-			break
-		}
-
-		// Check for expired keys (records already have TTL and Timestamp)
-		expiredCount := 0
-		batch := make([]*ttl.ExpirationEvent, 0)
-
-		for bucketId, records := range samples {
-			bucket := tx.db.bucketManager.BucketInfoMapper[bucketId]
-			if bucket == nil {
-				continue
-			}
-			for _, record := range records {
-				if tx.db.ttlService.GetChecker().IsExpired(record.TTL, record.Timestamp) {
-					expiredCount++
-					batch = append(batch, &ttl.ExpirationEvent{
-						BucketId:  bucketId,
-						Key:       record.Key,
-						Ds:        bucket.Ds,
-						Timestamp: record.Timestamp,
-					})
-				}
-			}
-		}
-
-		// Collect expired events
-		if len(batch) > 0 {
-			allExpiredEvents = append(allExpiredEvents, batch...)
-		}
-
-		// Calculate total sampled keys
-		var totalSampled int
-		for _, records := range samples {
-			totalSampled += len(records)
-		}
-		totalScanned += totalSampled
-
-		if totalSampled == 0 {
-			break
-		}
-
-		// Calculate expired rate
-		expiredRate := float64(expiredCount) / float64(totalSampled)
-
-		if expiredRate < ttlConfig.ExpiredThreshold {
-			break
-		}
-		// Continue sampling if many keys are expired
-	}
-
-	return allExpiredEvents
-}
-
-// randomSampleFromAllBuckets samples random keys from all buckets with weighted distribution.
-// Large buckets get proportionally more samples. Returns map[bucketId][]*core.Record.
-func randomSampleFromAllBuckets(bucketInfoMapper map[uint64]*core.Bucket, index *Index, n int) map[uint64][]*core.Record {
-	// Calculate total keys across all BTree buckets
-	// Todo support other data structures
-	var totalKeys int
-	for bucketId, bucket := range bucketInfoMapper {
-		if bucket.Ds != DataStructureBTree {
-			continue
-		}
-		if idx, ok := index.BTree.exist(bucketId); ok {
-			totalKeys += idx.Count()
-		}
-	}
-	if totalKeys == 0 {
-		return nil
-	}
-
-	// Distribute samples proportionally by bucket size
-	samples := make(map[uint64][]*core.Record)
-	remaining := n
-
-	for bucketId, bucket := range bucketInfoMapper {
-		if bucket.Ds != DataStructureBTree {
-			continue
-		}
-		idx, ok := index.BTree.exist(bucketId)
-		if !ok {
-			continue
-		}
-
-		bucketSize := idx.Count()
-		// Proportional sampling: bucketSize * n / totalKeys
-		sampleCount := (bucketSize * n) / totalKeys
-		// Ensure at least 1 sample if bucket is non-empty
-		if sampleCount == 0 && bucketSize > 0 {
-			sampleCount = 1
-		}
-		if sampleCount > bucketSize {
-			sampleCount = bucketSize
-		}
-		if sampleCount > remaining {
-			sampleCount = remaining
-		}
-
-		// Sample records directly (already have TTL and Timestamp)
-		samples[bucketId] = idx.SampleRandomRecords(sampleCount)
-		remaining -= sampleCount
-		if remaining <= 0 {
-			break
-		}
-	}
-
-	return samples
 }
 
 func (db *DB) rebuildBucketManager() error {
