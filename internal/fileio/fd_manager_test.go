@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -13,8 +14,8 @@ import (
 )
 
 func TestFdManager_All(t *testing.T) {
-	dir := "test-data"
-	testBasePath := dir + "/data-"
+	dir := filepath.Join(t.TempDir(), "test-data")
+	testBasePath := filepath.Join(dir, "data-")
 	err := os.Mkdir(dir, os.ModePerm)
 	assert.Nil(t, err)
 	defer os.RemoveAll(dir)
