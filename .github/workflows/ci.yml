@@ -1,9 +1,12 @@
 name: ci
 on:
   pull_request:
+
   push:
     branches:
-    - master
+      - master
+
+  workflow_dispatch:
 
 jobs:
   unit-test-linux:
@@ -54,3 +57,16 @@ jobs:
             sudo rm -rf /tmp/test-hintfile* || true
           fi
         done
+
+  unit-test-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+        
+      - name: Test
+        run: timeout 25m go test -v -race -timeout 15m ./...
