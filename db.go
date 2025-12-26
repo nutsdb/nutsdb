@@ -604,6 +604,7 @@ func (db *DB) parseDataFiles(dataFileIds []int64) (err error) {
 		if err != nil {
 			return err
 		}
+		_ = f.release()
 	}
 
 	// compute the valid record count and save it in db.RecordCount

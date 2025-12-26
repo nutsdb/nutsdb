@@ -61,11 +61,9 @@ func runNutsDBTest(t *testing.T, opts *Options, test func(t *testing.T, db *DB))
 	require.NoError(t, err)
 
 	test(t, db)
-	t.Cleanup(func() {
-		if !db.IsClose() {
-			require.NoError(t, db.Close())
-		}
-	})
+	if !db.IsClose() {
+		require.NoError(t, db.Close())
+	}
 }
 
 func runNutsDBTestWithWatch(t *testing.T, test func(t *testing.T, db *DB)) {
