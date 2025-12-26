@@ -265,6 +265,8 @@ func (db *DB) release() error {
 
 	db.ttlService.Close()
 
+	db.bucketManager.Close()
+
 	if db.watchManager != nil {
 		if err := db.watchManager.close(); err != nil {
 			log.Printf("watch manager closed already")

@@ -140,6 +140,9 @@ func TestBatchWrite(t *testing.T) {
 		testEmptyWrite(t, db)
 		TestFlushPanic(t, db)
 	}
+	for _, db := range dbs {
+		require.NoError(t, db.Close())
+	}
 }
 
 func TestWriteBatch_SetMaxPendingTxns(t *testing.T) {
@@ -149,6 +152,7 @@ func TestWriteBatch_SetMaxPendingTxns(t *testing.T) {
 		WithDir(t.TempDir()),
 	)
 	require.NoError(t, err)
+	defer db.Close()
 	wb, err := db.NewWriteBatch()
 	require.NoError(t, err)
 	wb.SetMaxPendingTxns(max)
