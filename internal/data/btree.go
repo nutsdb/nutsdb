@@ -523,7 +523,10 @@ func (b *BTreeScanner) isValid(item *core.Item[core.Record]) bool {
 // inRange checks if an item is within the specified key range.
 func (b *BTreeScanner) inRange(item *core.Item[core.Record]) bool {
 	if b.direction == Forward {
-		return b.endKey == nil || bytes.Compare(item.Key, b.endKey) <= 0
+		return (b.startKey == nil || bytes.Compare(item.Key, b.startKey) >= 0) &&
+			(b.endKey == nil || bytes.Compare(item.Key, b.endKey) <= 0)
 	}
-	return b.startKey == nil || bytes.Compare(item.Key, b.startKey) >= 0
+	// Reverse: item should be >= endKey (lower bound) and <= startKey (upper bound/pivot)
+	return (b.endKey == nil || bytes.Compare(item.Key, b.endKey) >= 0) &&
+		(b.startKey == nil || bytes.Compare(item.Key, b.startKey) <= 0)
 }

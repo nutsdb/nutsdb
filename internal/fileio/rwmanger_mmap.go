@@ -126,6 +126,12 @@ func (mm *MMapRWManager) Sync() (err error) {
 // Release deletes the memory mapped region, flushes any remaining changes
 func (mm *MMapRWManager) Release() (err error) {
 	mm.Fdm.ReduceUsing(mm.Path)
+
+	// Remove from global instances map to prevent reuse with stale FdManager
+	mmapRWManagerInstancesLock.Lock()
+	delete(mmapRWManagerInstances, mm.Path)
+	mmapRWManagerInstancesLock.Unlock()
+
 	return nil
 }
 

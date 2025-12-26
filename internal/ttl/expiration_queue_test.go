@@ -17,6 +17,8 @@ package ttl
 import (
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestExpirationQueue_PushPop(t *testing.T) {
@@ -148,6 +150,26 @@ func TestExpirationQueue_Close(t *testing.T) {
 	if !ok {
 		t.Fatal("Should be able to pop remaining events after close")
 	}
+}
+
+func TestExpirationQueue_DropWhenFullAllowsFutureEnqueue(t *testing.T) {
+	eq := newExpirationQueue(1)
+	defer eq.close()
+
+	first := &ExpirationEvent{BucketId: 1, Key: []byte("k1"), Ds: 1, Timestamp: 1}
+	second := &ExpirationEvent{BucketId: 1, Key: []byte("k2"), Ds: 1, Timestamp: 2}
+
+	require.True(t, eq.push(first))
+
+	// Channel is full, second event should be dropped
+	require.False(t, eq.push(second))
+
+	// Pop the first event to free capacity
+	_, ok := eq.pop()
+	require.True(t, ok)
+
+	// After freeing capacity, pushing the second event should succeed
+	require.True(t, eq.push(second))
 }
 
 func TestExpirationQueue_SeenMapClearedOnClose(t *testing.T) {

@@ -7,7 +7,7 @@ import (
 
 // LRUCache is a least recently used (LRU) cache.
 type LRUCache struct {
-	m   map[interface{}]*list.Element
+	m   map[any]*list.Element
 	l   *list.List
 	cap int
 	mu  *sync.RWMutex
@@ -16,7 +16,7 @@ type LRUCache struct {
 // New creates a new LRUCache with the specified capacity.
 func NewLruCache(cap int) *LRUCache {
 	return &LRUCache{
-		m:   make(map[interface{}]*list.Element),
+		m:   make(map[any]*list.Element),
 		l:   list.New(),
 		cap: cap,
 		mu:  &sync.RWMutex{},
@@ -24,7 +24,7 @@ func NewLruCache(cap int) *LRUCache {
 }
 
 // Add adds a new entry to the cache.
-func (c *LRUCache) Add(key interface{}, value interface{}) {
+func (c *LRUCache) Add(key any, value any) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -46,7 +46,7 @@ func (c *LRUCache) Add(key interface{}, value interface{}) {
 }
 
 // Get returns the entry associated with the given key, or nil if the key is not in the cache.
-func (c *LRUCache) Get(key interface{}) interface{} {
+func (c *LRUCache) Get(key any) any {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -60,7 +60,7 @@ func (c *LRUCache) Get(key interface{}) interface{} {
 }
 
 // Remove removes the entry associated with the given key from the cache.
-func (c *LRUCache) Remove(key interface{}) {
+func (c *LRUCache) Remove(key any) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -87,7 +87,7 @@ func (c *LRUCache) Clear() {
 	defer c.mu.Unlock()
 
 	c.l.Init()
-	c.m = make(map[interface{}]*list.Element)
+	c.m = make(map[any]*list.Element)
 }
 
 // removeOldest removes the oldest entry from the cache.
@@ -105,6 +105,6 @@ func (c *LRUCache) removeOldest() {
 
 // LruEntry is a struct that represents an entry in the LRU cache.
 type LruEntry struct {
-	Key   interface{}
-	Value interface{}
+	Key   any
+	Value any
 }

@@ -127,16 +127,12 @@ func (db *DB) mergeV2() error {
 func (job *mergeV2Job) prepare() error {
 	job.db.mu.Lock()
 
-	// Prevent concurrent merges
-	if !job.db.SetMerging(true) {
-		job.db.mu.Unlock()
-		return ErrIsMerging
-	}
+	// Note: Concurrent merge prevention is handled by mergeWorker.performMerge()
+	// which sets the isMerging flag before calling this method
 
 	// Enumerate all data files (both user and merge files)
 	userIDs, mergeIDs, err := enumerateDataFileIDs(job.db.opt.Dir)
 	if err != nil {
-		job.db.SetMerging(false)
 		job.db.mu.Unlock()
 		return fmt.Errorf("failed to enumerate data file IDs: %w", err)
 	}
@@ -159,7 +155,6 @@ func (job *mergeV2Job) prepare() error {
 
 	// Skip merge if there are fewer than 2 files
 	if len(job.pending) < 2 {
-		job.db.SetMerging(false)
 		job.db.mu.Unlock()
 		return ErrDontNeedMerge
 	}
@@ -170,7 +165,6 @@ func (job *mergeV2Job) prepare() error {
 	// Sync active file if using mmap without sync
 	if !job.db.opt.SyncEnable && job.db.opt.RWMode == MMap {
 		if err := job.db.ActiveFile.rwManager.Sync(); err != nil {
-			job.db.SetMerging(false)
 			job.db.mu.Unlock()
 			return fmt.Errorf("failed to sync active file: %w", err)
 		}
@@ -178,7 +172,6 @@ func (job *mergeV2Job) prepare() error {
 
 	// Release current active file for merge processing
 	if err := job.db.ActiveFile.rwManager.Release(); err != nil {
-		job.db.SetMerging(false)
 		job.db.mu.Unlock()
 		return fmt.Errorf("failed to release active file: %w", err)
 	}
@@ -188,7 +181,6 @@ func (job *mergeV2Job) prepare() error {
 	path := getDataPath(job.db.MaxFileID, job.db.opt.Dir)
 	activeFile, err := job.db.fm.GetDataFile(path, job.db.opt.SegmentSize)
 	if err != nil {
-		job.db.SetMerging(false)
 		job.db.mu.Unlock()
 		return fmt.Errorf("failed to create new active file: %w", err)
 	}
@@ -200,10 +192,11 @@ func (job *mergeV2Job) prepare() error {
 	return nil
 }
 
-// finish cleans up the merge job by resetting the merging state.
+// finish cleans up the merge job.
 // Always called via defer to ensure cleanup even if merge fails.
+// Note: The isMerging flag is managed by mergeWorker.performMerge()
 func (job *mergeV2Job) finish() {
-	job.db.SetMerging(false)
+	// No-op: State is managed by mergeWorker
 }
 
 // enterWritingState initializes the merge job for writing entries.

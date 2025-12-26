@@ -162,3 +162,37 @@ func TestWriteBatch_SetMaxPendingTxns(t *testing.T) {
 		t.Errorf("Expected error channel length to be %d, but got %d", max, len(wb.throttle.errCh))
 	}
 }
+
+func TestWriteBatchCommit_UnregistersOnBeginTxFailure(t *testing.T) {
+	db, err := Open(
+		DefaultOptions,
+		WithDir(t.TempDir()),
+	)
+	require.NoError(t, err)
+	defer func() { _ = db.release() }()
+
+	wb, err := db.NewWriteBatch()
+	require.NoError(t, err)
+
+	// Stop the background writer so the async commit request is not processed.
+	db.statusMgr.cancel()
+	db.statusMgr.wg.Wait()
+
+	// Simulate shutdown so the new transaction cannot be opened.
+	db.statusMgr.state.Store(StatusClosing)
+
+	err = wb.commit()
+	require.ErrorIs(t, err, ErrDBClosed)
+
+	// Drain the queued request so the CommitWith callback can return.
+	select {
+	case req := <-db.writeCh:
+		req.Wg.Done()
+	default:
+		t.Fatal("expected commit request in writeCh")
+	}
+
+	require.NoError(t, wb.throttle.Finish())
+
+	require.Equal(t, int64(0), db.transactionMgr.GetActiveTxCount(), "committing tx should be unregistered on BeginTx failure")
+}

@@ -83,7 +83,7 @@ func VarintSize(x int64) int {
 	return UvarintSize(ux)
 }
 
-func GetDiskSizeFromSingleObject(obj interface{}) int64 {
+func GetDiskSizeFromSingleObject(obj any) int64 {
 	typ := reflect.TypeOf(obj)
 	fields := reflect.VisibleFields(typ)
 	if len(fields) == 0 {

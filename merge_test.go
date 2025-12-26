@@ -23,8 +23,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nutsdb/nutsdb/internal/ttl"
 	"github.com/nutsdb/nutsdb/internal/testutils"
+	"github.com/nutsdb/nutsdb/internal/ttl"
 	"github.com/stretchr/testify/require"
 	"github.com/xujiajun/utils/strconv2"
 )
@@ -391,7 +391,7 @@ func TestDB_MergeForSet(t *testing.T) {
 			removeDir(opts.Dir)
 			opts.EntryIdxMode = idxMode
 			db, err := Open(opts)
-			if exist := db.bucketManager.ExistBucket(DataStructureSet, bucket); !exist {
+			if exist := db.bucketMgr.ExistBucket(DataStructureSet, bucket); !exist {
 				txCreateBucket(t, db, DataStructureSet, bucket, nil)
 			}
 
@@ -493,7 +493,7 @@ func TestDB_MergeForZSet(t *testing.T) {
 			removeDir(opts.Dir)
 			opts.EntryIdxMode = idxMode
 			db, err := Open(opts)
-			if exist := db.bucketManager.ExistBucket(DataStructureSortedSet, bucket); !exist {
+			if exist := db.bucketMgr.ExistBucket(DataStructureSortedSet, bucket); !exist {
 				txCreateBucket(t, db, DataStructureSortedSet, bucket, nil)
 			}
 			require.NoError(t, err)
@@ -599,7 +599,7 @@ func TestDB_MergeForList(t *testing.T) {
 			removeDir(opts.Dir)
 			opts.EntryIdxMode = idxMode
 			db, err := Open(opts)
-			if exist := db.bucketManager.ExistBucket(DataStructureList, bucket); !exist {
+			if exist := db.bucketMgr.ExistBucket(DataStructureList, bucket); !exist {
 				txCreateBucket(t, db, DataStructureList, bucket, nil)
 			}
 
@@ -1217,12 +1217,12 @@ func TestDB_MergeWithTTLScanner(t *testing.T) {
 			require.NoError(t, db.Close())
 			db, err = Open(opts)
 			require.NoError(t, err)
-			if exist := db.bucketManager.ExistBucket(DataStructureBTree, bucket); !exist {
+			if exist := db.bucketMgr.ExistBucket(DataStructureBTree, bucket); !exist {
 				txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 			}
 
 			// Add more data to create more data files
-			for i := initialKeys + fileIdx*200; i < initialKeys + (fileIdx+1)*200; i++ {
+			for i := initialKeys + fileIdx*200; i < initialKeys+(fileIdx+1)*200; i++ {
 				key := testutils.GetTestBytes(i)
 				err := db.Update(func(tx *Tx) error {
 					return tx.Put(bucket, key, testutils.GetTestBytes(i), uint32(5000))
@@ -1236,7 +1236,7 @@ func TestDB_MergeWithTTLScanner(t *testing.T) {
 		db, err = Open(opts)
 		require.NoError(t, err)
 		defer db.Close()
-		if exist := db.bucketManager.ExistBucket(DataStructureBTree, bucket); !exist {
+		if exist := db.bucketMgr.ExistBucket(DataStructureBTree, bucket); !exist {
 			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 		}
 

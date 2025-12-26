@@ -3,6 +3,7 @@ package nutsdb
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"sync"
 	"sync/atomic"
@@ -118,6 +119,7 @@ type watchManager struct {
 	wg             sync.WaitGroup
 
 	closed      atomic.Bool
+	started     atomic.Bool // indicates whether Start() has been called
 	mu          sync.Mutex
 	idGenerator *IDGenerator
 }
@@ -130,12 +132,18 @@ func NewWatchManager() *watchManager {
 		watchChan:      make(chan *Message, watchChanBufferSize),
 		distributeChan: make(chan []*Message, distributeChanBufferSize),
 		closed:         atomic.Bool{},
+		started:        atomic.Bool{},
 		workerCtx:      workerCtx,
 		workerCancel:   workerCancel,
 		idGenerator:    &IDGenerator{currentMaxId: 0},
 		victimMaps:     make(victimBucketToSubscribers),
 		victimChan:     make(victimBucketChan, victimBucketBufferSize),
 	}
+}
+
+// Name returns the component name
+func (wm *watchManager) Name() string {
+	return "WatchManager"
 }
 
 // send a message to the watch manager
@@ -584,4 +592,67 @@ func (wm *watchManager) deleteBucket(deletingMessageBucket Message) {
 			return
 		}
 	}
+}
+
+// Start starts the watch manager
+// Implements Component interface
+func (wm *watchManager) Start(ctx context.Context) error {
+	if wm.closed.Load() {
+		return ErrWatchManagerClosed
+	}
+
+	// ensure Start() is only called once
+	if wm.started.Swap(true) {
+		return nil // already started
+	}
+
+	// use a local ready channel to wait for goroutine startup
+	ready := make(chan struct{})
+
+	wm.wg.Add(1)
+	go func() {
+		defer wm.wg.Done()
+		close(ready) // signal that goroutine has started
+		wm.startDistributor()
+	}()
+
+	// wait for distributor goroutine to start before returning
+	select {
+	case <-ready:
+		return nil
+	case <-time.After(5 * time.Second):
+		return fmt.Errorf("timeout waiting for watch manager distributor to start")
+	}
+}
+
+// Stop stops the watch manager
+// Notifies all subscribers that the database is closing and closes all subscription channels
+// Implements Component interface
+func (wm *watchManager) Stop(timeout time.Duration) error {
+	if wm.closed.Load() {
+		return nil
+	}
+
+	// close watch manager
+	// this cancels context and signals all goroutines to stop
+	wm.close()
+
+	// wait for watch manager to complete cleanup
+	deadline := time.Now().Add(timeout)
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		if wm.isClosed() {
+			break
+		}
+
+		if time.Now().After(deadline) {
+			break
+		}
+
+		<-ticker.C
+	}
+
+	return nil
 }

@@ -15,7 +15,10 @@
 package ttl
 
 import (
+	"context"
 	"time"
+
+	"github.com/nutsdb/nutsdb/internal/core"
 )
 
 // BatchExpiredCallback is a function type for handling batch deletion of expired keys.
@@ -36,16 +39,15 @@ type ScanFunc func() ([]*ExpirationEvent, error)
 // - Batch processing (reduces transaction overhead)
 // - Adaptive sampling algorithm
 type Service struct {
-	checker         *Checker             // Passive expiration
-	scanner         *Scanner             // Active expiration
-	clock           Clock                // Unified clock source
-	scanFn          ScanFunc             // Scan function called each tick
-	expiredCallback BatchExpiredCallback // Handler for actual batch deletion
-	queue           *expirationQueue     // Queue for expiration events
-	workerCloseCh   chan struct{}        // Channel to signal worker shutdown
-	workerDone      chan struct{}        // Channel to wait for worker completion
-	batchSize       int                  // Batch size for processing expiration events
-	batchTimeout    time.Duration        // Timeout for processing expiration events
+	lifecycle       core.ComponentLifecycle // Lifecycle management
+	checker         *Checker                // Passive expiration
+	scanner         *Scanner                // Active expiration
+	clock           Clock                   // Unified clock source
+	scanFn          ScanFunc                // Scan function called each tick
+	expiredCallback BatchExpiredCallback    // Handler for actual batch deletion
+	queue           *expirationQueue        // Queue for expiration events
+	batchSize       int                     // Batch size for processing expiration events
+	batchTimeout    time.Duration           // Timeout for processing expiration events
 }
 
 // NewService creates a TTL service with the specified clock and configuration.
@@ -68,8 +70,6 @@ func NewService(clk Clock, config Config, callback BatchExpiredCallback, scanFn 
 		expiredCallback: callback,
 		scanFn:          scanFn,
 		queue:           newExpirationQueue(config.QueueSize),
-		workerCloseCh:   make(chan struct{}),
-		workerDone:      make(chan struct{}),
 		batchSize:       config.BatchSize,
 		batchTimeout:    config.BatchTimeout,
 	}
@@ -86,36 +86,6 @@ func NewService(clk Clock, config Config, callback BatchExpiredCallback, scanFn 
 	scanner.SetChecker(chk)
 
 	return service
-}
-
-// Run starts the TTL service with periodic scanning.
-// The scanFn is called each scan cycle to perform the scan within a transaction.
-func (s *Service) Run() {
-	go s.processExpirationEvents()
-	go s.scanner.Run(s.scanFn)
-}
-
-// Close stops the TTL service and releases all resources.
-func (s *Service) Close() {
-	s.scanner.Stop()
-
-	// Close queue first to stop accepting new events
-	s.queue.close()
-
-	// Signal worker to stop (non-blocking, check if already closed)
-	select {
-	case <-s.workerCloseCh:
-		// Already closed
-	default:
-		close(s.workerCloseCh)
-	}
-
-	// Wait for worker to finish with timeout
-	select {
-	case <-s.workerDone:
-	case <-time.After(time.Second):
-		// Timeout, worker may be blocked
-	}
 }
 
 // GetChecker returns the checker instance for use by data structures.
@@ -150,9 +120,7 @@ func (s *Service) onExpiredBatch(events []*ExpirationEvent) {
 }
 
 // processExpirationEvents processes expiration events in batches for efficient deletion.
-func (s *Service) processExpirationEvents() {
-	defer close(s.workerDone)
-
+func (s *Service) processExpirationEvents(ctx context.Context) {
 	batch := make([]*ExpirationEvent, 0, s.batchSize)
 	timer := time.NewTimer(s.batchTimeout)
 	defer timer.Stop()
@@ -166,7 +134,7 @@ func (s *Service) processExpirationEvents() {
 
 	for {
 		select {
-		case <-s.workerCloseCh:
+		case <-ctx.Done():
 			// Worker is shutting down, flush remaining batch
 			flushBatch()
 			return
@@ -198,4 +166,35 @@ func (s *Service) processExpirationEvents() {
 			timer.Reset(s.batchTimeout)
 		}
 	}
+}
+
+// Start starts the TTL service with periodic scanning.
+// Implements component lifecycle.
+func (s *Service) Start(ctx context.Context) error {
+	if err := s.lifecycle.Start(ctx); err != nil {
+		return err
+	}
+
+	// Start background workers using lifecycle.Go()
+	s.lifecycle.Go(s.processExpirationEvents)
+	s.lifecycle.Go(func(ctx context.Context) {
+		s.scanner.Run(ctx, s.scanFn)
+	})
+
+	return nil
+}
+
+// Stop stops the TTL service and releases all resources.
+// Implements component lifecycle.
+func (s *Service) Stop(timeout time.Duration) error {
+	// Close the queue to signal shutdown
+	s.queue.close()
+
+	// Wait for all goroutines to finish
+	return s.lifecycle.Stop(timeout)
+}
+
+// Name returns the component name.
+func (s *Service) Name() string {
+	return "TTLService"
 }

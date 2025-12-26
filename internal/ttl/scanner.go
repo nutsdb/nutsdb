@@ -15,6 +15,7 @@
 package ttl
 
 import (
+	"context"
 	"math/rand"
 	"sync"
 	"time"
@@ -30,12 +31,10 @@ type Scanner struct {
 	sampleSize       int           // Number of keys to sample each time (default: 20)
 	expiredThreshold float64       // Expired rate threshold (default: 0.25)
 	maxScanKeys      int           // Maximum keys to scan per cycle (default: 10000)
-	stopCh           chan struct{}
 	callback         ScanCallback
 	checker          *Checker
 	rand             *rand.Rand
 	mu               sync.RWMutex
-	running          bool
 }
 
 // ScannerConfig contains configuration for the Scanner.
@@ -66,7 +65,6 @@ func NewScanner(config ScannerConfig) *Scanner {
 		sampleSize:       config.SampleSize,
 		expiredThreshold: config.ExpiredThreshold,
 		maxScanKeys:      config.MaxScanKeys,
-		stopCh:           make(chan struct{}),
 		rand:             rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 }
@@ -87,22 +85,13 @@ func (s *Scanner) SetChecker(checker *Checker) {
 
 // Run starts the scanner with periodic scanning.
 // The scanFn is called each scan cycle to perform the scan within a transaction.
-func (s *Scanner) Run(scanFn ScanFunc) {
-	s.mu.Lock()
-	if s.running {
-		s.mu.Unlock()
-		return
-	}
-	s.running = true
-	s.stopCh = make(chan struct{})
-	s.mu.Unlock()
-
+func (s *Scanner) Run(ctx context.Context, scanFn ScanFunc) {
 	ticker := time.NewTicker(s.scanInterval)
 	defer ticker.Stop()
 
 	for {
 		select {
-		case <-s.stopCh:
+		case <-ctx.Done():
 			return
 		case <-ticker.C:
 			events, err := scanFn()
@@ -119,15 +108,5 @@ func (s *Scanner) Run(scanFn ScanFunc) {
 				}
 			}
 		}
-	}
-}
-
-// Stop stops the scanner.
-func (s *Scanner) Stop() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.running {
-		close(s.stopCh)
-		s.running = false
 	}
 }
