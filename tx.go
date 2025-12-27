@@ -46,7 +46,7 @@ type Tx struct {
 	pendingWrites     *pendingEntryList
 	size              int64
 	pendingBucketList pendingBucketList
-	lockAcquired      bool // track if lock was acquired (for WriteBatch optimization)
+	lockAcquired      atomic.Bool // track if lock was acquired (for WriteBatch optimization)
 }
 
 type txnCb struct {
@@ -201,6 +201,12 @@ func (tx *Tx) Commit() (err error) {
 	}
 
 	var curWriteCount int64
+
+	// If the database is closing/closed, abort early to avoid touching released resources.
+	if tx.db.statusMgr.isClosed() {
+		return ErrDBClosed
+	}
+
 	if tx.db.opt.MaxWriteRecordCount > 0 {
 		curWriteCount, err = tx.getNewAddRecordCount()
 		if err != nil {
@@ -559,12 +565,12 @@ func (tx *Tx) lock() {
 	} else {
 		tx.db.mu.RLock()
 	}
-	tx.lockAcquired = true
+	tx.lockAcquired.Store(true)
 }
 
 // unlock unlocks the database based on the transaction type.
 func (tx *Tx) unlock() {
-	if !tx.lockAcquired {
+	if !tx.lockAcquired.Load() {
 		return // Lock was not acquired, nothing to unlock
 	}
 	if tx.writable {
@@ -572,7 +578,7 @@ func (tx *Tx) unlock() {
 	} else {
 		tx.db.mu.RUnlock()
 	}
-	tx.lockAcquired = false
+	tx.lockAcquired.Store(false)
 }
 
 func (tx *Tx) handleErr(err error) {
@@ -582,7 +588,7 @@ func (tx *Tx) handleErr(err error) {
 }
 
 func (tx *Tx) checkTxIsClosed() error {
-	if tx.db == nil {
+	if tx.isClosed() {
 		return ErrTxClosed
 	}
 	return nil

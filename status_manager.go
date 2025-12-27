@@ -15,6 +15,7 @@ type StatusManager struct {
 	ctx            context.Context
 	cancel         context.CancelFunc
 	wg             sync.WaitGroup
+	activeGoCount  atomic.Int64
 	config         StatusManagerConfig
 	startMu        sync.Mutex
 	started        bool
@@ -31,7 +32,7 @@ type StatusManagerConfig struct {
 
 func DefaultStatusManagerConfig() StatusManagerConfig {
 	return StatusManagerConfig{
-		ShutdownTimeout: 30 * time.Second,
+		ShutdownTimeout: 5 * time.Second,
 	}
 }
 
@@ -160,9 +161,8 @@ func (sm *StatusManager) close() error {
 
 	componentNames := sm.getAllComponents()
 
-	shutdownOrder := make([]string, len(componentNames))
-	for i, name := range componentNames {
-		shutdownOrder[len(componentNames)-1-i] = name
+	for i, j := 0, len(componentNames)-1; i < j; i, j = i+1, j-1 {
+		componentNames[i], componentNames[j] = componentNames[j], componentNames[i]
 	}
 
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), sm.config.ShutdownTimeout)
@@ -170,7 +170,7 @@ func (sm *StatusManager) close() error {
 
 	doneCh := make(chan struct{})
 	go func() {
-		sm.shutdownComponents(shutdownCtx, shutdownOrder)
+		sm.shutdownComponents(shutdownCtx, componentNames)
 		close(doneCh)
 	}()
 
@@ -247,7 +247,7 @@ func (sm *StatusManager) waitForGoroutines(deadline time.Time) error {
 	case <-doneCh:
 		return nil
 	case <-time.After(remaining):
-		return fmt.Errorf("timeout waiting for background goroutines to stop")
+		return fmt.Errorf("timeout waiting for background goroutines to stop (count=%d)", sm.activeGoCount.Load())
 	}
 }
 
@@ -273,8 +273,10 @@ func (sm *StatusManager) setCloseErr(err error) {
 
 func (sm *StatusManager) Add(delta int) {
 	sm.wg.Add(delta)
+	sm.activeGoCount.Add(int64(delta))
 }
 
 func (sm *StatusManager) Done() {
 	sm.wg.Done()
+	sm.activeGoCount.Add(-1)
 }

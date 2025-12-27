@@ -196,3 +196,76 @@ func TestWriteBatchCommit_UnregistersOnBeginTxFailure(t *testing.T) {
 
 	require.Equal(t, int64(0), db.transactionMgr.GetActiveTxCount(), "committing tx should be unregistered on BeginTx failure")
 }
+
+func TestWriteBatchCancel_UnregistersTransaction(t *testing.T) {
+	db, err := Open(
+		DefaultOptions,
+		WithDir(t.TempDir()),
+	)
+	require.NoError(t, err)
+	defer func() { require.NoError(t, db.Close()) }()
+
+	wb, err := db.NewWriteBatch()
+	require.NoError(t, err)
+	require.Equal(t, int64(1), db.transactionMgr.GetActiveTxCount(), "write batch should register a tx")
+
+	require.NoError(t, wb.Cancel())
+	require.Equal(t, int64(0), db.transactionMgr.GetActiveTxCount(), "Cancel should unregister the tx")
+
+	// Subsequent Cancel should be a no-op.
+	require.NoError(t, wb.Cancel())
+}
+
+func TestWriteBatchFlush_UnregistersFinalTransaction(t *testing.T) {
+	db, err := Open(
+		DefaultOptions,
+		WithDir(t.TempDir()),
+	)
+	require.NoError(t, err)
+	defer func() { require.NoError(t, db.Close()) }()
+
+	const bucket = "flush_bucket"
+	require.NoError(t, db.Update(func(tx *Tx) error {
+		return tx.NewBucket(DataStructureBTree, bucket)
+	}))
+
+	wb, err := db.NewWriteBatch()
+	require.NoError(t, err)
+	require.Equal(t, int64(1), db.transactionMgr.GetActiveTxCount())
+
+	require.NoError(t, wb.Put(bucket, []byte("key"), []byte("value"), 0))
+	require.NoError(t, wb.Flush())
+
+	require.Equal(t, int64(0), db.transactionMgr.GetActiveTxCount(), "Flush should unregister all transactions")
+
+	require.NoError(t, db.View(func(tx *Tx) error {
+		val, err := tx.Get(bucket, []byte("key"))
+		require.NoError(t, err)
+		require.Equal(t, []byte("value"), val)
+		return nil
+	}))
+}
+
+func TestWriteBatchReset_ReplacesTransaction(t *testing.T) {
+	db, err := Open(
+		DefaultOptions,
+		WithDir(t.TempDir()),
+	)
+	require.NoError(t, err)
+	defer func() { require.NoError(t, db.Close()) }()
+
+	wb, err := db.NewWriteBatch()
+	require.NoError(t, err)
+	require.Equal(t, int64(1), db.transactionMgr.GetActiveTxCount())
+
+	firstTxID := wb.txID
+	require.NoError(t, wb.Reset())
+
+	require.Equal(t, int64(1), db.transactionMgr.GetActiveTxCount(), "Reset should keep exactly one active transaction")
+	require.NotEqual(t, firstTxID, wb.txID, "Reset should allocate a fresh transaction ID")
+	activeIDs := db.transactionMgr.GetActiveTxs()
+	require.NotContains(t, activeIDs, firstTxID, "old transaction must be unregistered on Reset")
+	require.Contains(t, activeIDs, wb.txID, "new transaction must be registered")
+
+	wb.Flush()
+}

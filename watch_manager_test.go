@@ -1,6 +1,7 @@
 package nutsdb
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"sync"
@@ -682,6 +683,35 @@ func TestWatchManager_StartDistributor(t *testing.T) {
 		<-receivingDone
 		wm.close()
 	})
+}
+
+func TestWatchManager_ComponentLifecycle(t *testing.T) {
+	wm := NewWatchManager()
+	ctx := context.Background()
+
+	require.NoError(t, wm.Start(ctx))
+	// Second Start should be a no-op.
+	require.NoError(t, wm.Start(ctx))
+
+	bucket := "component_bucket"
+	key := "component_key"
+
+	subscriber, err := wm.subscribe(bucket, key)
+	require.NoError(t, err)
+
+	msg := NewMessage(bucket, key, []byte("value"), DataSetFlag, uint64(time.Now().Unix()), MessageOptions{Priority: MessagePriorityMedium})
+	require.NoError(t, wm.sendMessage(msg))
+	wmReceiveMessage(t, subscriber.receiveChan, bucket, key, 2*time.Second)
+
+	require.NoError(t, wm.Stop(2*time.Second))
+	// Stop should be idempotent.
+	require.NoError(t, wm.Stop(2*time.Second))
+
+	// Once stopped, watch manager should reject more work.
+	err = wm.sendMessage(msg)
+	require.ErrorIs(t, err, ErrWatchManagerClosed)
+
+	require.ErrorIs(t, wm.Start(ctx), ErrWatchManagerClosed)
 }
 
 func TestWatchManager_DeleteBucket(t *testing.T) {

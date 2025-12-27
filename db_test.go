@@ -1056,6 +1056,7 @@ func TestDB_Close_Timeout(t *testing.T) {
 	err = db.Close()
 	closeDuration := time.Since(closeStartTime)
 
+	require.Error(t, err, "Close should surface shutdown timeout")
 	// Close should complete within reasonable time (timeout + buffer)
 	// The important thing is it doesn't hang forever
 	require.Less(t, closeDuration, 3*time.Second, "Close should timeout and not wait forever")

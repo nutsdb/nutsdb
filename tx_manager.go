@@ -46,7 +46,9 @@ func (tm *txManager) Start(ctx context.Context) error {
 }
 
 func (tm *txManager) Stop(timeout time.Duration) error {
-	tm.WaitForActiveTxs(timeout)
+	if err := tm.WaitForActiveTxs(timeout); err != nil {
+		tm.forceAbortActiveTxs()
+	}
 
 	return tm.lifecycle.Stop(timeout)
 }
@@ -73,7 +75,7 @@ func (tm *txManager) BeginTx(writable bool, acquireLock bool) (*Tx, error) {
 	if acquireLock {
 		tx.lock()
 	} else {
-		tx.lockAcquired = false
+		tx.lockAcquired.Store(false)
 	}
 
 	if err := tm.RegisterTx(tx); err != nil {
@@ -121,7 +123,7 @@ func (tm *txManager) WaitForActiveTxs(timeout time.Duration) error {
 		}
 
 		if time.Now().After(deadline) {
-			return fmt.Errorf("timeout waiting for %d active transactions to complete", count)
+			return fmt.Errorf("timeout waiting for %d active transactions to complete", tm.activeTxCount.Load())
 		}
 
 		select {
@@ -152,4 +154,15 @@ func (tm *txManager) GetActiveTxs() []uint64 {
 		return true
 	})
 	return txIDs
+}
+
+// forceAbortActiveTxs unregisters and closes all active transactions.
+// Used during shutdown when transactions fail to finish within the timeout.
+func (tm *txManager) forceAbortActiveTxs() {
+	tm.activeTxs.Range(func(key, value any) bool {
+		tx := value.(*Tx)
+		tx.setStatusClosed()
+		tm.UnregisterTx(tx.id)
+		return true
+	})
 }

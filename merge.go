@@ -467,7 +467,6 @@ func (mw *mergeWorker) Start(ctx context.Context) error {
 		mw.ticker.Stop()
 	}
 
-	mw.statusManager.Add(1)
 	mw.lifecycle.Go(mw.run)
 
 	return nil
@@ -503,8 +502,6 @@ func (mw *mergeWorker) IsMerging() bool {
 }
 
 func (mw *mergeWorker) run(ctx context.Context) {
-	defer mw.statusManager.Done()
-
 	for {
 		select {
 		case <-ctx.Done():

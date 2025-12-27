@@ -1189,6 +1189,8 @@ func TestDB_MergeWithTTLScanner(t *testing.T) {
 		close(stopCh)
 		wg.Wait()
 
+		// Wait briefly for all transactions to finish before closing to avoid CI flakiness
+		require.NoError(t, db.transactionMgr.WaitForActiveTxs(2*time.Second))
 		require.NoError(t, db.Close())
 	})
 }

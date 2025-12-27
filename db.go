@@ -235,14 +235,6 @@ func (db *DB) View(fn func(tx *Tx) error) error {
 	return db.managed(false, fn)
 }
 
-// IsMerging returns true if a merge operation is in progress.
-func (db *DB) IsMerging() bool {
-	if db.mergeWorker == nil {
-		return false
-	}
-	return db.mergeWorker.IsMerging()
-}
-
 // Backup copies the database to file directory at the given dir.
 func (db *DB) Backup(dir string) error {
 	return db.View(func(tx *Tx) error {
@@ -259,20 +251,13 @@ func (db *DB) BackupTarGZ(w io.Writer) error {
 
 // Close releases all db resources.
 func (db *DB) Close() error {
-	db.mu.Lock()
-
-	// Check if StatusManager is already closed to avoid double close
 	if db.statusMgr.isClosed() {
-		db.mu.Unlock()
 		return ErrDBClosed
 	}
 
-	db.mu.Unlock()
-
-	// Use StatusManagerV2 to shut down all registered components
+	// Use StatusManager to shut down all registered components
 	if err := db.statusMgr.Close(); err != nil {
-		// Log the error but keep closing resources
-		log.Printf("StatusManager.Close() error: %v", err)
+		return err
 	}
 
 	// Release remaining resources
@@ -488,15 +473,16 @@ func (db *DB) doWrites() {
 		}
 
 	closedCase:
-		// All the pending request are drained.
-		// Don't close the writeCh, because it has be used in several places.
+		// Drain pending requests and fail them, since we're shutting down.
 		for {
 			select {
 			case r = <-db.writeCh:
 				reqs = append(reqs, r)
 			default:
-				pendingCh <- struct{}{} // Push to pending before doing write.
-				writeRequests(reqs)
+				for _, req := range reqs {
+					req.Err = ErrDBClosed
+					req.Wg.Done()
+				}
 				return
 			}
 		}
