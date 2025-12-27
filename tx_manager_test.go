@@ -79,7 +79,7 @@ func TestTransactionManager_RegisterUnregisterTx(t *testing.T) {
 	if err := tm.Start(ctx); err != nil {
 		t.Fatalf("Failed to start TransactionManager: %v", err)
 	}
-	defer tm.Stop(5 * time.Second)
+	defer func() { _ = tm.Stop(5 * time.Second) }()
 
 	tx := &Tx{
 		id: 1,
@@ -130,7 +130,7 @@ func TestTransactionManager_RegisterNilTx(t *testing.T) {
 	if err := tm.Start(ctx); err != nil {
 		t.Fatalf("Failed to start TransactionManager: %v", err)
 	}
-	defer tm.Stop(5 * time.Second)
+	defer func() { _ = tm.Stop(5 * time.Second) }()
 
 	if err := tm.RegisterTx(nil); err == nil {
 		t.Error("Expected error when registering nil transaction")
@@ -177,7 +177,7 @@ func TestTransactionManager_RejectTxWhenClosing(t *testing.T) {
 	}
 
 	tm.UnregisterTx(tx1.id)
-	tm.Stop(5 * time.Second)
+	_ = tm.Stop(5 * time.Second)
 }
 
 func TestTransactionManager_RejectTxWhenNotRunning(t *testing.T) {
@@ -213,7 +213,7 @@ func TestTransactionManager_WaitForActiveTxs(t *testing.T) {
 	if err := tm.Start(ctx); err != nil {
 		t.Fatalf("Failed to start TransactionManager: %v", err)
 	}
-	defer tm.Stop(5 * time.Second)
+	defer func() { _ = tm.Stop(5 * time.Second) }()
 
 	start := time.Now()
 	if err := tm.WaitForActiveTxs(5 * time.Second); err != nil {
@@ -278,7 +278,7 @@ func TestTransactionManager_WaitForActiveTxsTimeout(t *testing.T) {
 	if err := tm.Start(ctx); err != nil {
 		t.Fatalf("Failed to start TransactionManager: %v", err)
 	}
-	defer tm.Stop(5 * time.Second)
+	defer func() { _ = tm.Stop(5 * time.Second) }()
 
 	tx := &Tx{id: 1, db: db}
 	if err := tm.RegisterTx(tx); err != nil {
@@ -318,7 +318,7 @@ func TestTransactionManager_ConcurrentRegisterUnregister(t *testing.T) {
 	if err := tm.Start(ctx); err != nil {
 		t.Fatalf("Failed to start TransactionManager: %v", err)
 	}
-	defer tm.Stop(5 * time.Second)
+	defer func() { _ = tm.Stop(5 * time.Second) }()
 
 	const numGoroutines = 50
 	const txPerGoroutine = 20
@@ -373,7 +373,7 @@ func TestTransactionManager_MaxActiveTxs(t *testing.T) {
 	if err := tm.Start(ctx); err != nil {
 		t.Fatalf("Failed to start TransactionManager: %v", err)
 	}
-	defer tm.Stop(5 * time.Second)
+	defer func() { _ = tm.Stop(5 * time.Second) }()
 
 	maxTxs := int64(5)
 	tm.SetMaxActiveTxs(maxTxs)

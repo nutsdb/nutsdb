@@ -118,11 +118,11 @@ func TestMergeWorker_RejectMergeWhenClosing(t *testing.T) {
 	err = db.mergeWorker.TriggerMerge()
 	require.Equal(t, ErrDBClosed, err, "Expected ErrDBClosed when triggering merge in Closed state")
 
-	db.mergeWorker.Stop(5 * time.Second)
-	db.transactionMgr.Stop(5 * time.Second)
-	db.ttlService.Stop(5 * time.Second)
+	_ = db.mergeWorker.Stop(5 * time.Second)
+	_ = db.transactionMgr.Stop(5 * time.Second)
+	_ = db.ttlService.Stop(5 * time.Second)
 	if db.watchMgr != nil {
-		db.watchMgr.Stop(5 * time.Second)
+		_ = db.watchMgr.Stop(5 * time.Second)
 	}
 }
 

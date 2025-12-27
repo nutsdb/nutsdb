@@ -45,8 +45,8 @@ func TestComponentLifecycle_Start(t *testing.T) {
 		var cl ComponentLifecycle
 		ctx := context.Background()
 
-		cl.Start(ctx)
-		cl.Stop(time.Second)
+		_ = cl.Start(ctx)
+		_ = cl.Stop(time.Second)
 
 		err := cl.Start(ctx)
 		if err != ErrAlreadyStopped {
@@ -60,7 +60,7 @@ func TestComponentLifecycle_Stop(t *testing.T) {
 		var cl ComponentLifecycle
 		ctx := context.Background()
 
-		cl.Start(ctx)
+		_ = cl.Start(ctx)
 
 		err := cl.Stop(time.Second)
 		if err != nil {
@@ -80,7 +80,7 @@ func TestComponentLifecycle_Stop(t *testing.T) {
 		var cl ComponentLifecycle
 		ctx := context.Background()
 
-		cl.Start(ctx)
+		_ = cl.Start(ctx)
 
 		err := cl.Stop(time.Second)
 		if err != nil {
@@ -97,7 +97,7 @@ func TestComponentLifecycle_Stop(t *testing.T) {
 		var cl ComponentLifecycle
 		ctx := context.Background()
 
-		cl.Start(ctx)
+		_ = cl.Start(ctx)
 
 		done := make(chan bool, 1)
 		cl.Go(func(ctx context.Context) {
@@ -125,7 +125,7 @@ func TestComponentLifecycle_Stop(t *testing.T) {
 		var cl ComponentLifecycle
 		ctx := context.Background()
 
-		cl.Start(ctx)
+		_ = cl.Start(ctx)
 
 		cl.Go(func(ctx context.Context) {
 			time.Sleep(2 * time.Second)
@@ -143,7 +143,7 @@ func TestComponentLifecycle_Go(t *testing.T) {
 		var cl ComponentLifecycle
 		ctx := context.Background()
 
-		cl.Start(ctx)
+		_ = cl.Start(ctx)
 
 		received := make(chan context.Context, 1)
 		cl.Go(func(ctx context.Context) {
@@ -159,14 +159,14 @@ func TestComponentLifecycle_Go(t *testing.T) {
 			t.Error("Goroutine did not execute")
 		}
 
-		cl.Stop(time.Second)
+		_ = cl.Stop(time.Second)
 	})
 
 	t.Run("panic recovery", func(t *testing.T) {
 		var cl ComponentLifecycle
 		ctx := context.Background()
 
-		cl.Start(ctx)
+		_ = cl.Start(ctx)
 
 		cl.Go(func(ctx context.Context) {
 			panic("test panic")
@@ -184,7 +184,7 @@ func TestComponentLifecycle_Go(t *testing.T) {
 		var cl ComponentLifecycle
 		ctx := context.Background()
 
-		cl.Start(ctx)
+		_ = cl.Start(ctx)
 
 		count := 10
 		var wg sync.WaitGroup
@@ -211,11 +211,11 @@ func TestComponentLifecycle_Context(t *testing.T) {
 		var cl ComponentLifecycle
 		ctx := context.Background()
 
-		cl.Start(ctx)
+		_ = cl.Start(ctx)
 
 		componentCtx := cl.Context()
 
-		cl.Stop(time.Second)
+		_ = cl.Stop(time.Second)
 
 		select {
 		case <-componentCtx.Done():
@@ -229,7 +229,7 @@ func TestComponentLifecycle_Context(t *testing.T) {
 		var cl ComponentLifecycle
 		ctx, cancel := context.WithCancel(context.Background())
 
-		cl.Start(ctx)
+		_ = cl.Start(ctx)
 
 		componentCtx := cl.Context()
 
@@ -242,7 +242,7 @@ func TestComponentLifecycle_Context(t *testing.T) {
 			t.Error("Context should be canceled when parent is canceled")
 		}
 
-		cl.Stop(time.Second)
+		_ = cl.Stop(time.Second)
 	})
 }
 
@@ -253,13 +253,13 @@ func TestComponentLifecycle_GetState(t *testing.T) {
 		t.Error("Initial state should be Created")
 	}
 
-	cl.Start(context.Background())
+	_ = cl.Start(context.Background())
 
 	if cl.GetState() != ComponentStateRunning {
 		t.Error("State should be Running after Start()")
 	}
 
-	cl.Stop(time.Second)
+	_ = cl.Stop(time.Second)
 
 	if cl.GetState() != ComponentStateStopped {
 		t.Error("State should be Stopped after Stop()")
@@ -308,14 +308,14 @@ func TestComponentLifecycle_ConcurrentStart(t *testing.T) {
 		t.Errorf("Expected %d ErrAlreadyStarted errors, got %d", goroutines-1, errorCount)
 	}
 
-	cl.Stop(time.Second)
+	_ = cl.Stop(time.Second)
 }
 
 func TestComponentLifecycle_ConcurrentStop(t *testing.T) {
 	var cl ComponentLifecycle
 	ctx := context.Background()
 
-	cl.Start(ctx)
+	_ = cl.Start(ctx)
 
 	const goroutines = 10
 	var wg sync.WaitGroup

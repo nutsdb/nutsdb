@@ -365,10 +365,7 @@ func (job *mergeV2Job) rewriteFile(fid int64) error {
 		return fmt.Errorf("failed to create file recovery for %s: %w", path, err)
 	}
 	defer func() {
-		if releaseErr := fr.release(); releaseErr != nil {
-			// Log the error but don't override the original error
-			// In a production environment, you might want to log this
-		}
+		_ = fr.release()
 	}()
 
 	off := int64(0)

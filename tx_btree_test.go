@@ -1800,7 +1800,7 @@ func TestTx_ReadAndWriteInSameTransaction(t *testing.T) {
 			v2 := []byte("v2")
 			v3 := []byte("v3")
 			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
-			db.Update(func(tx *Tx) error {
+			_ = db.Update(func(tx *Tx) error {
 				r.NoError(tx.Put(bucket, key, v1, Persistent))
 				var (
 					v   []byte
@@ -1940,7 +1940,7 @@ func TestTx_CreateBucketAndWriteInSameTransaction(t *testing.T) {
 				for i := 0; i < 10; i++ {
 					key := []byte(fmt.Sprintf("k%02d", i))
 					val := []byte(fmt.Sprintf("v%02d", i))
-					tx.Put(bucket, key, val, Persistent)
+					_ = tx.Put(bucket, key, val, Persistent)
 				}
 
 				keys, vals, err := tx.RangeScanEntries(bucket, []byte("k02"), []byte("k07"), true, true)
@@ -1974,11 +1974,11 @@ func TestTx_CreateBucketAndWriteInSameTransaction(t *testing.T) {
 			bucket := "1"
 
 			r.NoError(db.Update(func(tx *Tx) error {
-				tx.NewKVBucket(bucket)
+				_ = tx.NewKVBucket(bucket)
 				for i := 0; i < 10; i++ {
 					key := []byte(fmt.Sprintf("k%02d", i))
 					val := []byte(fmt.Sprintf("v%02d", i))
-					tx.Put(bucket, key, val, Persistent)
+					_ = tx.Put(bucket, key, val, Persistent)
 				}
 
 				keys, vals, err := tx.RangeScanEntries(bucket, []byte("k02"), []byte("k07"), true, true)
@@ -2041,7 +2041,7 @@ func TestTx_CreateBucketAndWriteInSameTransaction(t *testing.T) {
 			v2 := []byte("v2")
 			v3 := []byte("v3")
 
-			db.Update(func(tx *Tx) error {
+			_ = db.Update(func(tx *Tx) error {
 				r.NoError(tx.NewKVBucket(bucket))
 				r.NoError(tx.Put(bucket, key, v1, Persistent))
 				var (

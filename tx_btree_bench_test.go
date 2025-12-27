@@ -34,7 +34,7 @@ func setupBenchmarkDB(b *testing.B, dir string) *DB {
 
 	// Clean up directory
 	os.RemoveAll(dir)
-	os.MkdirAll(dir, 0755)
+	_ = os.MkdirAll(dir, 0755)
 
 	db, err := Open(opts)
 	if err != nil {

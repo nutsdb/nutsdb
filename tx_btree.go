@@ -150,8 +150,8 @@ func (tx *Tx) getMaxOrMinKey(bucket string, isMax bool) ([]byte, error) {
 	bucketId := b.Id
 
 	var (
-		key           []byte = nil
-		actuallyFound        = false
+		key           []byte
+		actuallyFound bool
 	)
 
 	key, actuallyFound = tx.pendingWrites.MaxOrMinKey(bucket, isMax)

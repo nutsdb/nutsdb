@@ -302,7 +302,7 @@ func TestWriteBatch_ConcurrentWithUpdate(t *testing.T) {
 			}
 			key := []byte(fmt.Sprintf("wb-key-%d", i))
 			if err := wb.Put("test-bucket", key, []byte("value"), 0); err != nil {
-				wb.Cancel()
+				_ = wb.Cancel()
 				done <- err
 				return
 			}

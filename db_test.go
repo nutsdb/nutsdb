@@ -69,12 +69,6 @@ func runNutsDBTest(t *testing.T, opts *Options, test func(t *testing.T, db *DB))
 	})
 }
 
-func runNutsDBTestWithWatch(t *testing.T, test func(t *testing.T, db *DB)) {
-	option := DefaultOptions
-	option.EnableWatch = true
-	runNutsDBTest(t, &option, test)
-}
-
 // runNutsDBTestWithMockClock runs a test with a MockClock for deterministic TTL testing.
 // The MockClock is initialized with the current system time in milliseconds.
 // The test function receives both the DB and the MockClock to allow time manipulation.
@@ -835,7 +829,7 @@ func TestDB_BackupTarGZ(t *testing.T) {
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		backUpFile := filepath.Join(t.TempDir(), "nutsdb-backup", "backup.tar.gz")
 
-		os.MkdirAll(filepath.Dir(backUpFile), os.ModePerm)
+		_ = os.MkdirAll(filepath.Dir(backUpFile), os.ModePerm)
 		f, err := os.Create(backUpFile)
 		require.NoError(t, err)
 		require.NoError(t, db.BackupTarGZ(f))

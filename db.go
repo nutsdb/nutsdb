@@ -114,7 +114,7 @@ func open(opt Options) (*DB, error) {
 			return nil, nil
 		}
 		var events []*ttl.ExpirationEvent
-		db.View(func(tx *Tx) error {
+		_ = db.View(func(tx *Tx) error {
 			events = tx.doTTLExpireScan(opt.TTLConfig)
 			return nil
 		})
@@ -1210,9 +1210,7 @@ func (db *DB) Watch(bucket string, key []byte, cb func(message *Message) error, 
 		ticker.Stop()
 
 		if subscriber != nil && subscriber.active.Load() {
-			if err := db.watchMgr.unsubscribe(bucket, keyWatch, subscriber.id); err != nil {
-				// ignore the error
-			}
+			_ = db.watchMgr.unsubscribe(bucket, keyWatch, subscriber.id)
 		}
 	}()
 

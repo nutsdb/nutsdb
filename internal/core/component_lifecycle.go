@@ -145,7 +145,7 @@ func (cl *ComponentLifecycle) Go(fn func(ctx context.Context)) {
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
-				// Panic recovered, but we still need to decrement WaitGroup
+				_ = r
 			}
 			cl.wg.Done()
 		}()

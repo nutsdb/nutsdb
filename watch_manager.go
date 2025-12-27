@@ -316,7 +316,7 @@ func (wm *watchManager) runDistributor() {
 			if !ok {
 				return
 			}
-			wm.distributeAllMessages(batch)
+			_ = wm.distributeAllMessages(batch)
 
 		case <-wm.workerCtx.Done():
 			// drain the distribute channel
@@ -326,7 +326,7 @@ func (wm *watchManager) runDistributor() {
 					if !ok {
 						return
 					}
-					wm.distributeAllMessages(batch)
+					_ = wm.distributeAllMessages(batch)
 				default:
 					return
 				}

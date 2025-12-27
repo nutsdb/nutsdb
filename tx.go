@@ -646,12 +646,6 @@ func (tx *Tx) setStatusRunning() {
 	tx.status.Store(status)
 }
 
-// isRunning will check if the tx status is txStatusRunning
-func (tx *Tx) isRunning() bool {
-	status := tx.status.Load().(int)
-	return status == txStatusRunning
-}
-
 // isCommitting will check if the tx status is txStatusCommitting
 func (tx *Tx) isCommitting() bool {
 	status := tx.status.Load().(int)

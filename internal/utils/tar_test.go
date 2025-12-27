@@ -13,7 +13,7 @@ import (
 func TestTarGZCompress(t *testing.T) {
 	backupFile := filepath.Join(t.TempDir(), "backupFile.tar.gz")
 	realPath := filepath.Join(t.TempDir(), "x", "realpath.txt")
-	os.MkdirAll(path.Dir(realPath), os.ModePerm)
+	_ = os.MkdirAll(path.Dir(realPath), os.ModePerm)
 	f, err := os.Create(realPath)
 	require.NoError(t, err)
 	f.Close()
