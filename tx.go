@@ -23,6 +23,7 @@ import (
 	"sync/atomic"
 
 	"github.com/nutsdb/nutsdb/internal/core"
+	"github.com/nutsdb/nutsdb/internal/ttl"
 	"github.com/nutsdb/nutsdb/internal/utils"
 	"github.com/xujiajun/utils/strconv2"
 )
@@ -45,6 +46,7 @@ type Tx struct {
 	pendingWrites     *pendingEntryList
 	size              int64
 	pendingBucketList pendingBucketList
+	lockAcquired      atomic.Bool // track if lock was acquired (for WriteBatch optimization)
 }
 
 type txnCb struct {
@@ -80,20 +82,8 @@ func runTxnCallback(cb *txnCb) {
 // the current read/write transaction is completed.
 // All transactions must be closed by calling Commit() or Rollback() when done.
 func (db *DB) Begin(writable bool) (tx *Tx, err error) {
-	tx, err = newTx(db, writable)
-	if err != nil {
-		return nil, err
-	}
-
-	tx.lock()
-	tx.setStatusRunning()
-	if db.closed {
-		tx.unlock()
-		tx.setStatusClosed()
-		return nil, ErrDBClosed
-	}
-
-	return
+	// Use TransactionManager so we guard via db.mu when acquiring new transactions
+	return db.transactionMgr.BeginTx(writable, true)
 }
 
 // newTx returns a newly initialized Tx object at given writable.
@@ -104,6 +94,7 @@ func newTx(db *DB, writable bool) (tx *Tx, err error) {
 		pendingWrites:     newPendingEntriesList(),
 		pendingBucketList: make(map[core.Ds]map[core.BucketName]*core.Bucket),
 	}
+	tx.setStatusRunning()
 
 	tx.id = tx.getTxID()
 
@@ -115,16 +106,26 @@ func (tx *Tx) CommitWith(cb func(error)) {
 		panic("Nil callback provided to CommitWith")
 	}
 
-	if tx.pendingWrites.size == 0 {
-		// Do not run these callbacks from here, because the CommitWith and the
-		// callback might be acquiring the same locks. Instead run the callback
-		// from another goroutine.
-		go runTxnCallback(&txnCb{user: cb, err: nil})
+	if tx.isClosed() {
+		go runTxnCallback(&txnCb{user: cb, err: ErrCannotCommitAClosedTx})
 		return
 	}
-	// defer tx.setStatusClosed()  //must not add this code because another process is also accessing tx
+
+	if tx.db == nil {
+		tx.setStatusClosed()
+		go runTxnCallback(&txnCb{user: cb, err: ErrDBClosed})
+		return
+	}
+
+	tx.setStatusCommitting()
+
 	commitCb, err := tx.commitAndSend()
 	if err != nil {
+		tx.handleErr(err)
+		tx.setStatusClosed()
+		tx.unlock()
+		tx.db = nil
+		tx.pendingWrites = nil
 		go runTxnCallback(&txnCb{user: cb, err: err})
 		return
 	}
@@ -181,6 +182,10 @@ func (tx *Tx) Commit() (err error) {
 		}
 
 		tx.unlock()
+
+		// Ensure the transaction is unregistered so active counts stay accurate
+		tx.db.transactionMgr.UnregisterTx(tx.id)
+
 		tx.db = nil
 
 		tx.pendingWrites = nil
@@ -196,6 +201,12 @@ func (tx *Tx) Commit() (err error) {
 	}
 
 	var curWriteCount int64
+
+	// If the database is closing/closed, abort early to avoid touching released resources.
+	if tx.db.statusMgr.isClosed() {
+		return ErrDBClosed
+	}
+
 	if tx.db.opt.MaxWriteRecordCount > 0 {
 		curWriteCount, err = tx.getNewAddRecordCount()
 		if err != nil {
@@ -281,7 +292,7 @@ func (tx *Tx) Commit() (err error) {
 	}
 
 	// send updated entries to watch manager
-	if tx.db.watchManager != nil {
+	if tx.db.watchMgr != nil {
 		tx.sendUpdatedEntries(pendingWriteList, tx.getDeletedBuckets())
 	}
 
@@ -428,7 +439,7 @@ func (tx *Tx) getEntryNewAddRecordCount(entry *core.Entry) (int64, error) {
 	var res int64
 	var err error
 
-	bucket, err := tx.db.bucketManager.GetBucketById(entry.Meta.BucketId)
+	bucket, err := tx.db.bucketMgr.GetBucketById(entry.Meta.BucketId)
 	if err != nil {
 		return 0, err
 	}
@@ -538,6 +549,9 @@ func (tx *Tx) Rollback() error {
 	tx.setStatusClosed()
 	tx.unlock()
 
+	// Unregister from TransactionManager so active tracking stays correct
+	tx.db.transactionMgr.UnregisterTx(tx.id)
+
 	tx.db = nil
 	tx.pendingWrites = nil
 
@@ -546,20 +560,28 @@ func (tx *Tx) Rollback() error {
 
 // lock locks the database based on the transaction type.
 func (tx *Tx) lock() {
+	if tx.lockAcquired.Load() {
+		return
+	}
 	if tx.writable {
 		tx.db.mu.Lock()
 	} else {
 		tx.db.mu.RLock()
 	}
+	tx.lockAcquired.Store(true)
 }
 
 // unlock unlocks the database based on the transaction type.
 func (tx *Tx) unlock() {
+	if !tx.lockAcquired.Load() {
+		return // Lock was not acquired, nothing to unlock
+	}
 	if tx.writable {
 		tx.db.mu.Unlock()
 	} else {
 		tx.db.mu.RUnlock()
 	}
+	tx.lockAcquired.Store(false)
 }
 
 func (tx *Tx) handleErr(err error) {
@@ -569,7 +591,7 @@ func (tx *Tx) handleErr(err error) {
 }
 
 func (tx *Tx) checkTxIsClosed() error {
-	if tx.db == nil {
+	if tx.isClosed() {
 		return ErrTxClosed
 	}
 	return nil
@@ -622,12 +644,6 @@ func (tx *Tx) setStatusClosed() {
 func (tx *Tx) setStatusRunning() {
 	status := txStatusRunning
 	tx.status.Store(status)
-}
-
-// isRunning will check if the tx status is txStatusRunning
-func (tx *Tx) isRunning() bool {
-	status := tx.status.Load().(int)
-	return status == txStatusRunning
 }
 
 // isCommitting will check if the tx status is txStatusCommitting
@@ -687,7 +703,7 @@ func (tx *Tx) SubmitBucket() error {
 			bucketReqs = append(bucketReqs, req)
 		}
 	}
-	return tx.db.bucketManager.SubmitPendingBucketChange(bucketReqs)
+	return tx.db.bucketMgr.SubmitPendingBucketChange(bucketReqs)
 }
 
 // buildBucketInIndex build indexes on creation and deletion of buckets
@@ -809,14 +825,14 @@ func (tx *Tx) getBucketAndItsStatus(ds core.Ds, name core.BucketName) (BucketSta
 			}
 		}
 	}
-	if bucket, err := tx.db.bucketManager.GetBucket(ds, name); err == nil {
+	if bucket, err := tx.db.bucketMgr.GetBucket(ds, name); err == nil {
 		return BucketStatusExistAlready, bucket
 	}
 	return BucketStatusUnknown, nil
 }
 
 // findEntryStatus finds the latest status for the certain Entry in Tx
-func (tx *Tx) findEntryAndItsStatus(ds core.Ds, bucket core.BucketName, key string) (EntryStatus, *core.Entry) {
+func (tx *Tx) findEntryAndItsStatus(_ core.Ds, bucket core.BucketName, key string) (EntryStatus, *core.Entry) {
 	if tx.pendingWrites.size == 0 {
 		return NotFoundEntry, nil
 	}
@@ -849,8 +865,8 @@ func (tx *Tx) findEntryAndItsStatus(ds core.Ds, bucket core.BucketName, key stri
  * @return: nil if success, error if any
  */
 func (tx *Tx) sendUpdatedEntries(pendingWriteList []*core.Entry, deletedBuckets map[core.BucketName]bool) {
-	err := tx.db.watchManager.sendUpdatedEntries(pendingWriteList, deletedBuckets, func(bucketId core.BucketId) (core.BucketName, error) {
-		bucket, err := tx.db.bucketManager.GetBucketById(bucketId)
+	err := tx.db.watchMgr.sendUpdatedEntries(pendingWriteList, deletedBuckets, func(bucketId core.BucketId) (core.BucketName, error) {
+		bucket, err := tx.db.bucketMgr.GetBucketById(bucketId)
 		if err != nil {
 			return "", err
 		}
@@ -877,7 +893,7 @@ func (tx *Tx) getDeletedBuckets() (deletedBuckets map[core.BucketName]bool) {
 	deletedBuckets = make(map[core.BucketName]bool)
 	for _, mapper := range tx.pendingBucketList {
 		for name, bucket := range mapper {
-			isAllDsDeleted := len(tx.db.bucketManager.BucketIDMarker[name]) == 0
+			isAllDsDeleted := len(tx.db.bucketMgr.BucketIDMarker[name]) == 0
 			if _, ok := deletedBuckets[name]; !ok && bucket.Meta.Op == core.BucketDeleteOperation && isAllDsDeleted {
 				deletedBuckets[name] = true
 			}
@@ -886,4 +902,139 @@ func (tx *Tx) getDeletedBuckets() (deletedBuckets map[core.BucketName]bool) {
 	}
 
 	return deletedBuckets
+}
+
+// doTTLExpireScan performs TTL expiration scanning within a transaction.
+// It samples random keys from all buckets and returns expired events.
+func (tx *Tx) doTTLExpireScan(ttlConfig TTLConfig) []*ttl.ExpirationEvent {
+	if ttlConfig.MaxScanKeys <= 0 || ttlConfig.SampleSize <= 0 {
+		return []*ttl.ExpirationEvent{}
+	}
+
+	totalScanned := 0
+	allExpiredEvents := make([]*ttl.ExpirationEvent, 0)
+
+	// Adaptive loop: continue sampling if expired rate exceeds threshold
+	// Todo Add statistics for TTL and exit directly if it does not exceed a threshold
+	for totalScanned < ttlConfig.MaxScanKeys {
+		remaining := ttlConfig.MaxScanKeys - totalScanned
+		n := ttlConfig.SampleSize
+		if n > remaining {
+			n = remaining
+		}
+
+		// Random sample keys from all buckets (weighted by bucket size)
+		samples := randomSampleFromAllBuckets(tx.db.bucketMgr.BucketInfoMapper, tx.db.Index, n)
+
+		if len(samples) == 0 {
+			break
+		}
+
+		// Check for expired keys (records already have TTL and Timestamp)
+		expiredCount := 0
+		batch := make([]*ttl.ExpirationEvent, 0)
+
+		for bucketId, records := range samples {
+			bucket := tx.db.bucketMgr.BucketInfoMapper[bucketId]
+			if bucket == nil {
+				continue
+			}
+			for _, record := range records {
+				if tx.db.ttlService.GetChecker().IsExpired(record.TTL, record.Timestamp) {
+					expiredCount++
+					batch = append(batch, &ttl.ExpirationEvent{
+						BucketId:  bucketId,
+						Key:       record.Key,
+						Ds:        bucket.Ds,
+						Timestamp: record.Timestamp,
+					})
+				}
+			}
+		}
+
+		// Collect expired events
+		if len(batch) > 0 {
+			allExpiredEvents = append(allExpiredEvents, batch...)
+		}
+
+		// Calculate total sampled keys
+		var totalSampled int
+		for _, records := range samples {
+			totalSampled += len(records)
+		}
+		if totalSampled > remaining {
+			totalSampled = remaining
+		}
+		totalScanned += totalSampled
+
+		if totalSampled == 0 {
+			break
+		}
+
+		// Calculate expired rate
+		expiredRate := float64(expiredCount) / float64(totalSampled)
+
+		if expiredRate < ttlConfig.ExpiredThreshold {
+			break
+		}
+		// Continue sampling if many keys are expired
+	}
+
+	return allExpiredEvents
+}
+
+// randomSampleFromAllBuckets samples random keys from all buckets with weighted distribution.
+// Large buckets get proportionally more samples. Returns map[bucketId][]*core.Record.
+func randomSampleFromAllBuckets(bucketInfoMapper map[uint64]*core.Bucket, index *Index, n int) map[uint64][]*core.Record {
+	// Calculate total keys across all BTree buckets
+	// Todo support other data structures
+	var totalKeys int
+	for bucketId, bucket := range bucketInfoMapper {
+		if bucket.Ds != DataStructureBTree {
+			continue
+		}
+		if idx, ok := index.BTree.exist(bucketId); ok {
+			totalKeys += idx.Count()
+		}
+	}
+	if totalKeys == 0 {
+		return nil
+	}
+
+	// Distribute samples proportionally by bucket size
+	samples := make(map[uint64][]*core.Record)
+	remaining := n
+
+	for bucketId, bucket := range bucketInfoMapper {
+		if bucket.Ds != DataStructureBTree {
+			continue
+		}
+		idx, ok := index.BTree.exist(bucketId)
+		if !ok {
+			continue
+		}
+
+		bucketSize := idx.Count()
+		// Proportional sampling: bucketSize * n / totalKeys
+		sampleCount := (bucketSize * n) / totalKeys
+		// Ensure at least 1 sample if bucket is non-empty
+		if sampleCount == 0 && bucketSize > 0 {
+			sampleCount = 1
+		}
+		if sampleCount > bucketSize {
+			sampleCount = bucketSize
+		}
+		if sampleCount > remaining {
+			sampleCount = remaining
+		}
+
+		// Sample records directly (already have TTL and Timestamp)
+		samples[bucketId] = idx.SampleRandomRecords(sampleCount)
+		remaining -= sampleCount
+		if remaining <= 0 {
+			break
+		}
+	}
+
+	return samples
 }

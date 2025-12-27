@@ -70,7 +70,7 @@ func TestRWManager_MMap_WriteAt(t *testing.T) {
 	if err != nil {
 		require.NoError(t, err)
 	}
-	defer os.Remove(fd.Name())
+	defer func() { _ = os.Remove(fd.Name()) }()
 
 	err = fileio.Truncate(filePath, 8*nutsdb.MB, fd, false)
 	if err != nil {
@@ -102,7 +102,7 @@ func TestRWManager_MMap_WriteAt_NotEnoughData(t *testing.T) {
 	fd, err := fdm.GetFd(filePath)
 	require.NoError(t, err)
 
-	defer os.Remove(fd.Name())
+	defer func() { _ = os.Remove(fd.Name()) }()
 
 	err = fileio.Truncate(filePath, 8*nutsdb.MB, fd, false)
 	require.NoError(t, err)
@@ -134,7 +134,7 @@ func TestRWManager_MMap_ReadAt_CrossBlock(t *testing.T) {
 	fd, err := fdm.GetFd(filePath)
 	require.NoError(t, err)
 
-	defer os.Remove(fd.Name())
+	defer func() { _ = os.Remove(fd.Name()) }()
 
 	err = fileio.Truncate(filePath, 8*nutsdb.MB, fd, false)
 	require.NoError(t, err)
@@ -164,7 +164,7 @@ func TestRWManager_MMap_ReadAt_NotEnoughBytes(t *testing.T) {
 	fd, err := fdm.GetFd(filePath)
 	require.NoError(t, err)
 
-	defer os.Remove(fd.Name())
+	defer func() { _ = os.Remove(fd.Name()) }()
 
 	err = fileio.Truncate(filePath, 8*nutsdb.MB, fd, false)
 	require.NoError(t, err)
@@ -194,7 +194,7 @@ func TestRWManager_MMap_ReadAt_ErrIndexOutOfBound(t *testing.T) {
 	fd, err := fdm.GetFd(filePath)
 	require.NoError(t, err)
 
-	defer os.Remove(fd.Name())
+	defer func() { _ = os.Remove(fd.Name()) }()
 
 	err = fileio.Truncate(filePath, 8*nutsdb.MB, fd, false)
 	require.NoError(t, err)
@@ -217,7 +217,7 @@ func TestRWManager_MMap_Sync(t *testing.T) {
 	if err != nil {
 		require.NoError(t, err)
 	}
-	defer os.Remove(fd.Name())
+	defer func() { _ = os.Remove(fd.Name()) }()
 
 	err = fileio.Truncate(filePath, 8*nutsdb.MB, fd, false)
 	if err != nil {
@@ -248,7 +248,7 @@ func TestRWManager_MMap_Close(t *testing.T) {
 	if err != nil {
 		require.NoError(t, err)
 	}
-	defer os.Remove(fd.Name())
+	defer func() { _ = os.Remove(fd.Name()) }()
 
 	err = fileio.Truncate(filePath, 8*fileio.MB, fd, false)
 	if err != nil {
@@ -266,7 +266,7 @@ func TestRWManager_MMap_Close(t *testing.T) {
 
 func isFileDescriptorClosed(fd uintptr) error {
 	file := os.NewFile(fd, "")
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	_, err := file.Stat()
 
 	return err

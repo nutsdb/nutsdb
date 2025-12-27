@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package clock
+package ttl
 
 import (
 	"sync"
@@ -29,7 +29,7 @@ type Clock interface {
 	NowSeconds() int64
 
 	// SetOnAdvance sets a callback to be called when the clock time is advanced.
-	// This is primarily used by MockClock to notify TTL managers of time changes.
+	// This is primarily used by MockClock for testing.
 	SetOnAdvance(onAdvance func(newTimeMillis int64))
 
 	// AdvanceTime moves the clock forward by the specified duration.

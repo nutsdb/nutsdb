@@ -121,7 +121,7 @@ func BenchmarkHintFileWrite(b *testing.B) {
 			b.Fatalf("Failed to close hint file: %v", err)
 		}
 
-		os.Remove(hintPath)
+		_ = os.Remove(hintPath)
 	}
 }
 
@@ -131,7 +131,7 @@ func BenchmarkHintFileRead(b *testing.B) {
 	if err != nil {
 		b.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	hintPath := tmpDir + "/test.hint"
 
@@ -203,7 +203,7 @@ func BenchmarkDBStartupWithHintFile(b *testing.B) {
 	if err != nil {
 		b.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	opts := DefaultOptions
 	opts.Dir = tmpDir
@@ -228,7 +228,7 @@ func BenchmarkDBStartupWithHintFile(b *testing.B) {
 		txPut(&testing.T{}, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), Persistent, nil, nil)
 	}
 	insertTime := time.Since(start)
-	b.Logf("插入阶段耗时: %v", insertTime)
+	b.Logf("Insert phase duration: %v", insertTime)
 
 	// Perform merge to create hint files
 	start = time.Now()
@@ -237,7 +237,7 @@ func BenchmarkDBStartupWithHintFile(b *testing.B) {
 		b.Fatalf("Failed to merge: %v", err)
 	}
 	mergeTime := time.Since(start)
-	b.Logf("Merge阶段耗时: %v", mergeTime)
+	b.Logf("Merge phase duration: %v", mergeTime)
 
 	start = time.Now()
 	err = db.Close()
@@ -245,8 +245,8 @@ func BenchmarkDBStartupWithHintFile(b *testing.B) {
 		b.Fatalf("Failed to close database: %v", err)
 	}
 	closeTime := time.Since(start)
-	b.Logf("初始关闭耗时: %v", closeTime)
-	b.Logf("初始打开耗时: %v", openTime)
+	b.Logf("Initial close duration: %v", closeTime)
+	b.Logf("Initial open duration: %v", openTime)
 
 	b.ResetTimer()
 	var totalStartupTime time.Duration
@@ -265,7 +265,7 @@ func BenchmarkDBStartupWithHintFile(b *testing.B) {
 		}
 	}
 	avgStartupTime := totalStartupTime / time.Duration(b.N)
-	b.Logf("平均重新启动耗时: %v", avgStartupTime)
+	b.Logf("Average restart duration: %v", avgStartupTime)
 }
 
 // BenchmarkDBStartupWithoutHintFile benchmarks database startup without hint files
@@ -274,7 +274,7 @@ func BenchmarkDBStartupWithoutHintFile(b *testing.B) {
 	if err != nil {
 		b.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	opts := DefaultOptions
 	opts.Dir = tmpDir
@@ -299,7 +299,7 @@ func BenchmarkDBStartupWithoutHintFile(b *testing.B) {
 		txPut(&testing.T{}, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), Persistent, nil, nil)
 	}
 	insertTime := time.Since(start)
-	b.Logf("插入阶段耗时: %v", insertTime)
+	b.Logf("Insert phase duration: %v", insertTime)
 
 	// Perform merge (should not create hint files)
 	start = time.Now()
@@ -308,7 +308,7 @@ func BenchmarkDBStartupWithoutHintFile(b *testing.B) {
 		b.Fatalf("Failed to merge: %v", err)
 	}
 	mergeTime := time.Since(start)
-	b.Logf("Merge阶段耗时: %v", mergeTime)
+	b.Logf("Merge phase duration: %v", mergeTime)
 
 	start = time.Now()
 	err = db.Close()
@@ -316,8 +316,8 @@ func BenchmarkDBStartupWithoutHintFile(b *testing.B) {
 		b.Fatalf("Failed to close database: %v", err)
 	}
 	closeTime := time.Since(start)
-	b.Logf("初始关闭耗时: %v", closeTime)
-	b.Logf("初始打开耗时: %v", openTime)
+	b.Logf("Initial close duration: %v", closeTime)
+	b.Logf("Initial open duration: %v", openTime)
 
 	b.ResetTimer()
 	var totalStartupTime time.Duration
@@ -336,7 +336,7 @@ func BenchmarkDBStartupWithoutHintFile(b *testing.B) {
 		}
 	}
 	avgStartupTime := totalStartupTime / time.Duration(b.N)
-	b.Logf("平均重新启动耗时: %v", avgStartupTime)
+	b.Logf("Average restart duration: %v", avgStartupTime)
 }
 
 // BenchmarkMergeWithHintFile benchmarks merge operation with hint files enabled
@@ -345,7 +345,7 @@ func BenchmarkMergeWithHintFile(b *testing.B) {
 	if err != nil {
 		b.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	opts := DefaultOptions
 	opts.Dir = tmpDir
@@ -403,7 +403,7 @@ func BenchmarkMergeWithoutHintFile(b *testing.B) {
 	if err != nil {
 		b.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	opts := DefaultOptions
 	opts.Dir = tmpDir
@@ -461,7 +461,7 @@ func BenchmarkHintFileLoad(b *testing.B) {
 	if err != nil {
 		b.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	opts := DefaultOptions
 	opts.Dir = tmpDir

@@ -127,10 +127,8 @@ func main() {
 }
 
 func createBucket() {
-	if err := db.Update(
+	_ = db.Update(
 		func(tx *nutsdb.Tx) error {
 			return tx.NewBucket(nutsdb.DataStructureBTree, bucket)
-		}); err != nil {
-		//log.Fatal(err)
-	}
+		})
 }

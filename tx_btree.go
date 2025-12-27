@@ -150,8 +150,8 @@ func (tx *Tx) getMaxOrMinKey(bucket string, isMax bool) ([]byte, error) {
 	bucketId := b.Id
 
 	var (
-		key           []byte = nil
-		actuallyFound        = false
+		key           []byte
+		actuallyFound bool
 	)
 
 	key, actuallyFound = tx.pendingWrites.MaxOrMinKey(bucket, isMax)
@@ -211,7 +211,7 @@ func (tx *Tx) getAllOrKeysOrValues(bucket string, typ uint8) ([][]byte, [][]byte
 		return nil, nil, err
 	}
 
-	bucketId, err := tx.db.bucketManager.GetBucketID(DataStructureBTree, bucket)
+	bucketId, err := tx.db.bucketMgr.GetBucketID(DataStructureBTree, bucket)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -356,7 +356,7 @@ func (tx *Tx) PrefixScanEntries(bucket string, prefix []byte, reg string, offset
 	if err := tx.checkTxIsClosed(); err != nil {
 		return nil, nil, err
 	}
-	b, err := tx.db.bucketManager.GetBucket(DataStructureBTree, bucket)
+	b, err := tx.db.bucketMgr.GetBucket(DataStructureBTree, bucket)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -415,7 +415,7 @@ func (tx *Tx) Delete(bucket string, key []byte) error {
 	if err := tx.checkTxIsClosed(); err != nil {
 		return err
 	}
-	b, err := tx.db.bucketManager.GetBucket(DataStructureBTree, bucket)
+	b, err := tx.db.bucketMgr.GetBucket(DataStructureBTree, bucket)
 	if err != nil {
 		return err
 	}

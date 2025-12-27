@@ -28,7 +28,7 @@ func main() {
 		val := []byte("val_" + fmt.Sprintf("%03d", i))
 		if err = tx.Put(bucket, key, val, nutsdb.Persistent); err != nil {
 			// tx rollback
-			tx.Rollback()
+			_ = tx.Rollback()
 			fmt.Printf("rollback ok, err %v:", err)
 		}
 	}
@@ -45,6 +45,9 @@ func main() {
 func forwardIteration() {
 	fmt.Println("--------begin forwardIteration--------")
 	tx, err := db.Begin(false)
+	if err != nil {
+		panic(err)
+	}
 	iterator := nutsdb.NewIterator(tx, bucket, nutsdb.IteratorOptions{Reverse: false})
 	for {
 		value, _ := iterator.Value()
@@ -65,6 +68,9 @@ func forwardIteration() {
 func reverseIterative() {
 	fmt.Println("--------start reverseIterative--------")
 	tx, err := db.Begin(false)
+	if err != nil {
+		panic(err)
+	}
 	iterator := nutsdb.NewIterator(tx, bucket, nutsdb.IteratorOptions{Reverse: true})
 	for {
 		value, _ := iterator.Value()

@@ -213,7 +213,7 @@ func TestHintFileWriterReader(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	hintPath := filepath.Join(tmpDir, "1.hint")
 
@@ -371,7 +371,7 @@ func TestHintFileReaderErrorHandling(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to create temp dir: %v", err)
 		}
-		defer os.RemoveAll(tmpDir)
+		defer func() { _ = os.RemoveAll(tmpDir) }()
 
 		corruptedPath := filepath.Join(tmpDir, "corrupted.hint")
 		// Create a corrupted file with invalid data
@@ -402,7 +402,7 @@ func TestHintFileReaderErrorHandling(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to create temp dir: %v", err)
 		}
-		defer os.RemoveAll(tmpDir)
+		defer func() { _ = os.RemoveAll(tmpDir) }()
 
 		emptyPath := filepath.Join(tmpDir, "empty.hint")
 		// Create an empty file
@@ -416,7 +416,7 @@ func TestHintFileReaderErrorHandling(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to open empty file: %v", err)
 		}
-		defer reader.Close()
+		defer func() { _ = reader.Close() }()
 
 		_, err = reader.Read()
 		if err != io.EOF {
@@ -464,7 +464,7 @@ func TestHintFilePartialRead(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	hintPath := filepath.Join(tmpDir, "partial.hint")
 
@@ -545,7 +545,7 @@ func TestHintFilePartialRead(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to reopen hint file: %v", err)
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	// Read all entries
 	readCount := 0

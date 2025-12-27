@@ -82,7 +82,7 @@ func get(key string) {
 		if err != nil {
 			return err
 		}
-		log.Println("get value: ", value)
+		log.Println("get value: ", string(value))
 		return nil
 	}); err != nil {
 		log.Println(err)

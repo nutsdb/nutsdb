@@ -13,7 +13,7 @@ type request struct {
 }
 
 var requestPool = sync.Pool{
-	New: func() interface{} {
+	New: func() any {
 		return new(request)
 	},
 }

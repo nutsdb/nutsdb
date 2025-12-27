@@ -127,11 +127,8 @@ func (db *DB) mergeV2() error {
 func (job *mergeV2Job) prepare() error {
 	job.db.mu.Lock()
 
-	// Prevent concurrent merges
-	if job.db.isMerging {
-		job.db.mu.Unlock()
-		return ErrIsMerging
-	}
+	// Note: Concurrent merge prevention is handled by mergeWorker.performMerge()
+	// which sets the isMerging flag before calling this method
 
 	// Enumerate all data files (both user and merge files)
 	userIDs, mergeIDs, err := enumerateDataFileIDs(job.db.opt.Dir)
@@ -165,13 +162,9 @@ func (job *mergeV2Job) prepare() error {
 	// Sort files by ID for consistent processing order
 	sort.Slice(job.pending, func(i, j int) bool { return job.pending[i] < job.pending[j] })
 
-	// Mark database as merging
-	job.db.isMerging = true
-
 	// Sync active file if using mmap without sync
 	if !job.db.opt.SyncEnable && job.db.opt.RWMode == MMap {
 		if err := job.db.ActiveFile.rwManager.Sync(); err != nil {
-			job.db.isMerging = false
 			job.db.mu.Unlock()
 			return fmt.Errorf("failed to sync active file: %w", err)
 		}
@@ -179,7 +172,6 @@ func (job *mergeV2Job) prepare() error {
 
 	// Release current active file for merge processing
 	if err := job.db.ActiveFile.rwManager.Release(); err != nil {
-		job.db.isMerging = false
 		job.db.mu.Unlock()
 		return fmt.Errorf("failed to release active file: %w", err)
 	}
@@ -189,7 +181,6 @@ func (job *mergeV2Job) prepare() error {
 	path := getDataPath(job.db.MaxFileID, job.db.opt.Dir)
 	activeFile, err := job.db.fm.GetDataFile(path, job.db.opt.SegmentSize)
 	if err != nil {
-		job.db.isMerging = false
 		job.db.mu.Unlock()
 		return fmt.Errorf("failed to create new active file: %w", err)
 	}
@@ -201,12 +192,11 @@ func (job *mergeV2Job) prepare() error {
 	return nil
 }
 
-// finish cleans up the merge job by resetting the merging state.
+// finish cleans up the merge job.
 // Always called via defer to ensure cleanup even if merge fails.
+// Note: The isMerging flag is managed by mergeWorker.performMerge()
 func (job *mergeV2Job) finish() {
-	job.db.mu.Lock()
-	job.db.isMerging = false
-	job.db.mu.Unlock()
+	// No-op: State is managed by mergeWorker
 }
 
 // enterWritingState initializes the merge job for writing entries.
@@ -375,17 +365,11 @@ func (job *mergeV2Job) rewriteFile(fid int64) error {
 		return fmt.Errorf("failed to create file recovery for %s: %w", path, err)
 	}
 	defer func() {
-		if releaseErr := fr.release(); releaseErr != nil {
-			// Log the error but don't override the original error
-			// In a production environment, you might want to log this
-		}
+		_ = fr.release()
 	}()
 
 	off := int64(0)
-	for {
-		if off >= fr.size {
-			break
-		}
+	for off < fr.size {
 		entry, err := fr.readEntry(off)
 		if err != nil {
 			if errors.Is(err, io.EOF) || errors.Is(err, ErrIndexOutOfBound) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, core.ErrHeaderSizeOutOfBounds) {
