@@ -90,11 +90,9 @@ func runNutsDBTestWithMockClock(t *testing.T, opts *Options, test func(t *testin
 	require.NoError(t, err)
 
 	test(t, db, mc)
-	t.Cleanup(func() {
-		if !db.IsClose() {
-			require.NoError(t, db.Close())
-		}
-	})
+	if !db.IsClose() {
+		require.NoError(t, db.Close())
+	}
 }
 
 func txPut(t *testing.T, db *DB, bucket string, key, value []byte, ttl uint32, expectErr error, finalExpectErr error) {
