@@ -163,14 +163,6 @@ db, err := nutsdb.Open(
 )
 ```
 
-#### Configuration Options
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `EnableHintFile` | bool | `false` | Enable/disable hint file feature |
-| `EnableMergeV2` | bool | `false` | Enable/disable Merge V2 algorithm |
-| `SegmentSize` | int64 | `256MB` | Size of data files before rotation |
-
 ### Performance Benefits
 
 #### Memory Efficiency
