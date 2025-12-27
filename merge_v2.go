@@ -369,10 +369,7 @@ func (job *mergeV2Job) rewriteFile(fid int64) error {
 	}()
 
 	off := int64(0)
-	for {
-		if off >= fr.size {
-			break
-		}
+	for off < fr.size {
 		entry, err := fr.readEntry(off)
 		if err != nil {
 			if errors.Is(err, io.EOF) || errors.Is(err, ErrIndexOutOfBound) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, core.ErrHeaderSizeOutOfBounds) {

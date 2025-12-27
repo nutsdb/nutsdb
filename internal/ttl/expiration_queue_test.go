@@ -118,7 +118,6 @@ func TestExpirationQueue_DifferentTimestamps(t *testing.T) {
 		case <-eq.events:
 			count++
 		case <-time.After(10 * time.Millisecond):
-			break
 		}
 	}
 

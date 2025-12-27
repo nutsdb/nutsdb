@@ -52,7 +52,7 @@ func TestBucketManager_Recovery(t *testing.T) {
 	txNewBucket(t, db, bucket1, DataStructureBTree, nil, nil)
 	txNewBucket(t, db, bucket2, DataStructureBTree, nil, nil)
 	txDeleteBucketFunc(t, db, bucket1, DataStructureBTree, nil, nil)
-	db.Close()
+	_ = db.Close()
 
 	db, err = Open(DefaultOptions, WithDir(dir))
 	assert.Nil(t, err)

@@ -11,7 +11,7 @@ import (
 func TestTransactionManager_Creation(t *testing.T) {
 	db := &DB{}
 	sm := NewStatusManager(DefaultStatusManagerConfig())
-	defer sm.Close()
+	defer func() { _ = sm.Close() }()
 
 	tm := newTxManager(db, sm)
 
@@ -35,7 +35,7 @@ func TestTransactionManager_Creation(t *testing.T) {
 func TestTransactionManager_StartStop(t *testing.T) {
 	db := &DB{}
 	sm := NewStatusManager(DefaultStatusManagerConfig())
-	defer sm.Close()
+	defer func() { _ = sm.Close() }()
 
 	tm := newTxManager(db, sm)
 
@@ -68,7 +68,7 @@ func TestTransactionManager_StartStop(t *testing.T) {
 func TestTransactionManager_RegisterUnregisterTx(t *testing.T) {
 	db := &DB{}
 	sm := NewStatusManager(DefaultStatusManagerConfig())
-	defer sm.Close()
+	defer func() { _ = sm.Close() }()
 
 	if err := sm.Start(); err != nil {
 		t.Fatalf("Failed to start StatusManager: %v", err)
@@ -119,7 +119,7 @@ func TestTransactionManager_RegisterUnregisterTx(t *testing.T) {
 func TestTransactionManager_RegisterNilTx(t *testing.T) {
 	db := &DB{}
 	sm := NewStatusManager(DefaultStatusManagerConfig())
-	defer sm.Close()
+	defer func() { _ = sm.Close() }()
 
 	if err := sm.Start(); err != nil {
 		t.Fatalf("Failed to start StatusManager: %v", err)
@@ -140,7 +140,7 @@ func TestTransactionManager_RegisterNilTx(t *testing.T) {
 func TestTransactionManager_RejectTxWhenClosing(t *testing.T) {
 	db := &DB{}
 	sm := NewStatusManager(DefaultStatusManagerConfig())
-	defer sm.Close()
+	defer func() { _ = sm.Close() }()
 
 	if err := sm.Start(); err != nil {
 		t.Fatalf("Failed to start StatusManager: %v", err)
@@ -183,7 +183,7 @@ func TestTransactionManager_RejectTxWhenClosing(t *testing.T) {
 func TestTransactionManager_RejectTxWhenNotRunning(t *testing.T) {
 	db := &DB{}
 	sm := NewStatusManager(DefaultStatusManagerConfig())
-	defer sm.Close()
+	defer func() { _ = sm.Close() }()
 
 	if err := sm.Start(); err != nil {
 		t.Fatalf("Failed to start StatusManager: %v", err)
@@ -202,7 +202,7 @@ func TestTransactionManager_RejectTxWhenNotRunning(t *testing.T) {
 func TestTransactionManager_WaitForActiveTxs(t *testing.T) {
 	db := &DB{}
 	sm := NewStatusManager(DefaultStatusManagerConfig())
-	defer sm.Close()
+	defer func() { _ = sm.Close() }()
 
 	if err := sm.Start(); err != nil {
 		t.Fatalf("Failed to start StatusManager: %v", err)
@@ -267,7 +267,7 @@ func TestTransactionManager_WaitForActiveTxs(t *testing.T) {
 func TestTransactionManager_WaitForActiveTxsTimeout(t *testing.T) {
 	db := &DB{}
 	sm := NewStatusManager(DefaultStatusManagerConfig())
-	defer sm.Close()
+	defer func() { _ = sm.Close() }()
 
 	if err := sm.Start(); err != nil {
 		t.Fatalf("Failed to start StatusManager: %v", err)
@@ -307,7 +307,7 @@ func TestTransactionManager_WaitForActiveTxsTimeout(t *testing.T) {
 func TestTransactionManager_ConcurrentRegisterUnregister(t *testing.T) {
 	db := &DB{}
 	sm := NewStatusManager(DefaultStatusManagerConfig())
-	defer sm.Close()
+	defer func() { _ = sm.Close() }()
 
 	if err := sm.Start(); err != nil {
 		t.Fatalf("Failed to start StatusManager: %v", err)
@@ -362,7 +362,7 @@ func TestTransactionManager_ConcurrentRegisterUnregister(t *testing.T) {
 func TestTransactionManager_MaxActiveTxs(t *testing.T) {
 	db := &DB{}
 	sm := NewStatusManager(DefaultStatusManagerConfig())
-	defer sm.Close()
+	defer func() { _ = sm.Close() }()
 
 	if err := sm.Start(); err != nil {
 		t.Fatalf("Failed to start StatusManager: %v", err)
@@ -401,7 +401,7 @@ func TestTransactionManager_MaxActiveTxs(t *testing.T) {
 func TestTransactionManager_StopWithActiveTxs(t *testing.T) {
 	db := &DB{}
 	sm := NewStatusManager(DefaultStatusManagerConfig())
-	defer sm.Close()
+	defer func() { _ = sm.Close() }()
 
 	if err := sm.Start(); err != nil {
 		t.Fatalf("Failed to start StatusManager: %v", err)
@@ -447,7 +447,7 @@ func TestTransactionManager_StopWithActiveTxs(t *testing.T) {
 func TestTransactionManager_StopTimeout(t *testing.T) {
 	db := &DB{}
 	sm := NewStatusManager(DefaultStatusManagerConfig())
-	defer sm.Close()
+	defer func() { _ = sm.Close() }()
 
 	if err := sm.Start(); err != nil {
 		t.Fatalf("Failed to start StatusManager: %v", err)

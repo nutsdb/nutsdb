@@ -310,7 +310,7 @@ func testZRangeByScore() {
 				return err
 			}
 			for _, node := range nodes {
-				fmt.Println("item:", node.Value, node.Score)
+				fmt.Println("item:", string(node.Value), node.Score)
 			}
 			return nil
 		}); err != nil {

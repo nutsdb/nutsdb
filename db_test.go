@@ -840,7 +840,7 @@ func TestDB_BackupTarGZ(t *testing.T) {
 func TestDB_Close_CompleteShutdownFlow(t *testing.T) {
 	opts := DefaultOptions
 	opts.Dir = filepath.Join(t.TempDir(), "test-close-complete")
-	defer os.RemoveAll(opts.Dir)
+	defer func() { _ = os.RemoveAll(opts.Dir) }()
 
 	db, err := Open(opts)
 	require.NoError(t, err)
@@ -889,7 +889,7 @@ func TestDB_Close_CompleteShutdownFlow(t *testing.T) {
 func TestDB_Close_WithActiveTxs(t *testing.T) {
 	opts := DefaultOptions
 	opts.Dir = filepath.Join(t.TempDir(), "test-close-active-txs")
-	defer os.RemoveAll(opts.Dir)
+	defer func() { _ = os.RemoveAll(opts.Dir) }()
 
 	db, err := Open(opts)
 	require.NoError(t, err)
@@ -955,7 +955,7 @@ func TestDB_Close_WithActiveTxs(t *testing.T) {
 func TestDB_Close_RejectsNewTxsDuringShutdown(t *testing.T) {
 	opts := DefaultOptions
 	opts.Dir = filepath.Join(t.TempDir(), "test-close-reject-txs")
-	defer os.RemoveAll(opts.Dir)
+	defer func() { _ = os.RemoveAll(opts.Dir) }()
 
 	db, err := Open(opts)
 	require.NoError(t, err)
@@ -1012,7 +1012,7 @@ func TestDB_Close_RejectsNewTxsDuringShutdown(t *testing.T) {
 func TestDB_Close_Timeout(t *testing.T) {
 	opts := DefaultOptions
 	opts.Dir = filepath.Join(t.TempDir(), "test-close-timeout")
-	defer os.RemoveAll(opts.Dir)
+	defer func() { _ = os.RemoveAll(opts.Dir) }()
 
 	db, err := Open(opts)
 	require.NoError(t, err)
@@ -1073,7 +1073,7 @@ func TestDB_Close_Timeout(t *testing.T) {
 func TestDB_Close_ConcurrentCalls(t *testing.T) {
 	opts := DefaultOptions
 	opts.Dir = filepath.Join(t.TempDir(), "test-close-concurrent")
-	defer os.RemoveAll(opts.Dir)
+	defer func() { _ = os.RemoveAll(opts.Dir) }()
 
 	db, err := Open(opts)
 	require.NoError(t, err)
@@ -1109,11 +1109,12 @@ func TestDB_Close_ConcurrentCalls(t *testing.T) {
 	hasClosedErr := false
 
 	for _, err := range errors {
-		if err == nil {
+		switch err {
+		case nil:
 			hasSuccess = true
-		} else if err == ErrDBClosed {
+		case ErrDBClosed:
 			hasClosedErr = true
-		} else {
+		default:
 			t.Logf("Unexpected error: %v", err)
 		}
 	}
@@ -1130,7 +1131,7 @@ func TestDB_Close_ConcurrentCalls(t *testing.T) {
 func TestDB_Close_IdempotentCalls(t *testing.T) {
 	opts := DefaultOptions
 	opts.Dir = filepath.Join(t.TempDir(), "test-close-idempotent")
-	defer os.RemoveAll(opts.Dir)
+	defer func() { _ = os.RemoveAll(opts.Dir) }()
 
 	db, err := Open(opts)
 	require.NoError(t, err)
@@ -1153,7 +1154,7 @@ func TestDB_Close_IdempotentCalls(t *testing.T) {
 func TestDB_Close_ComponentShutdownOrder(t *testing.T) {
 	opts := DefaultOptions
 	opts.Dir = filepath.Join(t.TempDir(), "test-close-order")
-	defer os.RemoveAll(opts.Dir)
+	defer func() { _ = os.RemoveAll(opts.Dir) }()
 
 	db, err := Open(opts)
 	require.NoError(t, err)
@@ -1171,7 +1172,7 @@ func TestDB_Close_WithMergeInProgress(t *testing.T) {
 	opts := DefaultOptions
 	opts.Dir = filepath.Join(t.TempDir(), "test-close-merge")
 	opts.SegmentSize = 1024 // Small segment to trigger merge easily
-	defer os.RemoveAll(opts.Dir)
+	defer func() { _ = os.RemoveAll(opts.Dir) }()
 
 	db, err := Open(opts)
 	require.NoError(t, err)
@@ -1214,7 +1215,7 @@ func TestDB_Close_WithMergeInProgress(t *testing.T) {
 func TestDB_Close_ResourceCleanup(t *testing.T) {
 	opts := DefaultOptions
 	opts.Dir = filepath.Join(t.TempDir(), "test-close-cleanup")
-	defer os.RemoveAll(opts.Dir)
+	defer func() { _ = os.RemoveAll(opts.Dir) }()
 
 	db, err := Open(opts)
 	require.NoError(t, err)
@@ -1272,7 +1273,7 @@ func TestDB_Close_ResourceCleanup(t *testing.T) {
 func TestDB_Close_ErrorHandling(t *testing.T) {
 	opts := DefaultOptions
 	opts.Dir = filepath.Join(t.TempDir(), "test-close-errors")
-	defer os.RemoveAll(opts.Dir)
+	defer func() { _ = os.RemoveAll(opts.Dir) }()
 
 	db, err := Open(opts)
 	require.NoError(t, err)
@@ -1402,8 +1403,8 @@ func withDBOption(t *testing.T, opt Options, fn func(t *testing.T, db *DB)) {
 	require.NoError(t, err)
 
 	defer func() {
-		os.RemoveAll(db.opt.Dir)
-		db.Close()
+		_ = os.RemoveAll(db.opt.Dir)
+		_ = db.Close()
 	}()
 
 	fn(t, db)
@@ -1439,7 +1440,7 @@ func TestDB_HintKeyValAndRAMIdxMode_RestartDB(t *testing.T) {
 		txPut(t, db, bucket, key, val, Persistent, nil, nil)
 		txGet(t, db, bucket, key, val, nil)
 
-		db.Close()
+		_ = db.Close()
 		// restart db with HintKeyValAndRAMIdxMode EntryIdxMode
 		db, err := Open(db.opt)
 		require.NoError(t, err)
@@ -1458,7 +1459,7 @@ func TestDB_HintKeyAndRAMIdxMode_RestartDB(t *testing.T) {
 
 		txPut(t, db, bucket, key, val, Persistent, nil, nil)
 		txGet(t, db, bucket, key, val, nil)
-		db.Close()
+		_ = db.Close()
 
 		// restart db with HintKeyAndRAMIdxMode EntryIdxMode
 		db, err := Open(db.opt)
@@ -1485,7 +1486,7 @@ func TestDB_HintKeyAndRAMIdxMode_LruCache(t *testing.T) {
 				txGet(t, db, bucket, key, val, nil)
 				txGet(t, db, bucket, key, val, nil)
 			}
-			db.Close()
+			_ = db.Close()
 		})
 	}
 }
@@ -2206,7 +2207,7 @@ func TestDB_HintFileMissingFallback(t *testing.T) {
 	fileIDs := enumerateDataFilesInDir(opts.Dir)
 	for _, fileID := range fileIDs {
 		hintPath := getHintPath(fileID, opts.Dir)
-		os.Remove(hintPath)
+		_ = os.Remove(hintPath)
 	}
 
 	// Reopen the database - it should fall back to scanning data files

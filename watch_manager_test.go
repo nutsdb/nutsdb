@@ -202,7 +202,7 @@ func wmStartReceiver(t *testing.T, receiveChan <-chan *Message, expectBucket, ex
 func TestWatchManager_SubscribeAndSendMessage(t *testing.T) {
 	t.Run("subscribe and send message", func(t *testing.T) {
 		wm := startDistributor()
-		defer wm.close()
+		defer func() { _ = wm.close() }()
 
 		bucket := "test"
 		key := "test"
@@ -217,7 +217,7 @@ func TestWatchManager_SubscribeAndSendMessage(t *testing.T) {
 
 	t.Run("subscribe and drop messages", func(t *testing.T) {
 		wm := startDistributor()
-		defer wm.close()
+		defer func() { _ = wm.close() }()
 
 		bucket := "bucket_test"
 		key := "key_test"
@@ -244,7 +244,7 @@ func TestWatchManager_SubscribeAndSendMessage(t *testing.T) {
 
 	t.Run("multiple subscribers for the same key", func(t *testing.T) {
 		wm := startDistributor()
-		defer wm.close()
+		defer func() { _ = wm.close() }()
 
 		bucket := "bucket_test"
 		key := "key_test"
@@ -280,7 +280,7 @@ func TestWatchManager_SubscribeAndSendMessage(t *testing.T) {
 
 	t.Run("multiple subscribers", func(t *testing.T) {
 		wm := startDistributor()
-		defer wm.close()
+		defer func() { _ = wm.close() }()
 
 		numSubscribers := 100
 		messagesPerSubscriber := 10
@@ -349,7 +349,7 @@ func TestWatchManager_SubscribeAndSendMessage(t *testing.T) {
 
 		defer func() {
 			if !isClosed {
-				wm.close()
+				_ = wm.close()
 			}
 		}()
 
@@ -379,7 +379,7 @@ func TestWatchManager_SubscribeAndSendMessage(t *testing.T) {
 
 		// Close watch manager and wait for cleanup
 		isClosed = true
-		wm.close()
+		_ = wm.close()
 
 		// Wait for the watch manager's internal goroutines to finish and cleanup
 		// This ensures cleanUpSubscribers() has run and closed all channels
@@ -397,7 +397,7 @@ func TestWatchManager_SubscribeAndSendMessage(t *testing.T) {
 func TestWatchManager_SubscribeAndUnsubscribe(t *testing.T) {
 	t.Run("subscribe and unsubscribe", func(t *testing.T) {
 		wm := startDistributor()
-		defer wm.close()
+		defer func() { _ = wm.close() }()
 
 		bucket := "bucket_test"
 		key := "key_test"
@@ -431,7 +431,7 @@ func TestWatchManager_SubscribeAndUnsubscribe(t *testing.T) {
 
 	t.Run("subscribe and unsubscribe with multiple keys", func(t *testing.T) {
 		wm := startDistributor()
-		defer wm.close()
+		defer func() { _ = wm.close() }()
 
 		expectedSubscribers := 10
 		expectedMessages := 100
@@ -482,7 +482,7 @@ func TestWatchManager_SubscribeAndUnsubscribe(t *testing.T) {
 
 	t.Run("subscribing and unsubscribe in random time", func(t *testing.T) {
 		wm := startDistributor()
-		defer wm.close()
+		defer func() { _ = wm.close() }()
 
 		bucket := "bucket_test"
 		key0 := "key_test0"
@@ -544,7 +544,7 @@ func TestWatchManager_SubscribeAndUnsubscribe(t *testing.T) {
 func TestWatchManager_StartDistributor(t *testing.T) {
 	t.Run("send messages and receive them in batches", func(t *testing.T) {
 		wm := startDistributor()
-		defer wm.close()
+		defer func() { _ = wm.close() }()
 		time.Sleep(50 * time.Millisecond)
 
 		bucket := "test_bucket"
@@ -563,7 +563,7 @@ func TestWatchManager_StartDistributor(t *testing.T) {
 
 	t.Run("max batch size triggers immediate send", func(t *testing.T) {
 		wm := startDistributor()
-		defer wm.close()
+		defer func() { _ = wm.close() }()
 		time.Sleep(50 * time.Millisecond)
 
 		bucket := "test_bucket"
@@ -578,12 +578,12 @@ func TestWatchManager_StartDistributor(t *testing.T) {
 		received := wmReceiveMessages(t, receiveChan, bucket, key, totalMessages, 3*time.Second)
 		assert.Equal(t, maxBatchSize, received, "should receive full batch immediately")
 
-		wm.close()
+		_ = wm.close()
 	})
 
 	t.Run("send max batch size messages at each subsriber", func(t *testing.T) {
 		wm := startDistributor()
-		defer wm.close()
+		defer func() { _ = wm.close() }()
 
 		expectedSubscribers := 100
 		expectedMessages := 1024
@@ -642,7 +642,7 @@ func TestWatchManager_StartDistributor(t *testing.T) {
 		watchChanBufferSize = 124   // Change the watch channel buffer size to 124 for testing
 		receiveChanBufferSize = 124 // Change the receive channel buffer size to 124 for testing
 		wm := startDistributor()
-		defer wm.close()
+		defer func() { _ = wm.close() }()
 		time.Sleep(50 * time.Millisecond)
 
 		bucket := "test_bucket"
@@ -681,7 +681,7 @@ func TestWatchManager_StartDistributor(t *testing.T) {
 
 		<-sendingDone
 		<-receivingDone
-		wm.close()
+		_ = wm.close()
 	})
 }
 
@@ -719,7 +719,7 @@ func TestWatchManager_DeleteBucket(t *testing.T) {
 		wm := NewWatchManager()
 		// Start both collector and distributor goroutines
 		go wm.startDistributor()
-		defer wm.close()
+		defer func() { _ = wm.close() }()
 
 		// Give goroutines time to start
 		time.Sleep(50 * time.Millisecond)
@@ -791,7 +791,7 @@ func TestWatchManager_DeleteBucket(t *testing.T) {
 	t.Run("delete non-existent bucket is no-op", func(t *testing.T) {
 		wm := NewWatchManager()
 		go wm.startDistributor()
-		defer wm.close()
+		defer func() { _ = wm.close() }()
 
 		time.Sleep(50 * time.Millisecond)
 
@@ -831,7 +831,7 @@ func TestWatchManager_DeleteBucket(t *testing.T) {
 	t.Run("delete bucket with no subscribers is no-op", func(t *testing.T) {
 		wm := NewWatchManager()
 		go wm.startDistributor()
-		defer wm.close()
+		defer func() { _ = wm.close() }()
 
 		time.Sleep(50 * time.Millisecond)
 
@@ -848,7 +848,7 @@ func TestWatchManager_DeleteBucket(t *testing.T) {
 	t.Run("multiple bucket deletions handled correctly", func(t *testing.T) {
 		wm := NewWatchManager()
 		go wm.startDistributor()
-		defer wm.close()
+		defer func() { _ = wm.close() }()
 
 		time.Sleep(50 * time.Millisecond)
 
@@ -902,7 +902,7 @@ func TestWatchManager_DeleteBucket(t *testing.T) {
 	t.Run("new subscription after bucket deletion uses fresh state", func(t *testing.T) {
 		wm := NewWatchManager()
 		go wm.startDistributor()
-		defer wm.close()
+		defer func() { _ = wm.close() }()
 
 		time.Sleep(50 * time.Millisecond)
 

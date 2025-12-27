@@ -29,7 +29,7 @@ func TestMergeWorker_Creation(t *testing.T) {
 
 func TestMergeWorker_StartStop(t *testing.T) {
 	sm := NewStatusManager(DefaultStatusManagerConfig())
-	defer sm.Close()
+	defer func() { _ = sm.Close() }()
 
 	opts := DefaultOptions
 	opts.Dir = filepath.Join(t.TempDir(), "nutsdb-test")
@@ -405,7 +405,7 @@ func TestMergeWorker_ConcurrentStops(t *testing.T) {
 
 func TestMergeWorker_StopTimeout(t *testing.T) {
 	sm := NewStatusManager(DefaultStatusManagerConfig())
-	defer sm.Close()
+	defer func() { _ = sm.Close() }()
 
 	opts := DefaultOptions
 	opts.Dir = filepath.Join(t.TempDir(), "nutsdb-test")

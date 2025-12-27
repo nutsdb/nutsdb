@@ -25,14 +25,14 @@ import (
 
 func TarGZCompress(dst io.Writer, src string) error {
 	gz := gzip.NewWriter(dst)
-	defer gz.Close()
+	defer func() { _ = gz.Close() }()
 	return TarCompress(gz, src)
 }
 
 // https://blog.ralch.com/articles/golang-working-with-tar-and-gzip
 func TarCompress(dst io.Writer, src string) error {
 	tarball := tar.NewWriter(dst)
-	defer tarball.Close()
+	defer func() { _ = tarball.Close() }()
 
 	info, err := os.Stat(src)
 	if err != nil {
@@ -72,7 +72,7 @@ func TarCompress(dst io.Writer, src string) error {
 				return err
 			}
 
-			defer file.Close()
+			defer func() { _ = file.Close() }()
 			_, err = io.Copy(tarball, file)
 			return err
 		})

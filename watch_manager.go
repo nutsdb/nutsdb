@@ -635,18 +635,14 @@ func (wm *watchManager) Stop(timeout time.Duration) error {
 
 	// close watch manager
 	// this cancels context and signals all goroutines to stop
-	wm.close()
+	_ = wm.close()
 
 	// wait for watch manager to complete cleanup
 	deadline := time.Now().Add(timeout)
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
 
-	for {
-		if wm.isClosed() {
-			break
-		}
-
+	for !wm.isClosed() {
 		if time.Now().After(deadline) {
 			break
 		}

@@ -50,7 +50,7 @@ func setupIteratorBenchmark(b *testing.B, numKeys int) (*DB, string) {
 		return nil
 	})
 	if err != nil {
-		db.Close()
+		_ = db.Close()
 		b.Fatalf("Failed to populate database: %v", err)
 	}
 
@@ -60,7 +60,7 @@ func setupIteratorBenchmark(b *testing.B, numKeys int) (*DB, string) {
 // BenchmarkIterator_Creation tests iterator creation overhead
 func BenchmarkIterator_Creation(b *testing.B) {
 	db, bucket := setupIteratorBenchmark(b, 10000)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	b.ResetTimer()
 	b.ReportAllocs()
@@ -87,7 +87,7 @@ func BenchmarkIterator_Next(b *testing.B) {
 	for _, size := range sizes {
 		b.Run(fmt.Sprintf("Size_%d", size), func(b *testing.B) {
 			db, bucket := setupIteratorBenchmark(b, size)
-			defer db.Close()
+			defer func() { _ = db.Close() }()
 
 			b.ResetTimer()
 			b.ReportAllocs()
@@ -121,7 +121,7 @@ func BenchmarkIterator_Prev(b *testing.B) {
 	for _, size := range sizes {
 		b.Run(fmt.Sprintf("Size_%d", size), func(b *testing.B) {
 			db, bucket := setupIteratorBenchmark(b, size)
-			defer db.Close()
+			defer func() { _ = db.Close() }()
 
 			b.ResetTimer()
 			b.ReportAllocs()
@@ -151,7 +151,7 @@ func BenchmarkIterator_Prev(b *testing.B) {
 // BenchmarkIterator_KeyAccess tests key access performance
 func BenchmarkIterator_KeyAccess(b *testing.B) {
 	db, bucket := setupIteratorBenchmark(b, 10000)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	b.ResetTimer()
 	b.ReportAllocs()
@@ -178,7 +178,7 @@ func BenchmarkIterator_KeyAccess(b *testing.B) {
 // BenchmarkIterator_ValueAccess tests value access performance
 func BenchmarkIterator_ValueAccess(b *testing.B) {
 	db, bucket := setupIteratorBenchmark(b, 10000)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	b.ResetTimer()
 	b.ReportAllocs()
@@ -208,7 +208,7 @@ func BenchmarkIterator_ValueAccess(b *testing.B) {
 // BenchmarkIterator_KeyValueAccess tests combined key-value access
 func BenchmarkIterator_KeyValueAccess(b *testing.B) {
 	db, bucket := setupIteratorBenchmark(b, 10000)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	b.ResetTimer()
 	b.ReportAllocs()
@@ -239,7 +239,7 @@ func BenchmarkIterator_KeyValueAccess(b *testing.B) {
 // BenchmarkIterator_Seek tests seek operation performance
 func BenchmarkIterator_Seek(b *testing.B) {
 	db, bucket := setupIteratorBenchmark(b, 100000)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Pre-generate seek keys
 	seekKeys := make([][]byte, 1000)
@@ -270,7 +270,7 @@ func BenchmarkIterator_Seek(b *testing.B) {
 // BenchmarkIterator_Rewind tests rewind operation performance
 func BenchmarkIterator_Rewind(b *testing.B) {
 	db, bucket := setupIteratorBenchmark(b, 10000)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	b.ResetTimer()
 	b.ReportAllocs()
@@ -300,7 +300,7 @@ func BenchmarkIterator_Rewind(b *testing.B) {
 // BenchmarkIterator_PartialScan tests scanning a portion of data
 func BenchmarkIterator_PartialScan(b *testing.B) {
 	db, bucket := setupIteratorBenchmark(b, 100000)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	b.ResetTimer()
 	b.ReportAllocs()
@@ -340,7 +340,7 @@ func BenchmarkIterator_PartialScan(b *testing.B) {
 // BenchmarkIterator_ValidCheck tests Valid() method overhead
 func BenchmarkIterator_ValidCheck(b *testing.B) {
 	db, bucket := setupIteratorBenchmark(b, 1000)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	b.ResetTimer()
 	b.ReportAllocs()
@@ -362,7 +362,7 @@ func BenchmarkIterator_ValidCheck(b *testing.B) {
 // BenchmarkIterator_MultipleIterators tests overhead of multiple concurrent iterators
 func BenchmarkIterator_MultipleIterators(b *testing.B) {
 	db, bucket := setupIteratorBenchmark(b, 10000)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	b.ResetTimer()
 	b.ReportAllocs()
@@ -407,7 +407,7 @@ func BenchmarkIterator_LargeValues(b *testing.B) {
 	if err != nil {
 		b.Fatalf("Failed to open database: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	bucket := "large_bucket"
 	largeValue := make([]byte, 64*1024) // 64KB values

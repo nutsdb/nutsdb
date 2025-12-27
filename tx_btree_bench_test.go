@@ -33,7 +33,7 @@ func setupBenchmarkDB(b *testing.B, dir string) *DB {
 	opts.SyncEnable = false              // Disable sync for better performance
 
 	// Clean up directory
-	os.RemoveAll(dir)
+	_ = os.RemoveAll(dir)
 	_ = os.MkdirAll(dir, 0755)
 
 	db, err := Open(opts)
@@ -54,9 +54,9 @@ func setupBenchmarkDB(b *testing.B, dir string) *DB {
 
 func cleanupBenchmarkDB(db *DB, dir string) {
 	if db != nil && !db.IsClose() {
-		db.Close()
+		_ = db.Close()
 	}
-	os.RemoveAll(dir)
+	_ = os.RemoveAll(dir)
 }
 
 // Benchmark Put operations

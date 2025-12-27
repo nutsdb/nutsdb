@@ -24,12 +24,10 @@ func init() {
 }
 
 func createBucket() {
-	if err := db.Update(
+	_ = db.Update(
 		func(tx *nutsdb.Tx) error {
 			return tx.NewBucket(nutsdb.DataStructureBTree, "bucket1")
-		}); err != nil {
-		//log.Fatal(err)
-	}
+		})
 }
 
 func main() {

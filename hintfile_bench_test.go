@@ -121,7 +121,7 @@ func BenchmarkHintFileWrite(b *testing.B) {
 			b.Fatalf("Failed to close hint file: %v", err)
 		}
 
-		os.Remove(hintPath)
+		_ = os.Remove(hintPath)
 	}
 }
 
@@ -131,7 +131,7 @@ func BenchmarkHintFileRead(b *testing.B) {
 	if err != nil {
 		b.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	hintPath := tmpDir + "/test.hint"
 
@@ -203,7 +203,7 @@ func BenchmarkDBStartupWithHintFile(b *testing.B) {
 	if err != nil {
 		b.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	opts := DefaultOptions
 	opts.Dir = tmpDir
@@ -274,7 +274,7 @@ func BenchmarkDBStartupWithoutHintFile(b *testing.B) {
 	if err != nil {
 		b.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	opts := DefaultOptions
 	opts.Dir = tmpDir
@@ -345,7 +345,7 @@ func BenchmarkMergeWithHintFile(b *testing.B) {
 	if err != nil {
 		b.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	opts := DefaultOptions
 	opts.Dir = tmpDir
@@ -403,7 +403,7 @@ func BenchmarkMergeWithoutHintFile(b *testing.B) {
 	if err != nil {
 		b.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	opts := DefaultOptions
 	opts.Dir = tmpDir
@@ -461,7 +461,7 @@ func BenchmarkHintFileLoad(b *testing.B) {
 	if err != nil {
 		b.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	opts := DefaultOptions
 	opts.Dir = tmpDir

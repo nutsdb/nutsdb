@@ -268,7 +268,7 @@ func TestWriteBatchReset_ReplacesTransaction(t *testing.T) {
 	require.NotContains(t, activeIDs, firstTxID, "old transaction must be unregistered on Reset")
 	require.Contains(t, activeIDs, wb.txID, "new transaction must be registered")
 
-	wb.Flush()
+	_ = wb.Flush()
 }
 
 func TestWriteBatch_ConcurrentWithUpdate(t *testing.T) {

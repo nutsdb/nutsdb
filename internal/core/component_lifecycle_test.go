@@ -291,11 +291,12 @@ func TestComponentLifecycle_ConcurrentStart(t *testing.T) {
 	errorCount := 0
 
 	for err := range errors {
-		if err == nil {
+		switch err {
+		case nil:
 			successCount++
-		} else if err == ErrAlreadyStarted {
+		case ErrAlreadyStarted:
 			errorCount++
-		} else {
+		default:
 			t.Errorf("Unexpected error: %v", err)
 		}
 	}

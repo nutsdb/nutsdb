@@ -624,7 +624,7 @@ func TestTx_ListRecoveryAfterRestart(t *testing.T) {
 	key := testutils.GetTestBytes(0)
 
 	dir := filepath.Join(t.TempDir(), "test_nutsdb_list_recovery")
-	defer os.RemoveAll(dir)
+	defer func() { _ = os.RemoveAll(dir) }()
 
 	// Step 1: Create DB and insert data
 	opts := DefaultOptions
@@ -654,7 +654,7 @@ func TestTx_ListRecoveryAfterRestart(t *testing.T) {
 	// Step 3: Reopen DB
 	db, err = Open(opts)
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Step 4: Verify data after recovery
 	txLSize(t, db, bucket, key, 10, nil)
@@ -679,7 +679,7 @@ func TestTx_ListRecoveryWithMixedOperations(t *testing.T) {
 	key := testutils.GetTestBytes(0)
 
 	dir := filepath.Join(t.TempDir(), "test_nutsdb_list_recovery_mixed")
-	defer os.RemoveAll(dir)
+	defer func() { _ = os.RemoveAll(dir) }()
 
 	opts := DefaultOptions
 	opts.Dir = dir
@@ -704,7 +704,7 @@ func TestTx_ListRecoveryWithMixedOperations(t *testing.T) {
 
 	db, err = Open(opts)
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Verify recovered state - should have 7 elements
 	txLSize(t, db, bucket, key, 7, nil)
@@ -719,7 +719,7 @@ func TestTx_ListRecoveryMultipleLists(t *testing.T) {
 	bucket := "list_bucket"
 
 	dir := filepath.Join(t.TempDir(), "test_nutsdb_list_recovery_multiple")
-	defer os.RemoveAll(dir)
+	defer func() { _ = os.RemoveAll(dir) }()
 
 	opts := DefaultOptions
 	opts.Dir = dir
@@ -743,7 +743,7 @@ func TestTx_ListRecoveryMultipleLists(t *testing.T) {
 
 	db, err = Open(opts)
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Verify all lists recovered correctly
 	for listIdx := 0; listIdx < 3; listIdx++ {

@@ -19,7 +19,7 @@ func main() {
 	if err != nil {
 		log.Fatalln("Open nutsdb :", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	bucket := "test_bucket"
 	ds := nutsdb.DataStructureBTree
 	key := "key"

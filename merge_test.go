@@ -671,7 +671,7 @@ func TestDB_MergeWithHintFile(t *testing.T) {
 					require.NoError(t, err)
 					hintEntryCount++
 				}
-				reader.Close()
+				_ = reader.Close()
 
 				totalHintEntryCount += hintEntryCount
 			}
@@ -931,7 +931,7 @@ func TestDB_MergeHintFileDifferentDataStructures(t *testing.T) {
 					zsetCount++
 				}
 			}
-			reader.Close()
+			_ = reader.Close()
 		}
 
 		require.Equal(t, 75, btreeCount)
@@ -1088,7 +1088,7 @@ func TestDB_MergeWithTTLScanner(t *testing.T) {
 
 		db, err := Open(opts)
 		require.NoError(t, err)
-		defer db.Close()
+		defer func() { _ = db.Close() }()
 
 		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
@@ -1121,7 +1121,7 @@ func TestDB_MergeWithTTLScanner(t *testing.T) {
 		require.NoError(t, db.Close())
 		db, err = Open(opts)
 		require.NoError(t, err)
-		defer db.Close()
+		defer func() { _ = db.Close() }()
 		if exist := db.bucketMgr.ExistBucket(DataStructureBTree, bucket); !exist {
 			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 		}
