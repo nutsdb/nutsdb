@@ -268,26 +268,31 @@ func TestDB_ReopenWithDelete(t *testing.T) {
 }
 
 func TestDB_Flock(t *testing.T) {
-	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		db2, err := Open(db.opt)
-		require.Nil(t, db2)
-		require.Equal(t, ErrDirLocked, err)
+	testDir := filepath.Join(t.TempDir(), "testdb_flock")
+	opt := DefaultOptions
+	opt.Dir = testDir
+	db1, err := Open(opt)
+	db2, err := Open(db1.opt)
 
-		err = db.Close()
-		require.NoError(t, err)
+	require.Nil(t, db2)
+	require.Equal(t, ErrDirLocked, err)
 
-		db2, err = Open(db.opt)
-		require.NoError(t, err)
-		require.NotNil(t, db2)
+	err = db1.Close()
+	require.NoError(t, err)
 
-		err = db2.flock.Unlock()
-		require.NoError(t, err)
-		require.False(t, db2.flock.Locked())
+	db2, err = Open(db1.opt)
+	require.NoError(t, err)
+	require.NotNil(t, db2)
 
-		err = db2.Close()
-		require.Error(t, err)
-		require.Equal(t, ErrDirUnlocked, err)
-	})
+	err = db2.flock.Unlock()
+	require.NoError(t, err)
+	require.False(t, db2.flock.Locked())
+
+	err = db2.Close()
+	require.Error(t, err)
+	require.Equal(t, ErrDirUnlocked, err)
+	// must close bucket manager here, otherwise will trigger windows panic
+	db2.bucketManager.Close()
 }
 
 func TestDB_DeleteANonExistKey(t *testing.T) {
