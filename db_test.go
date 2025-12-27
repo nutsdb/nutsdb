@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -826,6 +827,9 @@ func TestDB_GetKeyNotFound(t *testing.T) {
 }
 
 func TestDB_Backup(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip()
+	}
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		backUpDir := filepath.Join(t.TempDir(), "nutsdb-backup")
 		require.NoError(t, db.Backup(backUpDir))
@@ -833,6 +837,9 @@ func TestDB_Backup(t *testing.T) {
 }
 
 func TestDB_BackupTarGZ(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip()
+	}
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		backUpFile := filepath.Join(t.TempDir(), "nutsdb-backup", "backup.tar.gz")
 
