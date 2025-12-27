@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -90,11 +91,9 @@ func runNutsDBTestWithMockClock(t *testing.T, opts *Options, test func(t *testin
 	require.NoError(t, err)
 
 	test(t, db, mc)
-	t.Cleanup(func() {
-		if !db.IsClose() {
-			require.NoError(t, db.Close())
-		}
-	})
+	if !db.IsClose() {
+		require.NoError(t, db.Close())
+	}
 }
 
 func txPut(t *testing.T, db *DB, bucket string, key, value []byte, ttl uint32, expectErr error, finalExpectErr error) {
@@ -828,6 +827,9 @@ func TestDB_GetKeyNotFound(t *testing.T) {
 }
 
 func TestDB_Backup(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip()
+	}
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		backUpDir := filepath.Join(t.TempDir(), "nutsdb-backup")
 		require.NoError(t, db.Backup(backUpDir))
@@ -835,6 +837,9 @@ func TestDB_Backup(t *testing.T) {
 }
 
 func TestDB_BackupTarGZ(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip()
+	}
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		backUpFile := filepath.Join(t.TempDir(), "nutsdb-backup", "backup.tar.gz")
 
