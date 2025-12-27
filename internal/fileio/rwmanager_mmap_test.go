@@ -229,7 +229,10 @@ func (s *rwMgrMMapTestSuite) TestRWManager_MMap_ReadAt_ErrIndexOutOfBound() {
 
 func (s *rwMgrMMapTestSuite) TestRWManager_MMap_Sync() {
 	t := s.T()
+	r := require.New(t)
 	filePath := filepath.Join(t.TempDir(), t.Name())
+	err := os.MkdirAll(filepath.Dir(filePath), os.ModePerm)
+	r.NoError(err)
 	maxFdNums := 1024
 	cleanThreshold := 0.5
 	var fdm = fileio.NewFdm(maxFdNums, cleanThreshold)
@@ -261,7 +264,10 @@ func (s *rwMgrMMapTestSuite) TestRWManager_MMap_Sync() {
 
 func (s *rwMgrMMapTestSuite) TestRWManager_MMap_Close() {
 	t := s.T()
+	r := require.New(t)
 	filePath := filepath.Join(t.TempDir(), t.Name())
+	err := os.MkdirAll(filepath.Dir(filePath), os.ModePerm)
+	r.NoError(err)
 	maxFdNums := 1024
 	cleanThreshold := 0.5
 	var fdm = fileio.NewFdm(maxFdNums, cleanThreshold)
