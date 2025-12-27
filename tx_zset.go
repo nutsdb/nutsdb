@@ -56,7 +56,7 @@ func (tx *Tx) ZMembers(bucket string, key []byte) (map[*SortedSetMember]struct{}
 		return nil, err
 	}
 
-	b, err := tx.db.bucketManager.GetBucket(DataStructureSortedSet, bucket)
+	b, err := tx.db.bucketMgr.GetBucket(DataStructureSortedSet, bucket)
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +97,7 @@ func (tx *Tx) ZCard(bucket string, key []byte) (int, error) {
 		return 0, err
 	}
 
-	b, err := tx.db.bucketManager.GetBucket(DataStructureSortedSet, bucket)
+	b, err := tx.db.bucketMgr.GetBucket(DataStructureSortedSet, bucket)
 	if err != nil {
 		return 0, err
 	}
@@ -125,7 +125,7 @@ func (tx *Tx) ZCount(bucket string, key []byte, start, end float64, opts *GetByS
 		return 0, err
 	}
 
-	b, err := tx.db.bucketManager.GetBucket(DataStructureSortedSet, bucket)
+	b, err := tx.db.bucketMgr.GetBucket(DataStructureSortedSet, bucket)
 	if err != nil {
 		return 0, err
 	}
@@ -149,7 +149,7 @@ func (tx *Tx) ZPopMax(bucket string, key []byte) (*SortedSetMember, error) {
 		return nil, err
 	}
 
-	b, err := tx.db.bucketManager.GetBucket(DataStructureSortedSet, bucket)
+	b, err := tx.db.bucketMgr.GetBucket(DataStructureSortedSet, bucket)
 	if err != nil {
 		return nil, err
 	}
@@ -183,7 +183,7 @@ func (tx *Tx) ZPopMin(bucket string, key []byte) (*SortedSetMember, error) {
 		return nil, err
 	}
 
-	b, err := tx.db.bucketManager.GetBucket(DataStructureSortedSet, bucket)
+	b, err := tx.db.bucketMgr.GetBucket(DataStructureSortedSet, bucket)
 	if err != nil {
 		return nil, err
 	}
@@ -217,7 +217,7 @@ func (tx *Tx) ZPeekMax(bucket string, key []byte) (*SortedSetMember, error) {
 		return nil, err
 	}
 
-	b, err := tx.db.bucketManager.GetBucket(DataStructureSortedSet, bucket)
+	b, err := tx.db.bucketMgr.GetBucket(DataStructureSortedSet, bucket)
 	if err != nil {
 		return nil, err
 	}
@@ -251,7 +251,7 @@ func (tx *Tx) ZPeekMin(bucket string, key []byte) (*SortedSetMember, error) {
 		return nil, err
 	}
 
-	b, err := tx.db.bucketManager.GetBucket(DataStructureSortedSet, bucket)
+	b, err := tx.db.bucketMgr.GetBucket(DataStructureSortedSet, bucket)
 	if err != nil {
 		return nil, err
 	}
@@ -286,7 +286,7 @@ func (tx *Tx) ZRangeByScore(bucket string, key []byte, start, end float64, opts 
 		return nil, err
 	}
 
-	b, err := tx.db.bucketManager.GetBucket(DataStructureSortedSet, bucket)
+	b, err := tx.db.bucketMgr.GetBucket(DataStructureSortedSet, bucket)
 	if err != nil {
 		return nil, err
 	}
@@ -325,7 +325,7 @@ func (tx *Tx) ZRangeByRank(bucket string, key []byte, start, end int) ([]*Sorted
 		return nil, err
 	}
 
-	b, err := tx.db.bucketManager.GetBucket(DataStructureSortedSet, bucket)
+	b, err := tx.db.bucketMgr.GetBucket(DataStructureSortedSet, bucket)
 	if err != nil {
 		return nil, err
 	}
@@ -363,7 +363,7 @@ func (tx *Tx) ZRem(bucket string, key []byte, value []byte) error {
 		return err
 	}
 
-	b, err := tx.db.bucketManager.GetBucket(DataStructureSortedSet, bucket)
+	b, err := tx.db.bucketMgr.GetBucket(DataStructureSortedSet, bucket)
 	if err != nil {
 		return err
 	}
@@ -408,7 +408,7 @@ func (tx *Tx) ZRank(bucket string, key, value []byte) (int, error) {
 		return 0, err
 	}
 
-	b, err := tx.db.bucketManager.GetBucket(DataStructureSortedSet, bucket)
+	b, err := tx.db.bucketMgr.GetBucket(DataStructureSortedSet, bucket)
 	if err != nil {
 		return 0, err
 	}
@@ -432,7 +432,7 @@ func (tx *Tx) ZRevRank(bucket string, key, value []byte) (int, error) {
 		return 0, err
 	}
 
-	b, err := tx.db.bucketManager.GetBucket(DataStructureSortedSet, bucket)
+	b, err := tx.db.bucketMgr.GetBucket(DataStructureSortedSet, bucket)
 	if err != nil {
 		return 0, err
 	}
@@ -456,7 +456,7 @@ func (tx *Tx) ZScore(bucket string, key, value []byte) (float64, error) {
 		return 0, err
 	}
 
-	b, err := tx.db.bucketManager.GetBucket(DataStructureSortedSet, bucket)
+	b, err := tx.db.bucketMgr.GetBucket(DataStructureSortedSet, bucket)
 	if err != nil {
 		return 0.0, err
 	}
@@ -480,7 +480,7 @@ func (tx *Tx) ZKeys(bucket, pattern string, f func(key string) bool) error {
 		return err
 	}
 
-	b, err := tx.db.bucketManager.GetBucket(DataStructureSortedSet, bucket)
+	b, err := tx.db.bucketMgr.GetBucket(DataStructureSortedSet, bucket)
 	if err != nil {
 		return err
 	}
@@ -508,7 +508,7 @@ func (tx *Tx) ZCheck(bucket string) error {
 		return err
 	}
 
-	b, err := tx.db.bucketManager.GetBucket(DataStructureSortedSet, bucket)
+	b, err := tx.db.bucketMgr.GetBucket(DataStructureSortedSet, bucket)
 	if err != nil {
 		return err
 	}

@@ -24,12 +24,10 @@ func main() {
 	for i := 1; i <= 10; i++ {
 		bucket := "bucket_" + fmt.Sprintf("%03d", i)
 
-		if err := db.Update(
+		_ = db.Update(
 			func(tx *nutsdb.Tx) error {
 				return tx.NewBucket(nutsdb.DataStructureBTree, bucket)
-			}); err != nil {
-			//log.Fatal(err)
-		}
+			})
 
 		if err := db.Update(
 			func(tx *nutsdb.Tx) error {

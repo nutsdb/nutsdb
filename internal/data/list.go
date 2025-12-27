@@ -501,11 +501,11 @@ func (l *List) ExpireList(key []byte, ttl uint32) {
 }
 
 func (l *List) GeneratePushKey(key []byte, isLeft bool) []byte {
-	// 获取或创建HeadTailSeq
+	// Retrieve or initialize the HeadTailSeq for the list
 	keyStr := string(key)
 	seq, ok := l.Seq[keyStr]
 	if !ok {
-		// 如果不存在，先尝试从现有项推断
+		// If no seq entry exists, infer boundaries from existing items first
 		if items, exists := l.Items[keyStr]; exists && items.Count() > 0 {
 			minSeq, okMinSeq := items.Min()
 			maxSeq, okMaxSeq := items.Max()

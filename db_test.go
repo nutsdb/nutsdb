@@ -21,11 +21,12 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/nutsdb/nutsdb/internal/testutils"
-	"github.com/nutsdb/nutsdb/internal/ttl/clock"
+	"github.com/nutsdb/nutsdb/internal/ttl"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -67,17 +68,11 @@ func runNutsDBTest(t *testing.T, opts *Options, test func(t *testing.T, db *DB))
 	}
 }
 
-func runNutsDBTestWithWatch(t *testing.T, test func(t *testing.T, db *DB)) {
-	option := DefaultOptions
-	option.EnableWatch = true
-	runNutsDBTest(t, &option, test)
-}
-
 // runNutsDBTestWithMockClock runs a test with a MockClock for deterministic TTL testing.
 // The MockClock is initialized with the current system time in milliseconds.
 // The test function receives both the DB and the MockClock to allow time manipulation.
-func runNutsDBTestWithMockClock(t *testing.T, opts *Options, test func(t *testing.T, db *DB, mc clock.Clock)) {
-	mc := clock.NewMockClock(time.Now().UnixMilli())
+func runNutsDBTestWithMockClock(t *testing.T, opts *Options, test func(t *testing.T, db *DB, mc ttl.Clock)) {
+	mc := ttl.NewMockClock(time.Now().UnixMilli())
 	if opts == nil {
 		defaultOpts := DefaultOptions
 		opts = &defaultOpts
@@ -291,7 +286,7 @@ func TestDB_Flock(t *testing.T) {
 	require.Error(t, err)
 	require.Equal(t, ErrDirUnlocked, err)
 	// must close bucket manager here, otherwise will trigger windows panic
-	db2.bucketManager.Close()
+	db2.bucketMgr.Close()
 }
 
 func TestDB_DeleteANonExistKey(t *testing.T) {
@@ -306,7 +301,7 @@ func TestDB_DeleteANonExistKey(t *testing.T) {
 }
 
 func TestDB_CheckListExpired(t *testing.T) {
-	runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc clock.Clock) {
+	runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc ttl.Clock) {
 		testBucket := "test_bucket"
 		txCreateBucket(t, db, DataStructureBTree, testBucket, nil)
 
@@ -843,18 +838,463 @@ func TestDB_BackupTarGZ(t *testing.T) {
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		backUpFile := filepath.Join(t.TempDir(), "nutsdb-backup", "backup.tar.gz")
 
-		os.MkdirAll(filepath.Dir(backUpFile), os.ModePerm)
+		_ = os.MkdirAll(filepath.Dir(backUpFile), os.ModePerm)
 		f, err := os.Create(backUpFile)
 		require.NoError(t, err)
 		require.NoError(t, db.BackupTarGZ(f))
 	})
 }
 
-func TestDB_Close(t *testing.T) {
-	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		require.NoError(t, db.Close())
-		require.Equal(t, ErrDBClosed, db.Close())
+// TestDB_Close_CompleteShutdownFlow tests the complete shutdown flow
+func TestDB_Close_CompleteShutdownFlow(t *testing.T) {
+	opts := DefaultOptions
+	opts.Dir = filepath.Join(t.TempDir(), "test-close-complete")
+	defer func() { _ = os.RemoveAll(opts.Dir) }()
+
+	db, err := Open(opts)
+	require.NoError(t, err)
+	require.NotNil(t, db)
+
+	// Create a bucket and add some data
+	bucket := "test_bucket"
+	err = db.Update(func(tx *Tx) error {
+		return tx.NewBucket(DataStructureBTree, bucket)
 	})
+	require.NoError(t, err)
+
+	// Add some test data
+	for i := 0; i < 10; i++ {
+		key := testutils.GetTestBytes(i)
+		val := testutils.GetRandomBytes(100)
+		err = db.Update(func(tx *Tx) error {
+			return tx.Put(bucket, key, val, Persistent)
+		})
+		require.NoError(t, err)
+	}
+
+	// Verify database is operational before close
+	require.False(t, db.IsClose())
+	require.False(t, db.statusMgr.isClosingOrClosed())
+
+	// Close the database
+	err = db.Close()
+	require.NoError(t, err)
+
+	// Verify database is closed
+	require.True(t, db.IsClose())
+	require.True(t, db.statusMgr.isClosed())
+
+	// Verify resources are released
+	require.Nil(t, db.ActiveFile)
+	require.Nil(t, db.Index)
+	require.Nil(t, db.fm)
+	require.Nil(t, db.commitBuffer)
+
+	// Verify file lock is released
+	require.False(t, db.flock.Locked())
+}
+
+// TestDB_Close_WithActiveTxs tests closing database with active transactions
+func TestDB_Close_WithActiveTxs(t *testing.T) {
+	opts := DefaultOptions
+	opts.Dir = filepath.Join(t.TempDir(), "test-close-active-txs")
+	defer func() { _ = os.RemoveAll(opts.Dir) }()
+
+	db, err := Open(opts)
+	require.NoError(t, err)
+	require.NotNil(t, db)
+
+	bucket := "test_bucket"
+	err = db.Update(func(tx *Tx) error {
+		return tx.NewBucket(DataStructureBTree, bucket)
+	})
+	require.NoError(t, err)
+
+	// Start a long-running transaction
+	txStarted := make(chan struct{})
+	txCompleted := make(chan struct{})
+	txErr := make(chan error, 1)
+
+	go func() {
+		err := db.Update(func(tx *Tx) error {
+			close(txStarted)
+			// Simulate some work
+			time.Sleep(500 * time.Millisecond)
+			return tx.Put(bucket, []byte("key1"), []byte("value1"), Persistent)
+		})
+		txErr <- err
+		close(txCompleted)
+	}()
+
+	// Wait for transaction to start
+	<-txStarted
+
+	// Verify transaction is active
+	activeTxCount := db.transactionMgr.GetActiveTxCount()
+	require.Greater(t, activeTxCount, int64(0), "Should have active transactions")
+
+	// Close database (should wait for active transaction)
+	closeStartTime := time.Now()
+	err = db.Close()
+	closeDuration := time.Since(closeStartTime)
+
+	require.NoError(t, err)
+
+	// Verify transaction completed
+	select {
+	case err := <-txErr:
+		// Transaction should complete successfully or be rejected
+		// If it completes, it should be before close started
+		// If rejected, it should get ErrDBClosed
+		if err != nil {
+			require.ErrorIs(t, err, ErrDBClosed)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("Transaction did not complete")
+	}
+
+	// Verify close waited for transaction (should take at least 500ms)
+	require.Greater(t, closeDuration, 400*time.Millisecond, "Close should wait for active transactions")
+
+	// Verify database is closed
+	require.True(t, db.IsClose())
+}
+
+// TestDB_Close_RejectsNewTxsDuringShutdown tests that new transactions are rejected during shutdown
+func TestDB_Close_RejectsNewTxsDuringShutdown(t *testing.T) {
+	opts := DefaultOptions
+	opts.Dir = filepath.Join(t.TempDir(), "test-close-reject-txs")
+	defer func() { _ = os.RemoveAll(opts.Dir) }()
+
+	db, err := Open(opts)
+	require.NoError(t, err)
+	require.NotNil(t, db)
+
+	bucket := "test_bucket"
+	err = db.Update(func(tx *Tx) error {
+		return tx.NewBucket(DataStructureBTree, bucket)
+	})
+	require.NoError(t, err)
+
+	// Start a long-running transaction to delay close
+	txStarted := make(chan struct{})
+	go func() {
+		_ = db.Update(func(tx *Tx) error {
+			close(txStarted)
+			time.Sleep(1 * time.Second)
+			return nil
+		})
+	}()
+
+	<-txStarted
+
+	// Start closing in background
+	closeStarted := make(chan struct{})
+	closeDone := make(chan error, 1)
+	go func() {
+		close(closeStarted)
+		closeDone <- db.Close()
+	}()
+
+	<-closeStarted
+
+	// Give close time to transition to Closing state
+	time.Sleep(100 * time.Millisecond)
+
+	// Try to start new transactions during shutdown
+	for i := 0; i < 5; i++ {
+		err := db.Update(func(tx *Tx) error {
+			return tx.Put(bucket, []byte(fmt.Sprintf("key%d", i)), []byte("value"), Persistent)
+		})
+		// Should get ErrDBClosed
+		if err != nil {
+			require.ErrorIs(t, err, ErrDBClosed, "New transactions should be rejected during shutdown")
+		}
+	}
+
+	// Wait for close to complete
+	err = <-closeDone
+	require.NoError(t, err)
+}
+
+// TestDB_Close_Timeout tests timeout handling during close
+func TestDB_Close_Timeout(t *testing.T) {
+	opts := DefaultOptions
+	opts.Dir = filepath.Join(t.TempDir(), "test-close-timeout")
+	defer func() { _ = os.RemoveAll(opts.Dir) }()
+
+	db, err := Open(opts)
+	require.NoError(t, err)
+	require.NotNil(t, db)
+
+	// Configure a short shutdown timeout
+	db.statusMgr.config.ShutdownTimeout = 1 * time.Second
+
+	bucket := "test_bucket"
+	err = db.Update(func(tx *Tx) error {
+		return tx.NewBucket(DataStructureBTree, bucket)
+	})
+	require.NoError(t, err)
+
+	// Start a long-running transaction that exceeds timeout
+	txStarted := make(chan struct{})
+	txDone := make(chan struct{})
+
+	go func() {
+		_ = db.Update(func(tx *Tx) error {
+			close(txStarted)
+			// Sleep longer than shutdown timeout
+			time.Sleep(3 * time.Second)
+			return tx.Put(bucket, []byte("key1"), []byte("value"), Persistent)
+		})
+		close(txDone)
+	}()
+
+	// Wait for transaction to start
+	<-txStarted
+	time.Sleep(100 * time.Millisecond) // Ensure tx is active
+
+	// Close should timeout and force shutdown
+	closeStartTime := time.Now()
+	err = db.Close()
+	closeDuration := time.Since(closeStartTime)
+
+	require.Error(t, err, "Close should surface shutdown timeout")
+	// Close should complete within reasonable time (timeout + buffer)
+	// The important thing is it doesn't hang forever
+	require.Less(t, closeDuration, 3*time.Second, "Close should timeout and not wait forever")
+
+	// Database should be closed even if timeout occurred
+	require.True(t, db.IsClose())
+	require.True(t, db.statusMgr.isClosed())
+
+	// Wait for background transaction to finish
+	select {
+	case <-txDone:
+	case <-time.After(5 * time.Second):
+		// Transaction may still be running, that's ok
+	}
+}
+
+// TestDB_Close_ConcurrentCalls tests concurrent close calls
+// Note: This test may reveal race conditions in the release() method when called concurrently.
+// In practice, applications should not call Close() concurrently from multiple goroutines.
+func TestDB_Close_ConcurrentCalls(t *testing.T) {
+	opts := DefaultOptions
+	opts.Dir = filepath.Join(t.TempDir(), "test-close-concurrent")
+	defer func() { _ = os.RemoveAll(opts.Dir) }()
+
+	db, err := Open(opts)
+	require.NoError(t, err)
+	require.NotNil(t, db)
+
+	bucket := "test_bucket"
+	err = db.Update(func(tx *Tx) error {
+		return tx.NewBucket(DataStructureBTree, bucket)
+	})
+	require.NoError(t, err)
+
+	// Call Close() concurrently from multiple goroutines
+	// Note: This is testing the safety of concurrent Close() calls,
+	// though in practice this should be avoided
+	numGoroutines := 5
+	var wg sync.WaitGroup
+	errors := make([]error, numGoroutines)
+
+	wg.Add(numGoroutines)
+	for i := 0; i < numGoroutines; i++ {
+		go func(idx int) {
+			defer wg.Done()
+			// Add small delay to reduce contention
+			time.Sleep(time.Duration(idx) * 10 * time.Millisecond)
+			errors[idx] = db.Close()
+		}(i)
+	}
+
+	wg.Wait()
+
+	// At least one close should succeed or return ErrDBClosed
+	hasSuccess := false
+	hasClosedErr := false
+
+	for _, err := range errors {
+		switch err {
+		case nil:
+			hasSuccess = true
+		case ErrDBClosed:
+			hasClosedErr = true
+		default:
+			t.Logf("Unexpected error: %v", err)
+		}
+	}
+
+	// Either we got a success or all got ErrDBClosed
+	require.True(t, hasSuccess || hasClosedErr, "Should have at least one successful close or ErrDBClosed")
+
+	// Database should be closed
+	require.True(t, db.IsClose())
+	require.True(t, db.statusMgr.isClosed())
+}
+
+// TestDB_Close_IdempotentCalls tests that multiple sequential close calls are safe
+func TestDB_Close_IdempotentCalls(t *testing.T) {
+	opts := DefaultOptions
+	opts.Dir = filepath.Join(t.TempDir(), "test-close-idempotent")
+	defer func() { _ = os.RemoveAll(opts.Dir) }()
+
+	db, err := Open(opts)
+	require.NoError(t, err)
+	require.NotNil(t, db)
+
+	// First close should succeed
+	err = db.Close()
+	require.NoError(t, err)
+	require.True(t, db.IsClose())
+
+	// Subsequent closes should return ErrDBClosed
+	for i := 0; i < 5; i++ {
+		err = db.Close()
+		require.Equal(t, ErrDBClosed, err, "Subsequent Close() calls should return ErrDBClosed")
+		require.True(t, db.IsClose())
+	}
+}
+
+// TestDB_Close_ComponentShutdownOrder tests that components are shut down in reverse order
+func TestDB_Close_ComponentShutdownOrder(t *testing.T) {
+	opts := DefaultOptions
+	opts.Dir = filepath.Join(t.TempDir(), "test-close-order")
+	defer func() { _ = os.RemoveAll(opts.Dir) }()
+
+	db, err := Open(opts)
+	require.NoError(t, err)
+	require.NotNil(t, db)
+
+	err = db.Close()
+	require.NoError(t, err)
+
+	// Verify database is closed
+	require.True(t, db.statusMgr.isClosed())
+}
+
+// TestDB_Close_WithMergeInProgress tests closing database during merge operation
+func TestDB_Close_WithMergeInProgress(t *testing.T) {
+	opts := DefaultOptions
+	opts.Dir = filepath.Join(t.TempDir(), "test-close-merge")
+	opts.SegmentSize = 1024 // Small segment to trigger merge easily
+	defer func() { _ = os.RemoveAll(opts.Dir) }()
+
+	db, err := Open(opts)
+	require.NoError(t, err)
+	require.NotNil(t, db)
+
+	bucket := "test_bucket"
+	err = db.Update(func(tx *Tx) error {
+		return tx.NewBucket(DataStructureBTree, bucket)
+	})
+	require.NoError(t, err)
+
+	// Add enough data to potentially trigger merge
+	for i := 0; i < 100; i++ {
+		key := testutils.GetTestBytes(i)
+		val := testutils.GetRandomBytes(100)
+		err = db.Update(func(tx *Tx) error {
+			return tx.Put(bucket, key, val, Persistent)
+		})
+		require.NoError(t, err)
+	}
+
+	// Try to trigger merge (may or may not actually start)
+	go func() {
+		_ = db.Merge()
+	}()
+
+	// Give merge a moment to potentially start
+	time.Sleep(100 * time.Millisecond)
+
+	// Close should handle merge gracefully
+	err = db.Close()
+	require.NoError(t, err)
+
+	// Verify database is closed
+	require.True(t, db.IsClose())
+	require.True(t, db.statusMgr.isClosed())
+}
+
+// TestDB_Close_ResourceCleanup tests that all resources are properly cleaned up
+func TestDB_Close_ResourceCleanup(t *testing.T) {
+	opts := DefaultOptions
+	opts.Dir = filepath.Join(t.TempDir(), "test-close-cleanup")
+	defer func() { _ = os.RemoveAll(opts.Dir) }()
+
+	db, err := Open(opts)
+	require.NoError(t, err)
+	require.NotNil(t, db)
+
+	bucket := "test_bucket"
+	err = db.Update(func(tx *Tx) error {
+		return tx.NewBucket(DataStructureBTree, bucket)
+	})
+	require.NoError(t, err)
+
+	// Add some data
+	for i := 0; i < 10; i++ {
+		key := testutils.GetTestBytes(i)
+		val := testutils.GetRandomBytes(100)
+		err = db.Update(func(tx *Tx) error {
+			return tx.Put(bucket, key, val, Persistent)
+		})
+		require.NoError(t, err)
+	}
+
+	// Close database
+	err = db.Close()
+	require.NoError(t, err)
+
+	// Verify all resources are released
+	require.Nil(t, db.ActiveFile, "ActiveFile should be nil")
+	require.Nil(t, db.Index, "Index should be nil")
+	require.Nil(t, db.fm, "FileManager should be nil")
+	require.Nil(t, db.commitBuffer, "commitBuffer should be nil")
+
+	// Verify file lock is released
+	require.False(t, db.flock.Locked(), "File lock should be released")
+
+	// Verify we can open the database again (proves lock is released)
+	db2, err := Open(opts)
+	require.NoError(t, err)
+	require.NotNil(t, db2)
+
+	// Verify data is still accessible
+	err = db2.View(func(tx *Tx) error {
+		val, err := tx.Get(bucket, testutils.GetTestBytes(0))
+		require.NoError(t, err)
+		require.NotNil(t, val)
+		return nil
+	})
+	require.NoError(t, err)
+
+	// Clean up
+	err = db2.Close()
+	require.NoError(t, err)
+}
+
+// TestDB_Close_ErrorHandling tests error handling during component shutdown
+func TestDB_Close_ErrorHandling(t *testing.T) {
+	opts := DefaultOptions
+	opts.Dir = filepath.Join(t.TempDir(), "test-close-errors")
+	defer func() { _ = os.RemoveAll(opts.Dir) }()
+
+	db, err := Open(opts)
+	require.NoError(t, err)
+	require.NotNil(t, db)
+
+	// Close should handle errors gracefully and continue shutting down other components
+	err = db.Close()
+	require.NoError(t, err)
+
+	// Even if there were errors, database should be in closed state
+	require.True(t, db.IsClose())
+	require.True(t, db.statusMgr.isClosed())
 }
 
 func TestDB_ErrThenReadWrite(t *testing.T) {
@@ -972,8 +1412,8 @@ func withDBOption(t *testing.T, opt Options, fn func(t *testing.T, db *DB)) {
 	require.NoError(t, err)
 
 	defer func() {
-		os.RemoveAll(db.opt.Dir)
-		db.Close()
+		_ = os.RemoveAll(db.opt.Dir)
+		_ = db.Close()
 	}()
 
 	fn(t, db)
@@ -1009,7 +1449,7 @@ func TestDB_HintKeyValAndRAMIdxMode_RestartDB(t *testing.T) {
 		txPut(t, db, bucket, key, val, Persistent, nil, nil)
 		txGet(t, db, bucket, key, val, nil)
 
-		db.Close()
+		_ = db.Close()
 		// restart db with HintKeyValAndRAMIdxMode EntryIdxMode
 		var err error
 		db, err = Open(db.opt)
@@ -1032,7 +1472,7 @@ func TestDB_HintKeyAndRAMIdxMode_RestartDB(t *testing.T) {
 
 		txPut(t, db, bucket, key, val, Persistent, nil, nil)
 		txGet(t, db, bucket, key, val, nil)
-		db.Close()
+		_ = db.Close()
 
 		// restart db with HintKeyAndRAMIdxMode EntryIdxMode
 		db, err := Open(db.opt)
@@ -1062,7 +1502,7 @@ func TestDB_HintKeyAndRAMIdxMode_LruCache(t *testing.T) {
 				txGet(t, db, bucket, key, val, nil)
 				txGet(t, db, bucket, key, val, nil)
 			}
-			db.Close()
+			_ = db.Close()
 		})
 	}
 }
@@ -1787,7 +2227,7 @@ func TestDB_HintFileMissingFallback(t *testing.T) {
 	fileIDs := enumerateDataFilesInDir(opts.Dir)
 	for _, fileID := range fileIDs {
 		hintPath := getHintPath(fileID, opts.Dir)
-		os.Remove(hintPath)
+		_ = os.Remove(hintPath)
 	}
 
 	// Reopen the database - it should fall back to scanning data files

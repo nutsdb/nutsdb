@@ -18,7 +18,7 @@ func TestFdManager_All(t *testing.T) {
 	testBasePath := filepath.Join(dir, "data-")
 	err := os.Mkdir(dir, os.ModePerm)
 	assert.Nil(t, err)
-	defer os.RemoveAll(dir)
+	defer func() { _ = os.RemoveAll(dir) }()
 
 	startFdNums := 1
 	maxFdNums := 20

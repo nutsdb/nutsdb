@@ -41,10 +41,11 @@ func init() {
 
 func TestDataFile_Err(t *testing.T) {
 	fm := NewFileManager(MMap, 1024, 0.5, 256*MB)
-	defer fm.Close()
+	defer func() { _ = fm.Close() }()
 	_, err := fm.GetDataFile(filePath, -1)
 	defer func() {
-		os.Remove(filePath)
+		_ = fm.Close()
+		_ = os.Remove(filePath)
 	}()
 
 	assert.NotNil(t, err)
@@ -52,9 +53,9 @@ func TestDataFile_Err(t *testing.T) {
 
 func TestDataFile1(t *testing.T) {
 	fm := NewFileManager(MMap, 1024, 0.5, 256*MB)
-	defer fm.Close()
+	defer func() { _ = fm.Close() }()
 	df, err := fm.GetDataFile(filePath, 1024)
-	defer os.Remove(filePath)
+	defer func() { _ = os.Remove(filePath) }()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +87,7 @@ func TestDataFile2(t *testing.T) {
 	filePath2 := filepath.Join(tmpdir, "foo2")
 	df, err := fm.GetDataFile(filePath2, 64)
 	assert.Nil(t, err)
-	defer os.Remove(filePath2)
+	defer func() { _ = os.Remove(filePath2) }()
 	headerSize := entry.Meta.Size()
 	content := entry.Encode()[0 : headerSize-1]
 	_, err = df.WriteAt(content, 0)
@@ -103,7 +104,7 @@ func TestDataFile2(t *testing.T) {
 	filePath3 := filepath.Join(tmpdir, "foo3")
 
 	df2, err := fm.GetDataFile(filePath3, 64)
-	defer os.Remove(filePath3)
+	defer func() { _ = os.Remove(filePath3) }()
 	assert.Nil(t, err)
 
 	headerSize = entry.Meta.Size()
@@ -154,7 +155,7 @@ func TestDataFile_ReadRecord(t *testing.T) {
 
 func TestDataFile_Err_Path(t *testing.T) {
 	fm := NewFileManager(FileIO, 1024, 0.5, 256*MB)
-	defer fm.Close()
+	defer func() { _ = fm.Close() }()
 	filePath5 := ":/tmp/foo5"
 	df, err := fm.GetDataFile(filePath5, entry.Size())
 	if err == nil && df != nil {
@@ -202,6 +203,6 @@ func TestFileManager1(t *testing.T) {
 		assert.Nil(t, err)
 		err = fm.Close()
 		assert.Nil(t, err)
-		os.Remove(filePath)
+		_ = os.Remove(filePath)
 	}()
 }

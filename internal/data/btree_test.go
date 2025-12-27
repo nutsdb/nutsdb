@@ -15,14 +15,14 @@
 package data
 
 import (
+	"bytes"
 	"fmt"
 	"testing"
 	"time"
 
 	"github.com/nutsdb/nutsdb/internal/core"
 	"github.com/nutsdb/nutsdb/internal/testutils"
-	"github.com/nutsdb/nutsdb/internal/ttl/checker"
-	"github.com/nutsdb/nutsdb/internal/ttl/clock"
+	"github.com/nutsdb/nutsdb/internal/ttl"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -225,8 +225,8 @@ func createTestRecord(key string, ttlVal uint32, timestamp uint64) *core.Record 
 }
 
 func TestBTree_TTL_Find(t *testing.T) {
-	mockClock := clock.NewMockClock(1000000) // Current time: 1000 seconds in millis
-	checker := checker.NewChecker(mockClock)
+	mockClock := ttl.NewMockClock(1000000) // Current time: 1000 seconds in millis
+	checker := ttl.NewChecker(mockClock)
 	btree := NewBTree(1, checker) // bucketId 1 for test
 
 	// Insert a record that is not expired (TTL 100s, timestamp 999000ms = 999s)
@@ -269,8 +269,8 @@ func TestBTree_TTL_Find(t *testing.T) {
 }
 
 func TestBTree_TTL_All(t *testing.T) {
-	mockClock := clock.NewMockClock(1000000)
-	checker := checker.NewChecker(mockClock)
+	mockClock := ttl.NewMockClock(1000000)
+	checker := ttl.NewChecker(mockClock)
 	btree := NewBTree(1, checker) // bucketId 1 for test
 
 	// Insert mix of valid and expired records
@@ -301,8 +301,8 @@ func TestBTree_TTL_All(t *testing.T) {
 }
 
 func TestBTree_TTL_Range(t *testing.T) {
-	mockClock := clock.NewMockClock(1000000)
-	checker := checker.NewChecker(mockClock)
+	mockClock := ttl.NewMockClock(1000000)
+	checker := ttl.NewChecker(mockClock)
 	btree := NewBTree(1, checker) // bucketId 1 for test
 
 	// Insert records
@@ -327,8 +327,8 @@ func TestBTree_TTL_Range(t *testing.T) {
 }
 
 func TestBTree_TTL_PrefixScan(t *testing.T) {
-	mockClock := clock.NewMockClock(1000000)
-	checker := checker.NewChecker(mockClock)
+	mockClock := ttl.NewMockClock(1000000)
+	checker := ttl.NewChecker(mockClock)
 	btree := NewBTree(1, checker) // bucketId 1 for test
 
 	// Insert records with prefix
@@ -366,8 +366,8 @@ func TestBTree_TTL_PrefixScan(t *testing.T) {
 }
 
 func TestBTree_TTL_MinMax(t *testing.T) {
-	mockClock := clock.NewMockClock(1000000)
-	checker := checker.NewChecker(mockClock)
+	mockClock := ttl.NewMockClock(1000000)
+	checker := ttl.NewChecker(mockClock)
 	btree := NewBTree(1, checker) // bucketId 1 for test
 
 	// Insert records where min and max are expired
@@ -401,8 +401,8 @@ func TestBTree_TTL_MinMax(t *testing.T) {
 }
 
 func TestBTree_TTL_PopMinMax(t *testing.T) {
-	mockClock := clock.NewMockClock(1000000)
-	checker := checker.NewChecker(mockClock)
+	mockClock := ttl.NewMockClock(1000000)
+	checker := ttl.NewChecker(mockClock)
 	btree := NewBTree(1, checker) // bucketId 1 for test
 
 	// Insert records where min is expired
@@ -429,8 +429,8 @@ func TestBTree_TTL_PopMinMax(t *testing.T) {
 }
 
 func TestBTree_TTL_AllItems(t *testing.T) {
-	mockClock := clock.NewMockClock(1000000)
-	checker := checker.NewChecker(mockClock)
+	mockClock := ttl.NewMockClock(1000000)
+	checker := ttl.NewChecker(mockClock)
 	btree := NewBTree(1, checker) // bucketId 1 for test
 
 	// Insert mix of valid and expired records
@@ -445,8 +445,8 @@ func TestBTree_TTL_AllItems(t *testing.T) {
 }
 
 func TestBTree_TTL_TimeAdvancement(t *testing.T) {
-	mockClock := clock.NewMockClock(1000000) // Start at 1000 seconds
-	checker := checker.NewChecker(mockClock)
+	mockClock := ttl.NewMockClock(1000000) // Start at 1000 seconds
+	checker := ttl.NewChecker(mockClock)
 	btree := NewBTree(1, checker) // bucketId 1 for test
 
 	// Insert a record with TTL 100s, timestamp 1000000ms (current time)
@@ -469,8 +469,8 @@ func TestBTree_TTL_TimeAdvancement(t *testing.T) {
 }
 
 func TestBTree_GetTTL(t *testing.T) {
-	mockClock := clock.NewMockClock(1000000)            // Current time: 1000 seconds in millis
-	btree := NewBTree(1, checker.NewChecker(mockClock)) // bucketId 1 for test
+	mockClock := ttl.NewMockClock(1000000)            // Current time: 1000 seconds in millis
+	btree := NewBTree(1, ttl.NewChecker(mockClock)) // bucketId 1 for test
 
 	t.Run("get TTL for valid record", func(t *testing.T) {
 		// Insert a record with TTL 100s, timestamp 1000000ms (current time)
@@ -541,8 +541,8 @@ func TestBTree_GetTTL(t *testing.T) {
 }
 
 func TestBTree_IsExpiredKey(t *testing.T) {
-	mockClock := clock.NewMockClock(1000000) // Current time: 1000 seconds in millis
-	checker := checker.NewChecker(mockClock)
+	mockClock := ttl.NewMockClock(1000000) // Current time: 1000 seconds in millis
+	checker := ttl.NewChecker(mockClock)
 	btree := NewBTree(1, checker) // bucketId 1 for test
 
 	t.Run("valid record is not expired", func(t *testing.T) {
@@ -568,5 +568,307 @@ func TestBTree_IsExpiredKey(t *testing.T) {
 
 	t.Run("non-existent key is not expired", func(t *testing.T) {
 		assert.False(t, btree.IsExpiredKey([]byte("non_existent")))
+	})
+}
+
+func TestBTreeScanner_NilTTLChecker(t *testing.T) {
+	// Test BTreeScanner with nil TTL checker (e.g., for List data structure)
+	btree := NewBTree(0) // No checker
+
+	// Insert some records
+	for i := 0; i < 10; i++ {
+		key := []byte(fmt.Sprintf("key_%03d", i))
+		val := []byte(fmt.Sprintf("val_%03d", i))
+		rec := core.NewRecord().WithKey(key).WithValue(val)
+		_ = btree.InsertRecord(key, rec)
+	}
+
+	t.Run("scan with nil checker includes all records", func(t *testing.T) {
+		scanner := btree.scan().Prefix([]byte("key_"))
+		records := scanner.Collect()
+
+		assert.Len(t, records, 10)
+	})
+
+	t.Run("first with nil checker", func(t *testing.T) {
+		scanner := btree.scan()
+		item, found := scanner.First()
+
+		assert.True(t, found)
+		assert.Equal(t, "key_000", string(item.Key))
+	})
+
+	t.Run("count with nil checker", func(t *testing.T) {
+		scanner := btree.scan().Prefix([]byte("key_"))
+		count := scanner.Count()
+
+		assert.Equal(t, 10, count)
+	})
+}
+
+func TestBTreeScanner_Match(t *testing.T) {
+	mockClock := ttl.NewMockClock(1000000)
+	checker := ttl.NewChecker(mockClock)
+	btree := NewBTree(1, checker)
+
+	// Insert records with various keys
+	keys := []string{"user_001", "user_002", "order_001", "order_002", "product_001"}
+	for _, key := range keys {
+		rec := core.NewRecord().WithKey([]byte(key)).WithValue([]byte("value"))
+		btree.InsertRecord(rec.Key, rec)
+	}
+
+	t.Run("match with valid regex", func(t *testing.T) {
+		scanner := btree.scan().Match("user_\\d+")
+		records := scanner.Collect()
+
+		assert.Len(t, records, 2)
+		for _, r := range records {
+			assert.Contains(t, string(r.Key), "user_")
+		}
+	})
+
+	t.Run("match with no matches", func(t *testing.T) {
+		scanner := btree.scan().Match("nonexistent_\\d+")
+		records := scanner.Collect()
+
+		assert.Len(t, records, 0)
+	})
+
+	t.Run("match with wildcard", func(t *testing.T) {
+		scanner := btree.scan().Match(".*")
+		records := scanner.Collect()
+
+		// Should match all (when combined with prefix or range)
+		assert.Len(t, records, 5)
+	})
+
+	t.Run("match combined with prefix", func(t *testing.T) {
+		scanner := btree.scan().Prefix([]byte("user_")).Match("\\d+")
+		records := scanner.Collect()
+
+		assert.Len(t, records, 2)
+	})
+}
+
+func TestBTreeScanner_Where(t *testing.T) {
+	mockClock := ttl.NewMockClock(1000000)
+	checker := ttl.NewChecker(mockClock)
+	btree := NewBTree(1, checker)
+
+	// Insert records with numeric values
+	for i := 0; i < 10; i++ {
+		key := []byte(fmt.Sprintf("key_%03d", i))
+		val := []byte(fmt.Sprintf("%d", i*10))
+		rec := core.NewRecord().WithKey(key).WithValue(val)
+		btree.InsertRecord(rec.Key, rec)
+	}
+
+	t.Run("where filter returns true for some items", func(t *testing.T) {
+		scanner := btree.scan().Where(func(item *core.Item[core.Record]) bool {
+			// Only include items where value >= 50
+			val := string(item.Record.Value)
+			return val >= "50"
+		})
+		records := scanner.Collect()
+
+		// Should return items with index 5-9 (values 50-90)
+		assert.Len(t, records, 5)
+	})
+
+	t.Run("where filter returns false for all items", func(t *testing.T) {
+		scanner := btree.scan().Where(func(item *core.Item[core.Record]) bool {
+			return false
+		})
+		records := scanner.Collect()
+
+		assert.Len(t, records, 0)
+	})
+
+	t.Run("where filter returns true for all items", func(t *testing.T) {
+		scanner := btree.scan().Where(func(item *core.Item[core.Record]) bool {
+			return true
+		})
+		records := scanner.Collect()
+
+		assert.Len(t, records, 10)
+	})
+
+	t.Run("where with offset and limit", func(t *testing.T) {
+		scanner := btree.scan().
+			Where(func(item *core.Item[core.Record]) bool {
+				return true
+			}).
+			Skip(2).
+			Take(3)
+		records := scanner.Collect()
+
+		assert.Len(t, records, 3)
+		assert.Equal(t, "key_002", string(records[0].Key))
+		assert.Equal(t, "key_004", string(records[2].Key))
+	})
+}
+
+func TestBTreeScanner_ReversePrefixScan(t *testing.T) {
+	mockClock := ttl.NewMockClock(1000000)
+	checker := ttl.NewChecker(mockClock)
+	btree := NewBTree(1, checker)
+
+	// Insert records
+	for i := 0; i < 10; i++ {
+		key := []byte(fmt.Sprintf("key_%03d", i))
+		val := []byte(fmt.Sprintf("val_%03d", i))
+		rec := core.NewRecord().WithKey(key).WithValue(val)
+		btree.InsertRecord(rec.Key, rec)
+	}
+
+	t.Run("reverse scan all records", func(t *testing.T) {
+		// Simple reverse scan without range constraints
+		scanner := btree.scan().Descending()
+		records := scanner.Collect()
+
+		// Should return all 10 records in reverse order
+		require.Len(t, records, 10)
+		// Verify reverse order
+		for i := 0; i < 9; i++ {
+			assert.True(t, bytes.Compare(records[i].Key, records[i+1].Key) >= 0)
+		}
+	})
+
+	t.Run("reverse scan with Skip and Take", func(t *testing.T) {
+		scanner := btree.scan().Descending().Skip(2).Take(3)
+		records := scanner.Collect()
+
+		// Should return 3 records starting from index 2 in reverse order
+		require.Len(t, records, 3)
+		// Keys should be in reverse order
+		assert.Equal(t, "key_007", string(records[0].Key))
+		assert.Equal(t, "key_006", string(records[1].Key))
+		assert.Equal(t, "key_005", string(records[2].Key))
+	})
+}
+
+func TestBTreeScanner_InRange_Reverse(t *testing.T) {
+	mockClock := ttl.NewMockClock(1000000)
+	checker := ttl.NewChecker(mockClock)
+	btree := NewBTree(1, checker)
+
+	// Insert records
+	for i := 0; i < 10; i++ {
+		key := []byte(fmt.Sprintf("key_%03d", i))
+		val := []byte(fmt.Sprintf("val_%03d", i))
+		rec := core.NewRecord().WithKey(key).WithValue(val)
+		btree.InsertRecord(rec.Key, rec)
+	}
+
+	t.Run("reverse scan from pivot", func(t *testing.T) {
+		// From sets the upper bound (pivot) for reverse scan
+		scanner := btree.scan().From([]byte("key_005")).Descending()
+		records := scanner.Collect()
+
+		// Should return 005 down to 000 (6 records)
+		require.Len(t, records, 6)
+		assert.Equal(t, "key_005", string(records[0].Key))
+		assert.Equal(t, "key_000", string(records[5].Key))
+	})
+
+	t.Run("reverse scan with To sets lower bound", func(t *testing.T) {
+		// To sets the lower bound for reverse scan
+		scanner := btree.scan().To([]byte("key_003")).Descending()
+		records := scanner.Collect()
+
+		// Should return 009 down to 003 (7 records: 009, 008, 007, 006, 005, 004, 003)
+		require.Len(t, records, 7)
+		assert.Equal(t, "key_009", string(records[0].Key))
+		assert.Equal(t, "key_003", string(records[6].Key))
+	})
+
+	t.Run("reverse scan with From and To", func(t *testing.T) {
+		// From sets upper bound, To sets lower bound
+		scanner := btree.scan().From([]byte("key_007")).To([]byte("key_003")).Descending()
+		records := scanner.Collect()
+
+		// Should return 007, 006, 005, 004, 003 (5 records)
+		require.Len(t, records, 5)
+		assert.Equal(t, "key_007", string(records[0].Key))
+		assert.Equal(t, "key_003", string(records[4].Key))
+	})
+
+	t.Run("reverse scan uses Skip and Take for pagination", func(t *testing.T) {
+		// Test pagination in reverse scan
+		scanner := btree.scan().Descending().Skip(5).Take(3)
+		records := scanner.Collect()
+
+		require.Len(t, records, 3)
+		assert.Equal(t, "key_004", string(records[0].Key))
+		assert.Equal(t, "key_003", string(records[1].Key))
+		assert.Equal(t, "key_002", string(records[2].Key))
+	})
+}
+
+func TestBTreeScanner_CollectItems_TTLFiltering(t *testing.T) {
+	mockClock := ttl.NewMockClock(1000000)
+	checker := ttl.NewChecker(mockClock)
+	btree := NewBTree(1, checker)
+
+	// Insert mix of valid and expired records
+	for i := 0; i < 10; i++ {
+		key := []byte(fmt.Sprintf("key_%02d", i))
+		var ttlVal uint32
+		var timestamp uint64
+		if i%2 == 0 {
+			ttlVal = 100 // Valid
+			timestamp = 999000
+		} else {
+			ttlVal = 10 // Expired
+			timestamp = 900000
+		}
+		record := createTestRecord(string(key), ttlVal, timestamp)
+		btree.InsertRecord(record.Key, record)
+	}
+
+	t.Run("collect items filters expired", func(t *testing.T) {
+		scanner := btree.scan().Prefix([]byte("key_"))
+		items := scanner.CollectItems()
+
+		// Should only return 5 valid records (even indices: 00, 02, 04, 06, 08)
+		require.Len(t, items, 5)
+		for _, item := range items {
+			keyStr := string(item.Key)
+			// Key should end with even number: 00, 02, 04, 06, or 08
+			lastChar := keyStr[len(keyStr)-1]
+			assert.True(t, lastChar == '0' || lastChar == '2' || lastChar == '4' || lastChar == '6' || lastChar == '8',
+				"key %s should have even last digit", keyStr)
+		}
+	})
+
+	t.Run("collect items include expired when skipTTL", func(t *testing.T) {
+		scanner := btree.scan().
+			Prefix([]byte("key_")).
+			IncludeExpired()
+		items := scanner.CollectItems()
+
+		// Should return all 10 records
+		assert.Len(t, items, 10)
+	})
+
+	t.Run("collect items with offset", func(t *testing.T) {
+		scanner := btree.scan().
+			Prefix([]byte("key_")).
+			Skip(1)
+		items := scanner.CollectItems()
+
+		// Should return 4 valid records (skipping first valid)
+		assert.Len(t, items, 4)
+	})
+
+	t.Run("collect items with limit", func(t *testing.T) {
+		scanner := btree.scan().
+			Prefix([]byte("key_")).
+			Take(2)
+		items := scanner.CollectItems()
+
+		// Should return 2 valid records
+		assert.Len(t, items, 2)
 	})
 }

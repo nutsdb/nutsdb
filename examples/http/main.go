@@ -40,7 +40,7 @@ func init() {
 func main() {
 	mux := gorouter.New()
 	mux.GET("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("Hello, nutsdb!"))
+		_, _ = w.Write([]byte("Hello, nutsdb!"))
 	})
 
 	// For example you can visit like this: http://127.0.0.1:8181/test/put/key1/value1
@@ -55,7 +55,7 @@ func main() {
 			}); err != nil {
 			log.Fatal(err)
 		}
-		w.Write([]byte("puts data ok!"))
+		_, _ = w.Write([]byte("puts data ok!"))
 	})
 
 	// For example you can visit like this: http://127.0.0.1:8181/test/get/key1
@@ -73,7 +73,7 @@ func main() {
 			log.Fatal(err)
 		}
 
-		w.Write([]byte("read data ok!"))
+		_, _ = w.Write([]byte("read data ok!"))
 	})
 
 	// run http server

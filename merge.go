@@ -16,11 +16,13 @@ package nutsdb
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"math"
 	"os"
+	"sync/atomic"
 	"time"
 
 	"github.com/nutsdb/nutsdb/internal/core"
@@ -31,8 +33,7 @@ import (
 var ErrDontNeedMerge = errors.New("the number of files waiting to be merged is less than 2")
 
 func (db *DB) Merge() error {
-	db.mergeStartCh <- struct{}{}
-	return <-db.mergeEndCh
+	return db.mergeWorker.TriggerMerge()
 }
 
 func (db *DB) merge() error {
@@ -60,19 +61,7 @@ func (db *DB) mergeLegacy() error {
 		pendingMergeFIds []int64
 	)
 
-	// to prevent the initiation of multiple merges simultaneously.
 	db.mu.Lock()
-
-	if db.isMerging {
-		db.mu.Unlock()
-		return ErrIsMerging
-	}
-
-	db.isMerging = true
-	defer func() {
-		db.isMerging = false
-	}()
-
 	_, pendingMergeFIds = db.getMaxFileIDAndFileIDs()
 	if len(pendingMergeFIds) < 2 {
 		db.mu.Unlock()
@@ -108,7 +97,6 @@ func (db *DB) mergeLegacy() error {
 
 	mergingPath := make([]string, len(pendingMergeFIds))
 
-	// Used to collect all merged entry information for later writing to the HintFile
 	var mergedEntries []mergedEntryInfo
 
 	for i, pendingMergeFId := range pendingMergeFIds {
@@ -133,14 +121,10 @@ func (db *DB) mergeLegacy() error {
 					continue
 				}
 
-				// Due to the lack of concurrency safety in the index,
-				// there is a possibility that a race condition might occur when the merge goroutine reads the index,
-				// while a transaction is being committed, causing modifications to the index.
-				// To address this issue, we need to use a transaction to perform this operation.
+				// Index reads can race with commits; use a transaction to avoid inconsistencies.
 				err := db.Update(func(tx *Tx) error {
-					// check if we have a new entry with same key and bucket
 					if ok := db.isPendingMergeEntry(entry); ok {
-						bucket, err := db.bucketManager.GetBucketById(entry.Meta.BucketId)
+						bucket, err := db.bucketMgr.GetBucketById(entry.Meta.BucketId)
 						if err != nil {
 							return err
 						}
@@ -169,7 +153,6 @@ func (db *DB) mergeLegacy() error {
 							}
 						}
 
-						// Record merged entry information to get actual position from index later
 						mergedEntries = append(mergedEntries, mergedEntryInfo{
 							entry:    entry,
 							bucketId: bucket.Id,
@@ -202,13 +185,10 @@ func (db *DB) mergeLegacy() error {
 		mergingPath[i] = path
 	}
 
-	// Now that all data has been written, create HintFile for all newly generated data files
-	// Only create HintFile for new files actually generated during the Merge process
 	db.mu.Lock()
-	endFileID := db.MaxFileID // Record the maximum file ID when merge ends
+	endFileID := db.MaxFileID
 	db.mu.Unlock()
 
-	// 只有当启用 HintFile 功能时才创建 HintFile
 	if db.opt.EnableHintFile {
 		if err := db.buildHintFilesAfterMerge(startFileID, endFileID); err != nil {
 			return fmt.Errorf("failed to build hint files after merge: %w", err)
@@ -226,11 +206,9 @@ func (db *DB) mergeLegacy() error {
 			return fmt.Errorf("when merge err: %s", err)
 		}
 
-		// Delete the HintFile corresponding to the old data file (if it exists)
 		oldHintPath := getHintPath(int64(pendingMergeFIds[i]), db.opt.Dir)
 		if _, err := os.Stat(oldHintPath); err == nil {
 			if removeErr := os.Remove(oldHintPath); removeErr != nil {
-				// Log error but don't interrupt the merge process
 				fmt.Printf("warning: failed to remove old hint file %s: %v\n", oldHintPath, removeErr)
 			}
 		}
@@ -239,9 +217,6 @@ func (db *DB) mergeLegacy() error {
 	return nil
 }
 
-// buildHintFilesAfterMerge creates HintFiles for all newly generated data files after merge
-// by traversing the index to find all records pointing to new files.
-// Only process files in the range [startFileID, endFileID]
 func (db *DB) buildHintFilesAfterMerge(startFileID, endFileID int64) error {
 	if startFileID > endFileID {
 		return nil
@@ -315,33 +290,6 @@ func (db *DB) buildHintFilesAfterMerge(startFileID, endFileID int64) error {
 	return nil
 }
 
-func (db *DB) mergeWorker() {
-	var ticker *time.Ticker
-
-	if db.opt.MergeInterval != 0 {
-		ticker = time.NewTicker(db.opt.MergeInterval)
-	} else {
-		ticker = time.NewTicker(math.MaxInt)
-		ticker.Stop()
-	}
-
-	for {
-		select {
-		case <-db.mergeStartCh:
-			db.mergeEndCh <- db.merge()
-			// if automatic merging is enabled, then after a manual merge
-			// the t needs to be reset.
-			if db.opt.MergeInterval != 0 {
-				ticker.Reset(db.opt.MergeInterval)
-			}
-		case <-ticker.C:
-			_ = db.merge()
-		case <-db.mergeWorkCloseCh:
-			return
-		}
-	}
-}
-
 func (db *DB) isPendingMergeEntry(entry *core.Entry) bool {
 	switch {
 	case entry.IsBelongsToBTree():
@@ -368,7 +316,6 @@ func (db *DB) isPendingBtreeEntry(entry *core.Entry) bool {
 	}
 
 	if db.ttlService.GetChecker().IsExpired(r.TTL, r.Timestamp) {
-		db.ttlService.UnregisterTTL(entry.Meta.BucketId, string(entry.Key))
 		idx.Delete(entry.Key)
 		return false
 	}
@@ -465,8 +412,163 @@ func (db *DB) isPendingListEntry(entry *core.Entry) bool {
 	return false
 }
 
-// mergedEntryInfo 用于在 merge 过程中暂存条目信息
 type mergedEntryInfo struct {
 	entry    *core.Entry
 	bucketId core.BucketId
+}
+
+type mergeWorker struct {
+	lifecycle core.ComponentLifecycle
+
+	db            *DB
+	statusManager *StatusManager
+
+	mergeStartCh chan struct{}
+	mergeEndCh   chan error
+	isMerging    atomic.Bool
+
+	ticker *time.Ticker
+
+	config MergeConfig
+}
+
+type MergeConfig struct {
+	MergeInterval   time.Duration
+	EnableAutoMerge bool
+}
+
+func DefaultMergeConfig() MergeConfig {
+	return MergeConfig{
+		MergeInterval:   0,
+		EnableAutoMerge: false,
+	}
+}
+
+func newMergeWorker(db *DB, sm *StatusManager, config MergeConfig) *mergeWorker {
+	return &mergeWorker{
+		db:            db,
+		statusManager: sm,
+		mergeStartCh:  make(chan struct{}),
+		mergeEndCh:    make(chan error, 1),
+		config:        config,
+	}
+}
+
+func (mw *mergeWorker) Name() string {
+	return "MergeWorker"
+}
+
+func (mw *mergeWorker) Start(ctx context.Context) error {
+	if err := mw.lifecycle.Start(ctx); err != nil {
+		return err
+	}
+
+	if mw.config.EnableAutoMerge && mw.config.MergeInterval > 0 {
+		mw.ticker = time.NewTicker(mw.config.MergeInterval)
+	} else {
+		mw.ticker = time.NewTicker(math.MaxInt64)
+		mw.ticker.Stop()
+	}
+
+	mw.lifecycle.Go(mw.run)
+
+	return nil
+}
+
+func (mw *mergeWorker) Stop(timeout time.Duration) error {
+	if mw.ticker != nil {
+		mw.ticker.Stop()
+	}
+
+	return mw.lifecycle.Stop(timeout)
+}
+
+func (mw *mergeWorker) TriggerMerge() error {
+	if mw.statusManager.isClosingOrClosed() {
+		return ErrDBClosed
+	}
+
+	if mw.isMerging.Load() {
+		return ErrIsMerging
+	}
+
+	select {
+	case mw.mergeStartCh <- struct{}{}:
+		return <-mw.mergeEndCh
+	case <-mw.lifecycle.Context().Done():
+		return ErrDBClosed
+	}
+}
+
+func (mw *mergeWorker) IsMerging() bool {
+	return mw.isMerging.Load()
+}
+
+func (mw *mergeWorker) run(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+
+		case <-mw.mergeStartCh:
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+
+			err := mw.performMerge()
+
+			select {
+			case mw.mergeEndCh <- err:
+			default:
+			}
+
+			if mw.config.EnableAutoMerge && mw.config.MergeInterval > 0 {
+				mw.ticker.Reset(mw.config.MergeInterval)
+			}
+
+		case <-mw.ticker.C:
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+
+			_ = mw.performMerge()
+		}
+	}
+}
+
+func (mw *mergeWorker) performMerge() error {
+	if mw.statusManager.isClosingOrClosed() {
+		return ErrDBClosed
+	}
+
+	if !mw.isMerging.CompareAndSwap(false, true) {
+		return ErrIsMerging
+	}
+	defer mw.isMerging.Store(false)
+
+	return mw.db.merge()
+}
+
+func (mw *mergeWorker) SetMergeInterval(interval time.Duration) {
+	mw.config.MergeInterval = interval
+
+	if interval > 0 {
+		mw.config.EnableAutoMerge = true
+		if mw.ticker != nil {
+			mw.ticker.Reset(interval)
+		}
+	} else {
+		mw.config.EnableAutoMerge = false
+		if mw.ticker != nil {
+			mw.ticker.Stop()
+		}
+	}
+}
+
+func (mw *mergeWorker) GetMergeInterval() time.Duration {
+	return mw.config.MergeInterval
 }

@@ -12,14 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package checker
+package ttl
 
 import (
 	"testing"
 	"time"
 
 	"github.com/nutsdb/nutsdb/internal/core"
-	"github.com/nutsdb/nutsdb/internal/ttl/clock"
 )
 
 // Data structure constants for testing
@@ -28,7 +27,7 @@ const (
 )
 
 func TestChecker_IsExpired(t *testing.T) {
-	clk := clock.NewMockClock(1000000) // Start at 1000 seconds in milliseconds
+	clk := NewMockClock(1000000) // Start at 1000 seconds in milliseconds
 	checker := NewChecker(clk)
 
 	tests := []struct {
@@ -74,7 +73,7 @@ func TestChecker_IsExpired(t *testing.T) {
 }
 
 func TestChecker_FilterExpiredRecord(t *testing.T) {
-	clk := clock.NewMockClock(1000000) // Start at 1000 seconds in milliseconds
+	clk := NewMockClock(1000000) // Start at 1000 seconds in milliseconds
 	checker := NewChecker(clk)
 
 	// Track callback invocations
@@ -169,7 +168,7 @@ func TestChecker_FilterExpiredRecord(t *testing.T) {
 }
 
 func TestChecker_FilterExpiredRecords(t *testing.T) {
-	clk := clock.NewMockClock(1000000) // Start at 1000 seconds in milliseconds
+	clk := NewMockClock(1000000) // Start at 1000 seconds in milliseconds
 	checker := NewChecker(clk)
 
 	// Track callback invocations
@@ -234,7 +233,7 @@ func TestChecker_FilterExpiredRecords(t *testing.T) {
 }
 
 func TestChecker_FilterExpiredItems(t *testing.T) {
-	clk := clock.NewMockClock(1000000) // Start at 1000 seconds in milliseconds
+	clk := NewMockClock(1000000) // Start at 1000 seconds in milliseconds
 	checker := NewChecker(clk)
 
 	// Track callback invocations
@@ -304,7 +303,7 @@ func TestChecker_FilterExpiredItems(t *testing.T) {
 }
 
 func TestChecker_TimeAdvancement(t *testing.T) {
-	clk := clock.NewMockClock(1000000) // Start at 1000 seconds in milliseconds
+	clk := NewMockClock(1000000) // Start at 1000 seconds in milliseconds
 	checker := NewChecker(clk)
 
 	record := &core.Record{
@@ -333,7 +332,7 @@ func TestChecker_TimeAdvancement(t *testing.T) {
 
 // Integration tests for TTLChecker
 func TestCheckerIntegration(t *testing.T) {
-	clk := clock.NewMockClock(1000000) // Start at 1000 seconds in milliseconds
+	clk := NewMockClock(1000000) // Start at 1000 seconds in milliseconds
 	checker := NewChecker(clk)
 
 	// Test that the checker is properly created and functional

@@ -39,7 +39,7 @@ func (s *rwMgrMMapTestSuite) isActive(rwmanager *fileio.MMapRWManager) bool {
 
 func (s *rwMgrMMapTestSuite) isFileDescriptorClosed(fd uintptr) error {
 	file := os.NewFile(fd, "")
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	_, err := file.Stat()
 
 	return err
@@ -86,7 +86,7 @@ func (s *rwMgrMMapTestSuite) TestRWManager_MMap_WriteAt() {
 	if err != nil {
 		require.NoError(t, err)
 	}
-	defer os.Remove(fd.Name())
+	defer func() { _ = os.Remove(fd.Name()) }()
 
 	err = fileio.Truncate(filePath, 8*nutsdb.MB, fd, false)
 	if err != nil {
@@ -119,7 +119,7 @@ func (s *rwMgrMMapTestSuite) TestRWManager_MMap_WriteAt_NotEnoughData() {
 	fd, err := fdm.GetFd(filePath)
 	require.NoError(t, err)
 
-	defer os.Remove(fd.Name())
+	defer func() { _ = os.Remove(fd.Name()) }()
 
 	err = fileio.Truncate(filePath, 8*nutsdb.MB, fd, false)
 	require.NoError(t, err)
@@ -152,7 +152,7 @@ func (s *rwMgrMMapTestSuite) TestRWManager_MMap_ReadAt_CrossBlock() {
 	fd, err := fdm.GetFd(filePath)
 	require.NoError(t, err)
 
-	defer os.Remove(fd.Name())
+	defer func() { _ = os.Remove(fd.Name()) }()
 
 	err = fileio.Truncate(filePath, 8*nutsdb.MB, fd, false)
 	require.NoError(t, err)
@@ -183,7 +183,7 @@ func (s *rwMgrMMapTestSuite) TestRWManager_MMap_ReadAt_NotEnoughBytes() {
 	fd, err := fdm.GetFd(filePath)
 	require.NoError(t, err)
 
-	defer os.Remove(fd.Name())
+	defer func() { _ = os.Remove(fd.Name()) }()
 
 	err = fileio.Truncate(filePath, 8*nutsdb.MB, fd, false)
 	require.NoError(t, err)
@@ -214,7 +214,7 @@ func (s *rwMgrMMapTestSuite) TestRWManager_MMap_ReadAt_ErrIndexOutOfBound() {
 	fd, err := fdm.GetFd(filePath)
 	require.NoError(t, err)
 
-	defer os.Remove(fd.Name())
+	defer func() { _ = os.Remove(fd.Name()) }()
 
 	err = fileio.Truncate(filePath, 8*nutsdb.MB, fd, false)
 	require.NoError(t, err)
@@ -241,7 +241,7 @@ func (s *rwMgrMMapTestSuite) TestRWManager_MMap_Sync() {
 	if err != nil {
 		require.NoError(t, err)
 	}
-	defer os.Remove(fd.Name())
+	defer func() { _ = os.Remove(fd.Name()) }()
 
 	err = fileio.Truncate(filePath, 8*nutsdb.MB, fd, false)
 	if err != nil {
@@ -276,7 +276,7 @@ func (s *rwMgrMMapTestSuite) TestRWManager_MMap_Close() {
 	if err != nil {
 		require.NoError(t, err)
 	}
-	defer os.Remove(fd.Name())
+	defer func() { _ = os.Remove(fd.Name()) }()
 
 	err = fileio.Truncate(filePath, 8*fileio.MB, fd, false)
 	if err != nil {

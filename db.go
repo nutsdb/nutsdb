@@ -60,21 +60,19 @@ type (
 		MaxFileID               int64
 		mu                      sync.RWMutex
 		KeyCount                int // total key number ,include expired, deleted, repeated.
-		closed                  bool
-		isMerging               bool
+		statusMgr               *StatusManager
+		transactionMgr          *txManager
+		mergeWorker             *mergeWorker
 		fm                      *FileManager
 		flock                   *flock.Flock
 		commitBuffer            *bytes.Buffer
-		mergeStartCh            chan struct{}
-		mergeEndCh              chan error
-		mergeWorkCloseCh        chan struct{}
 		writeCh                 chan *request
 		ttlService              *ttl.Service
 		RecordCount             int64 // current valid record count, exclude deleted, repeated
-		bucketManager           *BucketManager
+		bucketMgr               *BucketManager
 		hintKeyAndRAMIdxModeLru *utils.LRUCache // lru cache for HintKeyAndRAMIdxMode
-		snowflakeManager        *SnowflakeManager
-		watchManager            *watchManager
+		snowflakeMgr            *SnowflakeManager
+		watchMgr                *watchManager
 	}
 )
 
@@ -104,19 +102,25 @@ func open(opt Options) (*DB, error) {
 		MaxFileID:               0,
 		opt:                     opt,
 		KeyCount:                0,
-		closed:                  false,
 		fm:                      NewFileManager(opt.RWMode, opt.MaxFdNumsInCache, opt.CleanFdsCacheThreshold, opt.SegmentSize),
-		mergeStartCh:            make(chan struct{}),
-		mergeEndCh:              make(chan error),
-		mergeWorkCloseCh:        make(chan struct{}),
 		writeCh:                 make(chan *request, KvWriteChCapacity),
 		hintKeyAndRAMIdxModeLru: utils.NewLruCache(opt.HintKeyAndRAMIdxCacheSize),
-		snowflakeManager:        NewSnowflakeManager(opt.NodeNum),
+		snowflakeMgr:            NewSnowflakeManager(opt.NodeNum),
 	}
 
-	// Initialize TTL service with unified management
-	db.ttlService = ttl.NewService(opt.Clock, opt.ExpiredDeleteType)
-	db.ttlService.SetExpiredCallback(db.handleExpiredKey)
+	scanFn := func() ([]*ttl.ExpirationEvent, error) {
+		// Check if db is closing (Index is nil) to avoid race
+		if db.Index == nil {
+			return nil, nil
+		}
+		var events []*ttl.ExpirationEvent
+		_ = db.View(func(tx *Tx) error {
+			events = tx.doTTLExpireScan(opt.TTLConfig)
+			return nil
+		})
+		return events, nil
+	}
+	db.ttlService = ttl.NewService(opt.Clock, opt.TTLConfig, db.handleExpiredKeys, scanFn)
 
 	db.Index = db.newIndex()
 
@@ -138,7 +142,7 @@ func open(opt Options) (*DB, error) {
 	db.flock = fileLock
 
 	if bm, err := NewBucketManager(opt.Dir); err == nil {
-		db.bucketManager = bm
+		db.bucketMgr = bm
 	} else {
 		return nil, err
 	}
@@ -156,26 +160,61 @@ func open(opt Options) (*DB, error) {
 	}
 
 	if db.opt.EnableWatch {
-		db.watchManager = NewWatchManager()
-		go db.watchManager.startDistributor()
-	} else {
-		db.watchManager = nil
+		db.watchMgr = NewWatchManager()
 	}
 
-	go db.mergeWorker()
+	smConfig := DefaultStatusManagerConfig()
+	smConfig.ShutdownTimeout = 30 * time.Second
+
+	db.statusMgr = NewStatusManager(smConfig)
+
+	db.transactionMgr = newTxManager(db, db.statusMgr)
+
+	mergeConfig := MergeConfig{
+		MergeInterval:   opt.MergeInterval,
+		EnableAutoMerge: opt.MergeInterval > 0,
+	}
+	db.mergeWorker = newMergeWorker(db, db.statusMgr, mergeConfig)
+
+	if err := db.statusMgr.RegisterComponent("TransactionManager", db.transactionMgr); err != nil {
+		return nil, fmt.Errorf("failed to register TransactionManager: %w", err)
+	}
+
+	if err := db.statusMgr.RegisterComponent("MergeWorker", db.mergeWorker); err != nil {
+		return nil, fmt.Errorf("failed to register MergeWorker: %w", err)
+	}
+
+	if err := db.statusMgr.RegisterComponent("TTLService", db.ttlService); err != nil {
+		return nil, fmt.Errorf("failed to register TTLService: %w", err)
+	}
+
+	if db.watchMgr != nil {
+		if err := db.statusMgr.RegisterComponent("WatchManager", db.watchMgr); err != nil {
+			return nil, fmt.Errorf("failed to register WatchManager: %w", err)
+		}
+	}
+
+	if err := db.statusMgr.Start(); err != nil {
+		if db.flock != nil && db.flock.Locked() {
+			_ = db.flock.Unlock()
+		}
+		return nil, fmt.Errorf("failed to start components: %w", err)
+	}
+
+	// Kick off doWrites goroutine so writes are processed asynchronously
+	db.statusMgr.Add(1)
 	go db.doWrites()
-	go db.ttlService.Run()
 
 	return db, nil
 }
 
 // Open returns a newly initialized DB object with Option.
-func Open(options Options, ops ...Option) (*DB, error) {
-	opts := &options
-	for _, do := range ops {
-		do(opts)
+func Open(opt Options, opts ...Option) (*DB, error) {
+	op := &opt
+	for _, do := range opts {
+		do(op)
 	}
-	return open(*opts)
+	return open(*op)
 }
 
 // Update executes a function within a managed read/write transaction.
@@ -212,15 +251,16 @@ func (db *DB) BackupTarGZ(w io.Writer) error {
 
 // Close releases all db resources.
 func (db *DB) Close() error {
-	db.mu.Lock()
-	defer db.mu.Unlock()
-
-	if db.closed {
+	if db.statusMgr.isClosed() {
 		return ErrDBClosed
 	}
 
-	db.closed = true
+	// Use StatusManager to shut down all registered components
+	if err := db.statusMgr.Close(); err != nil {
+		return err
+	}
 
+	// Release remaining resources
 	err := db.release()
 	if err != nil {
 		return err
@@ -233,42 +273,47 @@ func (db *DB) Close() error {
 func (db *DB) release() error {
 	GCEnable := db.opt.GCWhenClose
 
-	err := db.ActiveFile.rwManager.Release()
-	if err != nil {
-		return err
+	if db.ActiveFile != nil && db.ActiveFile.rwManager != nil {
+		err := db.ActiveFile.rwManager.Release()
+		if err != nil {
+			return err
+		}
 	}
-
-	db.Index = nil
 
 	db.ActiveFile = nil
 
-	err = db.fm.Close()
-
-	if err != nil {
-		return err
+	if db.fm != nil {
+		err := db.fm.Close()
+		if err != nil {
+			return err
+		}
 	}
 
-	db.mergeWorkCloseCh <- struct{}{}
-
-	if !db.flock.Locked() {
-		return ErrDirUnlocked
+	// Close TTL service first to stop the scanner goroutine
+	if db.ttlService != nil {
+		if err := db.ttlService.Stop(5 * time.Second); err != nil {
+			log.Printf("TTLService stop error: %v", err)
+		}
 	}
 
-	err = db.flock.Unlock()
-	if err != nil {
-		return err
+	// Now safe to release Index as all background services are stopped
+	db.Index = nil
+
+	if db.flock != nil && db.flock.Locked() {
+		err := db.flock.Unlock()
+		if err != nil {
+			return err
+		}
 	}
 
 	db.fm = nil
 
 	db.commitBuffer = nil
 
-	db.ttlService.Close()
+	db.bucketMgr.Close()
 
-	db.bucketManager.Close()
-
-	if db.watchManager != nil {
-		if err := db.watchManager.close(); err != nil {
+	if db.watchMgr != nil {
+		if err := db.watchMgr.close(); err != nil {
 			log.Printf("watch manager closed already")
 		}
 	}
@@ -325,26 +370,13 @@ func (db *DB) getValueByRecord(record *core.Record) ([]byte, error) {
 func (db *DB) commitTransaction(tx *Tx) error {
 	var err error
 	defer func() {
-		var panicked bool
 		if r := recover(); r != nil {
-			// resume normal execution
-			panicked = true
-		}
-		if panicked || err != nil {
-			if errRollback := tx.Rollback(); errRollback != nil {
-				err = errRollback
-			}
+			err = fmt.Errorf("panic when committing tx, err is %+v", r)
 		}
 	}()
 
-	// commit current tx
 	tx.lock()
-	tx.setStatusRunning()
 	err = tx.Commit()
-	if err != nil {
-		return err
-	}
-
 	return err
 }
 
@@ -363,7 +395,9 @@ func (db *DB) writeRequests(reqs []*request) error {
 
 	for _, req := range reqs {
 		tx := req.tx
+
 		cerr := db.commitTransaction(tx)
+
 		if cerr != nil {
 			err = cerr
 		}
@@ -393,10 +427,11 @@ func (db *DB) getHintKeyAndRAMIdxCacheSize() int {
 
 // getSnowflakeNode returns a cached snowflake node, creating it once if needed.
 func (db *DB) getSnowflakeNode() *snowflake.Node {
-	return db.snowflakeManager.GetNode()
+	return db.snowflakeMgr.GetNode()
 }
 
 func (db *DB) doWrites() {
+	defer db.statusMgr.Done()
 	pendingCh := make(chan struct{}, 1)
 	writeRequests := func(reqs []*request) {
 		if err := db.writeRequests(reqs); err != nil {
@@ -408,10 +443,15 @@ func (db *DB) doWrites() {
 	reqs := make([]*request, 0, 10)
 	var r *request
 	var ok bool
+	ctx := db.statusMgr.Context()
 	for {
-		r, ok = <-db.writeCh
-		if !ok {
+		select {
+		case <-ctx.Done():
 			goto closedCase
+		case r, ok = <-db.writeCh:
+			if !ok {
+				goto closedCase
+			}
 		}
 
 		for {
@@ -424,6 +464,8 @@ func (db *DB) doWrites() {
 
 			select {
 			// Either push to pending, or continue to pick from writeCh.
+			case <-ctx.Done():
+				goto closedCase
 			case r, ok = <-db.writeCh:
 				if !ok {
 					goto closedCase
@@ -434,15 +476,16 @@ func (db *DB) doWrites() {
 		}
 
 	closedCase:
-		// All the pending request are drained.
-		// Don't close the writeCh, because it has be used in several places.
+		// Drain pending requests and fail them, since we're shutting down.
 		for {
 			select {
 			case r = <-db.writeCh:
 				reqs = append(reqs, r)
 			default:
-				pendingCh <- struct{}{} // Push to pending before doing write.
-				writeRequests(reqs)
+				for _, req := range reqs {
+					req.Err = ErrDBClosed
+					req.Wg.Done()
+				}
 				return
 			}
 		}
@@ -506,7 +549,7 @@ func (db *DB) parseDataFiles(dataFileIds []int64) (err error) {
 			// its because it already deleted in the feature WAL log.
 			// so we can just ignore here.
 			bucketId := entry.Meta.BucketId
-			if _, err := db.bucketManager.GetBucketById(bucketId); errors.Is(err, ErrBucketNotExist) {
+			if _, err := db.bucketMgr.GetBucketById(bucketId); errors.Is(err, ErrBucketNotExist) {
 				continue
 			}
 
@@ -648,7 +691,7 @@ func (db *DB) loadHintFile(fid int64) (bool, error) {
 
 		// Check if bucket exists
 		bucketId := hintEntry.BucketId
-		if _, err := db.bucketManager.GetBucketById(bucketId); errors.Is(err, ErrBucketNotExist) {
+		if _, err := db.bucketMgr.GetBucketById(bucketId); errors.Is(err, ErrBucketNotExist) {
 			continue // Skip if bucket doesn't exist
 		}
 
@@ -757,7 +800,7 @@ func (db *DB) getRecordCount() (int64, error) {
 func (db *DB) buildBTreeIdx(record *core.Record, entry *core.Entry) error {
 	key, meta := entry.Key, entry.Meta
 
-	bucket, err := db.bucketManager.GetBucketById(meta.BucketId)
+	bucket, err := db.bucketMgr.GetBucketById(meta.BucketId)
 	if err != nil {
 		return err
 	}
@@ -766,14 +809,8 @@ func (db *DB) buildBTreeIdx(record *core.Record, entry *core.Entry) error {
 	bTree := db.Index.BTree.GetWithDefault(bucketId)
 
 	if db.ttlService.GetChecker().IsExpired(record.TTL, record.Timestamp) || meta.Flag == DataDeleteFlag {
-		db.ttlService.UnregisterTTL(bucketId, string(key))
 		bTree.Delete(key)
 	} else {
-		if meta.TTL != Persistent {
-			db.ttlService.RegisterTTL(bucketId, string(key), expireTime(meta.Timestamp, meta.TTL), DataStructureBTree, record.Timestamp)
-		} else {
-			db.ttlService.UnregisterTTL(bucketId, string(key))
-		}
 		bTree.InsertRecord(record.Key, record)
 	}
 	return nil
@@ -806,7 +843,7 @@ func (db *DB) buildIdxes(record *core.Record, entry *core.Entry) error {
 func (db *DB) buildSetIdx(record *core.Record, entry *core.Entry) error {
 	key, val, meta := entry.Key, entry.Value, entry.Meta
 
-	bucket, err := db.bucketManager.GetBucketById(entry.Meta.BucketId)
+	bucket, err := db.bucketMgr.GetBucketById(entry.Meta.BucketId)
 	if err != nil {
 		return err
 	}
@@ -832,7 +869,7 @@ func (db *DB) buildSetIdx(record *core.Record, entry *core.Entry) error {
 func (db *DB) buildSortedSetIdx(record *core.Record, entry *core.Entry) error {
 	key, val, meta := entry.Key, entry.Value, entry.Meta
 
-	bucket, err := db.bucketManager.GetBucketById(entry.Meta.BucketId)
+	bucket, err := db.bucketMgr.GetBucketById(entry.Meta.BucketId)
 	if err != nil {
 		return err
 	}
@@ -871,7 +908,7 @@ func (db *DB) buildSortedSetIdx(record *core.Record, entry *core.Entry) error {
 func (db *DB) buildListIdx(record *core.Record, entry *core.Entry) error {
 	key, val, meta := entry.Key, entry.Value, entry.Meta
 
-	bucket, err := db.bucketManager.GetBucketById(entry.Meta.BucketId)
+	bucket, err := db.bucketMgr.GetBucketById(entry.Meta.BucketId)
 	if err != nil {
 		return err
 	}
@@ -1022,43 +1059,60 @@ func (db *DB) checkListExpired() {
 
 // IsClose return the value that represents the status of DB
 func (db *DB) IsClose() bool {
-	return db.closed
+	return db.statusMgr.isClosed()
 }
 
-// handleExpiredKey is the unified callback for handling expired keys.
-// It validates the timestamp to prevent race conditions where a key is:
-// 1. Set with short TTL (timestamp T1)
+// handleExpiredKeys processes a batch of expiration events in a single transaction.
+// This batch processing approach significantly reduces transaction overhead compared
+// to processing each expired key individually.
+//
+// It validates timestamps to prevent race conditions where a key is:
+// 1. Set with TTL (timestamp T1)
 // 2. Expires and triggers async deletion
 // 3. Re-inserted with new TTL (timestamp T2)
 // 4. Async deletion from step 2 executes and mistakenly deletes the new key
+//
 // By comparing timestamps, we ensure only the originally expired key is deleted.
-func (db *DB) handleExpiredKey(bucketId uint64, key []byte, ds uint16, expiredTimestamp uint64) {
-	go func() {
-		_ = db.Update(func(tx *Tx) error {
-			bucket, err := db.bucketManager.GetBucketById(bucketId)
+func (db *DB) handleExpiredKeys(events []*ttl.ExpirationEvent) {
+	if len(events) == 0 {
+		return
+	}
+
+	_ = db.Update(func(tx *Tx) error {
+		// Group events by bucket to avoid repeated bucket lookups
+		bucketEvents := make(map[uint64][]*ttl.ExpirationEvent)
+		for _, event := range events {
+			bucketEvents[event.BucketId] = append(bucketEvents[event.BucketId], event)
+		}
+
+		for bucketId, evs := range bucketEvents {
+			bucket, err := db.bucketMgr.GetBucketById(bucketId)
 			if err != nil {
-				return err
+				continue
 			}
 
-			// Verify the key still exists and has the same timestamp
 			idx, ok := db.Index.BTree.exist(bucketId)
 			if !ok {
-				return nil
+				continue
 			}
 
-			record, found := idx.Find(key)
-			if !found {
-				return nil
-			}
+			for _, event := range evs {
+				// Use FindForVerification to get the record without triggering callbacks (avoid recursion)
+				record, found := idx.FindForVerification(event.Key)
+				if !found {
+					continue
+				}
 
-			// Only delete if timestamp matches (same record that expired)
-			if record.Timestamp == expiredTimestamp {
-				return tx.Delete(bucket.Name, key)
+				// Only delete if timestamp matches (same record that expired)
+				// Also verify it's actually expired (in case it was updated)
+				if record.Timestamp == event.Timestamp && db.ttlService.GetChecker().IsExpired(record.TTL, record.Timestamp) {
+					_ = tx.put(bucket.Name, event.Key, nil, Persistent, DataDeleteFlag, uint64(db.opt.Clock.NowMillis()), bucket.Ds)
+				}
 			}
+		}
 
-			return nil
-		})
-	}()
+		return nil
+	})
 }
 
 func (db *DB) rebuildBucketManager() error {
@@ -1088,7 +1142,7 @@ func (db *DB) rebuildBucketManager() error {
 	}
 
 	if len(bucketRequest) > 0 {
-		err = db.bucketManager.SubmitPendingBucketChange(bucketRequest)
+		err = db.bucketMgr.SubmitPendingBucketChange(bucketRequest)
 		if err != nil {
 			return err
 		}
@@ -1115,11 +1169,11 @@ func (db *DB) Watch(bucket string, key []byte, cb func(message *Message) error, 
 		watchOpts = &opts[0]
 	}
 
-	if db.watchManager == nil {
+	if db.watchMgr == nil {
 		return ErrWatchFeatureDisabled
 	}
 
-	subscriber, err := db.watchManager.subscribe(bucket, string(key))
+	subscriber, err := db.watchMgr.subscribe(bucket, string(key))
 	if err != nil {
 		return err
 	}
@@ -1159,15 +1213,13 @@ func (db *DB) Watch(bucket string, key []byte, cb func(message *Message) error, 
 		ticker.Stop()
 
 		if subscriber != nil && subscriber.active.Load() {
-			if err := db.watchManager.unsubscribe(bucket, keyWatch, subscriber.id); err != nil {
-				// ignore the error
-			}
+			_ = db.watchMgr.unsubscribe(bucket, keyWatch, subscriber.id)
 		}
 	}()
 
 	for {
 		select {
-		case <-db.watchManager.done():
+		case <-db.watchMgr.done():
 			// drain the batch
 			if err := processBatch(batch); err != nil {
 				return err

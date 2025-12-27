@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -164,5 +165,180 @@ func TestWriteBatch_SetMaxPendingTxns(t *testing.T) {
 	}
 	if cap(wb.throttle.errCh) != max {
 		t.Errorf("Expected error channel length to be %d, but got %d", max, len(wb.throttle.errCh))
+	}
+}
+
+func TestWriteBatchCommit_UnregistersOnBeginTxFailure(t *testing.T) {
+	db, err := Open(
+		DefaultOptions,
+		WithDir(t.TempDir()),
+	)
+	require.NoError(t, err)
+	defer func() { _ = db.release() }()
+
+	wb, err := db.NewWriteBatch()
+	require.NoError(t, err)
+
+	// Stop the background writer so the async commit request is not processed.
+	db.statusMgr.cancel()
+	db.statusMgr.wg.Wait()
+
+	// Simulate shutdown so the new transaction cannot be opened.
+	db.statusMgr.closing.Store(true)
+
+	err = wb.commit()
+	require.ErrorIs(t, err, ErrDBClosed)
+
+	// Drain the queued request so the CommitWith callback can return.
+	select {
+	case req := <-db.writeCh:
+		req.Wg.Done()
+	default:
+		t.Fatal("expected commit request in writeCh")
+	}
+
+	require.NoError(t, wb.throttle.Finish())
+
+	require.Equal(t, int64(0), db.transactionMgr.GetActiveTxCount(), "committing tx should be unregistered on BeginTx failure")
+}
+
+func TestWriteBatchCancel_UnregistersTransaction(t *testing.T) {
+	db, err := Open(
+		DefaultOptions,
+		WithDir(t.TempDir()),
+	)
+	require.NoError(t, err)
+	defer func() { require.NoError(t, db.Close()) }()
+
+	wb, err := db.NewWriteBatch()
+	require.NoError(t, err)
+	require.Equal(t, int64(1), db.transactionMgr.GetActiveTxCount(), "write batch should register a tx")
+
+	require.NoError(t, wb.Cancel())
+	require.Equal(t, int64(0), db.transactionMgr.GetActiveTxCount(), "Cancel should unregister the tx")
+
+	// Subsequent Cancel should be a no-op.
+	require.NoError(t, wb.Cancel())
+}
+
+func TestWriteBatchFlush_UnregistersFinalTransaction(t *testing.T) {
+	db, err := Open(
+		DefaultOptions,
+		WithDir(t.TempDir()),
+	)
+	require.NoError(t, err)
+	defer func() { require.NoError(t, db.Close()) }()
+
+	const bucket = "flush_bucket"
+	require.NoError(t, db.Update(func(tx *Tx) error {
+		return tx.NewBucket(DataStructureBTree, bucket)
+	}))
+
+	wb, err := db.NewWriteBatch()
+	require.NoError(t, err)
+	require.Equal(t, int64(1), db.transactionMgr.GetActiveTxCount())
+
+	require.NoError(t, wb.Put(bucket, []byte("key"), []byte("value"), 0))
+	require.NoError(t, wb.Flush())
+
+	require.Equal(t, int64(0), db.transactionMgr.GetActiveTxCount(), "Flush should unregister all transactions")
+
+	require.NoError(t, db.View(func(tx *Tx) error {
+		val, err := tx.Get(bucket, []byte("key"))
+		require.NoError(t, err)
+		require.Equal(t, []byte("value"), val)
+		return nil
+	}))
+}
+
+func TestWriteBatchReset_ReplacesTransaction(t *testing.T) {
+	db, err := Open(
+		DefaultOptions,
+		WithDir(t.TempDir()),
+	)
+	require.NoError(t, err)
+	defer func() { require.NoError(t, db.Close()) }()
+
+	wb, err := db.NewWriteBatch()
+	require.NoError(t, err)
+	require.Equal(t, int64(1), db.transactionMgr.GetActiveTxCount())
+
+	firstTxID := wb.txID
+	require.NoError(t, wb.Reset())
+
+	require.Equal(t, int64(1), db.transactionMgr.GetActiveTxCount(), "Reset should keep exactly one active transaction")
+	require.NotEqual(t, firstTxID, wb.txID, "Reset should allocate a fresh transaction ID")
+	activeIDs := db.transactionMgr.GetActiveTxs()
+	require.NotContains(t, activeIDs, firstTxID, "old transaction must be unregistered on Reset")
+	require.Contains(t, activeIDs, wb.txID, "new transaction must be registered")
+
+	_ = wb.Flush()
+}
+
+func TestWriteBatch_ConcurrentWithUpdate(t *testing.T) {
+	db, err := Open(
+		DefaultOptions,
+		WithDir(t.TempDir()),
+	)
+	require.NoError(t, err)
+	defer func() { require.NoError(t, db.Close()) }()
+
+	txCreateBucket(t, db, DataStructureBTree, "test-bucket", nil)
+
+	const iterations = 1000
+	const goroutines = 2
+	var ready sync.WaitGroup
+	var start sync.WaitGroup
+	done := make(chan error, goroutines)
+
+	ready.Add(goroutines)
+	start.Add(1)
+
+	// WriteBatch goroutine
+	go func() {
+		ready.Done()
+		start.Wait()
+		for i := 0; i < iterations; i++ {
+			wb, err := db.NewWriteBatch()
+			if err != nil {
+				done <- err
+				return
+			}
+			key := []byte(fmt.Sprintf("wb-key-%d", i))
+			if err := wb.Put("test-bucket", key, []byte("value"), 0); err != nil {
+				_ = wb.Cancel()
+				done <- err
+				return
+			}
+			if err := wb.Flush(); err != nil {
+				done <- err
+				return
+			}
+		}
+		done <- nil
+	}()
+
+	// db.Update goroutine
+	go func() {
+		ready.Done()
+		start.Wait()
+		for i := 0; i < iterations; i++ {
+			err := db.Update(func(tx *Tx) error {
+				key := []byte(fmt.Sprintf("update-key-%d", i))
+				return tx.Put("test-bucket", key, []byte("value"), 0)
+			})
+			if err != nil {
+				done <- err
+				return
+			}
+		}
+		done <- nil
+	}()
+
+	ready.Wait()
+	start.Done()
+
+	for i := 0; i < goroutines; i++ {
+		require.NoError(t, <-done)
 	}
 }

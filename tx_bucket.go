@@ -27,7 +27,7 @@ func (tx *Tx) IterateBuckets(ds uint16, pattern string, f func(bucket string) bo
 
 	if ds == DataStructureSet {
 		for bucketId := range tx.db.Index.Set.Idx {
-			bucket, err := tx.db.bucketManager.GetBucketById(uint64(bucketId))
+			bucket, err := tx.db.bucketMgr.GetBucketById(uint64(bucketId))
 			if err != nil {
 				return err
 			}
@@ -38,7 +38,7 @@ func (tx *Tx) IterateBuckets(ds uint16, pattern string, f func(bucket string) bo
 	}
 	if ds == DataStructureSortedSet {
 		for bucketId := range tx.db.Index.SortedSet.Idx {
-			bucket, err := tx.db.bucketManager.GetBucketById(uint64(bucketId))
+			bucket, err := tx.db.bucketMgr.GetBucketById(uint64(bucketId))
 			if err != nil {
 				return err
 			}
@@ -49,7 +49,7 @@ func (tx *Tx) IterateBuckets(ds uint16, pattern string, f func(bucket string) bo
 	}
 	if ds == DataStructureList {
 		for bucketId := range tx.db.Index.List.Idx {
-			bucket, err := tx.db.bucketManager.GetBucketById(uint64(bucketId))
+			bucket, err := tx.db.bucketMgr.GetBucketById(uint64(bucketId))
 			if err != nil {
 				return err
 			}
@@ -60,7 +60,7 @@ func (tx *Tx) IterateBuckets(ds uint16, pattern string, f func(bucket string) bo
 	}
 	if ds == DataStructureBTree {
 		for bucketId := range tx.db.Index.BTree.Idx {
-			bucket, err := tx.db.bucketManager.GetBucketById(uint64(bucketId))
+			bucket, err := tx.db.bucketMgr.GetBucketById(uint64(bucketId))
 			if err != nil {
 				return err
 			}
@@ -96,7 +96,7 @@ func (tx *Tx) NewBucket(ds uint16, name string) (err error) {
 		Meta: &core.BucketMeta{
 			Op: core.BucketInsertOperation,
 		},
-		Id:   tx.db.bucketManager.Gen.GenId(),
+		Id:   tx.db.bucketMgr.Gen.GenId(),
 		Ds:   ds,
 		Name: name,
 	}
@@ -113,7 +113,7 @@ func (tx *Tx) DeleteBucket(ds uint16, bucket string) error {
 		return err
 	}
 
-	b, err := tx.db.bucketManager.GetBucket(ds, bucket)
+	b, err := tx.db.bucketMgr.GetBucket(ds, bucket)
 	if err != nil {
 		return ErrBucketNotFound
 	}
@@ -131,5 +131,5 @@ func (tx *Tx) DeleteBucket(ds uint16, bucket string) error {
 }
 
 func (tx *Tx) ExistBucket(ds uint16, bucket string) bool {
-	return tx.db.bucketManager.ExistBucket(ds, bucket)
+	return tx.db.bucketMgr.ExistBucket(ds, bucket)
 }

@@ -21,7 +21,6 @@ import (
 	"runtime"
 	"testing"
 	"time"
-
 )
 
 // Benchmark suite for tx_btree.go functions
@@ -34,8 +33,8 @@ func setupBenchmarkDB(b *testing.B, dir string) *DB {
 	opts.SyncEnable = false              // Disable sync for better performance
 
 	// Clean up directory
-	os.RemoveAll(dir)
-	os.MkdirAll(dir, 0755)
+	_ = os.RemoveAll(dir)
+	_ = os.MkdirAll(dir, 0755)
 
 	db, err := Open(opts)
 	if err != nil {
@@ -55,9 +54,9 @@ func setupBenchmarkDB(b *testing.B, dir string) *DB {
 
 func cleanupBenchmarkDB(db *DB, dir string) {
 	if db != nil && !db.IsClose() {
-		db.Close()
+		_ = db.Close()
 	}
-	os.RemoveAll(dir)
+	_ = os.RemoveAll(dir)
 }
 
 // Benchmark Put operations

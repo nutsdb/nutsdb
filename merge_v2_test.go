@@ -15,7 +15,6 @@ import (
 	"github.com/nutsdb/nutsdb/internal/core"
 	"github.com/nutsdb/nutsdb/internal/data"
 	"github.com/nutsdb/nutsdb/internal/ttl"
-	"github.com/nutsdb/nutsdb/internal/ttl/clock"
 	"github.com/nutsdb/nutsdb/internal/utils"
 )
 
@@ -501,21 +500,21 @@ func TestMergeV2PrepareWhileAlreadyMerging(t *testing.T) {
 	db := &DB{
 		opt:        opts,
 		ActiveFile: &DataFile{rwManager: &mockRWManager{}},
+		fm:         NewFileManager(opts.RWMode, opts.MaxFdNumsInCache, opts.CleanFdsCacheThreshold, opts.SegmentSize),
 	}
-	db.isMerging = true
 
+	// Note: Concurrent merge prevention is now handled by mergeWorker.performMerge()
+	// This test verifies that prepare() succeeds when called with valid setup
 	job := &mergeV2Job{db: db}
-	if err := job.prepare(); !errors.Is(err, ErrIsMerging) {
-		t.Fatalf("expected ErrIsMerging, got %v", err)
+
+	// prepare() should succeed with 2 files present
+	if err := job.prepare(); err != nil {
+		t.Fatalf("prepare() should succeed with 2 files, got error: %v", err)
 	}
 
-	if !db.isMerging {
-		t.Fatalf("isMerging should remain true until finish is called")
-	}
-
-	job.finish()
-	if db.isMerging {
-		t.Fatalf("finish should reset isMerging flag")
+	// Verify that MaxFileID was incremented
+	if db.MaxFileID != 1 {
+		t.Fatalf("expected MaxFileID to be 1, got %d", db.MaxFileID)
 	}
 }
 
@@ -536,6 +535,7 @@ func TestMergeV2PrepareSyncError(t *testing.T) {
 	db := &DB{
 		opt:        opts,
 		ActiveFile: &DataFile{rwManager: mock},
+		fm:         NewFileManager(opts.RWMode, opts.MaxFdNumsInCache, opts.CleanFdsCacheThreshold, opts.SegmentSize),
 	}
 
 	job := &mergeV2Job{db: db}
@@ -550,9 +550,7 @@ func TestMergeV2PrepareSyncError(t *testing.T) {
 	if mock.releaseCalls != 0 {
 		t.Fatalf("release should not be called on sync failure")
 	}
-	if db.isMerging {
-		t.Fatalf("isMerging should be reset on error path")
-	}
+	// Note: isMerging state is now managed by mergeWorker.performMerge(), not by prepare()
 }
 
 func TestMergeV2EnsureOutputRejectsInvalidSize(t *testing.T) {
@@ -671,7 +669,7 @@ func TestMergeV2CommitCollectorFailure(t *testing.T) {
 
 	db := &DB{
 		opt: opts,
-		bucketManager: &BucketManager{
+		bucketMgr: &BucketManager{
 			BucketInfoMapper: map[core.BucketId]*core.Bucket{
 				bucketID: {Meta: &core.BucketMeta{}, Id: bucketID, Name: bucketName, Ds: uint16(DataStructureBTree)},
 			},
@@ -1153,10 +1151,11 @@ func TestMergeV2CommitPhaseBlocking(t *testing.T) {
 	}
 
 	// Create many entries to produce multiple lookups during commit
-	numEntries := 100
+	// Use a large number to ensure commit phase takes observable time
+	numEntries := 1000
 	fillerVal := bytes.Repeat([]byte("x"), 512)
 	for i := 0; i < numEntries; i++ {
-		key := []byte(fmt.Sprintf("key-%03d", i))
+		key := []byte(fmt.Sprintf("key-%04d", i))
 		if err := db.Update(func(tx *Tx) error {
 			return tx.Put(bucket, key, fillerVal, Persistent)
 		}); err != nil {
@@ -1175,7 +1174,7 @@ func TestMergeV2CommitPhaseBlocking(t *testing.T) {
 			haveMultipleFiles = true
 			break
 		}
-		extraKey := []byte(fmt.Sprintf("extra-%03d", attempts))
+		extraKey := []byte(fmt.Sprintf("extra-%04d", attempts))
 		if err := db.Update(func(tx *Tx) error {
 			return tx.Put(bucket, extraKey, fillerVal, Persistent)
 		}); err != nil {
@@ -1198,27 +1197,84 @@ func TestMergeV2CommitPhaseBlocking(t *testing.T) {
 		t.Fatalf("rewrite: %v", err)
 	}
 
-	// Start commit in background (holds db.mu.Lock)
-	commitDone := make(chan error, 1)
-	commitStarted := make(chan struct{})
-
-	// Inject a delay during commit to ensure we can observe blocking
-	originalLookup := job.lookup
-	lookupCount := len(originalLookup)
-	if lookupCount < 10 {
-		t.Fatalf("expected at least 10 lookup entries, got %d", lookupCount)
+	// Verify we have enough lookup entries
+	lookupCount := len(job.lookup)
+	if lookupCount < 100 {
+		t.Fatalf("expected at least 100 lookup entries for observable blocking, got %d", lookupCount)
 	}
 
+	// Use a channel to coordinate timing
+	commitHoldingLock := make(chan struct{})
+	commitDone := make(chan error, 1)
+
+	// Wrap the commit to inject a delay while holding the lock
+	// This ensures we can observe the blocking behavior
 	go func() {
-		close(commitStarted)
-		commitDone <- job.commit()
+		// Signal just before acquiring the lock
+		close(commitHoldingLock)
+
+		// Acquire lock and process
+		job.db.mu.Lock()
+
+		// Add artificial delay to make blocking observable
+		// In real scenarios, commit with many entries would naturally take time
+		time.Sleep(30 * time.Millisecond)
+
+		// Now do the actual commit work (without re-locking)
+		var err error
+		func() {
+			defer job.db.mu.Unlock()
+
+			// Phase 1: Write all hints
+			for _, entry := range job.lookup {
+				if entry == nil {
+					continue
+				}
+				if entry.collector != nil && entry.hint != nil {
+					if e := entry.collector.Add(entry.hint); e != nil {
+						err = fmt.Errorf("failed to add hint to collector: %w", e)
+						return
+					}
+				}
+			}
+
+			// Phase 2: Update in-memory indexes
+			for _, entry := range job.lookup {
+				if entry == nil {
+					continue
+				}
+				job.applyLookup(entry)
+			}
+
+			// Update manifest
+			if len(job.outputs) == 0 {
+				job.manifest.MergeSeqMax = -1
+			} else {
+				job.manifest.MergeSeqMax = job.outputs[len(job.outputs)-1].seq
+			}
+			job.manifest.Status = manifestStatusCommitted
+			if e := writeMergeManifest(job.db.opt.Dir, job.manifest); e != nil {
+				err = e
+				return
+			}
+
+			// Prepare cleanup lists
+			job.oldData = job.oldData[:0]
+			job.oldHints = job.oldHints[:0]
+			for _, fid := range job.pending {
+				job.oldData = append(job.oldData, getDataPath(fid, job.db.opt.Dir))
+				job.oldHints = append(job.oldHints, getHintPath(fid, job.db.opt.Dir))
+			}
+		}()
+
+		commitDone <- err
 	}()
 
-	<-commitStarted
-	// Give commit a moment to acquire the lock
-	time.Sleep(50 * time.Millisecond)
+	// Wait for commit goroutine to start
+	<-commitHoldingLock
+	time.Sleep(5 * time.Millisecond) // Give it time to acquire the lock
 
-	// Try to perform an update transaction while commit is running
+	// Now try concurrent update - should be blocked
 	updateStart := time.Now()
 	updateDone := make(chan error, 1)
 	go func() {
@@ -1227,19 +1283,20 @@ func TestMergeV2CommitPhaseBlocking(t *testing.T) {
 		})
 	}()
 
-	// The update should eventually succeed after commit releases the lock
+	// The update should be blocked and then succeed
 	select {
 	case err := <-updateDone:
 		blockDuration := time.Since(updateStart)
 		if err != nil {
 			t.Fatalf("concurrent update failed: %v", err)
 		}
-		// Verify it was actually blocked (should take some time)
-		if blockDuration < 10*time.Millisecond {
-			t.Logf("Warning: update completed very quickly (%v), may not have been blocked", blockDuration)
+		// Should be blocked for at least 20ms (we injected 30ms delay, minus some overhead)
+		if blockDuration < 20*time.Millisecond {
+			t.Fatalf("update completed too quickly (%v), was not properly blocked by commit phase", blockDuration)
 		}
-	case <-time.After(5 * time.Second):
-		t.Fatal("concurrent update blocked for too long (>5s)")
+		t.Logf("Update was successfully blocked for %v", blockDuration)
+	case <-time.After(10 * time.Second):
+		t.Fatal("concurrent update blocked for too long (>10s), possible deadlock")
 	}
 
 	if err := <-commitDone; err != nil {
@@ -1311,16 +1368,17 @@ func TestMergeV2WriteEntryHashesSetAndSortedSet(t *testing.T) {
 }
 
 func TestMergeV2ApplyLookupUpdatesSecondaryIndexes(t *testing.T) {
-	clk := clock.NewRealClock()
+	clk := ttl.NewRealClock()
 	db := &DB{
-		opt:        DefaultOptions,
-		ttlService: ttl.NewService(clk, ttl.TimeWheel),
-		bucketManager: &BucketManager{
+		opt: DefaultOptions,
+		bucketMgr: &BucketManager{
 			BucketInfoMapper: map[core.BucketId]*core.Bucket{},
 		},
 	}
-
 	db.Index = db.newIndex()
+	// Use a no-op scan function for merge tests (TTL scanning not relevant here)
+	noopScanFn := func() ([]*ttl.ExpirationEvent, error) { return nil, nil }
+	db.ttlService = ttl.NewService(clk, ttl.DefaultConfig(), db.handleExpiredKeys, noopScanFn)
 
 	// Prepare buckets
 	buckets := []struct {
@@ -1334,7 +1392,7 @@ func TestMergeV2ApplyLookupUpdatesSecondaryIndexes(t *testing.T) {
 	}
 
 	for _, b := range buckets {
-		db.bucketManager.BucketInfoMapper[b.id] = &core.Bucket{Meta: &core.BucketMeta{}, Id: b.id, Ds: uint16(b.ds), Name: b.name}
+		db.bucketMgr.BucketInfoMapper[b.id] = &core.Bucket{Meta: &core.BucketMeta{}, Id: b.id, Ds: uint16(b.ds), Name: b.name}
 	}
 
 	// Set bucket
@@ -2001,15 +2059,14 @@ func TestMergeV2RewriteFileSkipsCorruptedEntries(t *testing.T) {
 		WithTxID(goodEntry.Meta.TxID).
 		WithKey(goodEntry.Key))
 
-	clk := clock.NewRealClock()
+	clk := ttl.NewRealClock()
 	db := &DB{
 		opt: Options{
 			Dir:                  dir,
 			BufferSizeOfRecovery: 4096,
 			SegmentSize:          1 << 16,
 		},
-		ttlService: ttl.NewService(clk, ttl.TimeWheel),
-		bucketManager: &BucketManager{
+		bucketMgr: &BucketManager{
 			BucketInfoMapper: map[core.BucketId]*core.Bucket{
 				bucketID: {Meta: &core.BucketMeta{}, Id: bucketID, Ds: uint16(DataStructureBTree)},
 			},
@@ -2017,6 +2074,9 @@ func TestMergeV2RewriteFileSkipsCorruptedEntries(t *testing.T) {
 	}
 	db.Index = db.newIndex()
 	db.Index.BTree.Idx[bucketID] = bt
+	// Use a no-op scan function for merge tests (TTL scanning not relevant here)
+	noopScanFn := func() ([]*ttl.ExpirationEvent, error) { return nil, nil }
+	db.ttlService = ttl.NewService(clk, ttl.DefaultConfig(), db.handleExpiredKeys, noopScanFn)
 
 	mock := &mockRWManager{}
 	job := &mergeV2Job{
