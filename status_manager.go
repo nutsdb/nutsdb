@@ -8,331 +8,194 @@ import (
 	"time"
 )
 
-// Status represents the lifecycle state of the database
-type Status int
-
-const (
-	StatusInitializing Status = iota
-	StatusOpen
-	StatusClosing
-	StatusClosed
-)
-
-// StatusManager orchestrates the lifecycle and state of the database and its components
 type StatusManager struct {
-	// state machine
-	state atomic.Value // Status
-
-	// component registry and ordering guard
-	components   map[string]*ComponentWrapper
-	componentsMu sync.RWMutex // Ensures ordering while registering components
-
-	// Maintains component names in registration order
+	components     map[string]Component
+	componentsMu   sync.RWMutex
 	componentNames []string
-
-	// Controls lifecycle cancellation
-	ctx    context.Context
-	cancel context.CancelFunc
-
-	// Coordinates running goroutines
-	wg sync.WaitGroup
-
-	// Configuration for shutdown behavior
-	config StatusManagerConfig
-
-	// Error handling strategy
-	errorHandler ComponentErrorHandler
-
-	// Tracks shutdown progress
-	shutdownProgress *ShutdownProgress
+	ctx            context.Context
+	cancel         context.CancelFunc
+	wg             sync.WaitGroup
+	config         StatusManagerConfig
+	startMu        sync.Mutex
+	started        bool
+	closing        atomic.Bool
+	closed         atomic.Bool
+	closedCh       chan struct{}
+	closeErrMu     sync.Mutex
+	closeErr       error
 }
 
-// StatusManagerConfig holds configuration choices for StatusManager
 type StatusManagerConfig struct {
-	ShutdownTimeout time.Duration // Timeout used when closing components
+	ShutdownTimeout time.Duration
 }
 
-// DefaultStatusManagerConfig provides the default settings
 func DefaultStatusManagerConfig() StatusManagerConfig {
 	return StatusManagerConfig{
 		ShutdownTimeout: 30 * time.Second,
 	}
 }
 
-// NewStatusManager builds a new manager with the provided configuration
 func NewStatusManager(config StatusManagerConfig) *StatusManager {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	sm := &StatusManager{
-		componentNames:   make([]string, 0),
-		components:       make(map[string]*ComponentWrapper),
-		ctx:              ctx,
-		cancel:           cancel,
-		config:           config,
-		errorHandler:     NewDefaultErrorHandler(nil),
-		shutdownProgress: nil,
+		componentNames: make([]string, 0),
+		components:     make(map[string]Component),
+		ctx:            ctx,
+		cancel:         cancel,
+		config:         config,
+		closedCh:       make(chan struct{}),
 	}
-
-	// Start in Initializing so Start() can proceed
-	sm.state.Store(StatusInitializing)
 
 	return sm
 }
 
-// Status returns the current database status
-func (sm *StatusManager) Status() Status {
-	if v := sm.state.Load(); v != nil {
-		return v.(Status)
-	}
-	return StatusClosed
-}
-
-// IsOperational reports whether the database is ready for traffic (only true while Open)
-func (sm *StatusManager) IsOperational() bool {
-	return sm.Status() == StatusOpen
-}
-
-// Context provides the cancellation context that components should monitor for shutdown
 func (sm *StatusManager) Context() context.Context {
 	return sm.ctx
 }
 
-// String returns the human-readable form of a Status
-func (s Status) String() string {
-	switch s {
-	case StatusInitializing:
-		return "Initializing"
-	case StatusOpen:
-		return "Open"
-	case StatusClosing:
-		return "Closing"
-	case StatusClosed:
-		return "Closed"
-	default:
-		return "Unknown"
-	}
-}
-
-// RegisterComponent adds a component so StatusManager can manage it
 func (sm *StatusManager) RegisterComponent(name string, component Component) error {
 	sm.componentsMu.Lock()
 	defer sm.componentsMu.Unlock()
 
-	// Prevent duplicate component registration by name
 	if _, exists := sm.components[name]; exists {
 		return fmt.Errorf("component %s already registered", name)
 	}
 
-	// Wrap and store the component
-	wrapper := NewComponentWrapper(component)
-	sm.components[name] = wrapper
+	sm.components[name] = component
 	sm.componentNames = append(sm.componentNames, name)
 
 	return nil
 }
 
-// getComponentWrapper retrieves a registered wrapper (internal helper)
-func (sm *StatusManager) getComponentWrapper(name string) (*ComponentWrapper, error) {
+func (sm *StatusManager) getComponent(name string) (Component, error) {
 	sm.componentsMu.RLock()
 	defer sm.componentsMu.RUnlock()
 
-	wrapper, ok := sm.components[name]
+	component, ok := sm.components[name]
 	if !ok {
 		return nil, fmt.Errorf("component %s not found", name)
 	}
 
-	return wrapper, nil
+	return component, nil
 }
 
-// getAllComponents returns the registered names in order (internal helper)
 func (sm *StatusManager) getAllComponents() []string {
 	sm.componentsMu.RLock()
 	defer sm.componentsMu.RUnlock()
 
-	// Copy to avoid concurrent mutation
 	names := make([]string, len(sm.componentNames))
 	copy(names, sm.componentNames)
 	return names
 }
 
-// transitionTo performs a state transition after validating it follows allowed paths
-func (sm *StatusManager) transitionTo(toState Status) error {
-	fromState := sm.Status()
-
-	// Confirm the transition is valid before updating state
-	if !sm.isValidTransition(fromState, toState) {
-		return fmt.Errorf("invalid state transition from %s to %s", fromState, toState)
-	}
-
-	// Store the new state after validation
-	sm.state.Store(toState)
-	return nil
-}
-
-// isValidTransition enforces allowed lifecycle transitions
-// Rules:
-// - Initializing -> Open (when all components start)
-// - Open -> Closing (when Close is called)
-// - Closing -> Closed (after every component stops)
-// - Closed -> Closed (idempotent, can close multiple times)
-func (sm *StatusManager) isValidTransition(from, to Status) bool {
-	switch from {
-	case StatusInitializing:
-		return to == StatusOpen
-	case StatusOpen:
-		return to == StatusClosing
-	case StatusClosing:
-		return to == StatusClosed
-	case StatusClosed:
-		return to == StatusClosed // idempotent
-	default:
-		return false
-	}
-}
-
-// Start initializes every registered component in order and rolls back on failure
 func (sm *StatusManager) Start() error {
-	currentStatus := sm.Status()
-	if currentStatus != StatusInitializing {
-		return fmt.Errorf("cannot start: current status is %s, expected Initializing", currentStatus)
+	if sm.isClosingOrClosed() {
+		return ErrDBClosed
 	}
 
-	// Fetch names in registration order for deterministic startup
+	sm.startMu.Lock()
+	defer sm.startMu.Unlock()
+
+	if sm.started {
+		return fmt.Errorf("status manager already started")
+	}
+
 	componentNames := sm.getAllComponents()
 
-	// Track started components so we can roll back on failure
 	startedComponents := make([]string, 0, len(componentNames))
 
-	// Start components in registration order
 	for _, name := range componentNames {
-		wrapper, err := sm.getComponentWrapper(name)
+		component, err := sm.getComponent(name)
 		if err != nil {
 			sm.rollbackStartup(startedComponents)
 			return err
 		}
 
-		component := wrapper.GetComponent()
-
-		wrapper.SetStatus(ComponentStatusStarting)
-
-		// Start the component to transition it to running
 		if err := component.Start(sm.ctx); err != nil {
-			wrapper.SetStatus(ComponentStatusFailed)
-
-			// Report the startup error via the handler
-			wrappedErr := sm.errorHandler.HandleStartupError(name, err)
-
-			// Roll back the components that already started
 			sm.rollbackStartup(startedComponents)
 
-			return wrappedErr
+			return fmt.Errorf("component %s failed to start: %w", name, err)
 		}
 
-		// Mark the wrapper as running
-		wrapper.SetStatus(ComponentStatusRunning)
 		startedComponents = append(startedComponents, name)
 	}
 
-	// All components started, transition to Open
-	return sm.transitionTo(StatusOpen)
+	sm.started = true
+	return nil
 }
 
-// rollbackStartup stops started components in reverse order to undo partial start-ups
 func (sm *StatusManager) rollbackStartup(startedComponents []string) {
-	// Stop components in reverse order of startup
 	for i := len(startedComponents) - 1; i >= 0; i-- {
 		name := startedComponents[i]
-		wrapper, err := sm.getComponentWrapper(name)
+		component, err := sm.getComponent(name)
 		if err != nil {
 			continue
 		}
 
-		component := wrapper.GetComponent()
-		wrapper.SetStatus(ComponentStatusStopping)
-
-		// Use a shorter timeout for the rollback stop
-		if err := component.Stop(5 * time.Second); err != nil {
-			wrapper.SetStatus(ComponentStatusFailed)
-		} else {
-			wrapper.SetStatus(ComponentStatusStopped)
-		}
+		_ = component.Stop(5 * time.Second)
 	}
 }
 
-// Close terminates all components in reverse registration order for graceful shutdown
 func (sm *StatusManager) Close() error {
-	// Use mutex to prevent concurrent Close() calls from racing
-	sm.componentsMu.Lock()
-	currentStatus := sm.Status()
-
-	// Idempotent: if already Closed, return immediately
-	if currentStatus == StatusClosed {
-		sm.componentsMu.Unlock()
-		return nil
+	if sm.closed.Load() {
+		return sm.loadCloseErr()
 	}
 
-	// If already closing, wait for completion
-	if currentStatus == StatusClosing {
-		sm.componentsMu.Unlock()
-		return sm.waitForClosed()
+	if !sm.closing.CompareAndSwap(false, true) {
+		<-sm.closedCh
+		return sm.loadCloseErr()
 	}
 
-	// Transition to Closing state while holding the lock
-	if err := sm.transitionTo(StatusClosing); err != nil {
-		sm.componentsMu.Unlock()
-		return err
-	}
-	sm.componentsMu.Unlock()
+	err := sm.close()
+	sm.setCloseErr(err)
+	sm.closed.Store(true)
+	close(sm.closedCh)
 
-	// Cancel the shared context to signal components to stop
+	return err
+}
+
+func (sm *StatusManager) close() error {
 	sm.cancel()
 
-	// Collect component names and reverse them so shutdown happens in reverse registration order
 	componentNames := sm.getAllComponents()
 
-	// Reverse the list to compute shutdown order
 	shutdownOrder := make([]string, len(componentNames))
 	for i, name := range componentNames {
 		shutdownOrder[len(componentNames)-1-i] = name
 	}
 
-	// Initialize shutdown progress tracking
-	sm.shutdownProgress = NewShutdownProgress(len(shutdownOrder))
-	sm.shutdownProgress.SetCurrentPhase("Stopping components")
-
-	// Create a timed context to bound shutdown duration
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), sm.config.ShutdownTimeout)
+	deadline, _ := shutdownCtx.Deadline()
 
-	// Track shutdown completion via a channel
 	doneCh := make(chan struct{})
 	go func() {
 		sm.shutdownComponents(shutdownCtx, shutdownOrder)
 		close(doneCh)
 	}()
 
-	// Wait for shutdown completion or timeout
+	var shutdownErr error
 	select {
 	case <-doneCh:
 	case <-shutdownCtx.Done():
-		sm.shutdownProgress.SetCurrentPhase("Timeout - forcing closure")
+		shutdownErr = fmt.Errorf("timeout stopping components")
 	}
 
 	shutdownCancel()
 
-	// Wait for any remaining goroutines to finish
-	sm.wg.Wait()
+	if err := sm.waitForGoroutines(deadline); err != nil {
+		if shutdownErr != nil {
+			shutdownErr = fmt.Errorf("%v; %w", shutdownErr, err)
+		} else {
+			shutdownErr = err
+		}
+	}
 
-	// Transition to Closed after cleanup
-	sm.transitionTo(StatusClosed)
-
-	return nil
+	return shutdownErr
 }
 
-// shutdownComponents shuts down components following the provided order
 func (sm *StatusManager) shutdownComponents(ctx context.Context, order []string) {
-	// Handle empty component list
 	if len(order) == 0 {
-		sm.shutdownProgress.SetCurrentPhase("Complete")
 		return
 	}
 
@@ -341,31 +204,20 @@ func (sm *StatusManager) shutdownComponents(ctx context.Context, order []string)
 	for idx, name := range order {
 		select {
 		case <-ctx.Done():
-			sm.shutdownProgress.SetCurrentPhase("Timeout - forcing closure")
 			return
 		default:
 		}
 
-		wrapper, err := sm.getComponentWrapper(name)
+		component, err := sm.getComponent(name)
 		if err != nil {
-			sm.shutdownProgress.AddFailedComponent(name)
-			sm.shutdownProgress.IncrementStopped()
 			continue
 		}
 
-		component := wrapper.GetComponent()
-		wrapper.SetStatus(ComponentStatusStopping)
-
-		// Dedicate a slice of the remaining timeout to this component
 		remainingTimeout := sm.config.ShutdownTimeout
 		if hasDeadline {
 			remainingTimeout = time.Until(deadline)
 		}
 		if remainingTimeout <= 0 {
-			wrapper.SetStatus(ComponentStatusFailed)
-			sm.errorHandler.HandleShutdownError(name, context.DeadlineExceeded)
-			sm.shutdownProgress.AddFailedComponent(name)
-			sm.shutdownProgress.IncrementStopped()
 			continue
 		}
 
@@ -375,51 +227,54 @@ func (sm *StatusManager) shutdownComponents(ctx context.Context, order []string)
 			componentTimeout = remainingTimeout
 		}
 
-		// Attempt to stop regardless of error so shutdown continues
-		if err := component.Stop(componentTimeout); err != nil {
-			wrapper.SetStatus(ComponentStatusFailed)
-			sm.errorHandler.HandleShutdownError(name, err)
-			sm.shutdownProgress.AddFailedComponent(name)
-		} else {
-			wrapper.SetStatus(ComponentStatusStopped)
-		}
-
-		sm.shutdownProgress.IncrementStopped()
-	}
-
-	sm.shutdownProgress.SetCurrentPhase("Complete")
-}
-
-// waitForClosed polls until the manager reaches Closed status
-func (sm *StatusManager) waitForClosed() error {
-	ticker := time.NewTicker(100 * time.Millisecond)
-	defer ticker.Stop()
-
-	timeout := time.After(sm.config.ShutdownTimeout)
-
-	for {
-		select {
-		case <-ticker.C:
-			if sm.Status() == StatusClosed {
-				return nil
-			}
-		case <-timeout:
-			return fmt.Errorf("timeout waiting for StatusManager to close")
-		}
+		_ = component.Stop(componentTimeout)
 	}
 }
 
-// GetShutdownProgress returns the shutdown progress tracker (nil if shutdown hasn't started)
-func (sm *StatusManager) GetShutdownProgress() *ShutdownProgress {
-	return sm.shutdownProgress
+func (sm *StatusManager) waitForGoroutines(deadline time.Time) error {
+	remaining := time.Until(deadline)
+	if remaining <= 0 {
+		return fmt.Errorf("timeout waiting for background goroutines to stop")
+	}
+
+	doneCh := make(chan struct{})
+	go func() {
+		sm.wg.Wait()
+		close(doneCh)
+	}()
+
+	select {
+	case <-doneCh:
+		return nil
+	case <-time.After(remaining):
+		return fmt.Errorf("timeout waiting for background goroutines to stop")
+	}
 }
 
-// Add adjusts the internal WaitGroup so components can register goroutines
+func (sm *StatusManager) isClosingOrClosed() bool {
+	return sm.closing.Load() || sm.closed.Load()
+}
+
+func (sm *StatusManager) isClosed() bool {
+	return sm.closed.Load()
+}
+
+func (sm *StatusManager) loadCloseErr() error {
+	sm.closeErrMu.Lock()
+	defer sm.closeErrMu.Unlock()
+	return sm.closeErr
+}
+
+func (sm *StatusManager) setCloseErr(err error) {
+	sm.closeErrMu.Lock()
+	defer sm.closeErrMu.Unlock()
+	sm.closeErr = err
+}
+
 func (sm *StatusManager) Add(delta int) {
 	sm.wg.Add(delta)
 }
 
-// Done decrements the WaitGroup once a component goroutine finishes
 func (sm *StatusManager) Done() {
 	sm.wg.Done()
 }

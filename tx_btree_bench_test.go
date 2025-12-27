@@ -21,7 +21,6 @@ import (
 	"runtime"
 	"testing"
 	"time"
-
 )
 
 // Benchmark suite for tx_btree.go functions

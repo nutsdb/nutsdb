@@ -243,17 +243,6 @@ func (db *DB) IsMerging() bool {
 	return db.mergeWorker.IsMerging()
 }
 
-// SetMerging atomically sets the merging state.
-// SetMerging atomically sets the merging state.
-// Deprecated: This method is deprecated and will be removed in a future version.
-// Merge state is now managed internally by mergeWorker.
-// Returns true for backward compatibility.
-func (db *DB) SetMerging(v bool) bool {
-	// For backward compatibility, always return true
-	// The actual state is managed by mergeWorker
-	return true
-}
-
 // Backup copies the database to file directory at the given dir.
 func (db *DB) Backup(dir string) error {
 	return db.View(func(tx *Tx) error {
@@ -273,7 +262,7 @@ func (db *DB) Close() error {
 	db.mu.Lock()
 
 	// Check if StatusManager is already closed to avoid double close
-	if db.statusMgr.Status() == StatusClosed {
+	if db.statusMgr.isClosed() {
 		db.mu.Unlock()
 		return ErrDBClosed
 	}
@@ -1080,7 +1069,7 @@ func (db *DB) checkListExpired() {
 
 // IsClose return the value that represents the status of DB
 func (db *DB) IsClose() bool {
-	return db.statusMgr.Status() == StatusClosed
+	return db.statusMgr.isClosed()
 }
 
 // handleExpiredKeys processes a batch of expiration events in a single transaction.

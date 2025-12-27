@@ -33,7 +33,6 @@ import (
 var ErrDontNeedMerge = errors.New("the number of files waiting to be merged is less than 2")
 
 func (db *DB) Merge() error {
-	// Trigger merging through MergeWorker to keep merge logic centralized
 	return db.mergeWorker.TriggerMerge()
 }
 
@@ -62,15 +61,7 @@ func (db *DB) mergeLegacy() error {
 		pendingMergeFIds []int64
 	)
 
-	// to prevent the initiation of multiple merges simultaneously.
 	db.mu.Lock()
-
-	if !db.SetMerging(true) {
-		db.mu.Unlock()
-		return ErrIsMerging
-	}
-	defer db.SetMerging(false)
-
 	_, pendingMergeFIds = db.getMaxFileIDAndFileIDs()
 	if len(pendingMergeFIds) < 2 {
 		db.mu.Unlock()
@@ -106,7 +97,6 @@ func (db *DB) mergeLegacy() error {
 
 	mergingPath := make([]string, len(pendingMergeFIds))
 
-	// Used to collect all merged entry information for later writing to the HintFile
 	var mergedEntries []mergedEntryInfo
 
 	for i, pendingMergeFId := range pendingMergeFIds {
@@ -131,12 +121,8 @@ func (db *DB) mergeLegacy() error {
 					continue
 				}
 
-				// Due to the lack of concurrency safety in the index,
-				// there is a possibility that a race condition might occur when the merge goroutine reads the index,
-				// while a transaction is being committed, causing modifications to the index.
-				// To address this issue, we need to use a transaction to perform this operation.
+				// Index reads can race with commits; use a transaction to avoid inconsistencies.
 				err := db.Update(func(tx *Tx) error {
-					// check if we have a new entry with same key and bucket
 					if ok := db.isPendingMergeEntry(entry); ok {
 						bucket, err := db.bucketMgr.GetBucketById(entry.Meta.BucketId)
 						if err != nil {
@@ -167,7 +153,6 @@ func (db *DB) mergeLegacy() error {
 							}
 						}
 
-						// Record merged entry information to get actual position from index later
 						mergedEntries = append(mergedEntries, mergedEntryInfo{
 							entry:    entry,
 							bucketId: bucket.Id,
@@ -200,13 +185,10 @@ func (db *DB) mergeLegacy() error {
 		mergingPath[i] = path
 	}
 
-	// Now that all data has been written, create HintFile for all newly generated data files
-	// Only create HintFile for new files actually generated during the Merge process
 	db.mu.Lock()
-	endFileID := db.MaxFileID // Record the maximum file ID when merge ends
+	endFileID := db.MaxFileID
 	db.mu.Unlock()
 
-	// Only build HintFiles when the feature is enabled to avoid extra work
 	if db.opt.EnableHintFile {
 		if err := db.buildHintFilesAfterMerge(startFileID, endFileID); err != nil {
 			return fmt.Errorf("failed to build hint files after merge: %w", err)
@@ -221,11 +203,9 @@ func (db *DB) mergeLegacy() error {
 			return fmt.Errorf("when merge err: %s", err)
 		}
 
-		// Delete the HintFile corresponding to the old data file (if it exists)
 		oldHintPath := getHintPath(int64(pendingMergeFIds[i]), db.opt.Dir)
 		if _, err := os.Stat(oldHintPath); err == nil {
 			if removeErr := os.Remove(oldHintPath); removeErr != nil {
-				// Log error but don't interrupt the merge process
 				fmt.Printf("warning: failed to remove old hint file %s: %v\n", oldHintPath, removeErr)
 			}
 		}
@@ -234,9 +214,6 @@ func (db *DB) mergeLegacy() error {
 	return nil
 }
 
-// buildHintFilesAfterMerge creates HintFiles for all newly generated data files after merge
-// by traversing the index to find all records pointing to new files.
-// Only process files in the range [startFileID, endFileID]
 func (db *DB) buildHintFilesAfterMerge(startFileID, endFileID int64) error {
 	if startFileID > endFileID {
 		return nil
@@ -432,40 +409,31 @@ func (db *DB) isPendingListEntry(entry *core.Entry) bool {
 	return false
 }
 
-// mergedEntryInfo temporarily holds entry metadata during merge processing
 type mergedEntryInfo struct {
 	entry    *core.Entry
 	bucketId core.BucketId
 }
 
-// mergeWorker manages data file merge operations
-// Implements Component interface for lifecycle management
 type mergeWorker struct {
-	// lifecycle management
 	lifecycle core.ComponentLifecycle
 
 	db            *DB
 	statusManager *StatusManager
 
-	// merge control
 	mergeStartCh chan struct{}
 	mergeEndCh   chan error
 	isMerging    atomic.Bool
 
-	// timer
 	ticker *time.Ticker
 
-	// config
 	config MergeConfig
 }
 
-// MergeConfig merge configuration
 type MergeConfig struct {
-	MergeInterval   time.Duration // auto merge interval, 0 = disabled
-	EnableAutoMerge bool          // enable auto merge
+	MergeInterval   time.Duration
+	EnableAutoMerge bool
 }
 
-// DefaultMergeConfig returns default merge config
 func DefaultMergeConfig() MergeConfig {
 	return MergeConfig{
 		MergeInterval:   0,
@@ -473,7 +441,6 @@ func DefaultMergeConfig() MergeConfig {
 	}
 }
 
-// newMergeWorker creates a new mergeWorker
 func newMergeWorker(db *DB, sm *StatusManager, config MergeConfig) *mergeWorker {
 	return &mergeWorker{
 		db:            db,
@@ -484,20 +451,15 @@ func newMergeWorker(db *DB, sm *StatusManager, config MergeConfig) *mergeWorker 
 	}
 }
 
-// Name returns component name
 func (mw *mergeWorker) Name() string {
 	return "MergeWorker"
 }
 
-// Start starts the mergeWorker
-// Implements Component interface
 func (mw *mergeWorker) Start(ctx context.Context) error {
-	// start lifecycle
 	if err := mw.lifecycle.Start(ctx); err != nil {
 		return err
 	}
 
-	// initialize timer
 	if mw.config.EnableAutoMerge && mw.config.MergeInterval > 0 {
 		mw.ticker = time.NewTicker(mw.config.MergeInterval)
 	} else {
@@ -505,126 +467,92 @@ func (mw *mergeWorker) Start(ctx context.Context) error {
 		mw.ticker.Stop()
 	}
 
-	// start worker goroutine
 	mw.statusManager.Add(1)
 	mw.lifecycle.Go(mw.run)
 
 	return nil
 }
 
-// Stop stops the mergeWorker
-// Waits for current merge to complete or timeout
-// Implements Component interface
 func (mw *mergeWorker) Stop(timeout time.Duration) error {
-	// stop timer
 	if mw.ticker != nil {
 		mw.ticker.Stop()
 	}
 
-	// stop lifecycle (cancels context and waits for goroutines)
 	return mw.lifecycle.Stop(timeout)
 }
 
-// TriggerMerge manually triggers a merge operation
-// Returns ErrDBClosed if database is closing or closed
 func (mw *mergeWorker) TriggerMerge() error {
-	// check database status
-	status := mw.statusManager.Status()
-	if status == StatusClosing || status == StatusClosed {
+	if mw.statusManager.isClosingOrClosed() {
 		return ErrDBClosed
 	}
 
-	// check if already merging
 	if mw.isMerging.Load() {
 		return ErrIsMerging
 	}
 
-	// send merge request
 	select {
 	case mw.mergeStartCh <- struct{}{}:
-		// wait for merge to complete
 		return <-mw.mergeEndCh
 	case <-mw.lifecycle.Context().Done():
 		return ErrDBClosed
 	}
 }
 
-// IsMerging returns whether a merge is in progress
 func (mw *mergeWorker) IsMerging() bool {
 	return mw.isMerging.Load()
 }
 
-// run is the main loop for mergeWorker
-// Listens for merge requests and timer events
 func (mw *mergeWorker) run(ctx context.Context) {
 	defer mw.statusManager.Done()
 
 	for {
 		select {
 		case <-ctx.Done():
-			// received close signal, exit loop
 			return
 
 		case <-mw.mergeStartCh:
-			// received manual merge request
-
-			// check close signal before starting merge
 			select {
 			case <-ctx.Done():
 				return
 			default:
 			}
 
-			// perform merge
 			err := mw.performMerge()
 
-			// send merge result (non-blocking)
 			select {
 			case mw.mergeEndCh <- err:
 			default:
 			}
 
-			// if auto merge is enabled, reset timer
 			if mw.config.EnableAutoMerge && mw.config.MergeInterval > 0 {
 				mw.ticker.Reset(mw.config.MergeInterval)
 			}
 
 		case <-mw.ticker.C:
-			// timer triggered auto merge
-
-			// check close signal before starting merge
 			select {
 			case <-ctx.Done():
 				return
 			default:
 			}
 
-			// perform merge (ignore errors for auto merge)
 			_ = mw.performMerge()
 		}
 	}
 }
 
-// performMerge performs the actual merge operation
 func (mw *mergeWorker) performMerge() error {
-	// check database status
-	status := mw.statusManager.Status()
-	if status == StatusClosing || status == StatusClosed {
+	if mw.statusManager.isClosingOrClosed() {
 		return ErrDBClosed
 	}
 
-	// set merging flag atomically
 	if !mw.isMerging.CompareAndSwap(false, true) {
 		return ErrIsMerging
 	}
 	defer mw.isMerging.Store(false)
 
-	// perform merge
 	return mw.db.merge()
 }
 
-// SetMergeInterval sets the merge interval
-// If interval > 0, enables auto merge; otherwise disables
 func (mw *mergeWorker) SetMergeInterval(interval time.Duration) {
 	mw.config.MergeInterval = interval
 
@@ -641,7 +569,6 @@ func (mw *mergeWorker) SetMergeInterval(interval time.Duration) {
 	}
 }
 
-// GetMergeInterval returns the merge interval
 func (mw *mergeWorker) GetMergeInterval() time.Duration {
 	return mw.config.MergeInterval
 }

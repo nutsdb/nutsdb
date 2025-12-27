@@ -164,8 +164,8 @@ func TestProperty_ContextCancellationPropagation_RealComponents(t *testing.T) {
 			}
 
 			// Verification 4: StatusManager should be in Closed state
-			if sm.Status() != StatusClosed {
-				t.Logf("Expected StatusManager to be Closed, got: %s", sm.Status())
+			if !sm.isClosed() {
+				t.Logf("Expected StatusManager to be Closed")
 				return false
 			}
 

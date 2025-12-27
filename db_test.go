@@ -871,7 +871,7 @@ func TestDB_Close_CompleteShutdownFlow(t *testing.T) {
 
 	// Verify database is operational before close
 	require.False(t, db.IsClose())
-	require.Equal(t, StatusOpen, db.statusMgr.Status())
+	require.False(t, db.statusMgr.isClosingOrClosed())
 
 	// Close the database
 	err = db.Close()
@@ -879,7 +879,7 @@ func TestDB_Close_CompleteShutdownFlow(t *testing.T) {
 
 	// Verify database is closed
 	require.True(t, db.IsClose())
-	require.Equal(t, StatusClosed, db.statusMgr.Status())
+	require.True(t, db.statusMgr.isClosed())
 
 	// Verify resources are released
 	require.Nil(t, db.ActiveFile)
@@ -1062,7 +1062,7 @@ func TestDB_Close_Timeout(t *testing.T) {
 
 	// Database should be closed even if timeout occurred
 	require.True(t, db.IsClose())
-	require.Equal(t, StatusClosed, db.statusMgr.Status())
+	require.True(t, db.statusMgr.isClosed())
 
 	// Wait for background transaction to finish
 	select {
@@ -1128,7 +1128,7 @@ func TestDB_Close_ConcurrentCalls(t *testing.T) {
 
 	// Database should be closed
 	require.True(t, db.IsClose())
-	require.Equal(t, StatusClosed, db.statusMgr.Status())
+	require.True(t, db.statusMgr.isClosed())
 }
 
 // TestDB_Close_IdempotentCalls tests that multiple sequential close calls are safe
@@ -1168,7 +1168,7 @@ func TestDB_Close_ComponentShutdownOrder(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify database is closed
-	require.Equal(t, StatusClosed, db.statusMgr.Status())
+	require.True(t, db.statusMgr.isClosed())
 }
 
 // TestDB_Close_WithMergeInProgress tests closing database during merge operation
@@ -1212,7 +1212,7 @@ func TestDB_Close_WithMergeInProgress(t *testing.T) {
 
 	// Verify database is closed
 	require.True(t, db.IsClose())
-	require.Equal(t, StatusClosed, db.statusMgr.Status())
+	require.True(t, db.statusMgr.isClosed())
 }
 
 // TestDB_Close_ResourceCleanup tests that all resources are properly cleaned up
@@ -1289,7 +1289,7 @@ func TestDB_Close_ErrorHandling(t *testing.T) {
 
 	// Even if there were errors, database should be in closed state
 	require.True(t, db.IsClose())
-	require.Equal(t, StatusClosed, db.statusMgr.Status())
+	require.True(t, db.statusMgr.isClosed())
 }
 
 func TestDB_ErrThenReadWrite(t *testing.T) {

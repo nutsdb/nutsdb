@@ -179,7 +179,7 @@ func TestWriteBatchCommit_UnregistersOnBeginTxFailure(t *testing.T) {
 	db.statusMgr.wg.Wait()
 
 	// Simulate shutdown so the new transaction cannot be opened.
-	db.statusMgr.state.Store(StatusClosing)
+	db.statusMgr.closing.Store(true)
 
 	err = wb.commit()
 	require.ErrorIs(t, err, ErrDBClosed)

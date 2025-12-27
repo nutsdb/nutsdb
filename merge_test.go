@@ -77,7 +77,6 @@ func TestDB_MergeForString(t *testing.T) {
 		opts.EnableMergeV2 = mode.enableMergeV2
 		opts.Dir = fmt.Sprintf("/tmp/test-string-merge-%s/", mode.name)
 
-		// Clean the test directory at the start
 		removeDir(opts.Dir)
 
 		for _, idxMode := range []EntryIdxMode{HintKeyValAndRAMIdxMode, HintKeyAndRAMIdxMode} {
@@ -87,39 +86,32 @@ func TestDB_MergeForString(t *testing.T) {
 			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 			require.NoError(t, err)
 
-			// Merge is not needed
 			err = db.Merge()
 			require.Equal(t, ErrDontNeedMerge, err)
 
-			// Add some data
 			n := 1000
 			for i := 0; i < n; i++ {
 				txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), Persistent, nil, nil)
 			}
 
-			// Delete some data
 			for i := 0; i < n/2; i++ {
 				txDel(t, db, bucket, testutils.GetTestBytes(i), nil)
 			}
 
-			// Merge and check the result
 			require.NoError(t, db.Merge())
 
 			dbCnt, err := db.getRecordCount()
 			require.NoError(t, err)
 			require.Equal(t, int64(n/2), dbCnt)
 
-			// Check the deleted data is deleted
 			for i := 0; i < n/2; i++ {
 				txGet(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), ErrKeyNotFound)
 			}
 
-			// Check the added data is added
 			for i := n / 2; i < n; i++ {
 				txGet(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), nil)
 			}
 
-			// Close and reopen the db
 			require.NoError(t, db.Close())
 
 			db, err = Open(opts)
@@ -129,12 +121,10 @@ func TestDB_MergeForString(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, int64(n/2), dbCnt)
 
-			// Check the deleted data is deleted
 			for i := 0; i < n/2; i++ {
 				txGet(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), ErrKeyNotFound)
 			}
 
-			// Check the added data is added
 			for i := n / 2; i < n; i++ {
 				txGet(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), nil)
 			}
@@ -397,23 +387,19 @@ func TestDB_MergeForSet(t *testing.T) {
 
 			require.NoError(t, err)
 
-			// Merge is not needed
 			err = db.Merge()
 			require.Equal(t, ErrDontNeedMerge, err)
 
-			// Add some data
 			n := 1000
 			key := testutils.GetTestBytes(0)
 			for i := 0; i < n; i++ {
 				txSAdd(t, db, bucket, key, testutils.GetTestBytes(i), nil, nil)
 			}
 
-			// Delete some data
 			for i := 0; i < n/2; i++ {
 				txSRem(t, db, bucket, key, testutils.GetTestBytes(i), nil)
 			}
 
-			// Pop a random value
 			var spopValue []byte
 			err = db.Update(func(tx *Tx) error {
 				var err error
@@ -423,22 +409,18 @@ func TestDB_MergeForSet(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			// Check the random value is popped
 			txSIsMember(t, db, bucket, key, spopValue, false)
 
-			// txSPop(t, db, bucket, key,nil)
 			dbCnt, err := db.getRecordCount()
 			require.NoError(t, err)
 			require.Equal(t, int64(n/2-1), dbCnt)
 
-			// Merge and check the result
 			require.NoError(t, db.Merge())
 
 			dbCnt, err = db.getRecordCount()
 			require.NoError(t, err)
 			require.Equal(t, int64(n/2-1), dbCnt)
 
-			// Check the random value is popped
 			txSIsMember(t, db, bucket, key, spopValue, false)
 			for i := n / 2; i < n; i++ {
 				v := testutils.GetTestBytes(i)
@@ -448,10 +430,8 @@ func TestDB_MergeForSet(t *testing.T) {
 				txSIsMember(t, db, bucket, key, v, true)
 			}
 
-			// Close and reopen the db
 			require.NoError(t, db.Close())
 
-			// reopen db
 			db, err = Open(opts)
 			require.NoError(t, err)
 
@@ -459,7 +439,6 @@ func TestDB_MergeForSet(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, int64(n/2-1), dbCnt)
 
-			// Check the random value is popped
 			txSIsMember(t, db, bucket, key, spopValue, false)
 			for i := n / 2; i < n; i++ {
 				v := testutils.GetTestBytes(i)
@@ -474,10 +453,6 @@ func TestDB_MergeForSet(t *testing.T) {
 	})
 }
 
-// TestDB_MergeForZSet is a test function to check the Merge() function of the DB struct
-// It creates a DB with two different EntryIdxMode, then adds and scores each item in the DB
-// It then removes half of the items from the DB, then checks that the items that are left are the same as the ones that were removed
-// It then closes the DB, reopens it, and checks that the items that were removed are now not present
 func TestDB_MergeForZSet(t *testing.T) {
 	runForMergeModes(t, func(t *testing.T, mode mergeTestMode) {
 		bucket := "bucket"
@@ -488,7 +463,6 @@ func TestDB_MergeForZSet(t *testing.T) {
 		opts.EnableMergeV2 = mode.enableMergeV2
 		opts.Dir = fmt.Sprintf("/tmp/test-zset-merge-%s/", mode.name)
 
-		// test different EntryIdxMode
 		for _, idxMode := range []EntryIdxMode{HintKeyValAndRAMIdxMode, HintKeyAndRAMIdxMode} {
 			removeDir(opts.Dir)
 			opts.EntryIdxMode = idxMode
@@ -498,7 +472,6 @@ func TestDB_MergeForZSet(t *testing.T) {
 			}
 			require.NoError(t, err)
 
-			// add items
 			err = db.Merge()
 			require.Equal(t, ErrDontNeedMerge, err)
 
@@ -512,65 +485,53 @@ func TestDB_MergeForZSet(t *testing.T) {
 				txZScore(t, db, bucket, key, testutils.GetTestBytes(i), score, nil)
 			}
 
-			// remove half of the items
 			for i := 0; i < n/2; i++ {
 				txZRem(t, db, bucket, key, testutils.GetTestBytes(i), nil)
 			}
 
-			// check that the items that are left are the same as the ones that were removed
 			for i := 0; i < n/2; i++ {
 				score, _ := strconv2.IntToFloat64(i)
 				txZScore(t, db, bucket, key, testutils.GetTestBytes(i), score, ErrSortedSetMemberNotExist)
 			}
 
-			// check that the items that are left are the same as the ones that were removed
 			for i := n / 2; i < n; i++ {
 				score, _ := strconv2.IntToFloat64(i)
 				txZScore(t, db, bucket, key, testutils.GetTestBytes(i), score, nil)
 			}
 
-			// check that the number of items in the DB is correct
 			dbCnt, err := db.getRecordCount()
 			require.NoError(t, err)
 			require.Equal(t, int64(n/2), dbCnt)
 
-			// merge
 			require.NoError(t, db.Merge())
 
-			// check that the number of items in the DB is correct
 			dbCnt, err = db.getRecordCount()
 			require.NoError(t, err)
 			require.Equal(t, int64(n/2), dbCnt)
 
-			// check that the items that were removed are now not present
 			for i := 0; i < n/2; i++ {
 				score, _ := strconv2.IntToFloat64(i)
 				txZScore(t, db, bucket, key, testutils.GetTestBytes(i), score, ErrSortedSetMemberNotExist)
 			}
 
-			// check that the items that are left are the same as the ones that were removed
 			for i := n / 2; i < n; i++ {
 				score, _ := strconv2.IntToFloat64(i)
 				txZScore(t, db, bucket, key, testutils.GetTestBytes(i), score, nil)
 			}
 
-			// close db
 			require.NoError(t, db.Close())
 
-			// reopen db
 			db, err = Open(opts)
 			require.NoError(t, err)
 			dbCnt, err = db.getRecordCount()
 			require.NoError(t, err)
 			require.Equal(t, int64(n/2), dbCnt)
 
-			// check that the items that were removed are now not present
 			for i := 0; i < n/2; i++ {
 				score, _ := strconv2.IntToFloat64(i)
 				txZScore(t, db, bucket, key, testutils.GetTestBytes(i), score, ErrSortedSetMemberNotExist)
 			}
 
-			// check that the items that are left are the same as the ones that were removed
 			for i := n / 2; i < n; i++ {
 				score, _ := strconv2.IntToFloat64(i)
 				txZScore(t, db, bucket, key, testutils.GetTestBytes(i), score, nil)
@@ -582,9 +543,6 @@ func TestDB_MergeForZSet(t *testing.T) {
 	})
 }
 
-// TestDB_MergeForList tests the Merge() function of the DB struct.
-// It creates a DB with two different EntryIdxMode, pushes and pops data, and then merges the DB.
-// It then reopens the DB and checks that the data is still there.
 func TestDB_MergeForList(t *testing.T) {
 	runForMergeModes(t, func(t *testing.T, mode mergeTestMode) {
 		bucket := "bucket"
@@ -594,7 +552,6 @@ func TestDB_MergeForList(t *testing.T) {
 		opts.EnableMergeV2 = mode.enableMergeV2
 		opts.Dir = fmt.Sprintf("/tmp/test-list-merge-%s/", mode.name)
 
-		// test different EntryIdxMode
 		for _, idxMode := range []EntryIdxMode{HintKeyValAndRAMIdxMode, HintKeyAndRAMIdxMode} {
 			removeDir(opts.Dir)
 			opts.EntryIdxMode = idxMode
@@ -605,11 +562,9 @@ func TestDB_MergeForList(t *testing.T) {
 
 			require.NoError(t, err)
 
-			// check that we don't need merge
 			err = db.Merge()
 			require.Equal(t, ErrDontNeedMerge, err)
 
-			// push data
 			n := 1000
 			for i := 0; i < n; i++ {
 				txPush(t, db, bucket, key, testutils.GetTestBytes(i), true, nil, nil)
@@ -619,7 +574,6 @@ func TestDB_MergeForList(t *testing.T) {
 				txPush(t, db, bucket, key, testutils.GetTestBytes(i), false, nil, nil)
 			}
 
-			// pop data
 			for i := n - 1; i >= n/2; i-- {
 				txPop(t, db, bucket, key, testutils.GetTestBytes(i), nil, true)
 			}
@@ -628,7 +582,6 @@ func TestDB_MergeForList(t *testing.T) {
 				txPop(t, db, bucket, key, testutils.GetTestBytes(i), nil, false)
 			}
 
-			// trim and remove data
 			txLTrim(t, db, bucket, key, 0, 9, nil)
 			txLRem(t, db, bucket, key, 0, testutils.GetTestBytes(100), nil)
 			txLRemByIndex(t, db, bucket, key, nil, []int{7, 8, 9}...)
@@ -637,7 +590,6 @@ func TestDB_MergeForList(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, int64(7), dbCnt)
 
-			// merge
 			require.NoError(t, db.Merge())
 
 			dbCnt, err = db.getRecordCount()
@@ -646,7 +598,6 @@ func TestDB_MergeForList(t *testing.T) {
 
 			require.NoError(t, db.Close())
 
-			// reopen db
 			db, err = Open(opts)
 			require.NoError(t, err)
 
@@ -654,7 +605,6 @@ func TestDB_MergeForList(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, int64(7), dbCnt)
 
-			// pop data
 			for i := n/2 - 1; i < n/2-8; i-- {
 				txPop(t, db, bucket, key, testutils.GetTestBytes(i), nil, true)
 			}
@@ -678,50 +628,40 @@ func TestDB_MergeWithHintFile(t *testing.T) {
 			removeDir(opts.Dir)
 			opts.EntryIdxMode = idxMode
 
-			// First, create a database with some data
 			db, err := Open(opts)
 			require.NoError(t, err)
 			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
-			// Add some data to create multiple data files
 			n := 2000
 			for i := 0; i < n; i++ {
 				txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), Persistent, nil, nil)
 			}
 
-			// Delete some data to create dirty entries
 			for i := 0; i < n/2; i++ {
 				txDel(t, db, bucket, testutils.GetTestBytes(i), nil)
 			}
 
-			// Close and reopen to ensure data is persisted
 			require.NoError(t, db.Close())
 			db, err = Open(opts)
 			require.NoError(t, err)
 
-			// Perform merge
 			require.NoError(t, db.Merge())
 
-			// Collect data file sets and select the relevant IDs for this mode
 			sets := collectMergeFileSets(t, opts.Dir)
 			idsToCheck := dataFileIDsForMode(mode, sets)
 			require.Greater(t, len(idsToCheck), 0)
 
-			// Count total entries across all merged files' hint files
 			totalHintEntryCount := 0
 			for _, fid := range idsToCheck {
 				hintPath := getHintPath(fid, opts.Dir)
 
-				// Verify hint file exists
 				_, err = os.Stat(hintPath)
 				require.NoError(t, err, "Hint file should exist after merge for file %d", fid)
 
-				// Verify hint file content
 				reader := &HintFileReader{}
 				err = reader.Open(hintPath)
 				require.NoError(t, err)
 
-				// Count entries in this hint file
 				hintEntryCount := 0
 				for {
 					_, err := reader.Read()
@@ -736,40 +676,32 @@ func TestDB_MergeWithHintFile(t *testing.T) {
 				totalHintEntryCount += hintEntryCount
 			}
 
-			// Should have n/2 entries (the non-deleted ones) across all hint files
 			require.Equal(t, n/2, totalHintEntryCount)
 
-			// Verify data consistency after merge
 			dbCnt, err := db.getRecordCount()
 			require.NoError(t, err)
 			require.Equal(t, int64(n/2), dbCnt)
 
-			// Check the deleted data is deleted
 			for i := 0; i < n/2; i++ {
 				txGet(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), ErrKeyNotFound)
 			}
 
-			// Check the remaining data exists
 			for i := n / 2; i < n; i++ {
 				txGet(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), nil)
 			}
 
-			// Close and reopen to test hint file loading
 			require.NoError(t, db.Close())
 			db, err = Open(opts)
 			require.NoError(t, err)
 
-			// Verify data is still correct after reopening with hint file
 			dbCnt, err = db.getRecordCount()
 			require.NoError(t, err)
 			require.Equal(t, int64(n/2), dbCnt)
 
-			// Check the deleted data is still deleted
 			for i := 0; i < n/2; i++ {
 				txGet(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), ErrKeyNotFound)
 			}
 
-			// Check the remaining data still exists
 			for i := n / 2; i < n; i++ {
 				txGet(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), nil)
 			}
@@ -791,33 +723,27 @@ func TestDB_MergeHintFileCleanup(t *testing.T) {
 
 		removeDir(opts.Dir)
 
-		// Create a database with some data
 		db, err := Open(opts)
 		require.NoError(t, err)
 		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
-		// Add enough data to create multiple files
 		n := 500
 		for i := 0; i < n; i++ {
 			txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), Persistent, nil, nil)
 		}
 
-		// Delete some data to trigger merge
 		for i := 0; i < n/4; i++ {
 			txDel(t, db, bucket, testutils.GetTestBytes(i), nil)
 		}
 
-		// Get initial file IDs before merge (legacy files only)
 		_, initialFileIDs := db.getMaxFileIDAndFileIDs()
 
-		// Create hint files for initial files manually to test cleanup
 		for _, fileID := range initialFileIDs {
 			hintPath := getHintPath(fileID, opts.Dir)
 			writer := &HintFileWriter{}
 			err := writer.Create(hintPath)
 			require.NoError(t, err)
 
-			// Write a dummy entry
 			entry := &HintEntry{
 				BucketId:  1,
 				KeySize:   3,
@@ -838,17 +764,14 @@ func TestDB_MergeHintFileCleanup(t *testing.T) {
 			require.NoError(t, err)
 		}
 
-		// Verify hint files exist before merge
 		for _, fileID := range initialFileIDs {
 			hintPath := getHintPath(fileID, opts.Dir)
 			_, err := os.Stat(hintPath)
 			require.NoError(t, err, "Hint file should exist before merge")
 		}
 
-		// Perform merge
 		require.NoError(t, db.Merge())
 
-		// Verify old hint files are cleaned up
 		for _, fileID := range initialFileIDs {
 			hintPath := getHintPath(fileID, opts.Dir)
 			_, err := os.Stat(hintPath)
@@ -857,7 +780,6 @@ func TestDB_MergeHintFileCleanup(t *testing.T) {
 			}
 		}
 
-		// Verify new hint files exist for all merged files (legacy or merge v2)
 		sets := collectMergeFileSets(t, opts.Dir)
 		idsToCheck := dataFileIDsForMode(mode, sets)
 		require.Greater(t, len(idsToCheck), 0)
@@ -884,26 +806,21 @@ func TestDB_MergeHintFileDisabled(t *testing.T) {
 
 		removeDir(opts.Dir)
 
-		// Create a database with some data
 		db, err := Open(opts)
 		require.NoError(t, err)
 		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
-		// Add some data
 		n := 500
 		for i := 0; i < n; i++ {
 			txPut(t, db, bucket, testutils.GetTestBytes(i), testutils.GetTestBytes(i), Persistent, nil, nil)
 		}
 
-		// Delete some data to trigger merge
 		for i := 0; i < n/4; i++ {
 			txDel(t, db, bucket, testutils.GetTestBytes(i), nil)
 		}
 
-		// Perform merge
 		require.NoError(t, db.Merge())
 
-		// Verify no hint files are created
 		sets := collectMergeFileSets(t, opts.Dir)
 		idsToCheck := unionDataFileIDs(sets)
 		for _, fid := range idsToCheck {
@@ -914,7 +831,6 @@ func TestDB_MergeHintFileDisabled(t *testing.T) {
 			}
 		}
 
-		// Verify data is still correct after merge without hint files
 		dbCnt, err := db.getRecordCount()
 		require.NoError(t, err)
 		require.Equal(t, int64(3*n/4), dbCnt)
@@ -937,14 +853,12 @@ func TestDB_MergeHintFileDifferentDataStructures(t *testing.T) {
 		db, err := Open(opts)
 		require.NoError(t, err)
 
-		// Test BTree
 		bucketBTree := "bucket_btree"
 		txCreateBucket(t, db, DataStructureBTree, bucketBTree, nil)
 		for i := 0; i < 100; i++ {
 			txPut(t, db, bucketBTree, testutils.GetTestBytes(i), testutils.GetTestBytes(i), Persistent, nil, nil)
 		}
 
-		// Test Set
 		bucketSet := "bucket_set"
 		txCreateBucket(t, db, DataStructureSet, bucketSet, nil)
 		key := testutils.GetTestBytes(0)
@@ -952,7 +866,6 @@ func TestDB_MergeHintFileDifferentDataStructures(t *testing.T) {
 			txSAdd(t, db, bucketSet, key, testutils.GetTestBytes(i), nil, nil)
 		}
 
-		// Test List
 		bucketList := "bucket_list"
 		txCreateBucket(t, db, DataStructureList, bucketList, nil)
 		listKey := testutils.GetTestBytes(0)
@@ -960,7 +873,6 @@ func TestDB_MergeHintFileDifferentDataStructures(t *testing.T) {
 			txPush(t, db, bucketList, listKey, testutils.GetTestBytes(i), true, nil, nil)
 		}
 
-		// Test SortedSet
 		bucketZSet := "bucket_zset"
 		txCreateBucket(t, db, DataStructureSortedSet, bucketZSet, nil)
 		zsetKey := testutils.GetTestBytes(0)
@@ -968,7 +880,6 @@ func TestDB_MergeHintFileDifferentDataStructures(t *testing.T) {
 			txZAdd(t, db, bucketZSet, zsetKey, testutils.GetTestBytes(i), float64(i), nil, nil)
 		}
 
-		// Delete some data from each structure
 		for i := 0; i < 25; i++ {
 			txDel(t, db, bucketBTree, testutils.GetTestBytes(i), nil)
 		}
@@ -982,27 +893,22 @@ func TestDB_MergeHintFileDifferentDataStructures(t *testing.T) {
 			txZRem(t, db, bucketZSet, zsetKey, testutils.GetTestBytes(i), nil)
 		}
 
-		// Perform merge
 		require.NoError(t, db.Merge())
 
-		// Verify hint files exist and contain entries for all data structures
 		sets := collectMergeFileSets(t, opts.Dir)
 		idsToCheck := dataFileIDsForMode(mode, sets)
 		require.Greater(t, len(idsToCheck), 0)
 
-		// Count entries by data structure across all hint files
 		btreeCount := 0
 		setCount := 0
 		listCount := 0
 		zsetCount := 0
 
-		// Check that hint files exist for all merged files and count entries
 		for _, fid := range idsToCheck {
 			hintPath := getHintPath(fid, opts.Dir)
 			_, err = os.Stat(hintPath)
 			require.NoError(t, err, "Hint file should exist after merge for file %d", fid)
 
-			// Verify hint file content
 			reader := &HintFileReader{}
 			err = reader.Open(hintPath)
 			require.NoError(t, err)
@@ -1028,18 +934,15 @@ func TestDB_MergeHintFileDifferentDataStructures(t *testing.T) {
 			reader.Close()
 		}
 
-		// Verify counts match expected remaining entries
-		require.Equal(t, 75, btreeCount) // 100 - 25 deleted
-		require.Equal(t, 40, setCount)   // 50 - 10 deleted
-		require.Equal(t, 25, listCount)  // 30 - 5 deleted
-		require.Equal(t, 15, zsetCount)  // 20 - 5 deleted
+		require.Equal(t, 75, btreeCount)
+		require.Equal(t, 40, setCount)
+		require.Equal(t, 25, listCount)
+		require.Equal(t, 15, zsetCount)
 
-		// Verify data integrity after merge and reopen
 		require.NoError(t, db.Close())
 		db, err = Open(opts)
 		require.NoError(t, err)
 
-		// Check BTree data
 		for i := 25; i < 100; i++ {
 			txGet(t, db, bucketBTree, testutils.GetTestBytes(i), testutils.GetTestBytes(i), nil)
 		}
@@ -1047,7 +950,6 @@ func TestDB_MergeHintFileDifferentDataStructures(t *testing.T) {
 			txGet(t, db, bucketBTree, testutils.GetTestBytes(i), testutils.GetTestBytes(i), ErrKeyNotFound)
 		}
 
-		// Check Set data
 		for i := 10; i < 50; i++ {
 			txSIsMember(t, db, bucketSet, key, testutils.GetTestBytes(i), true)
 		}
@@ -1055,12 +957,10 @@ func TestDB_MergeHintFileDifferentDataStructures(t *testing.T) {
 			txSIsMember(t, db, bucketSet, key, testutils.GetTestBytes(i), false)
 		}
 
-		// Check List data
 		for i := 29; i < 24; i++ {
 			txLRange(t, db, bucketList, listKey, i-5, i-5, 1, [][]byte{testutils.GetTestBytes(i)}, nil)
 		}
 
-		// Check SortedSet data
 		for i := 5; i < 20; i++ {
 			txZScore(t, db, bucketZSet, zsetKey, testutils.GetTestBytes(i), float64(i), nil)
 		}
@@ -1134,7 +1034,6 @@ func TestDB_MergeModeSwitching(t *testing.T) {
 		return db
 	}
 
-	// Start with legacy merge to generate user data files and hint files.
 	db := openWith(legacyOpts)
 	require.NoError(t, db.Update(func(tx *Tx) error {
 		return tx.NewBucket(DataStructureBTree, bucket)
@@ -1147,7 +1046,6 @@ func TestDB_MergeModeSwitching(t *testing.T) {
 	assertStage(db, 'A')
 	require.NoError(t, db.Close())
 
-	// Switch to merge v2 and ensure it can consume legacy outputs.
 	db = openWith(v2Opts)
 	assertStage(db, 'A')
 
@@ -1158,7 +1056,6 @@ func TestDB_MergeModeSwitching(t *testing.T) {
 	assertStage(db, 'B')
 	require.NoError(t, db.Close())
 
-	// Switch back to legacy merge and verify it handles merge v2 artifacts.
 	db = openWith(legacyOpts)
 	assertStage(db, 'B')
 
@@ -1170,9 +1067,6 @@ func TestDB_MergeModeSwitching(t *testing.T) {
 	require.NoError(t, db.Close())
 }
 
-// TestDB_MergeWithTTLScanner tests that merge operations don't race with TTL scanner.
-// The TTL scanner periodically samples records to check for expiration, while merge
-// modifies record metadata. This test ensures no data race occurs when both run concurrently.
 func TestDB_MergeWithTTLScanner(t *testing.T) {
 	runForMergeModes(t, func(t *testing.T, mode mergeTestMode) {
 		bucket := "test_bucket"
@@ -1180,7 +1074,6 @@ func TestDB_MergeWithTTLScanner(t *testing.T) {
 		opts.SegmentSize = 64 * KB // Small segment size to trigger more frequent merges
 		opts.EnableMergeV2 = mode.enableMergeV2
 		opts.Dir = fmt.Sprintf("/tmp/test-merge-ttl-scanner-%s-%d/", mode.name, time.Now().UnixNano())
-		// Configure TTL with fast scanning to increase concurrent access chances
 		opts.TTLConfig = ttl.Config{
 			ScanInterval:     50 * time.Millisecond, // Fast scan interval
 			SampleSize:       100,                   // More samples per scan
@@ -1188,7 +1081,6 @@ func TestDB_MergeWithTTLScanner(t *testing.T) {
 			BatchSize:        50,
 			BatchTimeout:     10 * time.Millisecond,
 		}
-		// Enable automatic merging to increase merge frequency
 		opts.MergeInterval = 200 * time.Millisecond
 
 		removeDir(opts.Dir)
@@ -1198,21 +1090,17 @@ func TestDB_MergeWithTTLScanner(t *testing.T) {
 		require.NoError(t, err)
 		defer db.Close()
 
-		// Create bucket
 		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
-		// Insert initial data with TTL
 		const initialKeys = 500
 		for i := 0; i < initialKeys; i++ {
 			key := testutils.GetTestBytes(i)
-			// Set TTL to 1 second so scanner has expired keys to process
 			err := db.Update(func(tx *Tx) error {
 				return tx.Put(bucket, key, testutils.GetTestBytes(i), uint32(1000))
 			})
 			require.NoError(t, err)
 		}
 
-		// Create multiple files to ensure merge has work to do
 		for fileIdx := 0; fileIdx < 3; fileIdx++ {
 			require.NoError(t, db.Close())
 			db, err = Open(opts)
@@ -1221,7 +1109,6 @@ func TestDB_MergeWithTTLScanner(t *testing.T) {
 				txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 			}
 
-			// Add more data to create more data files
 			for i := initialKeys + fileIdx*200; i < initialKeys+(fileIdx+1)*200; i++ {
 				key := testutils.GetTestBytes(i)
 				err := db.Update(func(tx *Tx) error {
@@ -1231,7 +1118,6 @@ func TestDB_MergeWithTTLScanner(t *testing.T) {
 			}
 		}
 
-		// Ensure we're back to the final db instance
 		require.NoError(t, db.Close())
 		db, err = Open(opts)
 		require.NoError(t, err)
@@ -1240,11 +1126,9 @@ func TestDB_MergeWithTTLScanner(t *testing.T) {
 			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 		}
 
-		// Run concurrent merge and writes
 		var wg sync.WaitGroup
 		stopCh := make(chan struct{})
 
-		// Writer goroutine: continuously write new data
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -1263,7 +1147,6 @@ func TestDB_MergeWithTTLScanner(t *testing.T) {
 			}
 		}()
 
-		// Merger goroutine: continuously trigger merge
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -1279,7 +1162,6 @@ func TestDB_MergeWithTTLScanner(t *testing.T) {
 			}
 		}()
 
-		// Reader goroutine: continuously read data (triggers passive TTL check)
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -1302,14 +1184,11 @@ func TestDB_MergeWithTTLScanner(t *testing.T) {
 			}
 		}()
 
-		// Let them run for a while to increase chance of catching race
 		time.Sleep(2 * time.Second)
 
-		// Stop all goroutines
 		close(stopCh)
 		wg.Wait()
 
-		// Verify no errors occurred
 		require.NoError(t, db.Close())
 	})
 }

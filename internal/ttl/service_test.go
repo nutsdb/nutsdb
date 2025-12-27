@@ -42,7 +42,6 @@ func TestNewService(t *testing.T) {
 	assert.NotNil(t, service.GetChecker())
 	assert.Equal(t, mockClock, service.GetClock())
 
-	// Verify scanner and checker are linked
 	assert.NotNil(t, service.scanner)
 	assert.NotNil(t, service.checker)
 }
@@ -81,7 +80,6 @@ func TestService_onExpired(t *testing.T) {
 
 	service := NewService(mockClock, config, callback, nil)
 
-	// Simulate onExpired being called directly
 	event := &ExpirationEvent{
 		BucketId:  1,
 		Key:       []byte("test-key"),
@@ -90,7 +88,6 @@ func TestService_onExpired(t *testing.T) {
 	}
 	service.onExpired(event.BucketId, event.Key, event.Ds, event.Timestamp)
 
-	// Pop the event from the queue
 	popped, ok := service.queue.pop()
 	require.True(t, ok)
 	assert.Equal(t, event.BucketId, popped.BucketId)
@@ -113,7 +110,6 @@ func TestService_onExpiredBatch(t *testing.T) {
 
 	service := NewService(mockClock, config, callback, nil)
 
-	// Create batch events
 	events := []*ExpirationEvent{
 		{BucketId: 1, Key: []byte("key1"), Ds: 2, Timestamp: 1000000},
 		{BucketId: 1, Key: []byte("key2"), Ds: 2, Timestamp: 1000000},
@@ -122,7 +118,6 @@ func TestService_onExpiredBatch(t *testing.T) {
 
 	service.onExpiredBatch(events)
 
-	// All events should be in the queue
 	for _, expected := range events {
 		popped, ok := service.queue.pop()
 		require.True(t, ok)
@@ -138,7 +133,6 @@ func TestService_StartAndStop(t *testing.T) {
 	scanFn := func() ([]*ExpirationEvent, error) {
 		scanCallCount++
 		if scanCallCount >= 2 {
-			// Return events to trigger callback
 			return []*ExpirationEvent{
 				{BucketId: 1, Key: []byte("key1"), Ds: 2, Timestamp: 1000000},
 			}, nil
@@ -161,16 +155,12 @@ func TestService_StartAndStop(t *testing.T) {
 
 	service := NewService(mockClock, config, callback, scanFn)
 
-	// Start the service
 	require.NoError(t, service.Start(context.Background()))
 
-	// Wait for scanner to run at least one cycle
 	time.Sleep(50 * time.Millisecond)
 
-	// Stop the service
 	require.NoError(t, service.Stop(500*time.Millisecond))
 
-	// Verify the service stopped (queue is closed)
 	assert.True(t, service.queue.closed)
 }
 
@@ -191,7 +181,6 @@ func TestService_StopCancelsScanner(t *testing.T) {
 
 	require.NoError(t, service.Start(context.Background()))
 
-	// Let the scanner tick a couple of times
 	time.Sleep(20 * time.Millisecond)
 
 	start := time.Now()
@@ -199,12 +188,10 @@ func TestService_StopCancelsScanner(t *testing.T) {
 	elapsed := time.Since(start)
 	require.NoError(t, err)
 
-	// Ensure Stop returned well within the timeout
 	if elapsed > 500*time.Millisecond {
 		t.Fatalf("expected Stop to return quickly, took %v", elapsed)
 	}
 
-	// Capture current scan count and ensure it does not increase after Stop
 	afterStop := scanCalls.Load()
 	time.Sleep(15 * time.Millisecond)
 	require.Equal(t, afterStop, scanCalls.Load(), "scanner should be stopped after Stop")
@@ -216,7 +203,6 @@ func TestService_ProcessExpirationEvents_EmptyBatch(t *testing.T) {
 
 	callback := func(events []*ExpirationEvent) {}
 
-	// scanFn that returns empty
 	scanFn := func() ([]*ExpirationEvent, error) {
 		return []*ExpirationEvent{}, nil
 	}
@@ -225,10 +211,8 @@ func TestService_ProcessExpirationEvents_EmptyBatch(t *testing.T) {
 
 	require.NoError(t, service.Start(context.Background()))
 
-	// Wait a bit for processing
 	time.Sleep(10 * time.Millisecond)
 
-	// Stop the service
 	require.NoError(t, service.Stop(100*time.Millisecond))
 }
 
@@ -253,25 +237,22 @@ func TestService_ProcessExpirationEvents_FullBatchFlush(t *testing.T) {
 
 	require.NoError(t, service.Start(context.Background()))
 
-	// Push events to fill the batch (use unique keys to avoid deduplication)
 	for i := 0; i < 3; i++ {
 		event := &ExpirationEvent{
 			BucketId:  1,
-			Key:       []byte(fmt.Sprintf("key_%d", i)), // Unique key
+			Key:       []byte(fmt.Sprintf("key_%d", i)),
 			Ds:        2,
-			Timestamp: 1000000 + uint64(i), // Unique timestamp
+			Timestamp: 1000000 + uint64(i),
 		}
 		service.queue.push(event)
 	}
 
-	// Wait for callback to be called
 	mu.Lock()
 	for len(eventsReceived) == 0 {
 		cond.Wait()
 	}
 	mu.Unlock()
 
-	// Verify we received all 3 events (either in one batch or multiple)
 	assert.Equal(t, 3, len(eventsReceived))
 
 	require.NoError(t, service.Stop(100*time.Millisecond))
@@ -297,7 +278,6 @@ func TestService_ProcessExpirationEvents_TimerFlush(t *testing.T) {
 
 	require.NoError(t, service.Start(context.Background()))
 
-	// Push one event (less than batch size)
 	event := &ExpirationEvent{
 		BucketId:  1,
 		Key:       []byte("key"),
@@ -306,14 +286,12 @@ func TestService_ProcessExpirationEvents_TimerFlush(t *testing.T) {
 	}
 	service.queue.push(event)
 
-	// Wait for callback
 	mu.Lock()
 	for len(eventsReceived) == 0 {
 		cond.Wait()
 	}
 	mu.Unlock()
 
-	// Verify we received the event
 	assert.GreaterOrEqual(t, len(eventsReceived), 1)
 
 	require.NoError(t, service.Stop(100*time.Millisecond))
