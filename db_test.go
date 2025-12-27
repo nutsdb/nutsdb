@@ -1006,9 +1006,13 @@ func TestDB_HintKeyValAndRAMIdxMode_RestartDB(t *testing.T) {
 
 		db.Close()
 		// restart db with HintKeyValAndRAMIdxMode EntryIdxMode
-		db, err := Open(db.opt)
+		var err error
+		db, err = Open(db.opt)
 		require.NoError(t, err)
 		txGet(t, db, bucket, key, val, nil)
+		// TODO:
+		// I don't know why if I add this close here the cleanup will OK?
+		require.NoError(t, db.Close())
 	})
 }
 
@@ -1029,6 +1033,9 @@ func TestDB_HintKeyAndRAMIdxMode_RestartDB(t *testing.T) {
 		db, err := Open(db.opt)
 		require.NoError(t, err)
 		txGet(t, db, bucket, key, val, nil)
+		// TODO:
+		// I don't know why if I add this close here the cleanup will OK?
+		require.NoError(t, db.Close())
 	})
 }
 
@@ -1063,6 +1070,7 @@ func TestDB_ChangeMode_RestartDB(t *testing.T) {
 
 		runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
 			bucket := "bucket"
+			r := require.New(t)
 			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 			txCreateBucket(t, db, DataStructureList, bucket, nil)
 			txCreateBucket(t, db, DataStructureSet, bucket, nil)
@@ -1151,6 +1159,7 @@ func TestDB_ChangeMode_RestartDB(t *testing.T) {
 			for i := 3; i < 10; i++ {
 				txZScore(t, db, bucket, testutils.GetTestBytes(0), testutils.GetTestBytes(i), float64(i), nil)
 			}
+			r.NoError(db.Close())
 		})
 	}
 
@@ -1165,6 +1174,7 @@ func TestTx_SmallFile(t *testing.T) {
 	opts.SegmentSize = 100
 	opts.EntryIdxMode = HintKeyAndRAMIdxMode
 	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
+		r := require.New(t)
 		bucket := "bucket"
 		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
@@ -1177,11 +1187,12 @@ func TestTx_SmallFile(t *testing.T) {
 			}
 			return nil
 		})
-		require.Nil(t, err)
-		require.NoError(t, db.Close())
+		r.Nil(err)
+		r.NoError(db.Close())
 		db, _ = Open(opts)
 
 		txGet(t, db, bucket, testutils.GetTestBytes(10), testutils.GetTestBytes(10), nil)
+		r.NoError(db.Close())
 	})
 }
 
