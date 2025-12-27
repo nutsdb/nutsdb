@@ -560,6 +560,9 @@ func (tx *Tx) Rollback() error {
 
 // lock locks the database based on the transaction type.
 func (tx *Tx) lock() {
+	if tx.lockAcquired.Load() {
+		return
+	}
 	if tx.writable {
 		tx.db.mu.Lock()
 	} else {

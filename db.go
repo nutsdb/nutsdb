@@ -373,6 +373,7 @@ func (db *DB) commitTransaction(tx *Tx) error {
 		}
 	}()
 
+	tx.lock()
 	err = tx.Commit()
 	return err
 }

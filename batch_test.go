@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -268,4 +269,72 @@ func TestWriteBatchReset_ReplacesTransaction(t *testing.T) {
 	require.Contains(t, activeIDs, wb.txID, "new transaction must be registered")
 
 	wb.Flush()
+}
+
+func TestWriteBatch_ConcurrentWithUpdate(t *testing.T) {
+	db, err := Open(
+		DefaultOptions,
+		WithDir(t.TempDir()),
+	)
+	require.NoError(t, err)
+	defer func() { require.NoError(t, db.Close()) }()
+
+	txCreateBucket(t, db, DataStructureBTree, "test-bucket", nil)
+
+	const iterations = 1000
+	const goroutines = 2
+	var ready sync.WaitGroup
+	var start sync.WaitGroup
+	done := make(chan error, goroutines)
+
+	ready.Add(goroutines)
+	start.Add(1)
+
+	// WriteBatch goroutine
+	go func() {
+		ready.Done()
+		start.Wait()
+		for i := 0; i < iterations; i++ {
+			wb, err := db.NewWriteBatch()
+			if err != nil {
+				done <- err
+				return
+			}
+			key := []byte(fmt.Sprintf("wb-key-%d", i))
+			if err := wb.Put("test-bucket", key, []byte("value"), 0); err != nil {
+				wb.Cancel()
+				done <- err
+				return
+			}
+			if err := wb.Flush(); err != nil {
+				done <- err
+				return
+			}
+		}
+		done <- nil
+	}()
+
+	// db.Update goroutine
+	go func() {
+		ready.Done()
+		start.Wait()
+		for i := 0; i < iterations; i++ {
+			err := db.Update(func(tx *Tx) error {
+				key := []byte(fmt.Sprintf("update-key-%d", i))
+				return tx.Put("test-bucket", key, []byte("value"), 0)
+			})
+			if err != nil {
+				done <- err
+				return
+			}
+		}
+		done <- nil
+	}()
+
+	ready.Wait()
+	start.Done()
+
+	for i := 0; i < goroutines; i++ {
+		require.NoError(t, <-done)
+	}
 }
