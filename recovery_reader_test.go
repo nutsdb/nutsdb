@@ -32,13 +32,12 @@ func Test_readEntry(t *testing.T) {
 
 	assert.Equal(t, expect.Encode(), entry.Encode())
 
-	err = fd.Close()
-	require.NoError(t, err)
-
+	require.NoError(t, f.release())
+	require.NoError(t, fd.Close())
 }
 
 func Test_fileRecovery_readBucket(t *testing.T) {
-	filePath := "bucket_test_data"
+	filePath := filepath.Join(t.TempDir(), "bucket_test_data")
 	bucket := &core.Bucket{
 		Meta: &core.BucketMeta{
 			Op: core.BucketInsertOperation,
@@ -68,4 +67,5 @@ func Test_fileRecovery_readBucket(t *testing.T) {
 	assert.Equal(t, int64(8+2+8), int64(readBucket.Meta.Size))
 	assert.Equal(t, core.BucketId(1), readBucket.Id)
 	assert.Equal(t, readBucket.Name, "bucket_1")
+	fr.release()
 }
