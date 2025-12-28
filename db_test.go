@@ -3337,6 +3337,8 @@ func TestDB_WatchTTL(t *testing.T) {
 			require.NoError(t, errWait)
 
 			txPut(t, db, bucket, key, []byte("value"), 1, nil, nil)
+			time.Sleep(1100 * time.Millisecond)
+			txGet(t, db, bucket, key, []byte("value"), ErrKeyNotFound)
 
 			select {
 			case <-done:

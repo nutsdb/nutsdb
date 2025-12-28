@@ -15,7 +15,7 @@
 package ttl
 
 import (
-	"sync"
+	"sync/atomic"
 )
 
 // ExpirationEvent represents a key expiration event.
@@ -26,101 +26,38 @@ type ExpirationEvent struct {
 	Timestamp uint64
 }
 
-// dedupeKey is used as the key for the seen map to avoid string allocation.
-type dedupeKey struct {
-	bucketId  uint64
-	key       string
-	timestamp uint64
-}
-
-// expirationQueue manages a queue of expiration events with deduplication.
-// It prevents duplicate processing of the same key expiration.
+// expirationQueue manages a queue of expiration events.
+// Deduplication is removed since the delete callback should be idempotent.
 type expirationQueue struct {
 	events chan *ExpirationEvent
-	seen   map[dedupeKey]struct{}
-	closed bool
-	mu     sync.Mutex
+	closed atomic.Bool
 }
 
 // newExpirationQueue creates a new expiration queue with the specified buffer size.
 func newExpirationQueue(bufferSize int) *expirationQueue {
 	return &expirationQueue{
 		events: make(chan *ExpirationEvent, bufferSize),
-		seen:   make(map[dedupeKey]struct{}),
-		closed: false,
 	}
 }
 
-// push adds an expiration event to the queue with deduplication.
-// Returns true if the event was added, false if it was a duplicate or queue is closed.
+// push adds an expiration event to the queue.
+// Returns true if the event was added, false if queue is full or closed.
 func (eq *expirationQueue) push(event *ExpirationEvent) bool {
-	eq.mu.Lock()
-	if eq.closed {
-		eq.mu.Unlock()
+	if eq.closed.Load() {
 		return false
 	}
 
-	key := dedupeKey{
-		bucketId:  event.BucketId,
-		key:       string(event.Key),
-		timestamp: event.Timestamp,
-	}
-
-	if _, exists := eq.seen[key]; exists {
-		eq.mu.Unlock()
-		return false // Duplicate event, skip
-	}
-
-	// Optimistically add to map
-	eq.seen[key] = struct{}{}
-	eq.mu.Unlock()
-
-	// Try to send to channel (non-blocking)
 	select {
 	case eq.events <- event:
 		return true
 	default:
-		// Channel full, remove from seen map and drop event
-		eq.mu.Lock()
-		delete(eq.seen, key)
-		eq.mu.Unlock()
 		return false
 	}
 }
 
-// pop retrieves the next expiration event from the queue.
-// Returns the event and true if successful, or zero value and false if queue is closed.
-func (eq *expirationQueue) pop() (*ExpirationEvent, bool) {
-	event, ok := <-eq.events
-	if !ok {
-		return &ExpirationEvent{}, false
-	}
-
-	// Remove from seen map after processing
-	key := dedupeKey{
-		bucketId:  event.BucketId,
-		key:       string(event.Key),
-		timestamp: event.Timestamp,
-	}
-
-	eq.mu.Lock()
-	delete(eq.seen, key)
-	eq.mu.Unlock()
-
-	return event, true
-}
-
-// close closes the expiration queue and releases resources.
-// It also clears the seen map to prevent memory leaks.
+// close closes the expiration queue.
 func (eq *expirationQueue) close() {
-	eq.mu.Lock()
-	defer eq.mu.Unlock()
-
-	if !eq.closed {
-		eq.closed = true
+	if eq.closed.CompareAndSwap(false, true) {
 		close(eq.events)
-		// Clear seen map to prevent memory leaks for events that were
-		// added to seen but not yet popped (e.g., queue full, close called)
-		eq.seen = make(map[dedupeKey]struct{})
 	}
 }

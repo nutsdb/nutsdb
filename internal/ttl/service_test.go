@@ -70,11 +70,14 @@ func TestService_onExpired(t *testing.T) {
 	}
 	service.onExpired(event.BucketId, event.Key, event.Ds, event.Timestamp)
 
-	popped, ok := service.queue.pop()
-	require.True(t, ok)
-	assert.Equal(t, event.BucketId, popped.BucketId)
-	assert.Equal(t, event.Key, popped.Key)
-	assert.Equal(t, event.Ds, popped.Ds)
+	select {
+	case popped := <-service.queue.events:
+		assert.Equal(t, event.BucketId, popped.BucketId)
+		assert.Equal(t, event.Key, popped.Key)
+		assert.Equal(t, event.Ds, popped.Ds)
+	default:
+		t.Fatal("expected event in queue")
+	}
 }
 
 func TestService_StartAndStop(t *testing.T) {
@@ -100,7 +103,7 @@ func TestService_StartAndStop(t *testing.T) {
 
 	require.NoError(t, service.Stop(500*time.Millisecond))
 
-	assert.True(t, service.queue.closed)
+	assert.True(t, service.queue.closed.Load())
 }
 
 func TestService_ProcessExpirationEvents_FullBatchFlush(t *testing.T) {
