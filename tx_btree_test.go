@@ -3746,7 +3746,7 @@ func TestTx_TTL_LazyDeletionFromIndex(t *testing.T) {
 
 			txGet(t, db, bucket, key, nil, ErrKeyNotFound)
 
-			time.Sleep(200 * time.Millisecond)
+			time.Sleep(1100 * time.Millisecond)
 
 			err = db.View(func(tx *Tx) error {
 				idx, ok := db.Index.BTree.exist(1)
@@ -3795,7 +3795,7 @@ func TestTx_TTL_LazyDeletionFromIndex(t *testing.T) {
 				txGet(t, db, bucket, k, nil, ErrKeyNotFound)
 			}
 
-			time.Sleep(200 * time.Millisecond)
+			time.Sleep(1100 * time.Millisecond)
 
 			err = db.View(func(tx *Tx) error {
 				idx, ok := db.Index.BTree.exist(1)
@@ -3832,7 +3832,7 @@ func TestTx_TTL_LazyDeletionFromIndex(t *testing.T) {
 			}
 
 			wg.Wait()
-			time.Sleep(200 * time.Millisecond)
+			time.Sleep(1100 * time.Millisecond)
 
 			err := db.View(func(tx *Tx) error {
 				idx, ok := db.Index.BTree.exist(1)
@@ -3860,7 +3860,7 @@ func TestTx_TTL_LazyDeletionFromIndex(t *testing.T) {
 
 			txPut(t, db, bucket, key, []byte("value2"), 10, nil, nil)
 
-			time.Sleep(200 * time.Millisecond)
+			time.Sleep(1100 * time.Millisecond)
 
 			txGet(t, db, bucket, key, []byte("value2"), nil)
 

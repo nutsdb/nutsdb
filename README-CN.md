@@ -255,9 +255,33 @@ MB，这个可以自己配置。但是一旦被设置，下次启动数据库也
 
 `MaxBatchSize` 表示批量写入的最大字节数。
 
-- ExpiredDeleteType ExpiredDeleteType
+- HintKeyAndRAMIdxCacheSize int
 
-`ExpiredDeleteType ` 表示用于自动过期删除的数据结构。TimeWheel 意味着使用时间轮，你可以在需要高性能或者内存会充足的时候使用。TimeHeap 意味着使用时间轮，你可以在需要高精度删除或者内存将吃紧的时候使用。
+`HintKeyAndRAMIdxCacheSize` 表示 HintKeyAndRAMIdxMode 模式下的缓存大小。设置为 0 时禁用缓存。
+
+- TTLConfig TTLConfig
+
+`TTLConfig` 表示 TTL 扫描和批处理行为的配置（默认值：BatchSize=100, BatchTimeout=1s, QueueSize=1000）。
+
+- EnableHintFile bool
+
+`EnableHintFile` 表示是否启用提示文件功能。
+
+- EnableMergeV2 bool
+
+`EnableMergeV2` 表示是否启用 Merge V2 算法。
+
+- ListImpl ListImplementationType
+
+`ListImpl` 指定 List 数据结构的实现类型（默认：ListImplBTree）。
+
+- EnableWatch bool
+
+`EnableWatch` 表示是否启用监视功能。如果 `EnableWatch` 为 true，将启用监视功能。监视功能默认禁用。
+
+- Clock ttl.Clock
+
+`Clock` 为 TTL 计算提供时间操作。如果为 nil，默认使用 RealClock。
 
 
 
@@ -271,16 +295,22 @@ MB，这个可以自己配置。但是一旦被设置，下次启动数据库也
 ```
 var DefaultOptions = func() Options {
 	return Options{
-		EntryIdxMode:      HintKeyValAndRAMIdxMode,
-		SegmentSize:       defaultSegmentSize,
-		NodeNum:           1,
-		RWMode:            FileIO,
-		SyncEnable:        true,
-		CommitBufferSize:  4 * MB,
-		MergeInterval:     2 * time.Hour,
-		MaxBatchSize:      (15 * defaultSegmentSize / 4) / 100,
-		MaxBatchCount:     (15 * defaultSegmentSize / 4) / 100 / 100,
-		ExpiredDeleteType: TimeWheel,
+		EntryIdxMode:              HintKeyValAndRAMIdxMode,
+		SegmentSize:               defaultSegmentSize,
+		NodeNum:                   1,
+		RWMode:                    FileIO,
+		SyncEnable:                true,
+		CommitBufferSize:          4 * MB,
+		MergeInterval:             2 * time.Hour,
+		MaxBatchSize:              (15 * defaultSegmentSize / 4) / 100,
+		MaxBatchCount:             (15 * defaultSegmentSize / 4) / 100 / 100,
+		HintKeyAndRAMIdxCacheSize: 0,
+		TTLConfig:                 ttl.DefaultConfig(),
+		EnableHintFile:            false,
+		EnableMergeV2:             false,
+		ListImpl:                  ListImplementationType(ListImplBTree),
+		EnableWatch:               false,
+		Clock:                     ttl.NewRealClock(),
 	}
 }()
 ```

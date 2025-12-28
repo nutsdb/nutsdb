@@ -18,10 +18,13 @@ About options see here for detail.
 | MergeInterval        | `MergeInterval` represent the interval for automatic merges, with 0 meaning automatic merging is disabled. Default interval is 2 hours. | time.Duration     |
 | MaxBatchCount        | `MaxBatchCount` represents max entries in batch.             | int64             |
 | MaxBatchSize         | `MaxBatchSize` represents max batch size in bytes.           | int64             |
-| TTLConfig            | Configure TTL scanning and batching behavior (default values: BatchSize=100, BatchTimeout=1s, QueueSize=1000, ScanInterval=1s, SampleSize=20, ExpiredThreshold=0.25, MaxScanKeys=10000). | struct            |
+| HintKeyAndRAMIdxCacheSize | Cache size for HintKeyAndRAMIdxMode. When set to 0, caching is disabled. | int |
+| TTLConfig            | Configure TTL scanning and batching behavior (default values: BatchSize=100, BatchTimeout=1s, QueueSize=1000). | struct            |
 | EnableHintFile       | Enable/disable hint file feature.                            | bool              |
 | EnableMergeV2        | Enable/disable Merge V2 algorithm.                           | bool              |
+| ListImpl             | Specifies the implementation type for List data structure (default: ListImplBTree). | ListImplementationType |
 | EnableWatch          | `EnableWatch` toggles the watch feature. If `EnableWatch` is true, the watch feature will be enabled. The watch feature will be disabled by default. | bool              |
+| Clock                | Provides time operations for TTL calculations. If nil, a RealClock will be used by default. | ttl.Clock |
 
 ### Default Options
 
@@ -30,17 +33,22 @@ Recommend to use the `DefaultOptions`. Unless you know what you're doing.
 ```go
 var DefaultOptions = func() Options {
     return Options{
-        EntryIdxMode:      HintKeyValAndRAMIdxMode,
-        SegmentSize:       defaultSegmentSize,
-        NodeNum:           1,
-        RWMode:            FileIO,
-        SyncEnable:        true,
-        CommitBufferSize:  4 * MB,
-        MergeInterval:     2 * time.Hour,
-        MaxBatchSize:      (15 * defaultSegmentSize / 4) / 100,
-        MaxBatchCount:     (15 * defaultSegmentSize / 4) / 100 / 100,
-        ExpiredDeleteType: TimeWheel,
-        EnableWatch:       false,
+        EntryIdxMode:              HintKeyValAndRAMIdxMode,
+        SegmentSize:               defaultSegmentSize,
+        NodeNum:                   1,
+        RWMode:                    FileIO,
+        SyncEnable:                true,
+        CommitBufferSize:          4 * MB,
+        MergeInterval:             2 * time.Hour,
+        MaxBatchSize:              (15 * defaultSegmentSize / 4) / 100,
+        MaxBatchCount:             (15 * defaultSegmentSize / 4) / 100 / 100,
+        HintKeyAndRAMIdxCacheSize: 0,
+        TTLConfig:                 ttl.DefaultConfig(),
+        EnableHintFile:            false,
+        EnableMergeV2:             false,
+        ListImpl:                  ListImplementationType(ListImplBTree),
+        EnableWatch:               false,
+        Clock:                     ttl.NewRealClock(),
     }
 }()
 ```

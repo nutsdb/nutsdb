@@ -19,7 +19,7 @@ import "time"
 // Config contains TTL-related configuration for batch deletion.
 type Config struct {
 	BatchSize    int           // Batch size for deletion (default: 100)
-	BatchTimeout time.Duration // Batch timeout (default: 100ms)
+	BatchTimeout time.Duration // Batch timeout (default: 1s)
 	QueueSize    int           // Event queue size (default: 1000)
 }
 
@@ -27,7 +27,7 @@ type Config struct {
 func DefaultConfig() Config {
 	return Config{
 		BatchSize:    100,
-		BatchTimeout: 100 * time.Millisecond,
+		BatchTimeout: 1 * time.Second,
 		QueueSize:    1000,
 	}
 }
@@ -38,7 +38,7 @@ func (c *Config) Validate() {
 		c.BatchSize = 100
 	}
 	if c.BatchTimeout <= 0 {
-		c.BatchTimeout = 100 * time.Millisecond
+		c.BatchTimeout = 1 * time.Second
 	}
 	if c.QueueSize <= 0 {
 		c.QueueSize = 1000
