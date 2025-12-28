@@ -502,6 +502,7 @@ func TestMergeV2PrepareWhileAlreadyMerging(t *testing.T) {
 		ActiveFile: &DataFile{rwManager: &mockRWManager{}},
 		fm:         NewFileManager(opts.RWMode, opts.MaxFdNumsInCache, opts.CleanFdsCacheThreshold, opts.SegmentSize),
 	}
+	defer db.fm.Close()
 
 	// Note: Concurrent merge prevention is now handled by mergeWorker.performMerge()
 	// This test verifies that prepare() succeeds when called with valid setup
