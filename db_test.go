@@ -1016,6 +1016,7 @@ func TestDB_Close_RejectsNewTxsDuringShutdown(t *testing.T) {
 
 // TestDB_Close_Timeout tests timeout handling during close
 func TestDB_Close_Timeout(t *testing.T) {
+	r := require.New(t)
 	opts := DefaultOptions
 	opts.Dir = filepath.Join(t.TempDir(), "test-close-timeout")
 	defer func() { _ = os.RemoveAll(opts.Dir) }()
@@ -1070,6 +1071,16 @@ func TestDB_Close_Timeout(t *testing.T) {
 	case <-txDone:
 	case <-time.After(5 * time.Second):
 		// Transaction may still be running, that's ok
+	}
+
+	// close all active file and bucket manager and flock,
+	// let there is no openning file in temp dir.
+	r.NoError(db.flock.Unlock())
+	if db.ActiveFile != nil && db.ActiveFile.rwManager != nil {
+		r.NoError(db.ActiveFile.rwManager.Close())
+	}
+	if db.bucketMgr != nil {
+		r.NoError(db.bucketMgr.Close())
 	}
 }
 
