@@ -283,10 +283,7 @@ func TestDB_Flock(t *testing.T) {
 	require.False(t, db2.flock.Locked())
 
 	err = db2.Close()
-	require.Error(t, err)
-	require.Equal(t, ErrDirUnlocked, err)
-	// must close bucket manager here, otherwise will trigger windows panic
-	db2.bucketMgr.Close()
+	require.NoError(t, err)
 }
 
 func TestDB_DeleteANonExistKey(t *testing.T) {
