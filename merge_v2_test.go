@@ -1376,9 +1376,7 @@ func TestMergeV2ApplyLookupUpdatesSecondaryIndexes(t *testing.T) {
 		},
 	}
 	db.Index = db.newIndex()
-	// Use a no-op scan function for merge tests (TTL scanning not relevant here)
-	noopScanFn := func() ([]*ttl.ExpirationEvent, error) { return nil, nil }
-	db.ttlService = ttl.NewService(clk, ttl.DefaultConfig(), db.handleExpiredKeys, noopScanFn)
+	db.ttlService = ttl.NewService(clk, ttl.DefaultConfig(), db.handleExpiredKeys)
 
 	// Prepare buckets
 	buckets := []struct {
@@ -2074,9 +2072,7 @@ func TestMergeV2RewriteFileSkipsCorruptedEntries(t *testing.T) {
 	}
 	db.Index = db.newIndex()
 	db.Index.BTree.Idx[bucketID] = bt
-	// Use a no-op scan function for merge tests (TTL scanning not relevant here)
-	noopScanFn := func() ([]*ttl.ExpirationEvent, error) { return nil, nil }
-	db.ttlService = ttl.NewService(clk, ttl.DefaultConfig(), db.handleExpiredKeys, noopScanFn)
+	db.ttlService = ttl.NewService(clk, ttl.DefaultConfig(), db.handleExpiredKeys)
 
 	mock := &mockRWManager{}
 	job := &mergeV2Job{

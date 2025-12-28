@@ -18,7 +18,6 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -28,28 +27,20 @@ import (
 
 func TestNewService(t *testing.T) {
 	mockClock := NewMockClock(1000000)
-
 	callback := func(events []*ExpirationEvent) {}
-
-	scanFn := func() ([]*ExpirationEvent, error) {
-		return nil, nil
-	}
-
 	config := DefaultConfig()
-	service := NewService(mockClock, config, callback, scanFn)
+
+	service := NewService(mockClock, config, callback)
 
 	assert.NotNil(t, service)
 	assert.NotNil(t, service.GetChecker())
 	assert.Equal(t, mockClock, service.GetClock())
-
-	assert.NotNil(t, service.scanner)
-	assert.NotNil(t, service.checker)
 }
 
 func TestService_GetChecker(t *testing.T) {
 	mockClock := NewMockClock(1000000)
 	config := DefaultConfig()
-	service := NewService(mockClock, config, nil, nil)
+	service := NewService(mockClock, config, nil)
 
 	checker := service.GetChecker()
 	assert.NotNil(t, checker)
@@ -59,7 +50,7 @@ func TestService_GetChecker(t *testing.T) {
 func TestService_GetClock(t *testing.T) {
 	mockClock := NewMockClock(1000000)
 	config := DefaultConfig()
-	service := NewService(mockClock, config, nil, nil)
+	service := NewService(mockClock, config, nil)
 
 	clock := service.GetClock()
 	assert.Equal(t, mockClock, clock)
@@ -69,16 +60,7 @@ func TestService_onExpired(t *testing.T) {
 	mockClock := NewMockClock(1000000)
 	config := DefaultConfig()
 
-	eventsReceived := make([]*ExpirationEvent, 0)
-	var mu sync.Mutex
-
-	callback := func(events []*ExpirationEvent) {
-		mu.Lock()
-		eventsReceived = append(eventsReceived, events...)
-		mu.Unlock()
-	}
-
-	service := NewService(mockClock, config, callback, nil)
+	service := NewService(mockClock, config, nil)
 
 	event := &ExpirationEvent{
 		BucketId:  1,
@@ -95,51 +77,9 @@ func TestService_onExpired(t *testing.T) {
 	assert.Equal(t, event.Ds, popped.Ds)
 }
 
-func TestService_onExpiredBatch(t *testing.T) {
-	mockClock := NewMockClock(1000000)
-	config := DefaultConfig()
-
-	eventsReceived := make([]*ExpirationEvent, 0)
-	var mu sync.Mutex
-
-	callback := func(events []*ExpirationEvent) {
-		mu.Lock()
-		eventsReceived = append(eventsReceived, events...)
-		mu.Unlock()
-	}
-
-	service := NewService(mockClock, config, callback, nil)
-
-	events := []*ExpirationEvent{
-		{BucketId: 1, Key: []byte("key1"), Ds: 2, Timestamp: 1000000},
-		{BucketId: 1, Key: []byte("key2"), Ds: 2, Timestamp: 1000000},
-		{BucketId: 2, Key: []byte("key3"), Ds: 3, Timestamp: 1000000},
-	}
-
-	service.onExpiredBatch(events)
-
-	for _, expected := range events {
-		popped, ok := service.queue.pop()
-		require.True(t, ok)
-		assert.Equal(t, expected.BucketId, popped.BucketId)
-		assert.Equal(t, expected.Key, popped.Key)
-	}
-}
-
 func TestService_StartAndStop(t *testing.T) {
 	mockClock := NewMockClock(1000000)
 
-	scanCallCount := 0
-	scanFn := func() ([]*ExpirationEvent, error) {
-		scanCallCount++
-		if scanCallCount >= 2 {
-			return []*ExpirationEvent{
-				{BucketId: 1, Key: []byte("key1"), Ds: 2, Timestamp: 1000000},
-			}, nil
-		}
-		return nil, nil
-	}
-
 	eventsReceived := make([]*ExpirationEvent, 0)
 	var mu sync.Mutex
 	callback := func(events []*ExpirationEvent) {
@@ -149,11 +89,10 @@ func TestService_StartAndStop(t *testing.T) {
 	}
 
 	config := DefaultConfig()
-	config.ScanInterval = 10 * time.Millisecond
 	config.BatchTimeout = 50 * time.Millisecond
 	config.BatchSize = 10
 
-	service := NewService(mockClock, config, callback, scanFn)
+	service := NewService(mockClock, config, callback)
 
 	require.NoError(t, service.Start(context.Background()))
 
@@ -162,58 +101,6 @@ func TestService_StartAndStop(t *testing.T) {
 	require.NoError(t, service.Stop(500*time.Millisecond))
 
 	assert.True(t, service.queue.closed)
-}
-
-func TestService_StopCancelsScanner(t *testing.T) {
-	mockClock := NewMockClock(1000000)
-
-	var scanCalls atomic.Int64
-	scanFn := func() ([]*ExpirationEvent, error) {
-		scanCalls.Add(1)
-		return nil, nil
-	}
-
-	config := DefaultConfig()
-	config.ScanInterval = 5 * time.Millisecond
-	config.BatchTimeout = 20 * time.Millisecond
-
-	service := NewService(mockClock, config, nil, scanFn)
-
-	require.NoError(t, service.Start(context.Background()))
-
-	time.Sleep(20 * time.Millisecond)
-
-	start := time.Now()
-	err := service.Stop(500 * time.Millisecond)
-	elapsed := time.Since(start)
-	require.NoError(t, err)
-
-	if elapsed > 500*time.Millisecond {
-		t.Fatalf("expected Stop to return quickly, took %v", elapsed)
-	}
-
-	afterStop := scanCalls.Load()
-	time.Sleep(15 * time.Millisecond)
-	require.Equal(t, afterStop, scanCalls.Load(), "scanner should be stopped after Stop")
-}
-
-func TestService_ProcessExpirationEvents_EmptyBatch(t *testing.T) {
-	mockClock := NewMockClock(1000000)
-	config := DefaultConfig()
-
-	callback := func(events []*ExpirationEvent) {}
-
-	scanFn := func() ([]*ExpirationEvent, error) {
-		return []*ExpirationEvent{}, nil
-	}
-
-	service := NewService(mockClock, config, callback, scanFn)
-
-	require.NoError(t, service.Start(context.Background()))
-
-	time.Sleep(10 * time.Millisecond)
-
-	require.NoError(t, service.Stop(100*time.Millisecond))
 }
 
 func TestService_ProcessExpirationEvents_FullBatchFlush(t *testing.T) {
@@ -233,7 +120,7 @@ func TestService_ProcessExpirationEvents_FullBatchFlush(t *testing.T) {
 		mu.Unlock()
 	}
 
-	service := NewService(mockClock, config, callback, nil)
+	service := NewService(mockClock, config, callback)
 
 	require.NoError(t, service.Start(context.Background()))
 
@@ -261,8 +148,8 @@ func TestService_ProcessExpirationEvents_FullBatchFlush(t *testing.T) {
 func TestService_ProcessExpirationEvents_TimerFlush(t *testing.T) {
 	mockClock := NewMockClock(1000000)
 	config := DefaultConfig()
-	config.BatchSize = 10                       // Large batch size so we don't auto-flush
-	config.BatchTimeout = 50 * time.Millisecond // Short timeout
+	config.BatchSize = 10
+	config.BatchTimeout = 50 * time.Millisecond
 
 	eventsReceived := make([]*ExpirationEvent, 0)
 	var mu sync.Mutex
@@ -274,7 +161,7 @@ func TestService_ProcessExpirationEvents_TimerFlush(t *testing.T) {
 		mu.Unlock()
 	}
 
-	service := NewService(mockClock, config, callback, nil)
+	service := NewService(mockClock, config, callback)
 
 	require.NoError(t, service.Start(context.Background()))
 

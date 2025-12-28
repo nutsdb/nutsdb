@@ -1075,11 +1075,8 @@ func TestDB_MergeWithTTLScanner(t *testing.T) {
 		opts.EnableMergeV2 = mode.enableMergeV2
 		opts.Dir = fmt.Sprintf("/tmp/test-merge-ttl-scanner-%s-%d/", mode.name, time.Now().UnixNano())
 		opts.TTLConfig = ttl.Config{
-			ScanInterval:     50 * time.Millisecond, // Fast scan interval
-			SampleSize:       100,                   // More samples per scan
-			ExpiredThreshold: 0.5,                   // Continue scanning if 50% expired
-			BatchSize:        50,
-			BatchTimeout:     10 * time.Millisecond,
+			BatchSize:    50,
+			BatchTimeout: 10 * time.Millisecond,
 		}
 		opts.MergeInterval = 200 * time.Millisecond
 

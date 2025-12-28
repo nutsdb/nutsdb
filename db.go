@@ -109,19 +109,7 @@ func open(opt Options) (*DB, error) {
 		snowflakeMgr:            NewSnowflakeManager(opt.NodeNum),
 	}
 
-	scanFn := func() ([]*ttl.ExpirationEvent, error) {
-		// Check if db is closing (Index is nil) to avoid race
-		if db.Index == nil {
-			return nil, nil
-		}
-		var events []*ttl.ExpirationEvent
-		_ = db.View(func(tx *Tx) error {
-			events = tx.doTTLExpireScan(opt.TTLConfig)
-			return nil
-		})
-		return events, nil
-	}
-	db.ttlService = ttl.NewService(opt.Clock, opt.TTLConfig, db.handleExpiredKeys, scanFn)
+	db.ttlService = ttl.NewService(opt.Clock, opt.TTLConfig, db.handleExpiredKeys)
 
 	db.Index = db.newIndex()
 

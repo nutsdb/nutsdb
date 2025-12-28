@@ -351,22 +351,21 @@ func (b *BTreeScanner) WithDataStructure(ds uint16) Scanner {
 
 // checkItem validates an item against all filters and returns the iteration result.
 func (b *BTreeScanner) checkItem(item *core.Item[core.Record]) iterResult {
-	// TTL check
-	if !b.skipTTL && !b.isValid(item) {
-		return iterContinue
-	}
-
-	// Range check
+	// Range/Prefix checks first - can terminate iteration early
 	if !b.inRange(item) {
 		return iterStop
 	}
 
-	// Prefix check
 	if b.prefix != nil && !bytes.HasPrefix(item.Key, b.prefix) {
 		if b.direction == Forward {
-			return iterStop // prefix exhausted in forward scan
+			return iterStop
 		}
-		return iterContinue // skip in reverse scan
+		return iterContinue
+	}
+
+	// TTL check
+	if !b.skipTTL && !b.isValid(item) {
+		return iterContinue
 	}
 
 	// Regex check
@@ -412,7 +411,6 @@ func (b *BTreeScanner) CollectItems() []*core.Item[core.Record] {
 			return true
 		}
 
-		// Offset handling
 		if offset > 0 {
 			offset--
 			return true
@@ -420,17 +418,12 @@ func (b *BTreeScanner) CollectItems() []*core.Item[core.Record] {
 
 		results = append(results, item)
 
-		// Limit handling
 		if limit > 0 {
 			limit--
 			return limit != 0
 		}
 		return true
 	})
-
-	if b.ttlChecker != nil && !b.skipTTL {
-		results = b.ttlChecker.FilterExpiredItems(b.bt.bucketId, results, b.ds)
-	}
 
 	return results
 }
