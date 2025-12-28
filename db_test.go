@@ -19,6 +19,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -3099,7 +3100,7 @@ func TestDB_Watch(t *testing.T) {
 
 				//deliberately set error key to make tx rollback
 				if i == 9 {
-					currentKey = []byte("")
+					currentKey = nil
 				}
 				if err := tx.Put(bucket, currentKey, val, Persistent); err != nil {
 					if i < 9 {
@@ -3117,7 +3118,7 @@ func TestDB_Watch(t *testing.T) {
 		wg.Wait()
 
 		require.NoError(t, err)
-		require.Equal(t, count, 0, "all actions should be rolled back")
+		require.Equal(t, 0, count, "all actions should be rolled back")
 		t.Log("watch callback should not be called due to rollback")
 	})
 
@@ -3299,50 +3300,50 @@ func TestDB_Watch(t *testing.T) {
 }
 
 func TestDB_WatchTTL(t *testing.T) {
-	// t.Run("db watch and ttl", func(t *testing.T) {
-	// 	var err error
-	// 	wg := sync.WaitGroup{}
+	t.Run("db watch and ttl", func(t *testing.T) {
+		var err error
+		wg := sync.WaitGroup{}
 
-	// 	runNutsDBTestWithWatch(t, func(t *testing.T, db *DB) {
-	// 		bucket := "bucket"
-	// 		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
-	// 		key := testutils.GetTestBytes(0)
-	// 		done := make(chan struct{})
-	// 		count := atomic.Int64{}
-	// 		expectCount := int64(2)
+		runNutsDBTestWithWatch(t, func(t *testing.T, db *DB) {
+			bucket := "bucket"
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			key := testutils.GetTestBytes(0)
+			done := make(chan struct{})
+			count := atomic.Int64{}
+			expectCount := int64(2)
 
-	// 		watchFunc, errWatch := db.Watch(context.Background(), bucket, key, func(msg *Message) error {
-	// 			log.Printf("received message: %+v", msg)
-	// 			count.Add(1)
-	// 			if count.Load() == expectCount {
-	// 				close(done)
-	// 			}
-	// 			return nil
-	// 		})
-	// 		require.NoError(t, errWatch)
+			watchFunc, errWatch := db.Watch(context.Background(), bucket, key, func(msg *Message) error {
+				log.Printf("received message: %+v", msg)
+				count.Add(1)
+				if count.Load() == expectCount {
+					close(done)
+				}
+				return nil
+			})
+			require.NoError(t, errWatch)
 
-	// 		wg.Add(1)
-	// 		go func() {
-	// 			defer wg.Done()
-	// 			err = watchFunc.Run()
-	// 		}()
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				err = watchFunc.Run()
+			}()
 
-	// 		errWait := watchFunc.WaitReady(10 * time.Second)
-	// 		require.NoError(t, errWait)
+			errWait := watchFunc.WaitReady(10 * time.Second)
+			require.NoError(t, errWait)
 
-	// 		txPut(t, db, bucket, key, []byte("value"), 1, nil, nil)
+			txPut(t, db, bucket, key, []byte("value"), 1, nil, nil)
 
-	// 		select {
-	// 		case <-done:
-	// 			t.Log("Received message")
-	// 		case <-time.After(10 * time.Second):
-	// 			t.Fatal("Timeout waiting for message")
-	// 		}
-	// 	})
+			select {
+			case <-done:
+				t.Log("Received message")
+			case <-time.After(30 * time.Second):
+				t.Fatal("Timeout waiting for message")
+			}
+		})
 
-	// 	wg.Wait()
-	// 	require.NoError(t, err)
-	// })
+		wg.Wait()
+		require.NoError(t, err)
+	})
 
 	t.Run("db watch and ttl expired list", func(t *testing.T) {
 		var err error

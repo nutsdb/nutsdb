@@ -9,9 +9,9 @@ import (
 type WatchingFunc func() error
 
 type Watcher struct {
-	readyCh      chan struct{}
-	watchingFunc WatchingFunc
-	isReady      bool
+	readyCh      chan struct{} // the channel to signal that the watcher is ready
+	watchingFunc WatchingFunc  // the function to watch the key and bucket
+	isReady      bool          // indicates whether the watcher is ready
 
 	muReady sync.Mutex
 }
