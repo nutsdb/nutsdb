@@ -1074,7 +1074,7 @@ func TestDB_Close_Timeout(t *testing.T) {
 	}
 
 	// close all active file and bucket manager and flock,
-	// let there is no openning file in temp dir.
+	// let there is no opening file in temp dir.
 	r.NoError(db.flock.Unlock())
 	if db.ActiveFile != nil && db.ActiveFile.rwManager != nil {
 		r.NoError(db.ActiveFile.rwManager.Close())
