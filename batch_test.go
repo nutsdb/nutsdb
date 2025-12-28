@@ -172,7 +172,7 @@ func TestWriteBatch_SetMaxPendingTxns(t *testing.T) {
 	db.statusMgr.wg.Wait()
 	// Simulate shutdown so the new transaction cannot be opened.
 	db.statusMgr.closing.Store(true)
-	db.release()
+	_ = db.release()
 }
 
 func TestWriteBatchCommit_UnregistersOnBeginTxFailure(t *testing.T) {

@@ -310,7 +310,11 @@ func (db *DB) release() error {
 
 	db.commitBuffer = nil
 
-	db.bucketMgr.Close()
+	if db.bucketMgr != nil {
+		if err := db.bucketMgr.Close(); err != nil {
+			return err
+		}
+	}
 
 	if db.watchMgr != nil {
 		if err := db.watchMgr.close(); err != nil {
