@@ -1,8 +1,10 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
+	"os"
 	"sync"
 	"time"
 
@@ -12,13 +14,17 @@ import (
 var (
 	db     *nutsdb.DB
 	bucket = "bucket_watcher_demo"
+	dir    = "/tmp/nutsdbexample/example_watcher"
 )
 
 func init() {
 	var err error
+	os.RemoveAll(dir)
+
 	db, err = nutsdb.Open(
 		nutsdb.DefaultOptions,
-		nutsdb.WithDir("/tmp/nutsdbexample/example_watcher"),
+		nutsdb.WithDir(dir),
+		nutsdb.WithEnableWatch(true),
 	)
 	if err != nil {
 		log.Fatal(err)
@@ -52,41 +58,49 @@ func main() {
 func basicWatchExample() {
 	fmt.Println("--- Example 1: Basic Watch ---")
 	key := []byte("watched_key")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	var wg sync.WaitGroup
-	wg.Add(1)
 
+	messageCount := 0
+	watcher, err := db.Watch(ctx, bucket, key, func(msg *nutsdb.Message) error {
+		messageCount++
+		fmt.Printf("[Watch] Message #%d received:\n", messageCount)
+		fmt.Printf("  Bucket: %s\n", msg.BucketName)
+		fmt.Printf("  Key: %s\n", msg.Key)
+		fmt.Printf("  Value: %s\n", string(msg.Value))
+		fmt.Printf("  Flag: %d\n", msg.Flag)
+		fmt.Printf("  Timestamp: %d\n", msg.Timestamp)
+
+		switch msg.Flag {
+		case nutsdb.DataSetFlag:
+			fmt.Println("  Type: SET operation")
+		case nutsdb.DataDeleteFlag:
+			fmt.Println("  Type: DELETE operation")
+		}
+		fmt.Println("")
+
+		if messageCount >= 1 {
+			cancel()
+		}
+		return nil
+	})
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		messageCount := 0
-		err := db.Watch(bucket, key, func(msg *nutsdb.Message) error {
-			messageCount++
-			fmt.Printf("[Watch] Message #%d received:\n", messageCount)
-			fmt.Printf("  Bucket: %s\n", msg.BucketName)
-			fmt.Printf("  Key: %s\n", msg.Key)
-			fmt.Printf("  Value: %s\n", string(msg.Value))
-			fmt.Printf("  Flag: %d\n", msg.Flag)
-			fmt.Printf("  Timestamp: %d\n", msg.Timestamp)
-
-			switch msg.Flag {
-			case nutsdb.DataSetFlag:
-				fmt.Println("  Type: SET operation")
-			case nutsdb.DataDeleteFlag:
-				fmt.Println("  Type: DELETE operation")
-			}
-			fmt.Println("")
-
-			if messageCount >= 1 {
-				return nutsdb.ErrWatchingCallbackFailed // Stop watching
-			}
-			return nil
-		})
-
-		if err != nil && err != nutsdb.ErrWatchingCallbackFailed {
-			log.Printf("Watch error: %v\n", err)
+		err := watcher.Run()
+		if err != nil {
+			log.Fatal(err)
 		}
 	}()
 
-	time.Sleep(100 * time.Millisecond)
+	if err := watcher.WaitReady(10 * time.Second); err != nil {
+		log.Fatal(err)
+	}
 
 	if err := db.Update(func(tx *nutsdb.Tx) error {
 		return tx.Put(bucket, key, []byte("Hello, Watcher!"), nutsdb.Persistent)
@@ -101,35 +115,43 @@ func basicWatchExample() {
 func multipleOperationsExample() {
 	fmt.Println("--- Example 2: Watch Multiple Operations ---")
 	key := []byte("multi_op_key")
-	var wg sync.WaitGroup
-	wg.Add(1)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 
+	var wg sync.WaitGroup
+
+	watcher, err := db.Watch(ctx, bucket, key, func(msg *nutsdb.Message) error {
+		messageCount := 0
+		messageCount++
+		fmt.Printf("[Watch] Operation #%d: ", messageCount)
+
+		switch msg.Flag {
+		case nutsdb.DataSetFlag:
+			fmt.Printf("SET - Value: %s\n", string(msg.Value))
+		case nutsdb.DataDeleteFlag:
+			fmt.Printf("DELETE - Key: %s\n", msg.Key)
+		}
+
+		if messageCount >= 3 {
+			cancel()
+		}
+		return nil
+	})
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		messageCount := 0
-		err := db.Watch(bucket, key, func(msg *nutsdb.Message) error {
-			messageCount++
-			fmt.Printf("[Watch] Operation #%d: ", messageCount)
-
-			switch msg.Flag {
-			case nutsdb.DataSetFlag:
-				fmt.Printf("SET - Value: %s\n", string(msg.Value))
-			case nutsdb.DataDeleteFlag:
-				fmt.Printf("DELETE - Key: %s\n", msg.Key)
-			}
-
-			if messageCount >= 3 {
-				return nutsdb.ErrWatchingCallbackFailed
-			}
-			return nil
-		})
-
-		if err != nil && err != nutsdb.ErrWatchingCallbackFailed {
-			log.Printf("Watch error: %v\n", err)
+		if err := watcher.Run(); err != nil {
+			log.Fatal(err)
 		}
 	}()
 
-	time.Sleep(100 * time.Millisecond)
+	if err := watcher.WaitReady(10 * time.Second); err != nil {
+		log.Fatal(err)
+	}
 
 	// Perform multiple operations
 	operations := []struct {
@@ -142,8 +164,6 @@ func multipleOperationsExample() {
 	}
 
 	for _, op := range operations {
-		time.Sleep(50 * time.Millisecond)
-
 		switch op.action {
 		case "put":
 			if err := db.Update(func(tx *nutsdb.Tx) error {
@@ -167,35 +187,43 @@ func multipleOperationsExample() {
 func watchWithTTLExample() {
 	fmt.Println("--- Example 3: Watch with TTL ---")
 	key := []byte("ttl_key")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+
 	var wg sync.WaitGroup
 	wg.Add(1)
 
+	messageCount := 0
+	watcher, err := db.Watch(ctx, bucket, key, func(msg *nutsdb.Message) error {
+		messageCount++
+		fmt.Printf("[Watch] Message #%d:\n", messageCount)
+
+		switch msg.Flag {
+		case nutsdb.DataSetFlag:
+			fmt.Printf("  SET - Value: %s (with 2 second TTL)\n", string(msg.Value))
+		case nutsdb.DataDeleteFlag:
+			fmt.Printf("  DELETE - Key expired and auto-deleted\n")
+		}
+
+		if messageCount >= 2 {
+			cancel()
+		}
+		return nil
+	})
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	go func() {
 		defer wg.Done()
-		messageCount := 0
-		err := db.Watch(bucket, key, func(msg *nutsdb.Message) error {
-			messageCount++
-			fmt.Printf("[Watch] Message #%d:\n", messageCount)
-
-			switch msg.Flag {
-			case nutsdb.DataSetFlag:
-				fmt.Printf("  SET - Value: %s (with 2 second TTL)\n", string(msg.Value))
-			case nutsdb.DataDeleteFlag:
-				fmt.Printf("  DELETE - Key expired and auto-deleted\n")
-			}
-
-			if messageCount >= 2 {
-				return nutsdb.ErrWatchingCallbackFailed
-			}
-			return nil
-		})
-
-		if err != nil && err != nutsdb.ErrWatchingCallbackFailed {
-			log.Printf("Watch error: %v\n", err)
+		if err := watcher.Run(); err != nil {
+			log.Fatal(err)
 		}
 	}()
 
-	time.Sleep(100 * time.Millisecond)
+	if err := watcher.WaitReady(10 * time.Second); err != nil {
+		log.Fatal(err)
+	}
 
 	if err := db.Update(func(tx *nutsdb.Tx) error {
 		return tx.Put(bucket, key, []byte("Temporary value"), 2)

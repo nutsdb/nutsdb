@@ -15,15 +15,22 @@
 package nutsdb
 
 import (
+	"bytes"
+	"context"
+	"errors"
 	"fmt"
+	"log"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/nutsdb/nutsdb/internal/core"
 	"github.com/nutsdb/nutsdb/internal/testutils"
 	"github.com/nutsdb/nutsdb/internal/ttl"
 	"github.com/stretchr/testify/assert"
@@ -57,7 +64,9 @@ func runNutsDBTest(t *testing.T, opts *Options, test func(t *testing.T, db *DB))
 	if opts.Dir == "" {
 		opts.Dir = filepath.Join(t.TempDir(), "nutsdb-test")
 	}
+
 	defer removeDir(opts.Dir)
+
 	db, err := Open(*opts)
 	require.NoError(t, err)
 
@@ -92,6 +101,21 @@ func runNutsDBTestWithMockClock(t *testing.T, opts *Options, test func(t *testin
 			require.NoError(t, db.Close())
 		}
 	})
+}
+
+func runNutsDBTestWithWatch(t *testing.T, test func(t *testing.T, db *DB)) {
+	option := DefaultOptions
+	option.EnableWatch = true
+
+	//actively close the watch manager, to cancel the watcher
+	testWithCloseWatchManager := func(t *testing.T, db *DB) {
+		test(t, db)
+		if !db.IsClose() && db.watchMgr != nil && !db.watchMgr.isClosed() {
+			require.NoError(t, db.watchMgr.close())
+		}
+	}
+
+	runNutsDBTest(t, &option, testWithCloseWatchManager)
 }
 
 func txPut(t *testing.T, db *DB, bucket string, key, value []byte, ttl uint32, expectErr error, finalExpectErr error) {
@@ -2538,943 +2562,1265 @@ func TestDB_HintFileDisabled(t *testing.T) {
 	removeDir(opts.Dir)
 }
 
-// func TestDB_Watch(t *testing.T) {
-// 	t.Run("db btree watch key and receive message", func(t *testing.T) {
-// 		runNutsDBTestWithWatch(t, func(t *testing.T, db *DB) {
-// 			bucket := "bucket"
-// 			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
-// 			key0 := testutils.GetTestBytes(0)
-// 			val0 := testutils.GetRandomBytes(24)
-// 			done := make(chan struct{})
-
-// 			go func() {
-// 				err := db.Watch(bucket, key0, func(msg *Message) error {
-// 					assert.Equal(t, bucket, msg.BucketName)
-// 					assert.Equal(t, string(key0), msg.Key)
-// 					assert.Equal(t, val0, msg.Value)
-// 					close(done)
-// 					return nil
-// 				})
-
-// 				if err != nil {
-// 					assert.ErrorIs(t, err, ErrWatchingChannelClosed)
-// 					return
-// 				}
-// 			}()
-
-// 			// Wait for the watching to be started
-// 			time.Sleep(100 * time.Millisecond)
-
-// 			// put
-// 			txPut(t, db, bucket, key0, val0, Persistent, nil, nil)
-// 			select {
-// 			case <-done:
-// 				t.Log("Received message")
-// 			case <-time.After(10 * time.Second):
-// 				t.Fatal("Timeout waiting for message")
-// 			}
-// 		})
-// 	})
-
-// 	t.Run("db list watch key and receive message", func(t *testing.T) {
-// 		runNutsDBTestWithWatch(t, func(t *testing.T, db *DB) {
-// 			bucket := "bucket"
-// 			txCreateBucket(t, db, DataStructureList, bucket, nil)
-// 			key0 := testutils.GetTestBytes(0)
-// 			val0 := testutils.GetRandomBytes(24)
-// 			count := 0
-// 			expectCount := 6
-// 			done := make(chan struct{})
-
-// 			go func() {
-// 				err := db.Watch(bucket, key0, func(msg *Message) error {
-// 					assert.Equal(t, bucket, msg.BucketName)
-// 					assert.Equal(t, string(key0), msg.Key)
-// 					if msg.Flag != DataLRemFlag && msg.Flag != DataLRemByIndex {
-// 						assert.Equal(t, val0, msg.Value)
-// 					}
-// 					count++
-
-// 					if count == expectCount {
-// 						close(done)
-// 					}
-// 					return nil
-// 				})
-
-// 				if err != nil {
-// 					assert.ErrorIs(t, err, ErrWatchingChannelClosed)
-// 					return
-// 				}
-// 			}()
-
-// 			// Wait for the watching to be started
-// 			time.Sleep(100 * time.Millisecond)
-
-// 			// put head
-// 			txPush(t, db, bucket, key0, val0, false, nil, nil)
-
-// 			// put tail
-// 			txPush(t, db, bucket, key0, val0, true, nil, nil)
-
-// 			// remove elements of key
-// 			txLRem(t, db, bucket, key0, 0, val0, nil)
-
-// 			// push two elements to the list and lrem by index
-// 			txPush(t, db, bucket, key0, val0, true, nil, nil)
-// 			txPush(t, db, bucket, key0, val0, true, nil, nil)
-// 			txLRemByIndex(t, db, bucket, key0, nil, 0, 1)
-
-// 			// must receive one message
-// 			select {
-// 			case <-done:
-// 				require.Equal(t, count, expectCount, "must receive one message")
-// 			case <-time.After(10 * time.Second):
-// 				t.Fatal("Timeout waiting for message")
-// 			}
-// 		})
-// 	})
-
-// 	t.Run("db sorted set watch key and receive message", func(t *testing.T) {
-// 		runNutsDBTestWithWatch(t, func(t *testing.T, db *DB) {
-// 			bucket := "bucket"
-// 			txCreateBucket(t, db, DataStructureSortedSet, bucket, nil)
-// 			key := []byte("0")
-// 			value := []byte(strconv.Itoa(0))
-// 			count := atomic.Int32{}
-// 			score := 1.0
-// 			expectCount := 4
-// 			done := make(chan struct{})
-
-// 			go func() {
-// 				err := db.Watch(bucket, key, func(msg *Message) error {
-// 					assert.Equal(t, bucket, msg.BucketName)
-// 					assert.Equal(t, string(key), msg.Key)
-// 					if msg.Flag != DataZPopMinFlag && msg.Flag != DataZPopMaxFlag {
-// 						assert.Equal(t, value, msg.Value)
-// 					}
-
-// 					count.Add(1)
-// 					if count.Load() == int32(expectCount) {
-// 						close(done)
-// 					}
-// 					return nil
-// 				})
-
-// 				if err != nil {
-// 					assert.ErrorIs(t, err, ErrWatchingChannelClosed)
-// 					return
-// 				}
-// 			}()
-
-// 			// wait for the watching to be started
-// 			time.Sleep(100 * time.Millisecond)
-
-// 			txZAdd(t, db, bucket, key, value, score, nil, nil)
-// 			txZRem(t, db, bucket, key, value, nil)
-
-// 			txZAdd(t, db, bucket, key, value, score, nil, nil)
-
-// 			txZPop(t, db, bucket, key, true, value, score, nil)
-
-// 			select {
-// 			case <-done:
-// 				require.Equal(t, count.Load(), int32(expectCount), "must receive one message")
-// 			case <-time.After(10 * time.Second):
-// 				t.Fatal("Timeout waiting for message")
-// 			}
-// 		})
-// 	})
-
-// 	t.Run("db set watch key and receive message", func(t *testing.T) {
-// 		runNutsDBTestWithWatch(t, func(t *testing.T, db *DB) {
-// 			bucket := "bucket"
-// 			txCreateBucket(t, db, DataStructureSet, bucket, nil)
-// 			key := testutils.GetTestBytes(0)
-// 			val := testutils.GetTestBytes(0)
-// 			val1 := testutils.GetTestBytes(1)
-
-// 			count := atomic.Int32{}
-// 			expectCount := 3
-// 			done := make(chan struct{})
-
-// 			go func() {
-// 				err := db.Watch(bucket, key, func(msg *Message) error {
-// 					assert.Equal(t, bucket, msg.BucketName)
-// 					assert.Equal(t, string(key), msg.Key)
-// 					assert.NotNil(t, msg.Value)
-
-// 					count.Add(1)
-// 					if count.Load() == int32(expectCount) {
-// 						close(done)
-// 					}
-// 					return nil
-// 				})
-
-// 				if err != nil {
-// 					assert.ErrorIs(t, err, ErrWatchingChannelClosed)
-// 					return
-// 				}
-// 			}()
-
-// 			// wait for the watching to be started
-// 			time.Sleep(100 * time.Millisecond)
-// 			txSAdd(t, db, bucket, key, val, nil, nil)
-
-// 			// add duplicate value
-// 			txSAdd(t, db, bucket, key, val, nil, nil)
-
-// 			txSAdd(t, db, bucket, key, val1, nil, nil)
-// 			txSRem(t, db, bucket, key, val1, nil)
-
-// 			select {
-// 			case <-done:
-// 				txSRem(t, db, bucket, key, val1, ErrSetMemberNotExist)
-// 				require.Equal(t, count.Load(), int32(expectCount), "must receive one message")
-// 			case <-time.After(10 * time.Second):
-// 				t.Logf("receive count at test set: %+v", count.Load())
-// 				t.Fatal("Timeout waiting for message")
-// 			}
-// 		})
-// 	})
-
-// 	// t.Run("db watch and callback failed", func(t *testing.T) {
-// 	// 	runNutsDBTestWithWatch(t, func(t *testing.T, db *DB) {
-// 	// 		bucket := "bucket"
-// 	// 		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
-// 	// 		key := testutils.GetTestBytes(0)
-// 	// 		val := testutils.GetTestBytes(0)
-// 	// 		go func() {
-// 	// 			err := db.Watch(bucket, key, func(msg *Message) error {
-// 	// 				return ErrWatchingCallbackFailed
-// 	// 			})
-// 	// 			require.Equal(t, err, ErrWatchingCallbackFailed)
-// 	// 		}()
-
-// 	// 		time.Sleep(100 * time.Millisecond)
-
-// 	// 		// put
-// 	// 		txPut(t, db, bucket, key, val, Persistent, nil, nil)
-// 	// 	})
-// 	// })
-
-// 	// t.Run("db watch and callback timeout", func(t *testing.T) {
-// 	// 	runNutsDBTestWithWatch(t, func(t *testing.T, db *DB) {
-// 	// 		bucket := "bucket"
-// 	// 		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
-// 	// 		key := testutils.GetTestBytes(0)
-// 	// 		val := testutils.GetTestBytes(0)
-// 	// 		watchOpts := NewWatchOptions()
-// 	// 		watchOpts.WithCallbackTimeout(100 * time.Millisecond)
-
-// 	// 		go func() {
-// 	// 			err := db.Watch(bucket, key, func(msg *Message) error {
-// 	// 				time.Sleep(200 * time.Millisecond)
-// 	// 				return nil
-// 	// 			}, *watchOpts)
-// 	// 			require.ErrorIs(t, err, ErrWatchingCallbackTimeout)
-// 	// 		}()
-
-// 	// 		time.Sleep(100 * time.Millisecond)
-
-// 	// 		txPut(t, db, bucket, key, val, Persistent, nil, nil)
-// 	// 	})
-// 	// })
-
-// 	// t.Run("db watch with default callback timeout and run long", func(t *testing.T) {
-// 	// 	runNutsDBTestWithWatch(t, func(t *testing.T, db *DB) {
-// 	// 		bucket := "bucket"
-// 	// 		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
-// 	// 		key := testutils.GetTestBytes(0)
-// 	// 		val := testutils.GetTestBytes(0)
-// 	// 		watchOpts := NewWatchOptions()
-
-// 	// 		go func() {
-// 	// 			err := db.Watch(bucket, key, func(msg *Message) error {
-// 	// 				done := make(chan struct{})
-
-// 	// 				// block the callback
-// 	// 				<-done
-// 	// 				return nil
-// 	// 			}, *watchOpts)
-// 	// 			require.ErrorIs(t, err, ErrWatchingCallbackTimeout)
-// 	// 		}()
-
-// 	// 		time.Sleep(100 * time.Millisecond)
-
-// 	// 		for i := 0; i < 2; i++ {
-// 	// 			txPut(t, db, bucket, key, val, Persistent, nil, nil)
-// 	// 		}
-// 	// 	})
-// 	// })
-
-// 	t.Run("db watch after watch manager closed", func(t *testing.T) {
-// 		opts := DefaultOptions
-// 		opts.EnableWatch = true
-// 		opts.Dir = "/tmp/test-watch-manager-closed/"
-// 		removeDir(opts.Dir)
-
-// 		db, err := Open(opts)
-// 		require.NoError(t, err)
-// 		bucket := "bucket"
-// 		key := testutils.GetTestBytes(0)
-// 		val := testutils.GetTestBytes(0)
-// 		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
-// 		txPut(t, db, bucket, key, val, Persistent, nil, nil)
-
-// 		db.wm.close()
-// 		require.Equal(t, db.wm.isClosed(), true)
-// 		time.Sleep(100 * time.Millisecond)
-
-// 		err = db.Watch(bucket, key, func(msg *Message) error {
-// 			return nil
-// 		})
-// 		require.Equal(t, err, ErrWatchManagerClosed)
-// 	})
-
-// 	t.Run("db is watching and watch manager is closing", func(t *testing.T) {
-// 		runNutsDBTestWithWatch(t, func(t *testing.T, db *DB) {
-// 			bucket := "bucket"
-// 			key := testutils.GetTestBytes(0)
-// 			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
-
-// 			go func() {
-// 				err := db.Watch(bucket, key, func(msg *Message) error {
-// 					return nil
-// 				})
-// 				require.NoError(t, err)
-// 			}()
-
-// 			go func() {
-// 				time.Sleep(time.Duration(rand.Intn(100)) * time.Millisecond)
-// 				db.wm.close()
-// 				require.Equal(t, db.wm.isClosed(), true)
-// 			}()
-
-// 			ticker := time.NewTicker(10 * time.Millisecond)
-// 			defer ticker.Stop()
-// 			for i := 0; i < 100; i++ {
-// 				val := testutils.GetTestBytes(i)
-// 				<-ticker.C
-// 				txPut(t, db, bucket, key, val, Persistent, nil, nil)
-// 			}
-
-// 		})
-// 	})
-
-// 	t.Run("db watch and tx delete", func(t *testing.T) {
-// 		runNutsDBTestWithWatch(t, func(t *testing.T, db *DB) {
-// 			bucket := "bucket"
-// 			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
-// 			key := testutils.GetTestBytes(0)
-// 			val := testutils.GetTestBytes(0)
-// 			done := make(chan struct{})
-// 			go func() {
-// 				flag := DataSetFlag
-// 				err := db.Watch(bucket, key, func(msg *Message) error {
-// 					assert.Equal(t, bucket, msg.BucketName)
-// 					assert.Equal(t, string(key), msg.Key)
-// 					assert.Equal(t, flag, msg.Flag)
-// 					if flag != DataSetFlag {
-// 						close(done)
-// 					}
-// 					flag = DataDeleteFlag
-// 					return nil
-// 				})
-
-// 				if err != nil {
-// 					assert.ErrorIs(t, err, ErrWatchingChannelClosed)
-// 					return
-// 				}
-// 			}()
-
-// 			txPut(t, db, bucket, key, val, Persistent, nil, nil)
-// 			txDel(t, db, bucket, key, nil)
-// 			require.NoError(t, err)
-
-// 			select {
-// 			case <-done:
-// 				t.Log("Received delete message")
-// 			case <-time.After(10 * time.Second):
-// 				t.Fatal("Timeout waiting for message")
-// 			}
-// 		})
-// 	})
-
-// 	t.Run("db watch and transaction rollback", func(t *testing.T) {
-// 		opts := DefaultOptions
-// 		opts.EnableWatch = true
-// 		opts.Dir = "/tmp/test-watch-and-transaction-rollback/"
-// 		removeDir(opts.Dir)
-
-// 		db, err := Open(opts)
-
-// 		defer func() {
-// 			if db != nil {
-// 				db.Close()
-// 			}
-// 		}()
-
-// 		require.NoError(t, err)
-// 		bucket := "bucket"
-// 		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
-// 		key := testutils.GetTestBytes(0)
-
-// 		wg := sync.WaitGroup{}
-// 		wg.Add(1)
-// 		go func() {
-// 			defer wg.Done()
-// 			count := 0
-// 			err := db.Watch(bucket, key, func(msg *Message) error {
-// 				count++
-// 				return nil
-// 			})
-
-// 			require.NoError(t, err)
-// 			require.Equal(t, count, 0, "all actions should be rolled back")
-// 			t.Log("watch callback should not be called due to rollback")
-// 		}()
-
-// 		time.Sleep(100 * time.Millisecond)
-
-// 		errUpdate := db.Update(func(tx *Tx) error {
-// 			for i := 0; i < 10; i++ {
-// 				val := testutils.GetTestBytes(i)
-// 				currentKey := key
-
-// 				//deliberately set error key to make tx rollback
-// 				if i == 9 {
-// 					currentKey = []byte("")
-// 				}
-// 				if err := tx.Put(bucket, currentKey, val, Persistent); err != nil {
-// 					if i < 9 {
-// 						t.Fatal("check rollback watching failed")
-// 					}
-// 				}
-
-// 			}
-// 			return nil
-// 		})
-
-// 		require.NoError(t, errUpdate)
-// 		require.NoError(t, db.wm.close())
-// 		wg.Wait()
-// 	})
-
-// 	t.Run("db watch and txn exceed write limit", func(t *testing.T) {
-// 		// Set up options
-// 		opts := DefaultOptions
-// 		limitCount := int64(100)
-// 		opts.MaxWriteRecordCount = limitCount
-// 		opts.EnableWatch = true
-
-// 		bucket1 := "bucket1"
-// 		bucket2 := "bucket2"
-// 		score := 1.0
-// 		done := make(chan struct{})
-
-// 		// Iterate over EntryIdxMode options
-// 		for _, idxMode := range []EntryIdxMode{HintKeyValAndRAMIdxMode} {
-// 			count := atomic.Int64{} // count the number of messages received
-// 			opts.EntryIdxMode = idxMode
-// 			opts.Dir = "/tmp/test-watch-and-txn-exceed-write-limit-mode-" + strconv.Itoa(int(idxMode)) + "/"
-// 			removeDir(opts.Dir)
-
-// 			db, err := Open(opts)
-// 			require.NoError(t, err)
-
-// 			defer func() {
-// 				if db != nil {
-// 					db.Close()
-// 				}
-// 			}()
-
-// 			txCreateBucket(t, db, DataStructureBTree, bucket1, nil)
-// 			txCreateBucket(t, db, DataStructureList, bucket1, nil)
-// 			txCreateBucket(t, db, DataStructureSet, bucket1, nil)
-// 			txCreateBucket(t, db, DataStructureSortedSet, bucket1, nil)
-// 			txCreateBucket(t, db, DataStructureList, bucket2, nil)
-// 			key1 := []byte("key1")
-// 			key2 := []byte("key2")
-// 			countOfMessages := int64(107)
-
-// 			// Initialize the watcher for bucket2
-// 			for i := 0; i < int(limitCount); i++ {
-// 				go func(i int) {
-// 					key := []byte(strconv.Itoa(i))
-// 					err := db.Watch(bucket1, key, func(msg *Message) error {
-// 						count.Add(1)
-// 						if count.Load() == countOfMessages {
-// 							close(done)
-// 						}
-// 						return nil
-// 					})
-
-// 					require.NoError(t, err)
-// 				}(i)
-// 			}
-
-// 			go func() {
-// 				err := db.Watch(bucket1, key1, func(msg *Message) error {
-// 					count.Add(1)
-// 					if count.Load() == countOfMessages {
-// 						close(done)
-// 					}
-// 					return nil
-// 				})
-// 				require.NoError(t, err)
-// 			}()
-
-// 			keys := [][]byte{key1, key2}
-// 			for _, key := range keys {
-// 				go func(key []byte) {
-// 					err := db.Watch(bucket2, key, func(msg *Message) error {
-// 						count.Add(1)
-// 						if count.Load() == countOfMessages {
-// 							close(done)
-// 						}
-// 						return nil
-// 					})
-// 					require.NoError(t, err)
-// 				}(key)
-// 			}
-
-// 			// Add limitCount records
-// 			errUpdate := db.Update(func(tx *Tx) error {
-// 				for i := 0; i < int(limitCount); i++ {
-// 					value := []byte(strconv.Itoa(i))
-// 					key := []byte(strconv.Itoa(i))
-// 					err = tx.Put(bucket1, key, value, Persistent)
-// 					AssertErr(t, err, nil)
-// 				}
-// 				return nil
-// 			})
-// 			require.NoError(t, errUpdate)
-
-// 			// Trigger the limit
-// 			txPush(t, db, bucket1, []byte("0"), []byte("value1"), false, nil, ErrTxnExceedWriteLimit)
-
-// 			//  Delete item and add one
-// 			txDel(t, db, bucket1, []byte("0"), nil)
-
-// 			// NOTE: after delete the key, the watch of key "0" will be unsubscribed
-// 			// so the watch callback will not be called
-// 			txPush(t, db, bucket1, []byte("0"), []byte("value1"), false, nil, nil)
-
-// 			// Trigger the limit
-// 			txSAdd(t, db, bucket1, []byte("key1"), []byte("value1"), nil, ErrTxnExceedWriteLimit)
-// 			// Delete item and add one
-// 			txDel(t, db, bucket1, []byte("1"), nil)
-
-// 			txSAdd(t, db, bucket1, key1, []byte("value1"), nil, nil)
-// 			// Trigger the limit
-// 			txZAdd(t, db, bucket1, key1, []byte("value1"), score, nil, ErrTxnExceedWriteLimit)
-// 			// Delete item and add one
-// 			txDel(t, db, bucket1, []byte("2"), nil)
-// 			txZAdd(t, db, bucket1, key1, []byte("value1"), score, nil, nil)
-// 			// Delete bucket
-// 			txDeleteBucket(t, db, DataStructureSortedSet, bucket1, nil)
-
-// 			// Add data to another bucket
-// 			txPush(t, db, bucket2, key1, []byte("value1"), false, nil, nil)
-// 			// Trigger the limit
-// 			txPush(t, db, bucket2, key2, []byte("value2"), false, nil, ErrTxnExceedWriteLimit)
-// 			time.Sleep(1 * time.Second)
-
-// 			// db.wm.close()
-// 			select {
-// 			case <-done:
-// 				require.Equal(t, count.Load(), countOfMessages, "the watch callback should be called 108 times")
-// 			case <-time.After(10 * time.Second):
-// 				t.Log("watch callback is called", count.Load(), "times")
-// 				t.Fatal("Timeout waiting for message")
-// 			}
-// 		}
-// 	})
-
-// 	t.Run("db watch and watch feature disabled", func(t *testing.T) {
-// 		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-// 			bucket := "bucket"
-// 			key := testutils.GetTestBytes(0)
-// 			err := db.Watch(bucket, key, func(msg *Message) error {
-// 				t.Fatal("Watch feature should be disabled")
-// 				return nil
-// 			})
-// 			require.ErrorIs(t, err, ErrWatchFeatureDisabled)
-// 		})
-// 	})
-// }
-
-// func TestDB_WatchTTL(t *testing.T) {
-// 	t.Run("db watch and ttl", func(t *testing.T) {
-// 		runNutsDBTestWithWatch(t, func(t *testing.T, db *DB) {
-// 			bucket := "bucket"
-// 			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
-// 			key := testutils.GetTestBytes(0)
-// 			done := make(chan struct{})
-// 			count := atomic.Int64{}
-// 			expectCount := int64(2)
-
-// 			go func() {
-// 				err := db.Watch(bucket, key, func(msg *Message) error {
-// 					count.Add(1)
-// 					if count.Load() == expectCount {
-// 						close(done)
-// 					}
-// 					return nil
-// 				})
-// 				require.NoError(t, err)
-// 			}()
-
-// 			time.Sleep(100 * time.Millisecond)
-
-// 			txPut(t, db, bucket, key, []byte("value"), 1, nil, nil)
-
-// 			select {
-// 			case <-done:
-// 				t.Log("Received message")
-// 			case <-time.After(10 * time.Second):
-// 				t.Fatal("Timeout waiting for message")
-// 			}
-// 		})
-// 	})
-
-// 	t.Run("db watch and ttl expired list", func(t *testing.T) {
-// 		runNutsDBTestWithWatch(t, func(t *testing.T, db *DB) {
-// 			bucket := "bucket"
-// 			txCreateBucket(t, db, DataStructureList, bucket, nil)
-// 			key := testutils.GetTestBytes(0)
-// 			done := make(chan struct{})
-// 			count := atomic.Int64{}
-// 			expectCount := int64(2)
-
-// 			go func() {
-// 				err := db.Watch(bucket, key, func(msg *Message) error {
-// 					count.Add(1)
-// 					if count.Load() == expectCount {
-// 						close(done)
-// 					}
-// 					return nil
-// 				})
-// 				require.NoError(t, err)
-// 			}()
-
-// 			time.Sleep(100 * time.Millisecond)
-
-// 			txPush(t, db, bucket, key, []byte("value"), false, nil, nil)
-// 			txExpireList(t, db, bucket, key, 1, nil)
-
-// 			select {
-// 			case <-done:
-// 				t.Log("Received message")
-// 			case <-time.After(10 * time.Second):
-// 				t.Fatal("Timeout waiting for message")
-// 			}
-// 		})
-// 	})
-// }
-
-// func TestDB_WatchDeleteBucket(t *testing.T) {
-// 	t.Run("db watch and delete bucket", func(t *testing.T) {
-// 		runNutsDBTestWithWatch(t, func(t *testing.T, db *DB) {
-// 			bucket := "bucket"
-// 			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
-// 			key := testutils.GetTestBytes(0)
-// 			done := make(chan struct{})
-// 			count := atomic.Int64{}
-// 			expectCount := int64(2)
-
-// 			go func() {
-// 				err := db.Watch(bucket, key, func(msg *Message) error {
-// 					count.Add(1)
-// 					if count.Load() == expectCount {
-// 						close(done)
-// 					}
-// 					return nil
-// 				})
-// 				require.NoError(t, err)
-// 			}()
-
-// 			time.Sleep(100 * time.Millisecond)
-
-// 			txPut(t, db, bucket, key, []byte("value"), 1, nil, nil)
-
-// 			txDeleteBucket(t, db, DataStructureBTree, bucket, nil)
-// 			select {
-// 			case <-done:
-// 				t.Log("Received message")
-// 			case <-time.After(10 * time.Second):
-// 				t.Fatal("Timeout waiting for message")
-// 			}
-// 		})
-// 	})
-
-// 	t.Run("db watch and delete bucket", func(t *testing.T) {
-// 		runNutsDBTestWithWatch(t, func(t *testing.T, db *DB) {
-// 			bucket := "bucket"
-// 			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
-// 			key := testutils.GetTestBytes(0)
-// 			done := make(chan struct{})
-// 			count := atomic.Int64{}
-// 			expectCount := int64(2)
-
-// 			go func() {
-// 				err := db.Watch(bucket, key, func(msg *Message) error {
-// 					count.Add(1)
-// 					if count.Load() == expectCount {
-// 						close(done)
-// 					}
-// 					return nil
-// 				})
-// 				require.NoError(t, err)
-// 			}()
-
-// 			time.Sleep(100 * time.Millisecond)
-
-// 			txPut(t, db, bucket, key, []byte("value"), 1, nil, nil)
-
-// 			txDeleteBucket(t, db, DataStructureBTree, bucket, nil)
-// 			select {
-// 			case <-done:
-// 				t.Log("Received message")
-// 			case <-time.After(10 * time.Second):
-// 				t.Fatal("Timeout waiting for message")
-// 			}
-// 		})
-// 	})
-
-// 	t.Run("db watch many keys and delete bucket", func(t *testing.T) {
-// 		runNutsDBTestWithWatch(t, func(t *testing.T, db *DB) {
-// 			bucket := "bucket"
-// 			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
-// 			keys := make([][]byte, 100)
-// 			count := atomic.Int64{}
-// 			expectCount := int64(200)
-// 			done := make(chan struct{})
-// 			for i := 0; i < 100; i++ {
-// 				keys[i] = testutils.GetTestBytes(i)
-// 			}
-
-// 			for _, key := range keys {
-// 				go func(key []byte) {
-// 					err := db.Watch(bucket, key, func(msg *Message) error {
-// 						assert.NotNil(t, msg)
-// 						assert.Equal(t, bucket, msg.BucketName)
-// 						count.Add(1)
-// 						if count.Load() == expectCount {
-// 							close(done)
-// 						}
-// 						return nil
-// 					})
-// 					require.NoError(t, err)
-// 				}(key)
-// 			}
-
-// 			for _, key := range keys {
-// 				txPut(t, db, bucket, key, []byte("value"), Persistent, nil, nil)
-// 			}
-
-// 			txDeleteBucket(t, db, DataStructureBTree, bucket, nil)
-
-// 			select {
-// 			case <-done:
-// 				t.Log("Received message")
-// 			case <-time.After(10 * time.Second):
-// 				t.Log("Received message", count.Load(), "times")
-// 				t.Fatal("Timeout waiting for message")
-// 			}
-// 		})
-// 	})
-
-// 	t.Run("db watch different data structures and delete bucket", func(t *testing.T) {
-// 		runNutsDBTestWithWatch(t, func(t *testing.T, db *DB) {
-// 			// Create separate buckets for each data structure
-// 			btreeBucket := "btree_bucket"
-// 			listBucket := "list_bucket"
-// 			setBucket := "set_bucket"
-// 			zsetBucket := "zset_bucket"
-
-// 			txCreateBucket(t, db, DataStructureBTree, btreeBucket, nil)
-// 			txCreateBucket(t, db, DataStructureList, listBucket, nil)
-// 			txCreateBucket(t, db, DataStructureSet, setBucket, nil)
-// 			txCreateBucket(t, db, DataStructureSortedSet, zsetBucket, nil)
-
-// 			// Keys to watch
-// 			btreeKey := testutils.GetTestBytes(1)
-// 			listKey := testutils.GetTestBytes(2)
-// 			setKey := testutils.GetTestBytes(3)
-// 			zsetKey := testutils.GetTestBytes(4)
-
-// 			// Track message counts
-// 			// Each watcher should receive: 1 data operation + 1 delete = 2 messages
-// 			count := atomic.Int64{}
-// 			expectCount := int64(8) // 4 data structures × 2 messages each
-// 			done := make(chan struct{})
-
-// 			// Watch BTree bucket
-// 			go func() {
-// 				err := db.Watch(btreeBucket, btreeKey, func(msg *Message) error {
-// 					assert.NotNil(t, msg)
-// 					assert.Equal(t, core.BucketName(btreeBucket), msg.BucketName)
-// 					assert.Equal(t, string(btreeKey), msg.Key)
-
-// 					if count.Add(1) == expectCount {
-// 						close(done)
-// 					}
-// 					return nil
-// 				})
-// 				require.NoError(t, err)
-// 			}()
-
-// 			// Watch List bucket
-// 			go func() {
-// 				err := db.Watch(listBucket, listKey, func(msg *Message) error {
-// 					assert.NotNil(t, msg)
-// 					assert.Equal(t, core.BucketName(listBucket), msg.BucketName)
-// 					assert.Equal(t, string(listKey), msg.Key)
-
-// 					if count.Add(1) == expectCount {
-// 						close(done)
-// 					}
-// 					return nil
-// 				})
-// 				require.NoError(t, err)
-// 			}()
-
-// 			// Watch Set bucket
-// 			go func() {
-// 				err := db.Watch(setBucket, setKey, func(msg *Message) error {
-// 					assert.NotNil(t, msg)
-// 					assert.Equal(t, core.BucketName(setBucket), msg.BucketName)
-// 					assert.Equal(t, string(setKey), msg.Key)
-
-// 					if count.Add(1) == expectCount {
-// 						close(done)
-// 					}
-// 					return nil
-// 				})
-// 				require.NoError(t, err)
-// 			}()
-
-// 			// Watch SortedSet bucket
-// 			go func() {
-// 				err := db.Watch(zsetBucket, zsetKey, func(msg *Message) error {
-// 					assert.NotNil(t, msg)
-// 					assert.Equal(t, core.BucketName(zsetBucket), msg.BucketName)
-// 					assert.Equal(t, string(zsetKey), msg.Key)
-
-// 					if count.Add(1) == expectCount {
-// 						close(done)
-// 					}
-// 					return nil
-// 				})
-// 				require.NoError(t, err)
-// 			}()
-
-// 			// Give watchers time to subscribe
-// 			time.Sleep(100 * time.Millisecond)
-
-// 			// BTree: Put key-value
-// 			txPut(t, db, btreeBucket, btreeKey, []byte("btree_value"), Persistent, nil, nil)
-
-// 			// List: Push items
-// 			txPush(t, db, listBucket, listKey, []byte("list_item_1"), true, nil, nil)
-
-// 			// Set: Add members
-// 			txSAdd(t, db, setBucket, setKey, []byte("set_member_1"), nil, nil)
-
-// 			// SortedSet: Add scored members
-// 			txZAdd(t, db, zsetBucket, zsetKey, []byte("zset_member_1"), 1.0, nil, nil)
-
-// 			// Give time for messages to be processed
-// 			time.Sleep(100 * time.Millisecond)
-
-// 			// Delete all buckets - each watcher should receive a delete notification
-// 			txDeleteBucket(t, db, DataStructureBTree, btreeBucket, nil)
-// 			txDeleteBucket(t, db, DataStructureList, listBucket, nil)
-// 			txDeleteBucket(t, db, DataStructureSet, setBucket, nil)
-// 			txDeleteBucket(t, db, DataStructureSortedSet, zsetBucket, nil)
-
-// 			// Wait for all expected messages
-// 			select {
-// 			case <-done:
-// 				t.Logf("Received all %d expected messages (count=%d)", expectCount, count.Load())
-// 			case <-time.After(10 * time.Second):
-// 				t.Fatalf("Timeout waiting for messages. Received %d/%d messages", count.Load(), expectCount)
-// 			}
-// 		})
-// 	})
-
-// 	t.Run("db watch same bucket name across different data structures", func(t *testing.T) {
-// 		runNutsDBTestWithWatch(t, func(t *testing.T, db *DB) {
-// 			// Use the SAME bucket name for different data structures
-// 			// This tests that the bucket manager correctly handles multiple data structures
-// 			bucket := "shared_bucket"
-
-// 			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
-// 			txCreateBucket(t, db, DataStructureList, bucket, nil)
-// 			txCreateBucket(t, db, DataStructureSet, bucket, nil)
-// 			txCreateBucket(t, db, DataStructureSortedSet, bucket, nil)
-
-// 			// Use different keys for each data structure type
-// 			btreeKey := testutils.GetTestBytes(10)
-// 			listKey := testutils.GetTestBytes(20)
-// 			setKey := testutils.GetTestBytes(30)
-// 			zsetKey := testutils.GetTestBytes(40)
-
-// 			count := atomic.Int64{}
-// 			expectCount := int64(5)
-// 			done := make(chan struct{})
-
-// 			// Setup watchers
-// 			watcherSetup := []struct {
-// 				key  []byte
-// 				name string
-// 			}{
-// 				{btreeKey, "BTree"},
-// 				{listKey, "List"},
-// 				{setKey, "Set"},
-// 				{zsetKey, "ZSet"},
-// 			}
-
-// 			for _, ws := range watcherSetup {
-// 				go func(key []byte, name string) {
-// 					err := db.Watch(bucket, key, func(msg *Message) error {
-// 						assert.NotNil(t, msg)
-// 						assert.Equal(t, core.BucketName(bucket), msg.BucketName)
-
-// 						if count.Add(1) == expectCount {
-// 							close(done)
-// 						}
-// 						return nil
-// 					})
-// 					require.NoError(t, err)
-// 				}(ws.key, ws.name)
-// 			}
-
-// 			time.Sleep(100 * time.Millisecond)
-
-// 			// Perform operations
-// 			txPut(t, db, bucket, btreeKey, []byte("value"), Persistent, nil, nil)
-// 			txPush(t, db, bucket, listKey, []byte("item"), true, nil, nil)
-// 			txSAdd(t, db, bucket, setKey, []byte("member"), nil, nil)
-// 			txZAdd(t, db, bucket, zsetKey, []byte("member"), 1.0, nil, nil)
-
-// 			time.Sleep(100 * time.Millisecond)
-
-// 			// Delete all versions of the bucket
-// 			// When all the ds bucket are deleted, the bucket in watch manager will be deleted
-// 			// it will send the delete bucket message to the subscribers
-// 			txDeleteBucket(t, db, DataStructureBTree, bucket, nil)
-// 			txDeleteBucket(t, db, DataStructureList, bucket, nil)
-// 			txDeleteBucket(t, db, DataStructureSet, bucket, nil)
-// 			txDeleteBucket(t, db, DataStructureSortedSet, bucket, nil)
-
-// 			select {
-// 			case <-done:
-// 				t.Logf("Received all %d expected messages", expectCount)
-// 			case <-time.After(10 * time.Second):
-// 				t.Fatalf("Timeout. Received %d/%d messages", count.Load(), expectCount)
-// 			}
-// 		})
-// 	})
-// }
+func TestDB_Watch(t *testing.T) {
+	t.Run("db btree watch key and receive message", func(t *testing.T) {
+		runNutsDBTestWithWatch(t, func(t *testing.T, db *DB) {
+			bucket := "bucket" + strconv.Itoa(rand.Intn(1000))
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			key0 := testutils.GetTestBytes(0)
+			val0 := testutils.GetRandomBytes(24)
+			done := make(chan struct{})
+
+			var err error
+
+			watcher, errWatch := db.Watch(context.Background(), bucket, key0, func(msg *Message) error {
+				fmt.Println("received message: ", msg)
+				defer close(done)
+
+				if bucket != msg.BucketName {
+					return fmt.Errorf("bucket name is not equal")
+				}
+
+				if string(key0) != msg.Key {
+					return fmt.Errorf("key is not equal")
+				}
+
+				if !bytes.Equal(val0, msg.Value) {
+					return fmt.Errorf("value is not equal")
+				}
+
+				return nil
+			})
+
+			require.NoError(t, errWatch)
+
+			go func() {
+				err = watcher.Run()
+			}()
+
+			errWait := watcher.WaitReady(10 * time.Second)
+			require.NoError(t, errWait)
+
+			// put
+			txPut(t, db, bucket, key0, val0, Persistent, nil, nil)
+			select {
+			case <-done:
+				t.Log("Received message")
+				if err != nil {
+					require.ErrorIs(t, err, ErrWatchingChannelClosed)
+					return
+				}
+			case <-time.After(10 * time.Second):
+				t.Fatal("Timeout waiting for message")
+			}
+		})
+	})
+
+	t.Run("db list watch key and receive message", func(t *testing.T) {
+		var err error
+		wg := sync.WaitGroup{}
+
+		runNutsDBTestWithWatch(t, func(t *testing.T, db *DB) {
+			bucket := "bucket"
+			txCreateBucket(t, db, DataStructureList, bucket, nil)
+			key0 := testutils.GetTestBytes(0)
+			val0 := testutils.GetRandomBytes(24)
+			count := 0
+			expectCount := 6
+
+			done := make(chan struct{})
+
+			watcher, errWatch := db.Watch(context.Background(), bucket, key0, func(msg *Message) error {
+				if bucket != msg.BucketName {
+					return fmt.Errorf("bucket name is not equal")
+				}
+				if string(key0) != msg.Key {
+					return fmt.Errorf("key is not equal")
+				}
+
+				if msg.Flag != DataLRemFlag && msg.Flag != DataLRemByIndex {
+					if !bytes.Equal(val0, msg.Value) {
+						return fmt.Errorf("value is not equal")
+					}
+				}
+				count++
+
+				if count == expectCount {
+					close(done)
+				}
+				return nil
+			})
+
+			require.NoError(t, errWatch)
+
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				err = watcher.Run()
+			}()
+
+			errWait := watcher.WaitReady(10 * time.Second)
+			require.NoError(t, errWait)
+
+			// put head
+			txPush(t, db, bucket, key0, val0, false, nil, nil)
+
+			// put tail
+			txPush(t, db, bucket, key0, val0, true, nil, nil)
+
+			// remove elements of key
+			txLRem(t, db, bucket, key0, 0, val0, nil)
+
+			// push two elements to the list and lrem by index
+			txPush(t, db, bucket, key0, val0, true, nil, nil)
+			txPush(t, db, bucket, key0, val0, true, nil, nil)
+			txLRemByIndex(t, db, bucket, key0, nil, 0, 1)
+
+			// must receive one message
+			select {
+			case <-done:
+				require.Equal(t, count, expectCount, "must receive one message")
+			case <-time.After(10 * time.Second):
+				t.Fatal("Timeout waiting for message")
+			}
+		})
+
+		wg.Wait()
+		if err != nil {
+			require.ErrorIs(t, err, ErrWatchingChannelClosed)
+		}
+	})
+
+	t.Run("db sorted set watch key and receive message", func(t *testing.T) {
+		var err error
+		wg := sync.WaitGroup{}
+
+		runNutsDBTestWithWatch(t, func(t *testing.T, db *DB) {
+			bucket := "bucket"
+			txCreateBucket(t, db, DataStructureSortedSet, bucket, nil)
+			key := []byte("0")
+			value := []byte(strconv.Itoa(0))
+			count := atomic.Int32{}
+			score := 1.0
+			expectCount := 4
+			done := make(chan struct{})
+
+			watcher, errWatch := db.Watch(context.Background(), bucket, key, func(msg *Message) error {
+				if bucket != msg.BucketName {
+					return fmt.Errorf("bucket name is not equal")
+				}
+				if string(key) != msg.Key {
+					return fmt.Errorf("key is not equal")
+				}
+				if msg.Flag != DataZPopMinFlag && msg.Flag != DataZPopMaxFlag {
+					if !bytes.Equal(value, msg.Value) {
+
+					}
+					assert.Equal(t, value, msg.Value)
+				}
+
+				count.Add(1)
+				if count.Load() == int32(expectCount) {
+					close(done)
+				}
+				return nil
+			})
+
+			require.NoError(t, errWatch)
+
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				err = watcher.Run()
+			}()
+
+			errWait := watcher.WaitReady(10 * time.Second)
+			require.NoError(t, errWait)
+
+			txZAdd(t, db, bucket, key, value, score, nil, nil)
+			txZRem(t, db, bucket, key, value, nil)
+
+			txZAdd(t, db, bucket, key, value, score, nil, nil)
+
+			txZPop(t, db, bucket, key, true, value, score, nil)
+
+			select {
+			case <-done:
+				require.Equal(t, count.Load(), int32(expectCount), "must receive one message")
+			case <-time.After(10 * time.Second):
+				t.Fatal("Timeout waiting for message")
+			}
+		})
+
+		wg.Wait()
+		if err != nil {
+			require.ErrorIs(t, err, ErrWatchingChannelClosed)
+			return
+		}
+	})
+
+	t.Run("db set watch key and receive message", func(t *testing.T) {
+		var err error
+		wg := sync.WaitGroup{}
+
+		runNutsDBTestWithWatch(t, func(t *testing.T, db *DB) {
+			bucket := "bucket"
+			txCreateBucket(t, db, DataStructureSet, bucket, nil)
+			key := testutils.GetTestBytes(0)
+			val := testutils.GetTestBytes(0)
+			val1 := testutils.GetTestBytes(1)
+
+			count := atomic.Int32{}
+			expectCount := 3
+			done := make(chan struct{})
+
+			watcher, errWatch := db.Watch(context.Background(), bucket, key, func(msg *Message) error {
+				fmt.Println("watching message", msg)
+				if bucket != msg.BucketName {
+					return fmt.Errorf("bucket name is not equal")
+				}
+				if string(key) != msg.Key {
+					return fmt.Errorf("key is not equal")
+				}
+				if msg.Value == nil {
+					return fmt.Errorf("value is nil")
+				}
+
+				count.Add(1)
+				if count.Load() == int32(expectCount) {
+					close(done)
+				}
+				return nil
+			})
+
+			require.NoError(t, errWatch)
+
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				err = watcher.Run()
+			}()
+
+			errWait := watcher.WaitReady(10 * time.Second)
+			require.NoError(t, errWait)
+
+			txSAdd(t, db, bucket, key, val, nil, nil)
+
+			// add duplicate value
+			txSAdd(t, db, bucket, key, val, nil, nil)
+
+			txSAdd(t, db, bucket, key, val1, nil, nil)
+			txSRem(t, db, bucket, key, val1, nil)
+
+			select {
+			case <-done:
+				txSRem(t, db, bucket, key, val1, ErrSetMemberNotExist)
+				require.Equal(t, count.Load(), int32(expectCount), "must receive one message")
+			case <-time.After(10 * time.Second):
+				t.Logf("receive count at test set: %+v", count.Load())
+				t.Fatal("Timeout waiting for message")
+			}
+		})
+
+		wg.Wait()
+		if err != nil {
+			assert.ErrorIs(t, err, ErrWatchingChannelClosed)
+			return
+		}
+	})
+
+	t.Run("db watch and callback failed", func(t *testing.T) {
+		runNutsDBTestWithWatch(t, func(t *testing.T, db *DB) {
+			bucket := "bucket"
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			key := testutils.GetTestBytes(0)
+			val := testutils.GetTestBytes(0)
+
+			var err error
+			wg := sync.WaitGroup{}
+
+			watcher, errWatch := db.Watch(context.Background(), bucket, key, func(msg *Message) error {
+				return ErrWatchingCallbackFailed
+			})
+
+			require.NoError(t, errWatch)
+
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				err = watcher.Run()
+			}()
+
+			errWait := watcher.WaitReady(10 * time.Second)
+			require.NoError(t, errWait)
+
+			// put
+			txPut(t, db, bucket, key, val, Persistent, nil, nil)
+			wg.Wait()
+			require.ErrorIs(t, err, ErrWatchingCallbackFailed)
+		})
+	})
+
+	t.Run("db watch and callback timeout", func(t *testing.T) {
+		runNutsDBTestWithWatch(t, func(t *testing.T, db *DB) {
+			bucket := "bucket"
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			key := testutils.GetTestBytes(0)
+			val := testutils.GetTestBytes(0)
+			watchOpts := NewWatchOptions()
+			watchOpts.WithCallbackTimeout(100 * time.Millisecond)
+
+			var err error
+			wg := sync.WaitGroup{}
+
+			watcher, errWatch := db.Watch(context.Background(), bucket, key, func(msg *Message) error {
+				time.Sleep(200 * time.Millisecond)
+				return nil
+			}, *watchOpts)
+
+			require.NoError(t, errWatch)
+
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				err = watcher.Run()
+			}()
+
+			errWait := watcher.WaitReady(10 * time.Second)
+			require.NoError(t, errWait)
+
+			txPut(t, db, bucket, key, val, Persistent, nil, nil)
+			wg.Wait()
+			require.ErrorIs(t, err, ErrWatchingCallbackTimeout)
+		})
+	})
+
+	t.Run("db watch with default callback timeout and run long", func(t *testing.T) {
+		runNutsDBTestWithWatch(t, func(t *testing.T, db *DB) {
+			bucket := "bucket"
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			key := testutils.GetTestBytes(0)
+			val := testutils.GetTestBytes(0)
+			watchOpts := NewWatchOptions()
+
+			var err error
+			wg := sync.WaitGroup{}
+
+			watcher, errWatch := db.Watch(context.Background(), bucket, key, func(msg *Message) error {
+				done := make(chan struct{})
+
+				// block the callback
+				<-done
+				return nil
+			}, *watchOpts)
+
+			require.NoError(t, errWatch)
+
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				err = watcher.Run()
+			}()
+
+			errWait := watcher.WaitReady(10 * time.Second)
+			require.NoError(t, errWait)
+
+			for i := 0; i < 2; i++ {
+				txPut(t, db, bucket, key, val, Persistent, nil, nil)
+			}
+
+			wg.Wait()
+			require.ErrorIs(t, err, ErrWatchingCallbackTimeout)
+		})
+	})
+
+	t.Run("db watch after watch manager closed", func(t *testing.T) {
+		opts := DefaultOptions
+		opts.EnableWatch = true
+		opts.Dir = "/tmp/test-watch-manager-closed/"
+		removeDir(opts.Dir)
+
+		db, err := Open(opts)
+		require.NoError(t, err)
+		bucket := "bucket"
+		key := testutils.GetTestBytes(0)
+		val := testutils.GetTestBytes(0)
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+		txPut(t, db, bucket, key, val, Persistent, nil, nil)
+
+		errClose := db.watchMgr.close()
+		require.NoError(t, errClose)
+
+		require.Equal(t, db.watchMgr.isClosed(), true)
+		time.Sleep(100 * time.Millisecond)
+
+		_, errWatch := db.Watch(context.Background(), bucket, key, func(msg *Message) error {
+			return nil
+		})
+
+		require.Equal(t, ErrWatchManagerClosed, errWatch)
+	})
+
+	t.Run("db is watching and watch manager is closing", func(t *testing.T) {
+		var errClose error
+
+		runNutsDBTestWithWatch(t, func(t *testing.T, db *DB) {
+			bucket := "bucket"
+			key := testutils.GetTestBytes(0)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+			var err error
+			wg := sync.WaitGroup{}
+
+			watcher, errWatch := db.Watch(context.Background(), bucket, key, func(msg *Message) error {
+				return nil
+			})
+
+			require.NoError(t, errWatch)
+
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				err = watcher.Run()
+			}()
+
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				time.Sleep(time.Duration(rand.Intn(100)) * time.Millisecond)
+				errClose = db.watchMgr.close()
+			}()
+
+			ticker := time.NewTicker(10 * time.Millisecond)
+			defer ticker.Stop()
+			for i := 0; i < 100; i++ {
+				val := testutils.GetTestBytes(i)
+				<-ticker.C
+				txPut(t, db, bucket, key, val, Persistent, nil, nil)
+			}
+
+			wg.Wait()
+			require.NoError(t, errClose)
+			require.Equal(t, db.watchMgr.isClosed(), true)
+			if err != nil && (!errors.Is(err, ErrWatchManagerClosed) && !errors.Is(err, ErrWatchingChannelClosed)) {
+				t.Fatal("watch callback should not return error")
+			}
+		})
+	})
+
+	t.Run("db watch and tx delete", func(t *testing.T) {
+		var err error
+		wg := sync.WaitGroup{}
+
+		runNutsDBTestWithWatch(t, func(t *testing.T, db *DB) {
+			bucket := "bucket"
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			key := testutils.GetTestBytes(0)
+			val := testutils.GetTestBytes(0)
+			done := make(chan struct{})
+
+			flag := DataSetFlag
+			watcher, errWatch := db.Watch(context.Background(), bucket, key, func(msg *Message) error {
+				require.Equal(t, bucket, msg.BucketName)
+				require.Equal(t, string(key), msg.Key)
+				require.Equal(t, flag, msg.Flag)
+				if flag != DataSetFlag {
+					close(done)
+				}
+				flag = DataDeleteFlag
+				return nil
+			})
+
+			require.NoError(t, errWatch)
+
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				err = watcher.Run()
+			}()
+
+			errWait := watcher.WaitReady(10 * time.Second)
+			require.NoError(t, errWait)
+
+			txPut(t, db, bucket, key, val, Persistent, nil, nil)
+			txDel(t, db, bucket, key, nil)
+			require.NoError(t, err)
+
+			select {
+			case <-done:
+				t.Log("Received delete message")
+			case <-time.After(10 * time.Second):
+				t.Fatal("Timeout waiting for message")
+			}
+		})
+
+		wg.Wait()
+		if err != nil {
+			assert.ErrorIs(t, err, ErrWatchingChannelClosed)
+			return
+		}
+	})
+
+	t.Run("db watch and transaction rollback", func(t *testing.T) {
+		var err error
+		opts := DefaultOptions
+		opts.EnableWatch = true
+		opts.Dir = "/tmp/test-watch-and-transaction-rollback/"
+		removeDir(opts.Dir)
+
+		db, err := Open(opts)
+
+		defer func() {
+			if db != nil {
+				db.Close()
+			}
+		}()
+
+		require.NoError(t, err)
+		bucket := "bucket"
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+		key := testutils.GetTestBytes(0)
+		count := 0
+
+		wg := sync.WaitGroup{}
+		watcher, errWatch := db.Watch(context.Background(), bucket, key, func(msg *Message) error {
+			count++
+			return nil
+		})
+		require.NoError(t, errWatch)
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			err = watcher.Run()
+		}()
+
+		errWait := watcher.WaitReady(10 * time.Second)
+		require.NoError(t, errWait)
+
+		errUpdate := db.Update(func(tx *Tx) error {
+			for i := 0; i < 10; i++ {
+				val := testutils.GetTestBytes(i)
+				currentKey := key
+
+				//deliberately set error key to make tx rollback
+				if i == 9 {
+					currentKey = nil
+				}
+				if err := tx.Put(bucket, currentKey, val, Persistent); err != nil {
+					if i < 9 {
+						t.Fatal("check rollback watching failed")
+					}
+				}
+
+			}
+			return nil
+		})
+
+		require.NoError(t, errUpdate)
+		require.NoError(t, db.watchMgr.close())
+
+		wg.Wait()
+
+		require.NoError(t, err)
+		require.Equal(t, 0, count, "all actions should be rolled back")
+		t.Log("watch callback should not be called due to rollback")
+	})
+
+	t.Run("db watch and txn exceed write limit", func(t *testing.T) {
+		// Set up options
+		opts := DefaultOptions
+		limitCount := int64(100)
+		opts.MaxWriteRecordCount = limitCount
+		opts.EnableWatch = true
+
+		bucket1 := "bucket1"
+		bucket2 := "bucket2"
+		score := 1.0
+
+		// Iterate over EntryIdxMode options
+		for _, idxMode := range []EntryIdxMode{HintKeyValAndRAMIdxMode} {
+			done := make(chan struct{})
+			isNotDone := true
+
+			count := 0
+			var mu sync.Mutex
+
+			opts.EntryIdxMode = idxMode
+			opts.Dir = "/tmp/test-watch-and-txn-exceed-write-limit-mode-" + strconv.Itoa(int(idxMode)) + "/"
+			removeDir(opts.Dir)
+
+			db, err := Open(opts)
+			require.NoError(t, err)
+
+			defer func() {
+				if db != nil {
+					db.Close()
+				}
+			}()
+
+			txCreateBucket(t, db, DataStructureBTree, bucket1, nil)
+			txCreateBucket(t, db, DataStructureList, bucket1, nil)
+			txCreateBucket(t, db, DataStructureSet, bucket1, nil)
+			txCreateBucket(t, db, DataStructureSortedSet, bucket1, nil)
+			txCreateBucket(t, db, DataStructureList, bucket2, nil)
+			key1 := []byte("key1")
+			key2 := []byte("key2")
+			countOfMessages := 107
+
+			// Initialize the watchers for bucket1
+			for i := 0; i < int(limitCount); i++ {
+				key := []byte(strconv.Itoa(i))
+				watchFunc, errWatch := db.Watch(context.Background(), bucket1, key, func(msg *Message) error {
+					mu.Lock()
+					count++
+					if isNotDone && count == countOfMessages {
+						close(done)
+						isNotDone = false
+					}
+					mu.Unlock()
+					return nil
+				})
+
+				require.NoError(t, errWatch)
+
+				go func() {
+					//NOTE: make the chan of errors to test
+					watchFunc.Run()
+				}()
+
+				errWait := watchFunc.WaitReady(10 * time.Second)
+				require.NoError(t, errWait)
+			}
+
+			watchFunc, errWatch := db.Watch(context.Background(), bucket1, key1, func(msg *Message) error {
+				mu.Lock()
+				count++
+				if isNotDone && count == countOfMessages {
+					close(done)
+					isNotDone = false
+				}
+				mu.Unlock()
+				return nil
+			})
+			require.NoError(t, errWatch)
+
+			go func() {
+				//NOTE: make the chan of errors to test
+				watchFunc.Run()
+			}()
+
+			errWait := watchFunc.WaitReady(10 * time.Second)
+			require.NoError(t, errWait)
+
+			keys := [][]byte{key1, key2}
+			for _, key := range keys {
+				watchFunc, errWatch := db.Watch(context.Background(), bucket2, key, func(msg *Message) error {
+					mu.Lock()
+					count++
+					if isNotDone && count == countOfMessages {
+						close(done)
+						isNotDone = false
+					}
+					mu.Unlock()
+
+					return nil
+				})
+				require.NoError(t, errWatch)
+
+				go func() {
+					//NOTE: make the chan of errors to test
+					watchFunc.Run()
+				}()
+
+				errWait := watchFunc.WaitReady(10 * time.Second)
+				require.NoError(t, errWait)
+			}
+
+			// Add limitCount records
+			errUpdate := db.Update(func(tx *Tx) error {
+				for i := 0; i < int(limitCount); i++ {
+					value := []byte(strconv.Itoa(i))
+					key := []byte(strconv.Itoa(i))
+					err = tx.Put(bucket1, key, value, Persistent)
+					AssertErr(t, err, nil)
+				}
+				return nil
+			})
+			require.NoError(t, errUpdate)
+
+			// Trigger the limit
+			txPush(t, db, bucket1, []byte("0"), []byte("value1"), false, nil, ErrTxnExceedWriteLimit)
+
+			//  Delete item and add one
+			txDel(t, db, bucket1, []byte("0"), nil)
+
+			// NOTE: after delete the key, the watch of key "0" will be unsubscribed
+			// so the watch callback will not be called
+			txPush(t, db, bucket1, []byte("0"), []byte("value1"), false, nil, nil)
+
+			// Trigger the limit
+			txSAdd(t, db, bucket1, []byte("key1"), []byte("value1"), nil, ErrTxnExceedWriteLimit)
+			// Delete item and add one
+			txDel(t, db, bucket1, []byte("1"), nil)
+
+			txSAdd(t, db, bucket1, key1, []byte("value1"), nil, nil)
+			// Trigger the limit
+			txZAdd(t, db, bucket1, key1, []byte("value1"), score, nil, ErrTxnExceedWriteLimit)
+			// Delete item and add one
+			txDel(t, db, bucket1, []byte("2"), nil)
+			txZAdd(t, db, bucket1, key1, []byte("value1"), score, nil, nil)
+			// Delete bucket
+			txDeleteBucket(t, db, DataStructureSortedSet, bucket1, nil)
+
+			// Add data to another bucket
+			txPush(t, db, bucket2, key1, []byte("value1"), false, nil, nil)
+			// Trigger the limit
+			txPush(t, db, bucket2, key2, []byte("value2"), false, nil, ErrTxnExceedWriteLimit)
+			time.Sleep(1 * time.Second)
+
+			// db.wm.close()
+			select {
+			case <-done:
+				time.Sleep(1 * time.Second)
+				require.Equal(t, count, countOfMessages, "the watch callback should be called 107 times")
+			case <-time.After(10 * time.Second):
+				t.Log("watch callback is called", count, "times")
+				t.Fatal("Timeout waiting for message")
+			}
+		}
+	})
+
+	t.Run("db watch and watch feature disabled", func(t *testing.T) {
+		runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+			bucket := "bucket"
+			key := testutils.GetTestBytes(0)
+			_, errWatch := db.Watch(context.Background(), bucket, key, func(msg *Message) error {
+				t.Fatal("Watch feature should be disabled")
+				return nil
+			})
+			require.ErrorIs(t, errWatch, ErrWatchFeatureDisabled)
+		})
+	})
+}
+
+func TestDB_WatchTTL(t *testing.T) {
+	t.Run("db watch and ttl", func(t *testing.T) {
+		var err error
+		wg := sync.WaitGroup{}
+
+		runNutsDBTestWithWatch(t, func(t *testing.T, db *DB) {
+			bucket := "bucket"
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			key := testutils.GetTestBytes(0)
+			done := make(chan struct{})
+			count := atomic.Int64{}
+			expectCount := int64(2)
+
+			watchFunc, errWatch := db.Watch(context.Background(), bucket, key, func(msg *Message) error {
+				log.Printf("received message: %+v", msg)
+				count.Add(1)
+				if count.Load() == expectCount {
+					close(done)
+				}
+				return nil
+			})
+			require.NoError(t, errWatch)
+
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				err = watchFunc.Run()
+			}()
+
+			errWait := watchFunc.WaitReady(10 * time.Second)
+			require.NoError(t, errWait)
+
+			txPut(t, db, bucket, key, []byte("value"), 1, nil, nil)
+
+			select {
+			case <-done:
+				t.Log("Received message")
+			case <-time.After(30 * time.Second):
+				t.Fatal("Timeout waiting for message")
+			}
+		})
+
+		wg.Wait()
+		require.NoError(t, err)
+	})
+
+	t.Run("db watch and ttl expired list", func(t *testing.T) {
+		var err error
+		wg := sync.WaitGroup{}
+
+		runNutsDBTestWithWatch(t, func(t *testing.T, db *DB) {
+			bucket := "bucket"
+			txCreateBucket(t, db, DataStructureList, bucket, nil)
+			key := testutils.GetTestBytes(0)
+			done := make(chan struct{})
+			count := atomic.Int64{}
+			expectCount := int64(2)
+
+			watchFunc, errWatch := db.Watch(context.Background(), bucket, key, func(msg *Message) error {
+				count.Add(1)
+				if count.Load() == expectCount {
+					close(done)
+				}
+				return nil
+			})
+			require.NoError(t, errWatch)
+
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				err = watchFunc.Run()
+			}()
+
+			errWait := watchFunc.WaitReady(10 * time.Second)
+			require.NoError(t, errWait)
+
+			txPush(t, db, bucket, key, []byte("value"), false, nil, nil)
+			txExpireList(t, db, bucket, key, 1, nil)
+
+			select {
+			case <-done:
+				t.Log("Received message")
+			case <-time.After(10 * time.Second):
+				t.Fatal("Timeout waiting for message")
+			}
+		})
+
+		wg.Wait()
+		require.NoError(t, err)
+	})
+}
+
+func TestDB_WatchDeleteBucket(t *testing.T) {
+	t.Run("db watch and delete bucket", func(t *testing.T) {
+		var err error
+		wg := sync.WaitGroup{}
+		runNutsDBTestWithWatch(t, func(t *testing.T, db *DB) {
+			bucket := "bucket"
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			key := testutils.GetTestBytes(0)
+			done := make(chan struct{})
+			count := atomic.Int64{}
+			expectCount := int64(2)
+
+			watchFunc, errWatch := db.Watch(context.Background(), bucket, key, func(msg *Message) error {
+				count.Add(1)
+				if count.Load() == expectCount {
+					close(done)
+				}
+				return nil
+			})
+			require.NoError(t, errWatch)
+
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				err = watchFunc.Run()
+			}()
+
+			errWait := watchFunc.WaitReady(10 * time.Second)
+			require.NoError(t, errWait)
+
+			txPut(t, db, bucket, key, []byte("value"), 1, nil, nil)
+
+			txDeleteBucket(t, db, DataStructureBTree, bucket, nil)
+			select {
+			case <-done:
+				t.Log("Received message")
+			case <-time.After(10 * time.Second):
+				t.Fatal("Timeout waiting for message")
+			}
+		})
+
+		wg.Wait()
+		require.NoError(t, err)
+	})
+
+	t.Run("db watch and delete bucket", func(t *testing.T) {
+		var err error
+		wg := sync.WaitGroup{}
+		runNutsDBTestWithWatch(t, func(t *testing.T, db *DB) {
+			bucket := "bucket"
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			key := testutils.GetTestBytes(0)
+			done := make(chan struct{})
+			count := atomic.Int64{}
+			expectCount := int64(2)
+
+			watchFunc, errWatch := db.Watch(context.Background(), bucket, key, func(msg *Message) error {
+				count.Add(1)
+				if count.Load() == expectCount {
+					close(done)
+				}
+				return nil
+			})
+			require.NoError(t, errWatch)
+
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				err = watchFunc.Run()
+			}()
+
+			errWait := watchFunc.WaitReady(10 * time.Second)
+			require.NoError(t, errWait)
+
+			txPut(t, db, bucket, key, []byte("value"), 1, nil, nil)
+
+			txDeleteBucket(t, db, DataStructureBTree, bucket, nil)
+			select {
+			case <-done:
+				t.Log("Received message")
+			case <-time.After(10 * time.Second):
+				t.Fatal("Timeout waiting for message")
+			}
+		})
+
+		wg.Wait()
+		require.NoError(t, err)
+	})
+
+	t.Run("db watch many keys and delete bucket", func(t *testing.T) {
+		wg := sync.WaitGroup{}
+		errCh := make(chan error, 100)
+		countOfKeys := 100
+
+		runNutsDBTestWithWatch(t, func(t *testing.T, db *DB) {
+			bucket := "bucket"
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			keys := make([][]byte, countOfKeys)
+
+			countL := sync.Mutex{}
+			count := 0
+			expectCount := 200
+			done := make(chan struct{})
+
+			for i := 0; i < countOfKeys; i++ {
+				keys[i] = testutils.GetTestBytes(i)
+			}
+
+			for _, key := range keys {
+				watchFunc, errWatch := db.Watch(context.Background(), bucket, key, func(msg *Message) error {
+					if msg == nil {
+						return fmt.Errorf("message is nil")
+					}
+
+					if msg.BucketName != bucket {
+						return fmt.Errorf("bucket name is not equal")
+					}
+
+					countL.Lock()
+					count++
+					if done != nil && count == expectCount {
+						close(done)
+						done = nil
+					}
+					countL.Unlock()
+					return nil
+				})
+
+				require.NoError(t, errWatch)
+
+				wg.Add(1)
+				go func(key []byte) {
+					defer wg.Done()
+					err := watchFunc.Run()
+					errCh <- err
+				}(key)
+
+				errWait := watchFunc.WaitReady(10 * time.Second)
+				require.NoError(t, errWait)
+			}
+
+			for _, key := range keys {
+				txPut(t, db, bucket, key, []byte("value"), Persistent, nil, nil)
+			}
+
+			txDeleteBucket(t, db, DataStructureBTree, bucket, nil)
+
+			select {
+			case <-done:
+				t.Log("Received message")
+			case <-time.After(10 * time.Second):
+				t.Log("Received message", count, "times")
+				t.Fatal("Timeout waiting for message")
+			}
+		})
+
+		wg.Wait()
+		countErr := 0
+
+		for err := range errCh {
+			countErr++
+			require.NoError(t, err)
+			if countErr == countOfKeys {
+				break
+			}
+		}
+	})
+
+	t.Run("db watch different data structures and delete bucket", func(t *testing.T) {
+		errCh := make(chan error, 100)
+		wg := sync.WaitGroup{}
+
+		runNutsDBTestWithWatch(t, func(t *testing.T, db *DB) {
+			// Create separate buckets for each data structure
+			btreeBucket := "btree_bucket"
+			listBucket := "list_bucket"
+			setBucket := "set_bucket"
+			zsetBucket := "zset_bucket"
+
+			txCreateBucket(t, db, DataStructureBTree, btreeBucket, nil)
+			txCreateBucket(t, db, DataStructureList, listBucket, nil)
+			txCreateBucket(t, db, DataStructureSet, setBucket, nil)
+			txCreateBucket(t, db, DataStructureSortedSet, zsetBucket, nil)
+
+			// Keys to watch
+			btreeKey := testutils.GetTestBytes(1)
+			listKey := testutils.GetTestBytes(2)
+			setKey := testutils.GetTestBytes(3)
+			zsetKey := testutils.GetTestBytes(4)
+
+			// Track message counts
+			// Each watcher should receive: 1 data operation + 1 delete = 2 messages
+			count := atomic.Int64{}
+			expectCount := int64(8) // 4 data structures × 2 messages each
+			done := make(chan struct{})
+
+			btreeWatcher, errWatch := db.Watch(context.Background(), btreeBucket, btreeKey, func(msg *Message) error {
+				assert.NotNil(t, msg)
+				assert.Equal(t, core.BucketName(btreeBucket), msg.BucketName)
+				assert.Equal(t, string(btreeKey), msg.Key)
+
+				if count.Add(1) == expectCount {
+					close(done)
+				}
+				return nil
+			})
+
+			require.NoError(t, errWatch)
+
+			// Watch BTree bucket
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				err := btreeWatcher.Run()
+				errCh <- err
+			}()
+
+			errBtreeWait := btreeWatcher.WaitReady(10 * time.Second)
+			require.NoError(t, errBtreeWait)
+
+			listWatcher, errWatch := db.Watch(context.Background(), listBucket, listKey, func(msg *Message) error {
+				assert.NotNil(t, msg)
+				assert.Equal(t, core.BucketName(listBucket), msg.BucketName)
+				assert.Equal(t, string(listKey), msg.Key)
+
+				if count.Add(1) == expectCount {
+					close(done)
+				}
+				return nil
+			})
+
+			require.NoError(t, errWatch)
+
+			// Watch List bucket
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				err := listWatcher.Run()
+				errCh <- err
+			}()
+
+			errListWait := listWatcher.WaitReady(10 * time.Second)
+			require.NoError(t, errListWait)
+
+			setWatcher, errWatch := db.Watch(context.Background(), setBucket, setKey, func(msg *Message) error {
+				assert.NotNil(t, msg)
+				assert.Equal(t, core.BucketName(setBucket), msg.BucketName)
+				assert.Equal(t, string(setKey), msg.Key)
+
+				if count.Add(1) == expectCount {
+					close(done)
+				}
+				return nil
+			})
+
+			require.NoError(t, errWatch)
+
+			// Watch Set bucket
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				err := setWatcher.Run()
+				errCh <- err
+			}()
+
+			errSetWait := setWatcher.WaitReady(10 * time.Second)
+			require.NoError(t, errSetWait)
+
+			zsetWatcher, errWatch := db.Watch(context.Background(), zsetBucket, zsetKey, func(msg *Message) error {
+				assert.NotNil(t, msg)
+				assert.Equal(t, core.BucketName(zsetBucket), msg.BucketName)
+				assert.Equal(t, string(zsetKey), msg.Key)
+
+				if count.Add(1) == expectCount {
+					close(done)
+				}
+				return nil
+			})
+
+			require.NoError(t, err)
+
+			// Watch SortedSet bucket
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				err := zsetWatcher.Run()
+				errCh <- err
+			}()
+
+			errZsetWait := zsetWatcher.WaitReady(10 * time.Second)
+			require.NoError(t, errZsetWait)
+
+			// BTree: Put key-value
+			txPut(t, db, btreeBucket, btreeKey, []byte("btree_value"), Persistent, nil, nil)
+
+			// List: Push items
+			txPush(t, db, listBucket, listKey, []byte("list_item_1"), true, nil, nil)
+
+			// Set: Add members
+			txSAdd(t, db, setBucket, setKey, []byte("set_member_1"), nil, nil)
+
+			// SortedSet: Add scored members
+			txZAdd(t, db, zsetBucket, zsetKey, []byte("zset_member_1"), 1.0, nil, nil)
+
+			// Give time for messages to be processed
+			time.Sleep(100 * time.Millisecond)
+
+			// Delete all buckets - each watcher should receive a delete notification
+			txDeleteBucket(t, db, DataStructureBTree, btreeBucket, nil)
+			txDeleteBucket(t, db, DataStructureList, listBucket, nil)
+			txDeleteBucket(t, db, DataStructureSet, setBucket, nil)
+			txDeleteBucket(t, db, DataStructureSortedSet, zsetBucket, nil)
+
+			// Wait for all expected messages
+			select {
+			case <-done:
+				t.Logf("Received all %d expected messages (count=%d)", expectCount, count.Load())
+			case <-time.After(10 * time.Second):
+				t.Fatalf("Timeout waiting for messages. Received %d/%d messages", count.Load(), expectCount)
+			}
+		})
+
+		wg.Wait()
+		countErr := 0
+
+		for err := range errCh {
+			countErr++
+			require.NoError(t, err)
+			if countErr == 4 {
+				break
+			}
+		}
+	})
+
+	t.Run("db watch same bucket name across different data structures", func(t *testing.T) {
+		errCh := make(chan error, 100)
+		wg := sync.WaitGroup{}
+
+		runNutsDBTestWithWatch(t, func(t *testing.T, db *DB) {
+			// Use the SAME bucket name for different data structures
+			// This tests that the bucket manager correctly handles multiple data structures
+			bucket := "shared_bucket"
+
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			txCreateBucket(t, db, DataStructureList, bucket, nil)
+			txCreateBucket(t, db, DataStructureSet, bucket, nil)
+			txCreateBucket(t, db, DataStructureSortedSet, bucket, nil)
+
+			// Use different keys for each data structure type
+			btreeKey := testutils.GetTestBytes(10)
+			listKey := testutils.GetTestBytes(20)
+			setKey := testutils.GetTestBytes(30)
+			zsetKey := testutils.GetTestBytes(40)
+
+			count := atomic.Int64{}
+			expectCount := int64(5)
+			done := make(chan struct{})
+
+			// Setup watchers
+			watcherSetup := []struct {
+				key  []byte
+				name string
+			}{
+				{btreeKey, "BTree"},
+				{listKey, "List"},
+				{setKey, "Set"},
+				{zsetKey, "ZSet"},
+			}
+
+			for _, ws := range watcherSetup {
+				watchFunc, errWatch := db.Watch(context.Background(), bucket, ws.key, func(msg *Message) error {
+					assert.NotNil(t, msg)
+					assert.Equal(t, core.BucketName(bucket), msg.BucketName)
+
+					if count.Add(1) == expectCount {
+						close(done)
+					}
+					return nil
+				})
+				require.NoError(t, errWatch)
+
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					err := watchFunc.Run()
+					errCh <- err
+				}()
+
+				errWait := watchFunc.WaitReady(10 * time.Second)
+				require.NoError(t, errWait)
+			}
+
+			// Perform operations
+			txPut(t, db, bucket, btreeKey, []byte("value"), Persistent, nil, nil)
+			txPush(t, db, bucket, listKey, []byte("item"), true, nil, nil)
+			txSAdd(t, db, bucket, setKey, []byte("member"), nil, nil)
+			txZAdd(t, db, bucket, zsetKey, []byte("member"), 1.0, nil, nil)
+
+			time.Sleep(100 * time.Millisecond)
+
+			// Delete all versions of the bucket
+			// When all the ds bucket are deleted, the bucket in watch manager will be deleted
+			// it will send the delete bucket message to the subscribers
+			txDeleteBucket(t, db, DataStructureBTree, bucket, nil)
+			txDeleteBucket(t, db, DataStructureList, bucket, nil)
+			txDeleteBucket(t, db, DataStructureSet, bucket, nil)
+			txDeleteBucket(t, db, DataStructureSortedSet, bucket, nil)
+
+			select {
+			case <-done:
+				t.Logf("Received all %d expected messages", expectCount)
+			case <-time.After(10 * time.Second):
+				t.Fatalf("Timeout. Received %d/%d messages", count.Load(), expectCount)
+			}
+		})
+
+		wg.Wait()
+		countErr := 0
+
+		for err := range errCh {
+			countErr++
+			require.NoError(t, err)
+			if countErr == 4 {
+				break
+			}
+		}
+	})
+}

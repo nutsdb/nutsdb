@@ -16,6 +16,7 @@ package nutsdb
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -1151,15 +1152,17 @@ func (db *DB) rebuildBucketManager() error {
  * Watch watches the key and bucket and calls the callback function for each message received.
  * The callback will be called once for each individual message in the batch.
  *
+ * @param ctx - the context for the watch - used to cancel the watch manually
  * @param bucket - the bucket name to watch
  * @param key - the key in the bucket to watch
  * @param cb - the callback function to call for each message received
  * @param opts - the options for the watch
  *   - CallbackTimeout - the timeout for the callback, default is 1 second
  *
+ * @return watcher - the watcher object
  * @return error - the error if the watch is stopped
  */
-func (db *DB) Watch(bucket string, key []byte, cb func(message *Message) error, opts ...WatchOptions) error {
+func (db *DB) Watch(ctx context.Context, bucket string, key []byte, cb func(message *Message) error, opts ...WatchOptions) (*Watcher, error) {
 	watchOpts := NewWatchOptions()
 
 	if len(opts) > 0 {
@@ -1167,85 +1170,103 @@ func (db *DB) Watch(bucket string, key []byte, cb func(message *Message) error, 
 	}
 
 	if db.watchMgr == nil {
-		return ErrWatchFeatureDisabled
+		return nil, ErrWatchFeatureDisabled
 	}
 
 	subscriber, err := db.watchMgr.subscribe(bucket, string(key))
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	maxBatchSize := 128
-	batch := make([]*Message, 0, maxBatchSize)
+	watchingFunc := func() error {
+		maxBatchSize := 128
+		batch := make([]*Message, 0, maxBatchSize)
 
-	// Use a ticker to process the batch every 100 milliseconds
-	// Avoid CPU busy spinning
-	ticker := time.NewTicker(100 * time.Millisecond)
-	keyWatch := string(key)
+		// Use a ticker to process the batch every 100 milliseconds
+		// Avoid CPU busy spinning
+		ticker := time.NewTicker(100 * time.Millisecond)
+		keyWatch := string(key)
 
-	processBatch := func(batch []*Message) error {
-		if len(batch) == 0 {
-			return nil
-		}
-
-		for _, msg := range batch {
-			errChan := make(chan error, 1)
-			go func(msg *Message) {
-				errChan <- cb(msg)
-			}(msg)
-
-			select {
-			case <-time.After(watchOpts.CallbackTimeout):
-				return ErrWatchingCallbackTimeout
-			case err := <-errChan:
-				if err != nil {
-					return err
-				}
-			}
-		}
-		return nil
-	}
-
-	defer func() {
-		ticker.Stop()
-
-		if subscriber != nil && subscriber.active.Load() {
-			_ = db.watchMgr.unsubscribe(bucket, keyWatch, subscriber.id)
-		}
-	}()
-
-	for {
-		select {
-		case <-db.watchMgr.done():
-			// drain the batch
-			if err := processBatch(batch); err != nil {
-				return err
-			}
-			return nil
-		case message, ok := <-subscriber.receiveChan:
-			if !ok {
-				if err := processBatch(batch); err != nil {
-					return err
-				}
-
+		processBatch := func(batch []*Message) error {
+			if len(batch) == 0 {
 				return nil
 			}
 
-			batch = append(batch, message)
+			for _, msg := range batch {
+				errChan := make(chan error, 1)
+				go func(msg *Message) {
+					errChan <- cb(msg)
+				}(msg)
 
-			if len(batch) >= maxBatchSize {
-				if err := processBatch(batch); err != nil {
-					return err
+				select {
+				case <-time.After(watchOpts.CallbackTimeout):
+					return ErrWatchingCallbackTimeout
+				case err := <-errChan:
+					if err != nil {
+						return err
+					}
 				}
-				batch = batch[:0]
 			}
-		case <-ticker.C:
-			for len(batch) > 0 {
+			return nil
+		}
+
+		defer func() {
+			ticker.Stop()
+
+			if subscriber != nil && subscriber.active.Load() {
+				if err := db.watchMgr.unsubscribe(bucket, keyWatch, subscriber.id); err != nil {
+					// ignore the error
+				}
+			}
+		}()
+
+		for {
+			select {
+			case <-ctx.Done():
+				// drain the batch
 				if err := processBatch(batch); err != nil {
 					return err
 				}
-				batch = batch[:0]
+				return nil
+			case <-db.watchMgr.done():
+				// drain the batch
+				if err := processBatch(batch); err != nil {
+					return err
+				}
+				return nil
+			case message, ok := <-subscriber.receiveChan:
+				if !ok {
+					if err := processBatch(batch); err != nil {
+						return err
+					}
+
+					return nil
+				}
+
+				batch = append(batch, message)
+
+				if len(batch) >= maxBatchSize {
+					if err := processBatch(batch); err != nil {
+						return err
+					}
+					batch = batch[:0]
+				}
+			case <-ticker.C:
+				for len(batch) > 0 {
+					if err := processBatch(batch); err != nil {
+						return err
+					}
+					batch = batch[:0]
+				}
 			}
 		}
 	}
+
+	watcher := &Watcher{
+		readyCh:      make(chan struct{}),
+		watchingFunc: watchingFunc,
+		isReady:      false,
+	}
+
+	return watcher, nil
 }
