@@ -23,38 +23,28 @@ import (
 
 type BatchExpiredCallback func(events []*ExpirationEvent)
 
-type ScanFunc func() ([]*ExpirationEvent, error)
-
+// Service provides TTL checking and batched expiration deletion.
+// Expired keys are detected lazily during reads and collected into a queue,
+// then batch-deleted by a background goroutine.
 type Service struct {
 	lifecycle       core.ComponentLifecycle
 	checker         *Checker
-	scanner         *Scanner
 	clock           Clock
-	scanFn          ScanFunc
 	expiredCallback BatchExpiredCallback
 	queue           *expirationQueue
 	batchSize       int
 	batchTimeout    time.Duration
 }
 
-func NewService(clk Clock, config Config, callback BatchExpiredCallback, scanFn ScanFunc) *Service {
+func NewService(clk Clock, config Config, callback BatchExpiredCallback) *Service {
 	config.Validate()
 
 	chk := NewChecker(clk)
 
-	scanner := NewScanner(ScannerConfig{
-		ScanInterval:     config.ScanInterval,
-		SampleSize:       config.SampleSize,
-		ExpiredThreshold: config.ExpiredThreshold,
-		MaxScanKeys:      config.MaxScanKeys,
-	})
-
 	service := &Service{
 		checker:         chk,
-		scanner:         scanner,
 		clock:           clk,
 		expiredCallback: callback,
-		scanFn:          scanFn,
 		queue:           newExpirationQueue(config.QueueSize),
 		batchSize:       config.BatchSize,
 		batchTimeout:    config.BatchTimeout,
@@ -63,10 +53,6 @@ func NewService(clk Clock, config Config, callback BatchExpiredCallback, scanFn 
 	chk.SetExpiredCallback(func(bucketId uint64, key []byte, ds uint16, timestamp uint64) {
 		service.onExpired(bucketId, key, ds, timestamp)
 	})
-
-	scanner.SetCallback(service.onExpiredBatch)
-
-	scanner.SetChecker(chk)
 
 	return service
 }
@@ -87,12 +73,6 @@ func (s *Service) onExpired(bucketId uint64, key []byte, ds uint16, timestamp ui
 		Timestamp: timestamp,
 	}
 	s.queue.push(event)
-}
-
-func (s *Service) onExpiredBatch(events []*ExpirationEvent) {
-	for _, event := range events {
-		s.onExpired(event.BucketId, event.Key, event.Ds, event.Timestamp)
-	}
 }
 
 func (s *Service) processExpirationEvents(ctx context.Context) {
@@ -145,16 +125,12 @@ func (s *Service) Start(ctx context.Context) error {
 	}
 
 	s.lifecycle.Go(s.processExpirationEvents)
-	s.lifecycle.Go(func(ctx context.Context) {
-		s.scanner.Run(ctx, s.scanFn)
-	})
 
 	return nil
 }
 
 func (s *Service) Stop(timeout time.Duration) error {
 	s.queue.close()
-
 	return s.lifecycle.Stop(timeout)
 }
 

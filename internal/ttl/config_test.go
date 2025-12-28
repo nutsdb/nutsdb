@@ -24,84 +24,44 @@ import (
 func TestDefaultConfig(t *testing.T) {
 	config := DefaultConfig()
 
-	// Batch processing defaults
 	assert.Equal(t, 100, config.BatchSize)
-	assert.Equal(t, 1000*time.Millisecond, config.BatchTimeout)
+	assert.Equal(t, 1*time.Second, config.BatchTimeout)
 	assert.Equal(t, 1000, config.QueueSize)
-
-	// Scanner configuration defaults
-	assert.Equal(t, 1000*time.Millisecond, config.ScanInterval)
-	assert.Equal(t, 20, config.SampleSize)
-	assert.Equal(t, 0.25, config.ExpiredThreshold)
-	assert.Equal(t, 10000, config.MaxScanKeys)
 }
 
 func TestConfig_Validate(t *testing.T) {
-	t.Run("validate with zero values sets defaults", func(t *testing.T) {
+	t.Run("with zero values uses defaults", func(t *testing.T) {
 		config := Config{}
 		config.Validate()
 
 		assert.Equal(t, 100, config.BatchSize)
-		assert.Equal(t, 100*time.Millisecond, config.BatchTimeout)
+		assert.Equal(t, 1*time.Second, config.BatchTimeout)
 		assert.Equal(t, 1000, config.QueueSize)
-		assert.Equal(t, 100*time.Millisecond, config.ScanInterval)
-		assert.Equal(t, 20, config.SampleSize)
-		assert.Equal(t, 0.25, config.ExpiredThreshold)
-		assert.Equal(t, 10000, config.MaxScanKeys)
 	})
 
-	t.Run("validate with negative values sets defaults", func(t *testing.T) {
+	t.Run("with negative values uses defaults", func(t *testing.T) {
 		config := Config{
-			BatchSize:         -1,
-			BatchTimeout:      -time.Second,
-			QueueSize:         -100,
-			ScanInterval:      -time.Millisecond,
-			SampleSize:        -5,
-			ExpiredThreshold:  -0.1,
-			MaxScanKeys:       -1000,
+			BatchSize:    -10,
+			BatchTimeout: -time.Second,
+			QueueSize:    -100,
 		}
 		config.Validate()
 
 		assert.Equal(t, 100, config.BatchSize)
-		assert.Equal(t, 100*time.Millisecond, config.BatchTimeout)
+		assert.Equal(t, 1*time.Second, config.BatchTimeout)
 		assert.Equal(t, 1000, config.QueueSize)
-		assert.Equal(t, 100*time.Millisecond, config.ScanInterval)
-		assert.Equal(t, 20, config.SampleSize)
-		assert.Equal(t, 0.25, config.ExpiredThreshold)
-		assert.Equal(t, 10000, config.MaxScanKeys)
 	})
 
-	t.Run("validate with partial zero values", func(t *testing.T) {
+	t.Run("with custom values keeps them", func(t *testing.T) {
 		config := Config{
 			BatchSize:    200,
-			BatchTimeout: 500 * time.Millisecond,
-			QueueSize:    0, // Should get default
+			BatchTimeout: 2 * time.Second,
+			QueueSize:    2000,
 		}
 		config.Validate()
 
 		assert.Equal(t, 200, config.BatchSize)
-		assert.Equal(t, 500*time.Millisecond, config.BatchTimeout)
-		assert.Equal(t, 1000, config.QueueSize) // Default
-	})
-
-	t.Run("validate with valid values preserves them", func(t *testing.T) {
-		config := Config{
-			BatchSize:         500,
-			BatchTimeout:      2 * time.Second,
-			QueueSize:         2000,
-			ScanInterval:      500 * time.Millisecond,
-			SampleSize:        50,
-			ExpiredThreshold:  0.5,
-			MaxScanKeys:       50000,
-		}
-		config.Validate()
-
-		assert.Equal(t, 500, config.BatchSize)
 		assert.Equal(t, 2*time.Second, config.BatchTimeout)
 		assert.Equal(t, 2000, config.QueueSize)
-		assert.Equal(t, 500*time.Millisecond, config.ScanInterval)
-		assert.Equal(t, 50, config.SampleSize)
-		assert.Equal(t, 0.5, config.ExpiredThreshold)
-		assert.Equal(t, 50000, config.MaxScanKeys)
 	})
 }
