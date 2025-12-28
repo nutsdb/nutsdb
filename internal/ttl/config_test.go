@@ -25,7 +25,7 @@ func TestDefaultConfig(t *testing.T) {
 	config := DefaultConfig()
 
 	assert.Equal(t, 100, config.BatchSize)
-	assert.Equal(t, 100*time.Millisecond, config.BatchTimeout)
+	assert.Equal(t, 1*time.Second, config.BatchTimeout)
 	assert.Equal(t, 1000, config.QueueSize)
 }
 
@@ -35,7 +35,7 @@ func TestConfig_Validate(t *testing.T) {
 		config.Validate()
 
 		assert.Equal(t, 100, config.BatchSize)
-		assert.Equal(t, 100*time.Millisecond, config.BatchTimeout)
+		assert.Equal(t, 1*time.Second, config.BatchTimeout)
 		assert.Equal(t, 1000, config.QueueSize)
 	})
 
@@ -48,7 +48,7 @@ func TestConfig_Validate(t *testing.T) {
 		config.Validate()
 
 		assert.Equal(t, 100, config.BatchSize)
-		assert.Equal(t, 100*time.Millisecond, config.BatchTimeout)
+		assert.Equal(t, 1*time.Second, config.BatchTimeout)
 		assert.Equal(t, 1000, config.QueueSize)
 	})
 
