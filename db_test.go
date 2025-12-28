@@ -2948,7 +2948,9 @@ func TestDB_Watch(t *testing.T) {
 		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 		txPut(t, db, bucket, key, val, Persistent, nil, nil)
 
-		db.watchMgr.close()
+		errClose := db.watchMgr.close()
+		require.NoError(t, errClose)
+
 		require.Equal(t, db.watchMgr.isClosed(), true)
 		time.Sleep(100 * time.Millisecond)
 
@@ -2960,6 +2962,8 @@ func TestDB_Watch(t *testing.T) {
 	})
 
 	t.Run("db is watching and watch manager is closing", func(t *testing.T) {
+		var errClose error
+
 		runNutsDBTestWithWatch(t, func(t *testing.T, db *DB) {
 			bucket := "bucket"
 			key := testutils.GetTestBytes(0)
@@ -2984,7 +2988,7 @@ func TestDB_Watch(t *testing.T) {
 			go func() {
 				defer wg.Done()
 				time.Sleep(time.Duration(rand.Intn(100)) * time.Millisecond)
-				db.watchMgr.close()
+				errClose = db.watchMgr.close()
 			}()
 
 			ticker := time.NewTicker(10 * time.Millisecond)
@@ -2996,6 +3000,7 @@ func TestDB_Watch(t *testing.T) {
 			}
 
 			wg.Wait()
+			require.NoError(t, errClose)
 			require.Equal(t, db.watchMgr.isClosed(), true)
 			if err != nil && (!errors.Is(err, ErrWatchManagerClosed) && !errors.Is(err, ErrWatchingChannelClosed)) {
 				t.Fatal("watch callback should not return error")
