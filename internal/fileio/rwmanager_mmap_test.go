@@ -18,16 +18,35 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/nutsdb/nutsdb"
 	"github.com/nutsdb/nutsdb/internal/fileio"
 	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 
 	"github.com/edsrzf/mmap-go"
 )
 
-func TestRWManager_MMap_Release(t *testing.T) {
+type rwMgrMMapTestSuite struct {
+	suite.Suite
+}
+
+func (s *rwMgrMMapTestSuite) isActive(rwmanager *fileio.MMapRWManager) bool {
+	return rwmanager.Fdm.Cache[rwmanager.Path].Using() != 0
+}
+
+func (s *rwMgrMMapTestSuite) isFileDescriptorClosed(fd uintptr) error {
+	file := os.NewFile(fd, "")
+	defer func() { _ = file.Close() }()
+	_, err := file.Stat()
+
+	return err
+}
+
+func (s *rwMgrMMapTestSuite) TestRWManager_MMap_Release() {
+	t := s.T()
 	filePath := filepath.Join(t.TempDir(), "foo_rw_MMap")
 	fdm := nutsdb.NewFileManager(nutsdb.MMap, 8*nutsdb.MB, 0.5, 8*nutsdb.MB)
 	rwmanager, err := fdm.GetMMapRWManager(filePath, 8*nutsdb.MB, 8*nutsdb.MB, false)
@@ -42,7 +61,7 @@ func TestRWManager_MMap_Release(t *testing.T) {
 		t.Error("err TestRWManager_MMap_Release WriteAt")
 	}
 
-	if !isActive(rwmanager) {
+	if !s.isActive(rwmanager) {
 		t.Error("err TestRWManager_MMap_Release FdInfo:using not correct")
 	}
 
@@ -51,16 +70,13 @@ func TestRWManager_MMap_Release(t *testing.T) {
 		t.Error("err TestRWManager_MMap_Release Release")
 	}
 
-	if isActive(rwmanager) {
+	if s.isActive(rwmanager) {
 		t.Error("err TestRWManager_MMap_Release Release Failed")
 	}
 }
 
-func isActive(rwmanager *fileio.MMapRWManager) bool {
-	return rwmanager.Fdm.Cache[rwmanager.Path].Using() != 0
-}
-
-func TestRWManager_MMap_WriteAt(t *testing.T) {
+func (s *rwMgrMMapTestSuite) TestRWManager_MMap_WriteAt() {
+	t := s.T()
 	filePath := filepath.Join(t.TempDir(), "foo_rw_filemmap")
 	maxFdNums := 1024
 	cleanThreshold := 0.5
@@ -93,7 +109,8 @@ func TestRWManager_MMap_WriteAt(t *testing.T) {
 	require.Equal(t, append([]byte{0, 0, 0}, b...), []byte(m[:off+int64(len(b))]))
 }
 
-func TestRWManager_MMap_WriteAt_NotEnoughData(t *testing.T) {
+func (s *rwMgrMMapTestSuite) TestRWManager_MMap_WriteAt_NotEnoughData() {
+	t := s.T()
 	filePath := filepath.Join(t.TempDir(), "rw_mmap")
 	maxFdNums := 1024
 	cleanThreshold := 0.5
@@ -125,7 +142,8 @@ func TestRWManager_MMap_WriteAt_NotEnoughData(t *testing.T) {
 	require.Equal(t, b[:n], data)
 }
 
-func TestRWManager_MMap_ReadAt_CrossBlock(t *testing.T) {
+func (s *rwMgrMMapTestSuite) TestRWManager_MMap_ReadAt_CrossBlock() {
+	t := s.T()
 	filePath := filepath.Join(t.TempDir(), "rw_mmap")
 	maxFdNums := 1024
 	cleanThreshold := 0.5
@@ -155,7 +173,8 @@ func TestRWManager_MMap_ReadAt_CrossBlock(t *testing.T) {
 	require.Equal(t, b, data)
 }
 
-func TestRWManager_MMap_ReadAt_NotEnoughBytes(t *testing.T) {
+func (s *rwMgrMMapTestSuite) TestRWManager_MMap_ReadAt_NotEnoughBytes() {
+	t := s.T()
 	filePath := filepath.Join(t.TempDir(), "rw_mmap")
 	maxFdNums := 1024
 	cleanThreshold := 0.5
@@ -185,7 +204,8 @@ func TestRWManager_MMap_ReadAt_NotEnoughBytes(t *testing.T) {
 	require.Equal(t, b, data[0:4])
 }
 
-func TestRWManager_MMap_ReadAt_ErrIndexOutOfBound(t *testing.T) {
+func (s *rwMgrMMapTestSuite) TestRWManager_MMap_ReadAt_ErrIndexOutOfBound() {
+	t := s.T()
 	filePath := filepath.Join(t.TempDir(), "rw_mmap")
 	maxFdNums := 1024
 	cleanThreshold := 0.5
@@ -207,8 +227,12 @@ func TestRWManager_MMap_ReadAt_ErrIndexOutOfBound(t *testing.T) {
 	require.True(t, errors.Is(err, fileio.ErrIndexOutOfBound))
 }
 
-func TestRWManager_MMap_Sync(t *testing.T) {
+func (s *rwMgrMMapTestSuite) TestRWManager_MMap_Sync() {
+	t := s.T()
+	r := require.New(t)
 	filePath := filepath.Join(t.TempDir(), t.Name())
+	err := os.MkdirAll(filepath.Dir(filePath), os.ModePerm)
+	r.NoError(err)
 	maxFdNums := 1024
 	cleanThreshold := 0.5
 	var fdm = fileio.NewFdm(maxFdNums, cleanThreshold)
@@ -238,8 +262,12 @@ func TestRWManager_MMap_Sync(t *testing.T) {
 	require.Equal(t, fileContents, []byte(m[:]))
 }
 
-func TestRWManager_MMap_Close(t *testing.T) {
+func (s *rwMgrMMapTestSuite) TestRWManager_MMap_Close() {
+	t := s.T()
+	r := require.New(t)
 	filePath := filepath.Join(t.TempDir(), t.Name())
+	err := os.MkdirAll(filepath.Dir(filePath), os.ModePerm)
+	r.NoError(err)
 	maxFdNums := 1024
 	cleanThreshold := 0.5
 	var fdm = fileio.NewFdm(maxFdNums, cleanThreshold)
@@ -258,16 +286,15 @@ func TestRWManager_MMap_Close(t *testing.T) {
 
 	mmManager := fileio.GetMMapRWManager(fd, filePath, fdm, 8*fileio.MB)
 	require.NoError(t, mmManager.Close())
-	err = isFileDescriptorClosed(fd.Fd())
+	err = s.isFileDescriptorClosed(fd.Fd())
 	if err == nil {
 		t.Error("expected file descriptor to be closed, but it's still open")
 	}
 }
 
-func isFileDescriptorClosed(fd uintptr) error {
-	file := os.NewFile(fd, "")
-	defer func() { _ = file.Close() }()
-	_, err := file.Stat()
-
-	return err
+func TestRWMgrMMapMain(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip()
+	}
+	suite.Run(t, new(rwMgrMMapTestSuite))
 }

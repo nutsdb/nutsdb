@@ -18,6 +18,7 @@ func TestRWManager_FileIO_All(t *testing.T) {
 
 	t.Run("test write read", func(t *testing.T) {
 		fdm = fileio.NewFdm(maxFdNums, cleanThreshold)
+		defer func() { _ = fdm.Close() }()
 		fd, err := fdm.GetFd(filePath)
 		if err != nil {
 			require.NoError(t, err)

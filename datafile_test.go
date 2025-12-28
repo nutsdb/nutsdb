@@ -17,6 +17,7 @@ package nutsdb
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/nutsdb/nutsdb/internal/core"
@@ -29,7 +30,7 @@ var (
 )
 
 func init() {
-	filePath = "/tmp/foo"
+	filePath = filepath.Join(os.TempDir(), "foo")
 	entry = core.Entry{
 		Key:   []byte("key_0001"),
 		Value: []byte("val_0001"),
@@ -40,6 +41,9 @@ func init() {
 }
 
 func TestDataFile_Err(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip()
+	}
 	fm := NewFileManager(MMap, 1024, 0.5, 256*MB)
 	defer func() { _ = fm.Close() }()
 	_, err := fm.GetDataFile(filePath, -1)
@@ -52,6 +56,9 @@ func TestDataFile_Err(t *testing.T) {
 }
 
 func TestDataFile1(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip()
+	}
 	fm := NewFileManager(MMap, 1024, 0.5, 256*MB)
 	defer func() { _ = fm.Close() }()
 	df, err := fm.GetDataFile(filePath, 1024)

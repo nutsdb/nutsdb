@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -110,7 +111,7 @@ func TestHintFileIntegration_EnableDisableToggle(t *testing.T) {
 		bucket := "bucket"
 		opts := DefaultOptions
 		opts.SegmentSize = 64 * KB
-		opts.Dir = fmt.Sprintf("/tmp/test-hintfile-toggle-%s", mode.name)
+		opts.Dir = filepath.Join(t.TempDir(), fmt.Sprintf("test-hintfile-toggle-%s", mode.name))
 		opts.EnableMergeV2 = mode.enableMergeV2
 
 		removeDir(opts.Dir)
@@ -189,7 +190,7 @@ func TestHintFileIntegration_MultipleMerges(t *testing.T) {
 		bucket := "bucket"
 		opts := DefaultOptions
 		opts.SegmentSize = 32 * KB // Smaller segment size to trigger more merges
-		opts.Dir = fmt.Sprintf("/tmp/test-hintfile-multi-merge-%s/", mode.name)
+		opts.Dir = filepath.Join(t.TempDir(), fmt.Sprintf("test-hintfile-multi-merge-%s", mode.name))
 		opts.EnableHintFile = true
 		opts.EnableMergeV2 = mode.enableMergeV2
 
@@ -276,7 +277,7 @@ func TestHintFileIntegration_MixedDataStructures(t *testing.T) {
 	runForMergeModes(t, func(t *testing.T, mode mergeTestMode) {
 		opts := DefaultOptions
 		opts.SegmentSize = 64 * KB
-		opts.Dir = fmt.Sprintf("/tmp/test-hintfile-mixed-ds-%s/", mode.name)
+		opts.Dir = filepath.Join(t.TempDir(), fmt.Sprintf("test-hintfile-mixed-ds-%s", mode.name))
 		opts.EnableHintFile = true
 		opts.EnableMergeV2 = mode.enableMergeV2
 
@@ -384,11 +385,14 @@ func TestHintFileIntegration_MixedDataStructures(t *testing.T) {
 
 // TestHintFileIntegration_CrashRecovery tests database recovery after simulated crashes
 func TestHintFileIntegration_CrashRecovery(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip()
+	}
 	runForMergeModes(t, func(t *testing.T, mode mergeTestMode) {
 		bucket := "bucket"
 		opts := DefaultOptions
 		opts.SegmentSize = 64 * KB
-		opts.Dir = fmt.Sprintf("/tmp/test-hintfile-crash-%s/", mode.name)
+		opts.Dir = filepath.Join(t.TempDir(), fmt.Sprintf("test-hintfile-crash-%s", mode.name))
 		opts.EnableHintFile = true
 		opts.EnableMergeV2 = mode.enableMergeV2
 
@@ -447,7 +451,7 @@ func TestHintFileIntegration_ConcurrentOperations(t *testing.T) {
 	runForMergeModes(t, func(t *testing.T, mode mergeTestMode) {
 		opts := DefaultOptions
 		opts.SegmentSize = 64 * KB
-		opts.Dir = fmt.Sprintf("/tmp/test-hintfile-concurrent-%s/", mode.name)
+		opts.Dir = filepath.Join(t.TempDir(), fmt.Sprintf("test-hintfile-concurrent-%s", mode.name))
 		opts.EnableHintFile = true
 		opts.EnableMergeV2 = mode.enableMergeV2
 
@@ -520,7 +524,7 @@ func TestHintFileIntegration_LargeDataset(t *testing.T) {
 	runForMergeModes(t, func(t *testing.T, mode mergeTestMode) {
 		opts := DefaultOptions
 		opts.SegmentSize = 256 * KB
-		opts.Dir = fmt.Sprintf("/tmp/test-hintfile-large-%s/", mode.name)
+		opts.Dir = filepath.Join(t.TempDir(), fmt.Sprintf("test-hintfile-large-%s", mode.name))
 		opts.EnableHintFile = true
 		opts.EnableMergeV2 = mode.enableMergeV2
 

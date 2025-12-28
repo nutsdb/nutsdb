@@ -299,6 +299,12 @@ func (db *DB) release() error {
 
 	db.commitBuffer = nil
 
+	if db.bucketMgr != nil {
+		if err := db.bucketMgr.Close(); err != nil {
+			return err
+		}
+	}
+
 	if db.watchMgr != nil {
 		if err := db.watchMgr.close(); err != nil {
 			log.Printf("watch manager closed already")
@@ -634,6 +640,7 @@ func (db *DB) parseDataFiles(dataFileIds []int64) (err error) {
 		if err != nil {
 			return err
 		}
+		_ = f.release()
 	}
 
 	// compute the valid record count and save it in db.RecordCount
