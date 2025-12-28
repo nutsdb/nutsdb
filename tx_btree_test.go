@@ -3715,3 +3715,166 @@ func TestTx_TTL_RapidExpireUpdate(t *testing.T) {
 		})
 	})
 }
+
+// TestTx_TTL_LazyDeletionFromIndex verifies that expired keys are actually removed from the index
+// after lazy deletion is triggered, not just filtered out during reads.
+func TestTx_TTL_LazyDeletionFromIndex(t *testing.T) {
+	bucket := "test_bucket"
+	key := []byte("test_key")
+	value := []byte("test_value")
+
+	t.Run("expired key removed from index after lazy deletion", func(t *testing.T) {
+		runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc ttl.Clock) {
+			r := require.New(t)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+			txPut(t, db, bucket, key, value, 1, nil, nil)
+
+			err := db.View(func(tx *Tx) error {
+				idx, ok := db.Index.BTree.exist(1) // bucket ID 1
+				r.True(ok)
+
+				record, found := idx.FindForVerification(key)
+				r.True(found, "key should exist in index before expiration")
+				r.NotNil(record)
+				r.Equal(value, record.Value)
+				return nil
+			})
+			r.NoError(err)
+
+			mc.AdvanceTime(2 * time.Second)
+
+			txGet(t, db, bucket, key, nil, ErrKeyNotFound)
+
+			time.Sleep(200 * time.Millisecond)
+
+			err = db.View(func(tx *Tx) error {
+				idx, ok := db.Index.BTree.exist(1)
+				r.True(ok)
+
+				record, found := idx.FindForVerification(key)
+				r.False(found, "expired key should be physically removed from index")
+				r.Nil(record)
+				return nil
+			})
+			r.NoError(err)
+		})
+	})
+
+	t.Run("multiple expired keys batch deleted from index", func(t *testing.T) {
+		runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc ttl.Clock) {
+			r := require.New(t)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+			keys := [][]byte{
+				[]byte("key1"),
+				[]byte("key2"),
+				[]byte("key3"),
+			}
+
+			for _, k := range keys {
+				txPut(t, db, bucket, k, value, 1, nil, nil)
+			}
+
+			err := db.View(func(tx *Tx) error {
+				idx, ok := db.Index.BTree.exist(1)
+				r.True(ok)
+
+				for _, k := range keys {
+					record, found := idx.FindForVerification(k)
+					r.True(found, "key %s should exist in index", string(k))
+					r.NotNil(record)
+				}
+				return nil
+			})
+			r.NoError(err)
+
+			mc.AdvanceTime(2 * time.Second)
+
+			for _, k := range keys {
+				txGet(t, db, bucket, k, nil, ErrKeyNotFound)
+			}
+
+			time.Sleep(200 * time.Millisecond)
+
+			err = db.View(func(tx *Tx) error {
+				idx, ok := db.Index.BTree.exist(1)
+				r.True(ok)
+
+				for _, k := range keys {
+					record, found := idx.FindForVerification(k)
+					r.False(found, "expired key %s should be removed from index", string(k))
+					r.Nil(record)
+				}
+				return nil
+			})
+			r.NoError(err)
+		})
+	})
+
+	t.Run("concurrent access during lazy deletion", func(t *testing.T) {
+		runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc ttl.Clock) {
+			r := require.New(t)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+			txPut(t, db, bucket, key, value, 1, nil, nil)
+
+			mc.AdvanceTime(2 * time.Second)
+
+			var wg sync.WaitGroup
+			wg.Add(10)
+
+			for i := 0; i < 10; i++ {
+				go func() {
+					defer wg.Done()
+					txGet(t, db, bucket, key, nil, ErrKeyNotFound)
+				}()
+			}
+
+			wg.Wait()
+			time.Sleep(200 * time.Millisecond)
+
+			err := db.View(func(tx *Tx) error {
+				idx, ok := db.Index.BTree.exist(1)
+				r.True(ok)
+
+				record, found := idx.FindForVerification(key)
+				r.False(found, "expired key should be removed from index after concurrent access")
+				r.Nil(record)
+				return nil
+			})
+			r.NoError(err)
+		})
+	})
+
+	t.Run("timestamp verification prevents wrong deletion", func(t *testing.T) {
+		runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc ttl.Clock) {
+			r := require.New(t)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+			txPut(t, db, bucket, key, []byte("value1"), 1, nil, nil)
+
+			mc.AdvanceTime(2 * time.Second)
+
+			txGet(t, db, bucket, key, nil, ErrKeyNotFound)
+
+			txPut(t, db, bucket, key, []byte("value2"), 10, nil, nil)
+
+			time.Sleep(200 * time.Millisecond)
+
+			txGet(t, db, bucket, key, []byte("value2"), nil)
+
+			err := db.View(func(tx *Tx) error {
+				idx, ok := db.Index.BTree.exist(1)
+				r.True(ok)
+
+				record, found := idx.FindForVerification(key)
+				r.True(found, "new key should exist in index")
+				r.NotNil(record)
+				r.Equal([]byte("value2"), record.Value)
+				return nil
+			})
+			r.NoError(err)
+		})
+	})
+}
