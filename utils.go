@@ -18,7 +18,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -29,9 +29,9 @@ import (
 func getDataPath(fID int64, dir string) string {
 	if IsMergeFile(fID) {
 		seq := GetMergeSeq(fID)
-		return path.Join(dir, fmt.Sprintf("merge_%d%s", seq, DataSuffix))
+		return filepath.Join(dir, fmt.Sprintf("merge_%d%s", seq, DataSuffix))
 	}
-	return path.Join(dir, strconv2.Int64ToStr(fID)+DataSuffix)
+	return filepath.Join(dir, strconv2.Int64ToStr(fID)+DataSuffix)
 }
 
 func splitIntStringStr(str, separator string) (int, string) {

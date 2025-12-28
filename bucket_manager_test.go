@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestBucketManager_NewBucketAndDeleteBucket(t *testing.T) {
@@ -42,17 +43,17 @@ func TestBucketManager_ExistBucket(t *testing.T) {
 }
 
 func TestBucketManager_Recovery(t *testing.T) {
+	r := require.New(t)
 	dir := filepath.Join(t.TempDir(), "nutsdb_test_data")
 	const bucket1 = "bucket_1"
 	const bucket2 = "bucket_2"
 	db, err := Open(DefaultOptions, WithDir(dir))
-	defer removeDir(dir)
 	assert.NotNil(t, db)
 	assert.Nil(t, err)
 	txNewBucket(t, db, bucket1, DataStructureBTree, nil, nil)
 	txNewBucket(t, db, bucket2, DataStructureBTree, nil, nil)
 	txDeleteBucketFunc(t, db, bucket1, DataStructureBTree, nil, nil)
-	_ = db.Close()
+	r.NoError(db.Close())
 
 	db, err = Open(DefaultOptions, WithDir(dir))
 	assert.Nil(t, err)
@@ -66,6 +67,7 @@ func TestBucketManager_Recovery(t *testing.T) {
 		return nil
 	})
 	assert.Nil(t, err)
+	r.NoError(db.Close())
 }
 
 func TestBucketManager_DataStructureIsolation(t *testing.T) {

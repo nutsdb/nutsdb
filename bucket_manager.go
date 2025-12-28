@@ -3,6 +3,7 @@ package nutsdb
 import (
 	"errors"
 	"os"
+	"path/filepath"
 
 	"github.com/nutsdb/nutsdb/internal/core"
 )
@@ -25,7 +26,7 @@ func NewBucketManager(dir string) (*BucketManager, error) {
 		BucketInfoMapper: make(core.InfoMapperInBucket),
 		BucketIDMarker:   make(core.IDMarkerInBucket),
 	}
-	bucketFilePath := dir + "/" + BucketStoreFileName
+	bucketFilePath := filepath.Join(dir, BucketStoreFileName)
 	_, err := os.Stat(bucketFilePath)
 	mode := os.O_RDWR
 	if err != nil {
@@ -128,4 +129,8 @@ func (bm *BucketManager) GetBucketID(ds core.Ds, name core.BucketName) (core.Buc
 	} else {
 		return bucket.Id, nil
 	}
+}
+
+func (bm *BucketManager) Close() error {
+	return bm.fd.Close()
 }

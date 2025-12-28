@@ -141,6 +141,9 @@ func TestBatchWrite(t *testing.T) {
 		testEmptyWrite(t, db)
 		TestFlushPanic(t, db)
 	}
+	for _, db := range dbs {
+		require.NoError(t, db.Close())
+	}
 }
 
 func TestWriteBatch_SetMaxPendingTxns(t *testing.T) {
@@ -162,6 +165,14 @@ func TestWriteBatch_SetMaxPendingTxns(t *testing.T) {
 	if cap(wb.throttle.errCh) != max {
 		t.Errorf("Expected error channel length to be %d, but got %d", max, len(wb.throttle.errCh))
 	}
+
+	// TODO:
+	// not sure if this usage is available.
+	db.statusMgr.cancel()
+	db.statusMgr.wg.Wait()
+	// Simulate shutdown so the new transaction cannot be opened.
+	db.statusMgr.closing.Store(true)
+	_ = db.release()
 }
 
 func TestWriteBatchCommit_UnregistersOnBeginTxFailure(t *testing.T) {

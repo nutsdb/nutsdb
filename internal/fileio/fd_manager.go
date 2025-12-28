@@ -1,6 +1,7 @@
 package fileio
 
 import (
+	"fmt"
 	"math"
 	"os"
 	"path/filepath"
@@ -122,7 +123,7 @@ func (fdm *FdManager) ReduceUsing(path string) {
 	cleanPath := filepath.Clean(path)
 	node, isExist := fdm.Cache[cleanPath]
 	if !isExist {
-		panic("unexpected the node is not in cache")
+		panic(fmt.Errorf("unexpected the node is not in cache %s", cleanPath))
 	}
 	node.using--
 }

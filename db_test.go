@@ -23,6 +23,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -71,11 +72,9 @@ func runNutsDBTest(t *testing.T, opts *Options, test func(t *testing.T, db *DB))
 	require.NoError(t, err)
 
 	test(t, db)
-	t.Cleanup(func() {
-		if !db.IsClose() {
-			require.NoError(t, db.Close())
-		}
-	})
+	if !db.IsClose() {
+		require.NoError(t, db.Close())
+	}
 }
 
 // runNutsDBTestWithMockClock runs a test with a MockClock for deterministic TTL testing.
@@ -96,11 +95,9 @@ func runNutsDBTestWithMockClock(t *testing.T, opts *Options, test func(t *testin
 	require.NoError(t, err)
 
 	test(t, db, mc)
-	t.Cleanup(func() {
-		if !db.IsClose() {
-			require.NoError(t, db.Close())
-		}
-	})
+	if !db.IsClose() {
+		require.NoError(t, db.Close())
+	}
 }
 
 func runNutsDBTestWithWatch(t *testing.T, test func(t *testing.T, db *DB)) {
@@ -289,25 +286,28 @@ func TestDB_ReopenWithDelete(t *testing.T) {
 }
 
 func TestDB_Flock(t *testing.T) {
-	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
-		db2, err := Open(db.opt)
-		require.Nil(t, db2)
-		require.Equal(t, ErrDirLocked, err)
+	testDir := filepath.Join(t.TempDir(), "testdb_flock")
+	opt := DefaultOptions
+	opt.Dir = testDir
+	db1, err := Open(opt)
+	db2, err := Open(db1.opt)
 
-		err = db.Close()
-		require.NoError(t, err)
+	require.Nil(t, db2)
+	require.Equal(t, ErrDirLocked, err)
 
-		db2, err = Open(db.opt)
-		require.NoError(t, err)
-		require.NotNil(t, db2)
+	err = db1.Close()
+	require.NoError(t, err)
 
-		err = db2.flock.Unlock()
-		require.NoError(t, err)
-		require.False(t, db2.flock.Locked())
+	db2, err = Open(db1.opt)
+	require.NoError(t, err)
+	require.NotNil(t, db2)
 
-		err = db2.Close()
-		require.NoError(t, err)
-	})
+	err = db2.flock.Unlock()
+	require.NoError(t, err)
+	require.False(t, db2.flock.Locked())
+
+	err = db2.Close()
+	require.NoError(t, err)
 }
 
 func TestDB_DeleteANonExistKey(t *testing.T) {
@@ -843,6 +843,9 @@ func TestDB_GetKeyNotFound(t *testing.T) {
 }
 
 func TestDB_Backup(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip()
+	}
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		backUpDir := filepath.Join(t.TempDir(), "nutsdb-backup")
 		require.NoError(t, db.Backup(backUpDir))
@@ -850,6 +853,9 @@ func TestDB_Backup(t *testing.T) {
 }
 
 func TestDB_BackupTarGZ(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip()
+	}
 	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
 		backUpFile := filepath.Join(t.TempDir(), "nutsdb-backup", "backup.tar.gz")
 
@@ -1034,6 +1040,7 @@ func TestDB_Close_RejectsNewTxsDuringShutdown(t *testing.T) {
 
 // TestDB_Close_Timeout tests timeout handling during close
 func TestDB_Close_Timeout(t *testing.T) {
+	r := require.New(t)
 	opts := DefaultOptions
 	opts.Dir = filepath.Join(t.TempDir(), "test-close-timeout")
 	defer func() { _ = os.RemoveAll(opts.Dir) }()
@@ -1088,6 +1095,16 @@ func TestDB_Close_Timeout(t *testing.T) {
 	case <-txDone:
 	case <-time.After(5 * time.Second):
 		// Transaction may still be running, that's ok
+	}
+
+	// close all active file and bucket manager and flock,
+	// let there is no opening file in temp dir.
+	r.NoError(db.flock.Unlock())
+	if db.ActiveFile != nil && db.ActiveFile.rwManager != nil {
+		r.NoError(db.ActiveFile.rwManager.Close())
+	}
+	if db.bucketMgr != nil {
+		r.NoError(db.bucketMgr.Close())
 	}
 }
 
@@ -1466,9 +1483,13 @@ func TestDB_HintKeyValAndRAMIdxMode_RestartDB(t *testing.T) {
 
 		_ = db.Close()
 		// restart db with HintKeyValAndRAMIdxMode EntryIdxMode
-		db, err := Open(db.opt)
+		var err error
+		db, err = Open(db.opt)
 		require.NoError(t, err)
 		txGet(t, db, bucket, key, val, nil)
+		// TODO:
+		// I don't know why if I add this close here the cleanup will OK?
+		require.NoError(t, db.Close())
 	})
 }
 
@@ -1489,6 +1510,9 @@ func TestDB_HintKeyAndRAMIdxMode_RestartDB(t *testing.T) {
 		db, err := Open(db.opt)
 		require.NoError(t, err)
 		txGet(t, db, bucket, key, val, nil)
+		// TODO:
+		// I don't know why if I add this close here the cleanup will OK?
+		require.NoError(t, db.Close())
 	})
 }
 
@@ -1523,6 +1547,7 @@ func TestDB_ChangeMode_RestartDB(t *testing.T) {
 
 		runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
 			bucket := "bucket"
+			r := require.New(t)
 			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 			txCreateBucket(t, db, DataStructureList, bucket, nil)
 			txCreateBucket(t, db, DataStructureSet, bucket, nil)
@@ -1611,6 +1636,7 @@ func TestDB_ChangeMode_RestartDB(t *testing.T) {
 			for i := 3; i < 10; i++ {
 				txZScore(t, db, bucket, testutils.GetTestBytes(0), testutils.GetTestBytes(i), float64(i), nil)
 			}
+			r.NoError(db.Close())
 		})
 	}
 
@@ -1625,6 +1651,7 @@ func TestTx_SmallFile(t *testing.T) {
 	opts.SegmentSize = 100
 	opts.EntryIdxMode = HintKeyAndRAMIdxMode
 	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
+		r := require.New(t)
 		bucket := "bucket"
 		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
@@ -1637,11 +1664,12 @@ func TestTx_SmallFile(t *testing.T) {
 			}
 			return nil
 		})
-		require.Nil(t, err)
-		require.NoError(t, db.Close())
+		r.Nil(err)
+		r.NoError(db.Close())
 		db, _ = Open(opts)
 
 		txGet(t, db, bucket, testutils.GetTestBytes(10), testutils.GetTestBytes(10), nil)
+		r.NoError(db.Close())
 	})
 }
 

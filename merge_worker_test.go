@@ -124,6 +124,11 @@ func TestMergeWorker_RejectMergeWhenClosing(t *testing.T) {
 	if db.watchMgr != nil {
 		_ = db.watchMgr.Stop(5 * time.Second)
 	}
+	_ = db.bucketMgr.Close()
+	if db.ActiveFile != nil {
+		_ = db.ActiveFile.rwManager.Close()
+	}
+	_ = db.flock.Unlock()
 }
 
 func TestMergeWorker_RejectConcurrentMerge(t *testing.T) {

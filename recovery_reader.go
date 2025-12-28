@@ -13,6 +13,7 @@ type fileRecovery struct {
 	fd     *os.File
 	reader *bufio.Reader
 	size   int64
+	closed bool
 }
 
 func newFileRecovery(path string, bufSize int) (fr *fileRecovery, err error) {
@@ -29,6 +30,7 @@ func newFileRecovery(path string, bufSize int) (fr *fileRecovery, err error) {
 		fd:     fd,
 		reader: bufio.NewReaderSize(fd, bufSize),
 		size:   fileInfo.Size(),
+		closed: false,
 	}, nil
 }
 
@@ -134,5 +136,9 @@ func calBufferSize(size int) int {
 }
 
 func (fr *fileRecovery) release() error {
+	if fr.closed {
+		return nil
+	}
+	fr.closed = true
 	return fr.fd.Close()
 }
