@@ -42,7 +42,7 @@ After **nutsdb v1.0.0**, due to changes in the underlying data storage protocol,
 
 ### Install NutsDB
 
-To start using NutsDB, first needs [Go](https://golang.org/dl/) installed (version 1.18+ is required).  and run go get:
+To start using NutsDB, first needs [Go](https://golang.org/dl/) installed (version 1.24+ is required).  and run go get:
 
 ```
 go get -u github.com/nutsdb/nutsdb
