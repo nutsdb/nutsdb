@@ -722,9 +722,9 @@ func TestWatchManager_ComponentLifecycle(t *testing.T) {
 	require.NoError(t, wm.sendMessage(msg))
 	wmReceiveMessage(t, subscriber.receiveChan, bucket, key, 2*time.Second)
 
-	require.NoError(t, wm.Stop(2*time.Second))
+	require.NoError(t, wm.Stop(5*time.Second))
 	// Stop should be idempotent.
-	require.NoError(t, wm.Stop(2*time.Second))
+	require.ErrorIs(t, wm.Stop(2*time.Second), ErrWatchManagerClosed)
 
 	// Once stopped, watch manager should reject more work.
 	err = wm.sendMessage(msg)

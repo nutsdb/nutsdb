@@ -23,6 +23,7 @@ var (
 	ErrWatchingCallbackFailed   = errors.New("watching callback failed")
 	ErrWatchingChannelClosed    = errors.New("watching channel closed")
 	ErrChannelNotAvailable      = errors.New("channel not available")
+	ErrCloseWatchManagerTimeout = errors.New("close watch manager timeout")
 )
 
 // convert these variables to var for testing
@@ -118,10 +119,13 @@ type watchManager struct {
 	workerCancel   context.CancelFunc
 	wg             sync.WaitGroup
 
-	closed      atomic.Bool
-	started     atomic.Bool // indicates whether Start() has been called
-	mu          sync.Mutex
+	closed      bool
+	started     bool // indicates whether Start() has been called
 	idGenerator *IDGenerator
+
+	muClosed  sync.Mutex
+	muStarted sync.Mutex
+	mu        sync.Mutex
 }
 
 func NewWatchManager() *watchManager {
@@ -131,8 +135,8 @@ func NewWatchManager() *watchManager {
 		lookup:         make(bucketToSubscribers),
 		watchChan:      make(chan *Message, watchChanBufferSize),
 		distributeChan: make(chan []*Message, distributeChanBufferSize),
-		closed:         atomic.Bool{},
-		started:        atomic.Bool{},
+		closed:         false,
+		started:        false,
 		workerCtx:      workerCtx,
 		workerCancel:   workerCancel,
 		idGenerator:    &IDGenerator{currentMaxId: 0},
@@ -148,7 +152,7 @@ func (wm *watchManager) Name() string {
 
 // send a message to the watch manager
 func (wm *watchManager) sendMessage(message *Message) error {
-	if wm.closed.Load() {
+	if wm.isClosed() {
 		return ErrWatchManagerClosed
 	}
 
@@ -173,7 +177,7 @@ func (wm *watchManager) sendMessage(message *Message) error {
 }
 
 func (wm *watchManager) sendUpdatedEntries(entries []*core.Entry, deletedbuckets map[core.BucketName]bool, getBucketName func(bucketId core.BucketId) (core.BucketName, error)) error {
-	if wm.closed.Load() {
+	if wm.isClosed() {
 		return ErrWatchManagerClosed
 	}
 
@@ -528,13 +532,16 @@ func (wm *watchManager) cleanUpSubscribers() {
 }
 
 func (wm *watchManager) close() error {
-	if wm.workerCtx.Err() != nil {
+	wm.muClosed.Lock()
+	defer wm.muClosed.Unlock()
+
+	if wm.closed == true {
 		return ErrWatchManagerClosed
 	}
 
 	wm.workerCancel()
+	wm.closed = true
 
-	wm.closed.Store(true)
 	return nil
 }
 
@@ -557,7 +564,9 @@ func (wm *watchManager) done() <-chan struct{} {
 }
 
 func (wm *watchManager) isClosed() bool {
-	return wm.closed.Load()
+	wm.muClosed.Lock()
+	defer wm.muClosed.Unlock()
+	return wm.closed
 }
 
 /*
@@ -597,21 +606,23 @@ func (wm *watchManager) deleteBucket(deletingMessageBucket Message) {
 // Start starts the watch manager
 // Implements Component interface
 func (wm *watchManager) Start(ctx context.Context) error {
-	if wm.closed.Load() {
+	if wm.isClosed() {
 		return ErrWatchManagerClosed
 	}
 
-	// ensure Start() is only called once
-	if wm.started.Swap(true) {
-		return nil // already started
+	wm.muStarted.Lock()
+	if wm.started {
+		wm.muStarted.Unlock()
+		return nil
 	}
+
+	wm.started = true
+	wm.muStarted.Unlock()
 
 	// use a local ready channel to wait for goroutine startup
 	ready := make(chan struct{})
 
-	wm.wg.Add(1)
 	go func() {
-		defer wm.wg.Done()
 		close(ready) // signal that goroutine has started
 		wm.startDistributor()
 	}()
@@ -619,6 +630,7 @@ func (wm *watchManager) Start(ctx context.Context) error {
 	// wait for distributor goroutine to start before returning
 	select {
 	case <-ready:
+		log.Printf("[watch_manager] Watch manager distributor started\n")
 		return nil
 	case <-time.After(5 * time.Second):
 		return fmt.Errorf("timeout waiting for watch manager distributor to start")
@@ -628,27 +640,20 @@ func (wm *watchManager) Start(ctx context.Context) error {
 // Stop stops the watch manager
 // Notifies all subscribers that the database is closing and closes all subscription channels
 // Implements Component interface
-func (wm *watchManager) Stop(timeout time.Duration) error {
-	if wm.closed.Load() {
-		return nil
-	}
+func (wm *watchManager) Stop(timeout time.Duration) (err error) {
+	closeChan := make(chan struct{})
 
 	// close watch manager
 	// this cancels context and signals all goroutines to stop
-	_ = wm.close()
+	go func() {
+		err = wm.close()
+		close(closeChan)
+	}()
 
-	// wait for watch manager to complete cleanup
-	deadline := time.Now().Add(timeout)
-	ticker := time.NewTicker(100 * time.Millisecond)
-	defer ticker.Stop()
-
-	for !wm.isClosed() {
-		if time.Now().After(deadline) {
-			break
-		}
-
-		<-ticker.C
+	select {
+	case <-closeChan:
+		return err
+	case <-time.After(timeout):
+		return ErrCloseWatchManagerTimeout
 	}
-
-	return nil
 }
