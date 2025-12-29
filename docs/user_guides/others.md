@@ -133,14 +133,82 @@ db, err := nutsdb.Open(opts, nutsdb.WithDir("/tmp/nutsdb"))
 The `Watch` function blocks and listens for changes to a specific key in a bucket.
 
 ```go
-func (db *DB) Watch(bucket string, key []byte, cb func(message *Message) error, opts ...WatchOptions) error
+func (db *DB) Watch(bucket string, key []byte, cb func(message *Message) error, opts ...WatchOptions) (*Watcher, error)
 ```
 
 ### Parameters
 - **bucket**: The bucket name to watch.
 - **key**: The key to watch.
-- **cb**: A callback function that handles the incoming `*Message`. Return an error to stop watching.
-- **opts**: Optional settings, such as `CallbackTimeout` (default 1s).
+- **cb**: A callback function that handles the incoming `*Message`. Return an error to stop watching, or `nil` to continue. The callback is executed sequentially for each message with a timeout.
+- **opts**: Optional settings for the watch:
+  - **CallbackTimeout**: The timeout for each callback execution (default: 1 second). If a callback takes longer than this timeout, watching will stop with `ErrWatchingCallbackTimeout`.
+
+### Return Values
+- **watcher**: A `*Watcher` object that must be started by calling `watcher.Run()` in a goroutine. 
+- **error**: Returns an error if the watch cannot be started (e.g., `ErrWatchFeatureDisabled` if watching is not enabled, or `ErrWatchManagerClosed` if the watch manager is closed).
+
+### Watcher Object
+
+The `Watcher` object returned by `db.Watch()` provides methods to control the watch lifecycle:
+
+#### `Run() error`
+
+Starts the watcher and begins listening for messages. This is a blocking call that must be executed in a goroutine.
+
+- **Returns**: An error if the watch is stopped due to callback failure, timeout, or context cancellation.
+- **Behavior**: 
+  - Signals readiness by closing the internal ready channel
+  - Processes incoming messages and calls the callback function
+  - Returns when the context is done or an error occurs
+
+**Usage**:
+```go
+go func() {
+    if err := watcher.Run(); err != nil {
+        log.Printf("Watcher stopped: %v", err)
+    }
+}()
+```
+
+#### `WaitReady(timeout time.Duration) error`
+
+Blocks until the watcher is ready to receive messages or the timeout expires.
+
+- **Parameters**: 
+  - `timeout`: Maximum time to wait for the watcher to be ready
+- **Returns**: 
+  - `nil` if the watcher is ready
+  - An error if the timeout is reached before the watcher is ready
+  - It should be called after `watcher.Run()`
+
+**Usage**:
+```go
+go func() {
+    if err := watcher.Run(); err != nil {
+        log.Printf("Watcher stopped: %v", err)
+    }
+}()
+
+// After the func Run() has been called, we should wait for ready to ensure that the watcher is available to receive messages
+if err := watcher.WaitReady(5 * time.Second); err != nil {
+    log.Fatal("Watcher not ready:", err)
+}
+```
+
+#### `Cancel()`
+
+Manually cancels the watcher and stops it from receiving messages.
+
+- **Behavior**: 
+  - Triggers the context done signal
+  - Marks the watcher as not ready
+  - Safe to call multiple times
+
+**Usage**:
+```go
+watcher.Cancel()
+fmt.Println("Watcher cancelled")
+```
 
 ### Example
 
@@ -150,43 +218,83 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	"github.com/nutsdb/nutsdb"
 )
 
+var (
+	db     *nutsdb.DB
+	bucket = "bucket_watcher_demo"
+	dir    = "/tmp/nutsdbexample/example_watcher"
+)
+
+func init() {
+	var err error
+	os.RemoveAll(dir)
+
+	db, err = nutsdb.Open(
+		nutsdb.DefaultOptions,
+		nutsdb.WithDir(dir),
+		nutsdb.WithEnableWatch(true),
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
 func main() {
-	// 1. Open DB with EnableWatch = true
-	opt := nutsdb.DefaultOptions
-	opt.EnableWatch = true
-	db, _ := nutsdb.Open(opt, nutsdb.WithDir("/tmp/nutsdb"))
-	defer db.Close()
-
-	bucket := "myBucket"
 	key := []byte("myKey")
+	done := make(chan struct{})
 
-	// 2. Start watching in a separate goroutine
+	// Create bucket
+	if err := db.Update(func(tx *nutsdb.Tx) error {
+		return tx.NewBucket(nutsdb.DataStructureBTree, bucket)
+	}); err != nil {
+		log.Fatal(err)
+	}
+
+	watcher, _ := db.Watch(bucket, key, func(msg *nutsdb.Message) error {
+		fmt.Printf("Received: Key=%s, Value=%s, Flag=%d\n", msg.Key, msg.Value, msg.Flag)
+
+		//signal that we received the message
+		close(done)
+		return nil
+	})
+
 	go func() {
-		// Watch is a blocking call
-		err := db.Watch(bucket, key, func(msg *nutsdb.Message) error {
-			fmt.Printf("Received event: Key=%s, Value=%s, Flag=%d\n", msg.Key, msg.Value, msg.Flag)
-			// Return nil to continue watching, or an error to stop.
-			return nil
-		})
-		if err != nil {
-			log.Println("Watch stopped:", err)
+		if err := watcher.Run(); err != nil {
+			log.Fatal(err)
 		}
 	}()
 
-	// 3. Perform operations
-	db.Update(func(tx *nutsdb.Tx) error {
-		tx.NewBucket(nutsdb.DataStructureBTree, bucket)
-		return tx.Put(bucket, key, []byte("hello world"), 0)
-	})
+	// wait for the watcher to be ready
+	if err := watcher.WaitReady(5 * time.Second); err != nil {
+		log.Fatal(err)
+	}
 
-	time.Sleep(1 * time.Second)
+	// Perform operations
+	if err := db.Update(func(tx *nutsdb.Tx) error {
+		return tx.Put(bucket, key, []byte("hello world"), nutsdb.Persistent)
+	}); err != nil {
+		log.Fatal(err)
+	}
+
+	select {
+	case <-done:
+		fmt.Println("Received message")
+		//manually cancel the watcher
+		watcher.Cancel()
+		fmt.Println("Watcher cancelled")
+	case <-time.After(10 * time.Second):
+		fmt.Println("Timeout")
+	}
+
+	fmt.Println("Done")
 }
 ```
+
 ### Watch Manager Architecture
 
 For those interested in the internal architecture:

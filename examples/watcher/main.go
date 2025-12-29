@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"os"
@@ -58,30 +57,17 @@ func main() {
 func basicWatchExample() {
 	fmt.Println("--- Example 1: Basic Watch ---")
 	key := []byte("watched_key")
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	var wg sync.WaitGroup
+	done := make(chan struct{})
 
-	messageCount := 0
-	watcher, err := db.Watch(ctx, bucket, key, func(msg *nutsdb.Message) error {
-		messageCount++
-		fmt.Printf("[Watch] Message #%d received:\n", messageCount)
+	watcher, err := db.Watch(bucket, key, func(msg *nutsdb.Message) error {
 		fmt.Printf("  Bucket: %s\n", msg.BucketName)
 		fmt.Printf("  Key: %s\n", msg.Key)
 		fmt.Printf("  Value: %s\n", string(msg.Value))
 		fmt.Printf("  Flag: %d\n", msg.Flag)
 		fmt.Printf("  Timestamp: %d\n", msg.Timestamp)
 
-		switch msg.Flag {
-		case nutsdb.DataSetFlag:
-			fmt.Println("  Type: SET operation")
-		case nutsdb.DataDeleteFlag:
-			fmt.Println("  Type: DELETE operation")
-		}
-		fmt.Println("")
-
-		if messageCount >= 1 {
-			cancel()
-		}
+		// signal that we received the message
+		close(done)
 		return nil
 	})
 
@@ -89,15 +75,13 @@ func basicWatchExample() {
 		log.Fatal(err)
 	}
 
-	wg.Add(1)
 	go func() {
-		defer wg.Done()
-		err := watcher.Run()
-		if err != nil {
+		if err := watcher.Run(); err != nil {
 			log.Fatal(err)
 		}
 	}()
 
+	// wait for the watcher to be ready
 	if err := watcher.WaitReady(10 * time.Second); err != nil {
 		log.Fatal(err)
 	}
@@ -108,19 +92,28 @@ func basicWatchExample() {
 		log.Fatal(err)
 	}
 
-	wg.Wait()
+	select {
+	case <-done:
+		fmt.Println("Received message")
+		//manually cancel the watcher
+		watcher.Cancel()
+	case <-time.After(10 * time.Second):
+		fmt.Println("Timeout")
+	}
 	fmt.Println("")
 }
 
 func multipleOperationsExample() {
 	fmt.Println("--- Example 2: Watch Multiple Operations ---")
 	key := []byte("multi_op_key")
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	done := make(chan struct{})
+	mu := sync.Mutex{}
 
-	var wg sync.WaitGroup
+	messageCount := 0
+	watcher, err := db.Watch(bucket, key, func(msg *nutsdb.Message) error {
+		mu.Lock()
+		defer mu.Unlock()
 
-	watcher, err := db.Watch(ctx, bucket, key, func(msg *nutsdb.Message) error {
-		messageCount := 0
 		messageCount++
 		fmt.Printf("[Watch] Operation #%d: ", messageCount)
 
@@ -132,7 +125,7 @@ func multipleOperationsExample() {
 		}
 
 		if messageCount >= 3 {
-			cancel()
+			close(done)
 		}
 		return nil
 	})
@@ -141,9 +134,7 @@ func multipleOperationsExample() {
 		log.Fatal(err)
 	}
 
-	wg.Add(1)
 	go func() {
-		defer wg.Done()
 		if err := watcher.Run(); err != nil {
 			log.Fatal(err)
 		}
@@ -180,20 +171,28 @@ func multipleOperationsExample() {
 		}
 	}
 
-	wg.Wait()
+	select {
+	case <-done:
+		fmt.Println("Received message")
+		//manually cancel the watcher
+		watcher.Cancel()
+	case <-time.After(10 * time.Second):
+		fmt.Println("Timeout")
+	}
 	fmt.Println("")
 }
 
 func watchWithTTLExample() {
 	fmt.Println("--- Example 3: Watch with TTL ---")
 	key := []byte("ttl_key")
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-
-	var wg sync.WaitGroup
-	wg.Add(1)
+	done := make(chan struct{})
+	mu := sync.Mutex{}
 
 	messageCount := 0
-	watcher, err := db.Watch(ctx, bucket, key, func(msg *nutsdb.Message) error {
+	watcher, err := db.Watch(bucket, key, func(msg *nutsdb.Message) error {
+		mu.Lock()
+		defer mu.Unlock()
+
 		messageCount++
 		fmt.Printf("[Watch] Message #%d:\n", messageCount)
 
@@ -205,7 +204,7 @@ func watchWithTTLExample() {
 		}
 
 		if messageCount >= 2 {
-			cancel()
+			close(done)
 		}
 		return nil
 	})
@@ -215,7 +214,6 @@ func watchWithTTLExample() {
 	}
 
 	go func() {
-		defer wg.Done()
 		if err := watcher.Run(); err != nil {
 			log.Fatal(err)
 		}
@@ -235,6 +233,13 @@ func watchWithTTLExample() {
 
 	time.Sleep(3 * time.Second)
 
-	wg.Wait()
+	select {
+	case <-done:
+		fmt.Println("Received message")
+		//manually cancel the watcher
+		watcher.Cancel()
+	case <-time.After(10 * time.Second):
+		fmt.Println("Timeout")
+	}
 	fmt.Println("")
 }
