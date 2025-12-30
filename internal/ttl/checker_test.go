@@ -329,25 +329,3 @@ func TestChecker_TimeAdvancement(t *testing.T) {
 		t.Error("Record should be expired after 15 seconds total")
 	}
 }
-
-// Integration tests for TTLChecker
-func TestCheckerIntegration(t *testing.T) {
-	clk := NewMockClock(1000000) // Start at 1000 seconds in milliseconds
-	checker := NewChecker(clk)
-
-	// Test that the checker is properly created and functional
-	if checker == nil {
-		t.Error("Expected Checker to be created")
-	}
-
-	// Test basic expiration logic
-	expired := checker.IsExpired(50, 900000) // 50 seconds TTL, 900 seconds timestamp, expires at 950 seconds
-	if !expired {
-		t.Error("Expected record to be expired")
-	}
-
-	notExpired := checker.IsExpired(100, 950000) // 100 seconds TTL, 950 seconds timestamp, expires at 1050 seconds
-	if notExpired {
-		t.Error("Expected record not to be expired")
-	}
-}

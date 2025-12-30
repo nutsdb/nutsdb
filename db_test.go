@@ -86,13 +86,13 @@ func runNutsDBTestWithMockClock(t *testing.T, opts *Options, test func(t *testin
 		defaultOpts := DefaultOptions
 		opts = &defaultOpts
 	}
-	opts.Clock = mc
 	if opts.Dir == "" {
 		opts.Dir = filepath.Join(t.TempDir(), "nutsdb-test")
 	}
 	defer removeDir(opts.Dir)
 	db, err := Open(*opts)
 	require.NoError(t, err)
+	db.ttlService.GetChecker().SetClock(mc)
 
 	test(t, db, mc)
 	if !db.IsClose() {

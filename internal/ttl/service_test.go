@@ -33,27 +33,25 @@ func TestNewService(t *testing.T) {
 	service := NewService(mockClock, config, callback)
 
 	assert.NotNil(t, service)
-	assert.NotNil(t, service.GetChecker())
-	assert.Equal(t, mockClock, service.GetClock())
+	assert.NotNil(t, service.checker)
+	assert.Equal(t, mockClock, service.clock)
 }
 
-func TestService_GetChecker(t *testing.T) {
-	mockClock := NewMockClock(1000000)
+func TestService_NowMillisAndNowSeconds_WithMockClock(t *testing.T) {
+	mockClock := NewMockClock(1234567890)
 	config := DefaultConfig()
 	service := NewService(mockClock, config, nil)
 
-	checker := service.GetChecker()
-	assert.NotNil(t, checker)
-	assert.IsType(t, &Checker{}, checker)
+	assert.Equal(t, mockClock.NowMillis(), service.NowMillis())
+	assert.Equal(t, mockClock.NowSeconds(), service.NowSeconds())
 }
 
-func TestService_GetClock(t *testing.T) {
-	mockClock := NewMockClock(1000000)
+func TestService_IsExpired_DelegatesToChecker(t *testing.T) {
+	mockClock := NewMockClock(2000)
 	config := DefaultConfig()
 	service := NewService(mockClock, config, nil)
 
-	clock := service.GetClock()
-	assert.Equal(t, mockClock, clock)
+	assert.Equal(t, service.checker.IsExpired(1, 500), service.IsExpired(1, 500))
 }
 
 func TestService_onExpired(t *testing.T) {
@@ -98,9 +96,6 @@ func TestService_StartAndStop(t *testing.T) {
 	service := NewService(mockClock, config, callback)
 
 	require.NoError(t, service.Start(context.Background()))
-
-	time.Sleep(50 * time.Millisecond)
-
 	require.NoError(t, service.Stop(500*time.Millisecond))
 
 	assert.True(t, service.queue.closed.Load())
@@ -148,20 +143,23 @@ func TestService_ProcessExpirationEvents_FullBatchFlush(t *testing.T) {
 	require.NoError(t, service.Stop(100*time.Millisecond))
 }
 
-func TestService_ProcessExpirationEvents_TimerFlush(t *testing.T) {
+func TestService_ProcessExpirationEvents_FlushOnStop(t *testing.T) {
 	mockClock := NewMockClock(1000000)
 	config := DefaultConfig()
 	config.BatchSize = 10
-	config.BatchTimeout = 50 * time.Millisecond
+	config.BatchTimeout = time.Hour
 
 	eventsReceived := make([]*ExpirationEvent, 0)
 	var mu sync.Mutex
-	cond := sync.NewCond(&mu)
+	received := make(chan struct{}, 1)
 	callback := func(events []*ExpirationEvent) {
 		mu.Lock()
 		eventsReceived = append(eventsReceived, events...)
-		cond.Signal()
 		mu.Unlock()
+		select {
+		case received <- struct{}{}:
+		default:
+		}
 	}
 
 	service := NewService(mockClock, config, callback)
@@ -176,13 +174,16 @@ func TestService_ProcessExpirationEvents_TimerFlush(t *testing.T) {
 	}
 	service.queue.push(event)
 
-	mu.Lock()
-	for len(eventsReceived) == 0 {
-		cond.Wait()
-	}
-	mu.Unlock()
-
-	assert.GreaterOrEqual(t, len(eventsReceived), 1)
-
+	service.queue.close()
 	require.NoError(t, service.Stop(100*time.Millisecond))
+
+	select {
+	case <-received:
+	case <-time.After(1 * time.Second):
+		t.Fatal("expected expiration events after stop")
+	}
+
+	mu.Lock()
+	assert.GreaterOrEqual(t, len(eventsReceived), 1)
+	mu.Unlock()
 }

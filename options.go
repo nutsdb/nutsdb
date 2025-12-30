@@ -155,10 +155,6 @@ type Options struct {
 	// EnableWatch toggles the watch feature.
 	// If EnableWatch is true, the watch feature will be enabled. The watch feature will be disabled by default.
 	EnableWatch bool
-
-	// Clock provides time operations for TTL calculations.
-	// If nil, a RealClock will be used by default.
-	Clock ttl.Clock
 }
 
 const (
@@ -189,7 +185,6 @@ var DefaultOptions = func() Options {
 		EnableMergeV2:             false,
 		ListImpl:                  ListImplementationType(ListImplBTree),
 		EnableWatch:               false,
-		Clock:                     ttl.NewRealClock(),
 	}
 }()
 
@@ -312,12 +307,6 @@ func WithEnableMergeV2(enable bool) Option {
 func WithListImpl(implType ListImplementationType) Option {
 	return func(opt *Options) {
 		opt.ListImpl = implType
-	}
-}
-
-func WithClock(clock ttl.Clock) Option {
-	return func(opt *Options) {
-		opt.Clock = clock
 	}
 }
 

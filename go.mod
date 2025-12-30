@@ -3,6 +3,7 @@ module github.com/nutsdb/nutsdb
 go 1.24.0
 
 require (
+	github.com/RussellLuo/timingwheel v0.0.0-20220218152713-54845bda3108
 	github.com/bwmarrin/snowflake v0.3.0
 	github.com/edsrzf/mmap-go v1.2.0
 	github.com/gofrs/flock v0.13.0

@@ -401,28 +401,53 @@ func TestBTree_TTL_MinMax(t *testing.T) {
 }
 
 func TestBTree_TTL_PopMinMax(t *testing.T) {
-	mockClock := ttl.NewMockClock(1000000)
-	checker := ttl.NewChecker(mockClock)
-	btree := NewBTree(1, checker) // bucketId 1 for test
-
-	// Insert records where min is expired
-	records := []struct {
-		key       string
-		ttlVal    uint32
-		timestamp uint64
-	}{
-		{"aaa", 10, 900000},  // Expired
-		{"bbb", 100, 999000}, // Valid
-		{"ccc", 100, 999000}, // Valid
-	}
-
-	for _, r := range records {
-		record := createTestRecord(r.key, r.ttlVal, r.timestamp)
-		btree.InsertRecord(record.Key, record)
-	}
-
 	t.Run("pop min skips expired", func(t *testing.T) {
+		mockClock := ttl.NewMockClock(1000000)
+		checker := ttl.NewChecker(mockClock)
+		btree := NewBTree(1, checker) // bucketId 1 for test
+
+		// Insert records where min is expired
+		records := []struct {
+			key       string
+			ttlVal    uint32
+			timestamp uint64
+		}{
+			{"aaa", 10, 900000},  // Expired
+			{"bbb", 100, 999000}, // Valid
+			{"ccc", 100, 999000}, // Valid
+		}
+
+		for _, r := range records {
+			record := createTestRecord(r.key, r.ttlVal, r.timestamp)
+			btree.InsertRecord(record.Key, record)
+		}
+
 		item, found := btree.PopMin()
+		require.True(t, found)
+		assert.Equal(t, "bbb", string(item.Key))
+	})
+
+	t.Run("pop max skips expired", func(t *testing.T) {
+		mockClock := ttl.NewMockClock(1000000)
+		checker := ttl.NewChecker(mockClock)
+		btree := NewBTree(1, checker) // bucketId 1 for test
+
+		records := []struct {
+			key       string
+			ttlVal    uint32
+			timestamp uint64
+		}{
+			{"aaa", 100, 999000}, // Valid
+			{"bbb", 100, 999000}, // Valid
+			{"zzz", 10, 900000},  // Expired
+		}
+
+		for _, r := range records {
+			record := createTestRecord(r.key, r.ttlVal, r.timestamp)
+			btree.InsertRecord(record.Key, record)
+		}
+
+		item, found := btree.PopMax()
 		require.True(t, found)
 		assert.Equal(t, "bbb", string(item.Key))
 	})
@@ -469,7 +494,7 @@ func TestBTree_TTL_TimeAdvancement(t *testing.T) {
 }
 
 func TestBTree_GetTTL(t *testing.T) {
-	mockClock := ttl.NewMockClock(1000000)            // Current time: 1000 seconds in millis
+	mockClock := ttl.NewMockClock(1000000)          // Current time: 1000 seconds in millis
 	btree := NewBTree(1, ttl.NewChecker(mockClock)) // bucketId 1 for test
 
 	t.Run("get TTL for valid record", func(t *testing.T) {
