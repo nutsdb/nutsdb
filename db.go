@@ -109,7 +109,7 @@ func open(opt Options) (*DB, error) {
 		snowflakeMgr:            NewSnowflakeManager(opt.NodeNum),
 	}
 
-	db.ttlService = ttl.NewService(opt.Clock, opt.TTLConfig, db.handleExpiredKeys)
+	db.ttlService = ttl.NewService(ttl.NewRealClock(), opt.TTLConfig, db.handleExpiredKeys)
 
 	db.Index = db.newIndex()
 
@@ -801,8 +801,9 @@ func (db *DB) buildBTreeIdx(record *core.Record, entry *core.Entry) error {
 
 	bTree := db.Index.BTree.GetWithDefault(bucketId)
 
-	if db.ttlService.GetChecker().IsExpired(record.TTL, record.Timestamp) || meta.Flag == DataDeleteFlag {
+	if db.ttlService.IsExpired(record.TTL, record.Timestamp) || meta.Flag == DataDeleteFlag {
 		bTree.Delete(key)
+		db.ttlService.DeregisterKeyFromActiveExpiration(bucketId, key)
 	} else {
 		bTree.InsertRecord(record.Key, record)
 	}
@@ -813,7 +814,9 @@ func (db *DB) buildIdxes(record *core.Record, entry *core.Entry) error {
 	meta := entry.Meta
 	switch meta.Ds {
 	case DataStructureBTree:
-		return db.buildBTreeIdx(record, entry)
+		if err := db.buildBTreeIdx(record, entry); err != nil {
+			return err
+		}
 	case DataStructureList:
 		if err := db.buildListIdx(record, entry); err != nil {
 			return err
@@ -829,7 +832,36 @@ func (db *DB) buildIdxes(record *core.Record, entry *core.Entry) error {
 	default:
 		panic(fmt.Sprintf("there is an unexpected data structure that is unimplemented in our database.:%d", meta.Ds))
 	}
+
+	db.registerKeyForActiveExpiration(record, entry)
+
 	return nil
+}
+
+// registerKeyForActiveExpiration registers a key with TTL in the timing wheel for active expiration.
+func (db *DB) registerKeyForActiveExpiration(record *core.Record, entry *core.Entry) {
+	if db.ttlService == nil {
+		return
+	}
+
+	meta := entry.Meta
+
+	if meta.TTL > 0 && meta.Flag != DataDeleteFlag {
+		if db.ttlService.IsExpired(record.TTL, record.Timestamp) {
+			return
+		}
+
+		// Deregister old TTL before registering new one (handles TTL updates)
+		db.ttlService.DeregisterKeyFromActiveExpiration(meta.BucketId, entry.Key)
+
+		db.ttlService.RegisterKeyForActiveExpiration(
+			meta.BucketId,
+			entry.Key,
+			meta.Ds,
+			meta.TTL,
+			meta.Timestamp,
+		)
+	}
 }
 
 // buildSetIdx builds set index when opening the DB.
@@ -909,7 +941,7 @@ func (db *DB) buildListIdx(record *core.Record, entry *core.Entry) error {
 
 	l := db.Index.List.GetWithDefault(bucketId)
 
-	if db.ttlService.GetChecker().IsExpired(meta.TTL, meta.Timestamp) {
+	if db.ttlService.IsExpired(meta.TTL, meta.Timestamp) {
 		return nil
 	}
 
@@ -1098,8 +1130,10 @@ func (db *DB) handleExpiredKeys(events []*ttl.ExpirationEvent) {
 
 				// Only delete if timestamp matches (same record that expired)
 				// Also verify it's actually expired (in case it was updated)
-				if record.Timestamp == event.Timestamp && db.ttlService.GetChecker().IsExpired(record.TTL, record.Timestamp) {
-					_ = tx.put(bucket.Name, event.Key, nil, Persistent, DataDeleteFlag, uint64(db.opt.Clock.NowMillis()), bucket.Ds)
+				if record.Timestamp == event.Timestamp && db.ttlService.IsExpired(record.TTL, record.Timestamp) {
+					_ = tx.put(bucket.Name, event.Key, nil, Persistent, DataDeleteFlag, uint64(db.ttlService.NowMillis()), bucket.Ds)
+					// Deregister from timing wheel to prevent duplicate expiration events
+					db.ttlService.DeregisterKeyFromActiveExpiration(bucketId, event.Key)
 				}
 			}
 		}

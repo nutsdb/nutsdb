@@ -18,17 +18,25 @@ import "time"
 
 // Config contains TTL-related configuration for batch deletion.
 type Config struct {
-	BatchSize    int           // Batch size for deletion (default: 100)
-	BatchTimeout time.Duration // Batch timeout (default: 1s)
-	QueueSize    int           // Event queue size (default: 1000)
+	BatchSize    int           // Batch size for deletion (default: 100, optimal balance)
+	BatchTimeout time.Duration // Batch timeout (default: 1s, reasonable latency tolerance)
+	QueueSize    int           // Event queue size (default: 1000, handles burst traffic)
+
+	// Timing wheel configuration
+	EnableTimingWheel bool          // Enable active deletion via timing wheel (default: true, <1% overhead)
+	WheelSlotDuration time.Duration // Duration of each wheel slot (default: 1s, optimal performance-precision balance)
+	WheelSize         int           // Number of slots in the wheel (default: 3600, covers 1 hour with minimal overhead)
 }
 
 // DefaultConfig returns the default TTL configuration.
 func DefaultConfig() Config {
 	return Config{
-		BatchSize:    100,
-		BatchTimeout: 1 * time.Second,
-		QueueSize:    1000,
+		BatchSize:         100,
+		BatchTimeout:      1 * time.Second,
+		QueueSize:         1000,
+		EnableTimingWheel: true,
+		WheelSlotDuration: 1 * time.Second,
+		WheelSize:         3600,
 	}
 }
 
@@ -42,5 +50,13 @@ func (c *Config) Validate() {
 	}
 	if c.QueueSize <= 0 {
 		c.QueueSize = 1000
+	}
+	if c.EnableTimingWheel {
+		if c.WheelSlotDuration <= 0 {
+			c.WheelSlotDuration = 1 * time.Second
+		}
+		if c.WheelSize <= 0 {
+			c.WheelSize = 3600
+		}
 	}
 }

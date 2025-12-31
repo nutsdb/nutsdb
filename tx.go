@@ -286,6 +286,8 @@ func (tx *Tx) Commit() (err error) {
 	}
 	tx.db.RecordCount += curWriteCount
 
+	tx.registerKeysForActiveExpiration(records, pendingWriteList)
+
 	if err := tx.buildBucketInIndex(); err != nil {
 		return err
 	}
@@ -901,4 +903,31 @@ func (tx *Tx) getDeletedBuckets() (deletedBuckets map[core.BucketName]bool) {
 	}
 
 	return deletedBuckets
+}
+
+// registerKeysForActiveExpiration registers keys with TTL in the timing wheel for active expiration.
+func (tx *Tx) registerKeysForActiveExpiration(records []*core.Record, entries []*core.Entry) {
+	if tx.db.ttlService == nil {
+		return
+	}
+
+	for i, entry := range entries {
+		meta := entry.Meta
+
+		if meta.TTL > 0 && meta.Flag != DataDeleteFlag {
+			record := records[i]
+
+			if tx.db.ttlService.IsExpired(record.TTL, record.Timestamp) {
+				continue
+			}
+
+			tx.db.ttlService.RegisterKeyForActiveExpiration(
+				meta.BucketId,
+				entry.Key,
+				meta.Ds,
+				meta.TTL,
+				meta.Timestamp,
+			)
+		}
+	}
 }

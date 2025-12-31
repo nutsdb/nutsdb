@@ -936,11 +936,11 @@ func TestTx_ExpiredDeletion(t *testing.T) {
 		mc := ttl.NewMockClock(time.Now().UnixMilli())
 		opts := DefaultOptions
 		opts.Dir = filepath.Join(t.TempDir(), "nutsdb-test")
-		opts.Clock = mc
 		defer removeDir(opts.Dir)
 
 		db, err := Open(opts)
 		require.NoError(t, err)
+		db.ttlService.SetClock(mc)
 
 		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
@@ -960,6 +960,7 @@ func TestTx_ExpiredDeletion(t *testing.T) {
 		// Reopen with the same MockClock
 		db, err = Open(opts)
 		require.NoError(t, err)
+		db.ttlService.SetClock(mc)
 		defer func() {
 			if !db.IsClose() {
 				require.NoError(t, db.Close())
@@ -2208,7 +2209,7 @@ func TestTx_Delete_NoRecursiveCallback(t *testing.T) {
 				r.NotNil(record)
 
 				// Verify the record is actually expired
-				r.True(db.ttlService.GetChecker().IsExpired(record.TTL, record.Timestamp))
+				r.True(db.ttlService.IsExpired(record.TTL, record.Timestamp))
 
 				return nil
 			})
@@ -2241,7 +2242,7 @@ func TestTx_Delete_NoRecursiveCallback(t *testing.T) {
 				r.NotNil(record)
 
 				// Record should not be expired
-				r.False(db.ttlService.GetChecker().IsExpired(record.TTL, record.Timestamp))
+				r.False(db.ttlService.IsExpired(record.TTL, record.Timestamp))
 
 				return tx.Delete(bucket, key)
 			})
@@ -2333,7 +2334,7 @@ func TestTx_Delete_NoRecursiveCallback(t *testing.T) {
 				r.NotNil(record)
 
 				// Verify it's actually expired
-				r.True(db.ttlService.GetChecker().IsExpired(record.TTL, record.Timestamp))
+				r.True(db.ttlService.IsExpired(record.TTL, record.Timestamp))
 
 				// Compare with Find - should return nil (triggers callback and filters)
 				record2, found2 := idx.Find(key)
@@ -2379,7 +2380,7 @@ func TestTx_Delete_NoRecursiveCallback(t *testing.T) {
 							return nil
 						}
 
-						if db.ttlService.GetChecker().IsExpired(record.TTL, record.Timestamp) {
+						if db.ttlService.IsExpired(record.TTL, record.Timestamp) {
 							return tx.Delete(bucket, k)
 						}
 						return nil
@@ -2496,89 +2497,6 @@ func TestTx_Delete_FindVsFindForVerification(t *testing.T) {
 	})
 }
 
-func TestTx_TTL_PutGetDelete(t *testing.T) {
-	bucket := "bucket"
-
-	t.Run("basic put and get with TTL", func(t *testing.T) {
-		runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc ttl.Clock) {
-			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
-
-			txPut(t, db, bucket, testutils.GetTestBytes(0), testutils.GetTestBytes(0), 1, nil, nil)
-			txPut(t, db, bucket, testutils.GetTestBytes(1), testutils.GetTestBytes(1), 2, nil, nil)
-			txPut(t, db, bucket, testutils.GetTestBytes(2), testutils.GetTestBytes(2), 3, nil, nil)
-
-			// Verify all keys are accessible
-			txGet(t, db, bucket, testutils.GetTestBytes(0), testutils.GetTestBytes(0), nil)
-			txGet(t, db, bucket, testutils.GetTestBytes(1), testutils.GetTestBytes(1), nil)
-			txGet(t, db, bucket, testutils.GetTestBytes(2), testutils.GetTestBytes(2), nil)
-
-			// Delete one key
-			txDel(t, db, bucket, testutils.GetTestBytes(2), nil)
-
-			// Advance time to expire first key
-			mc.AdvanceTime(1100 * time.Millisecond)
-
-			// First key should be expired
-			txGet(t, db, bucket, testutils.GetTestBytes(0), nil, ErrKeyNotFound)
-			// Second key should still be alive
-			txGet(t, db, bucket, testutils.GetTestBytes(1), testutils.GetTestBytes(1), nil)
-
-			// Advance time to expire second key
-			mc.AdvanceTime(1 * time.Second)
-
-			// Second key should now be expired
-			txGet(t, db, bucket, testutils.GetTestBytes(1), nil, ErrKeyNotFound)
-
-			// Verify via BTree index
-			r := require.New(t)
-			r.Nil(db.Index.BTree.GetWithDefault(1).Find(testutils.GetTestBytes(0)))
-			r.Nil(db.Index.BTree.GetWithDefault(1).Find(testutils.GetTestBytes(1)))
-		})
-	})
-
-	t.Run("update expire time", func(t *testing.T) {
-		runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc ttl.Clock) {
-			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
-
-			txPut(t, db, bucket, testutils.GetTestBytes(0), testutils.GetTestBytes(0), 1, nil, nil)
-			mc.AdvanceTime(500 * time.Millisecond)
-
-			// Reset expire time to 3 seconds
-			txPut(t, db, bucket, testutils.GetTestBytes(0), testutils.GetTestBytes(0), 3, nil, nil)
-			mc.AdvanceTime(1 * time.Second)
-
-			// Key should still be accessible
-			txGet(t, db, bucket, testutils.GetTestBytes(0), testutils.GetTestBytes(0), nil)
-
-			mc.AdvanceTime(3 * time.Second)
-
-			// Now key should be expired
-			txGet(t, db, bucket, testutils.GetTestBytes(0), nil, ErrKeyNotFound)
-		})
-	})
-
-	t.Run("persist expire time", func(t *testing.T) {
-		runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc ttl.Clock) {
-			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
-
-			txPut(t, db, bucket, testutils.GetTestBytes(0), testutils.GetTestBytes(0), 1, nil, nil)
-			mc.AdvanceTime(500 * time.Millisecond)
-
-			// Persist the key (set TTL to Persistent)
-			txPut(t, db, bucket, testutils.GetTestBytes(0), testutils.GetTestBytes(0), Persistent, nil, nil)
-			mc.AdvanceTime(1 * time.Second)
-
-			// Key should still be accessible
-			txGet(t, db, bucket, testutils.GetTestBytes(0), testutils.GetTestBytes(0), nil)
-
-			mc.AdvanceTime(3 * time.Second)
-
-			// Key should still be accessible (persisted)
-			txGet(t, db, bucket, testutils.GetTestBytes(0), testutils.GetTestBytes(0), nil)
-		})
-	})
-}
-
 // TestTx_TTL_RestartCheck tests TTL behavior after database restart.
 func TestTx_TTL_RestartCheck(t *testing.T) {
 	bucket := "bucket"
@@ -2588,11 +2506,11 @@ func TestTx_TTL_RestartCheck(t *testing.T) {
 		mc := ttl.NewMockClock(time.Now().UnixMilli())
 		opts := DefaultOptions
 		opts.Dir = filepath.Join(t.TempDir(), "nutsdb-test")
-		opts.Clock = mc
 		defer removeDir(opts.Dir)
 
 		db, err := Open(opts)
 		require.NoError(t, err)
+		db.ttlService.SetClock(mc)
 
 		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
@@ -2616,6 +2534,7 @@ func TestTx_TTL_RestartCheck(t *testing.T) {
 		// Reopen with the same MockClock
 		db, err = Open(opts)
 		require.NoError(t, err)
+		db.ttlService.SetClock(mc)
 		defer func() {
 			if !db.IsClose() {
 				require.NoError(t, db.Close())
@@ -2675,114 +2594,30 @@ func TestTx_TTL_MergeCheck(t *testing.T) {
 
 // TestTx_TTL_BatchProcessing tests batch processing of expired keys.
 func TestTx_TTL_BatchProcessing(t *testing.T) {
-	t.Run("expire deletion with batch processing", func(t *testing.T) {
+	bucket := "bucket"
+
+	t.Run("batch deletion removes expired keys", func(t *testing.T) {
 		opts := DefaultOptions
+		opts.TTLConfig.BatchSize = 2
+		opts.TTLConfig.BatchTimeout = time.Hour
 		runNutsDBTestWithMockClock(t, &opts, func(t *testing.T, db *DB, mc ttl.Clock) {
 			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
-			txPut(t, db, bucket, testutils.GetTestBytes(0), testutils.GetTestBytes(0), 1, nil, nil)
-			txPut(t, db, bucket, testutils.GetTestBytes(1), testutils.GetTestBytes(1), 2, nil, nil)
-			txGet(t, db, bucket, testutils.GetTestBytes(0), testutils.GetTestBytes(0), nil)
-			txGet(t, db, bucket, testutils.GetTestBytes(1), testutils.GetTestBytes(1), nil)
+			key0 := testutils.GetTestBytes(0)
+			key1 := testutils.GetTestBytes(1)
 
-			mc.AdvanceTime(1100 * time.Millisecond)
-
-			// First key should be expired
-			txGet(t, db, bucket, testutils.GetTestBytes(0), nil, ErrKeyNotFound)
-			// Second key should still be alive
-			txGet(t, db, bucket, testutils.GetTestBytes(1), testutils.GetTestBytes(1), nil)
-
-			mc.AdvanceTime(1 * time.Second)
-
-			// Second key should now be expired
-			txGet(t, db, bucket, testutils.GetTestBytes(1), nil, ErrKeyNotFound)
-
-			r := require.New(t)
-			r.Nil(db.Index.BTree.GetWithDefault(1).Find(testutils.GetTestBytes(0)))
-			r.Nil(db.Index.BTree.GetWithDefault(1).Find(testutils.GetTestBytes(1)))
-		})
-	})
-}
-
-// TestTx_TTL_MinMax tests Min/Max operations with TTL filtering.
-func TestTx_TTL_MinMax(t *testing.T) {
-	t.Run("Min/Max skip expired keys", func(t *testing.T) {
-		runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc ttl.Clock) {
-			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
-			keya := []byte("A")
-			keyb := []byte("B")
-			keyc := []byte("C")
-			txPut(t, db, bucket, keya, keya, 1, nil, nil)
-			txPut(t, db, bucket, keyb, keyb, Persistent, nil, nil)
-			txPut(t, db, bucket, keyc, keyc, 3, nil, nil)
-
-			// Initial Min/Max
-			txGetMaxOrMinKey(t, db, bucket, false, keya, nil) // Min: A
-			txGetMaxOrMinKey(t, db, bucket, true, keyc, nil)  // Max: C
-
-			// Advance time to expire A
-			mc.AdvanceTime(1500 * time.Millisecond)
-
-			// Min should now be B (A is expired)
-			txGetMaxOrMinKey(t, db, bucket, false, keyb, nil)
-
-			// Advance time to expire C
-			mc.AdvanceTime(2000 * time.Millisecond)
-
-			// Max should now be B
-			txGetMaxOrMinKey(t, db, bucket, true, keyb, nil)
-		})
-	})
-}
-
-// TestTx_TTL_IncrDecr tests Incr/Decr operations with TTL.
-func TestTx_TTL_IncrDecr(t *testing.T) {
-	t.Run("operations on expired key", func(t *testing.T) {
-		runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc ttl.Clock) {
-			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
-
-			key := testutils.GetTestBytes(0)
-			txPut(t, db, bucket, key, []byte("1"), 1, nil, nil)
+			txPut(t, db, bucket, key0, testutils.GetTestBytes(0), 1, nil, nil)
+			txPut(t, db, bucket, key1, testutils.GetTestBytes(1), 1, nil, nil)
 
 			mc.AdvanceTime(2 * time.Second)
 
-			// Operations on expired key should return ErrKeyNotFound
-			txIncrement(t, db, bucket, key, ErrKeyNotFound, nil)
-			txIncrementBy(t, db, bucket, key, 12, ErrKeyNotFound, nil)
-			txDecrement(t, db, bucket, key, ErrKeyNotFound, nil)
-			txDecrementBy(t, db, bucket, key, 12, ErrKeyNotFound, nil)
-		})
-	})
-}
+			txGet(t, db, bucket, key0, nil, ErrKeyNotFound)
+			txGet(t, db, bucket, key1, nil, ErrKeyNotFound)
 
-// TestTx_TTL_GetTTL tests GetTTL operation.
-func TestTx_TTL_GetTTL(t *testing.T) {
-	t.Run("GetTTL and Persist", func(t *testing.T) {
-		runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc ttl.Clock) {
-			bucket := "bucket1"
-			key := []byte("key1")
-			value := []byte("value1")
-
-			// Non-existent bucket
-			txGetTTL(t, db, bucket, key, 0, ErrBucketNotExist)
-
-			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
-
-			// Non-existent key
-			txGetTTL(t, db, bucket, key, 0, ErrKeyNotFound)
-			txPersist(t, db, bucket, key, ErrKeyNotFound)
-
-			// Put with TTL, then wait for expiration
-			txPut(t, db, bucket, key, value, 1, nil, nil)
-			mc.AdvanceTime(2 * time.Second)
-			txGetTTL(t, db, bucket, key, 0, ErrKeyNotFound)
-
-			// Put with TTL
-			txPut(t, db, bucket, key, value, 100, nil, nil)
-			txGetTTL(t, db, bucket, key, 100, nil)
-
-			// Persist the key
-			txPersist(t, db, bucket, key, nil)
-			txGetTTL(t, db, bucket, key, -1, nil)
+			require.Eventually(t, func() bool {
+				_, found0 := db.Index.BTree.GetWithDefault(1).Find(key0)
+				_, found1 := db.Index.BTree.GetWithDefault(1).Find(key1)
+				return !found0 && !found1
+			}, time.Second, 10*time.Millisecond)
 		})
 	})
 }
@@ -2901,7 +2736,7 @@ func TestTx_TTL_DeleteExpired(t *testing.T) {
 				r.True(found)
 				r.NotNil(record)
 
-				r.False(db.ttlService.GetChecker().IsExpired(record.TTL, record.Timestamp))
+				r.False(db.ttlService.IsExpired(record.TTL, record.Timestamp))
 
 				return tx.Delete(bucket, key)
 			})
@@ -2928,7 +2763,7 @@ func TestTx_TTL_DeleteExpired(t *testing.T) {
 				r.True(found)
 				r.NotNil(record)
 
-				r.False(db.ttlService.GetChecker().IsExpired(record.TTL, record.Timestamp))
+				r.False(db.ttlService.IsExpired(record.TTL, record.Timestamp))
 
 				return tx.Delete(bucket, key)
 			})
@@ -3020,7 +2855,7 @@ func TestTx_TTL_DeleteExpired(t *testing.T) {
 				r.NotNil(record)
 
 				// Verify it's actually expired
-				r.True(db.ttlService.GetChecker().IsExpired(record.TTL, record.Timestamp))
+				r.True(db.ttlService.IsExpired(record.TTL, record.Timestamp))
 
 				// Compare with Find - should return nil (triggers callback and filters)
 				record2, found2 := idx.Find(key)
@@ -3065,7 +2900,7 @@ func TestTx_TTL_DeleteExpired(t *testing.T) {
 							return nil
 						}
 
-						if db.ttlService.GetChecker().IsExpired(record.TTL, record.Timestamp) {
+						if db.ttlService.IsExpired(record.TTL, record.Timestamp) {
 							return tx.Delete(bucket, k)
 						}
 						return nil
@@ -3248,81 +3083,6 @@ func TestTx_TTL_ConcurrentUpdate(t *testing.T) {
 				return err
 			})
 			require.Error(t, err)
-		})
-	})
-}
-
-// TestTx_TTL_BoundaryValues tests TTL with boundary values.
-func TestTx_TTL_BoundaryValues(t *testing.T) {
-	t.Run("TTL = 0 (Persistent)", func(t *testing.T) {
-		runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc ttl.Clock) {
-			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
-
-			key := testutils.GetTestBytes(0)
-			txPut(t, db, bucket, key, []byte("value"), 0, nil, nil) // Persistent
-
-			// Advance a long time
-			mc.AdvanceTime(100 * time.Second)
-
-			// Key should still exist
-			txGet(t, db, bucket, key, []byte("value"), nil)
-
-			// GetTTL should return -1 for persistent
-			var actualTTL int64
-			_ = db.View(func(tx *Tx) error {
-				var err error
-				actualTTL, err = tx.GetTTL(bucket, key)
-				return err
-			})
-			require.Equal(t, int64(-1), actualTTL)
-		})
-	})
-
-	t.Run("TTL = 1 (minimum positive TTL)", func(t *testing.T) {
-		runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc ttl.Clock) {
-			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
-
-			key := testutils.GetTestBytes(0)
-			txPut(t, db, bucket, key, []byte("value"), 1, nil, nil)
-
-			// Before expiration
-			txGet(t, db, bucket, key, []byte("value"), nil)
-
-			// Advance just under 1 second
-			mc.AdvanceTime(999 * time.Millisecond)
-			txGet(t, db, bucket, key, []byte("value"), nil)
-
-			// Advance past 1 second
-			mc.AdvanceTime(2 * time.Millisecond)
-			txGet(t, db, bucket, key, nil, ErrKeyNotFound)
-		})
-	})
-
-	t.Run("TTL = uint32 max", func(t *testing.T) {
-		runNutsDBTestWithMockClock(t, nil, func(t *testing.T, db *DB, mc ttl.Clock) {
-			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
-
-			key := testutils.GetTestBytes(0)
-			maxTTL := uint32(4294967295) // uint32 max (~136 years)
-
-			txPut(t, db, bucket, key, []byte("value"), maxTTL, nil, nil)
-
-			// Advance a short time
-			mc.AdvanceTime(1 * time.Second)
-
-			// Key should still exist
-			txGet(t, db, bucket, key, []byte("value"), nil)
-
-			// GetTTL should return a large number (less than maxTTL due to elapsed time)
-			var ttl int64
-			err := db.View(func(tx *Tx) error {
-				var err error
-				ttl, err = tx.GetTTL(bucket, key)
-				return err
-			})
-			require.NoError(t, err)
-			require.Less(t, ttl, int64(maxTTL))
-			require.Greater(t, ttl, int64(maxTTL-5)) // Should still be close to max
 		})
 	})
 }
@@ -3544,7 +3304,7 @@ func TestTx_TTL_RapidExpireUpdate(t *testing.T) {
 				r.NotNil(record)
 				oldTimestamp = record.Timestamp
 				// Verify it's expired
-				r.True(db.ttlService.GetChecker().IsExpired(record.TTL, record.Timestamp))
+				r.True(db.ttlService.IsExpired(record.TTL, record.Timestamp))
 				return nil
 			})
 

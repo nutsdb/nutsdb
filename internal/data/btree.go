@@ -17,9 +17,7 @@ package data
 import (
 	"bytes"
 	"errors"
-	"math/rand"
 	"regexp"
-	"time"
 
 	"github.com/nutsdb/nutsdb/internal/core"
 	"github.com/nutsdb/nutsdb/internal/ttl"
@@ -34,7 +32,6 @@ type BTree struct {
 	index      *btree.BTreeG[*core.Item[core.Record]]
 	ttlChecker *ttl.Checker
 	bucketId   uint64
-	rand       *rand.Rand
 }
 
 // NewBTree creates a new BTree instance with optional TTL support.
@@ -45,7 +42,6 @@ func NewBTree(bucketId uint64, ttlCheckers ...*ttl.Checker) *BTree {
 			return bytes.Compare(a.Key, b.Key) == -1
 		}),
 		bucketId: bucketId,
-		rand:     rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 	if len(ttlCheckers) > 0 {
 		bt.ttlChecker = ttlCheckers[0]
@@ -101,42 +97,6 @@ func (bt *BTree) FindForVerification(key []byte) (*core.Record, bool) {
 		return nil, false
 	}
 	return item.Record, true
-}
-
-// SampleRandomRecords randomly samples 'count' records from the BTree.
-func (bt *BTree) SampleRandomRecords(count int) []*core.Record {
-	length := bt.index.Len()
-	if length == 0 {
-		return nil
-	}
-
-	if count > length {
-		count = length
-	}
-
-	records := make([]*core.Record, 0, count)
-	// Use a map to track visited indices to avoid duplicates
-	visited := make(map[int]struct{})
-
-	for len(records) < count {
-		// Safety break if we can't find new items (shouldn't happen with logic above but good practice)
-		if len(visited) >= length {
-			break
-		}
-
-		idx := bt.rand.Intn(length)
-		if _, exists := visited[idx]; exists {
-			continue
-		}
-		visited[idx] = struct{}{}
-
-		item, ok := bt.index.GetAt(idx)
-		if ok && item != nil {
-			records = append(records, item.Record)
-		}
-	}
-
-	return records
 }
 
 func (bt *BTree) InsertRecord(key []byte, record *core.Record) bool {

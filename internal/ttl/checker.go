@@ -39,6 +39,10 @@ func (c *Checker) SetExpiredCallback(callback ExpiredCallback) {
 	c.onExpired = callback
 }
 
+func (c *Checker) SetClock(clk Clock) {
+	c.Clock = clk
+}
+
 // IsExpired checks if a record is expired based on TTL and timestamp.
 // TTL is in seconds, timestamp is in milliseconds.
 func (c *Checker) IsExpired(ttl uint32, timestamp uint64) bool {
