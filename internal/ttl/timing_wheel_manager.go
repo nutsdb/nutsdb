@@ -146,7 +146,6 @@ func (r *timerRegistry) clear() {
 type TimingWheelManager struct {
 	wheel        *timingwheel.TimingWheel
 	queue        *expirationQueue
-	clock        Clock
 	enabled      bool
 	slotDuration time.Duration
 	wheelSize    int64 // number of slots in the wheel
@@ -180,16 +179,11 @@ type TimingWheelMetrics struct {
 // NewTimingWheelManager creates a new timing wheel manager.
 // If the timing wheel is disabled in config, it returns a manager with enabled=false
 // that will no-op on all operations.
-func NewTimingWheelManager(
-	clk Clock,
-	config Config,
-	queue *expirationQueue,
-) *TimingWheelManager {
+func NewTimingWheelManager(config Config, queue *expirationQueue) *TimingWheelManager {
 	config.Validate()
 
 	mgr := &TimingWheelManager{
 		queue:        queue,
-		clock:        clk,
 		enabled:      config.EnableTimingWheel,
 		slotDuration: config.WheelSlotDuration,
 		wheelSize:    int64(config.WheelSize),

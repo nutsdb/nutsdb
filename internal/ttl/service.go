@@ -45,7 +45,7 @@ func NewService(clk Clock, config Config, callback BatchExpiredCallback) *Servic
 
 	var wheelManager *TimingWheelManager
 	if config.EnableTimingWheel {
-		wheelManager = NewTimingWheelManager(clk, config, queue)
+		wheelManager = NewTimingWheelManager(config, queue)
 	}
 
 	service := &Service{
@@ -88,6 +88,15 @@ func (s *Service) IsExpired(ttl uint32, timestamp uint64) bool {
 // Deprecated: root package code should use Service.IsExpired instead.
 func (s *Service) GetChecker() *Checker {
 	return s.checker
+}
+
+// SetClock updates the service clock and propagates it to the checker.
+// Intended for tests that need deterministic time control.
+func (s *Service) SetClock(clk Clock) {
+	s.clock = clk
+	if s.checker != nil {
+		s.checker.SetClock(clk)
+	}
 }
 
 func (s *Service) onExpired(bucketId uint64, key []byte, ds uint16, timestamp uint64) {

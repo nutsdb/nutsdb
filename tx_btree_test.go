@@ -940,7 +940,7 @@ func TestTx_ExpiredDeletion(t *testing.T) {
 
 		db, err := Open(opts)
 		require.NoError(t, err)
-		db.ttlService.GetChecker().SetClock(mc)
+		db.ttlService.SetClock(mc)
 
 		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
@@ -960,7 +960,7 @@ func TestTx_ExpiredDeletion(t *testing.T) {
 		// Reopen with the same MockClock
 		db, err = Open(opts)
 		require.NoError(t, err)
-		db.ttlService.GetChecker().SetClock(mc)
+		db.ttlService.SetClock(mc)
 		defer func() {
 			if !db.IsClose() {
 				require.NoError(t, db.Close())
@@ -2510,7 +2510,7 @@ func TestTx_TTL_RestartCheck(t *testing.T) {
 
 		db, err := Open(opts)
 		require.NoError(t, err)
-		db.ttlService.GetChecker().SetClock(mc)
+		db.ttlService.SetClock(mc)
 
 		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
 
@@ -2534,7 +2534,7 @@ func TestTx_TTL_RestartCheck(t *testing.T) {
 		// Reopen with the same MockClock
 		db, err = Open(opts)
 		require.NoError(t, err)
-		db.ttlService.GetChecker().SetClock(mc)
+		db.ttlService.SetClock(mc)
 		defer func() {
 			if !db.IsClose() {
 				require.NoError(t, db.Close())

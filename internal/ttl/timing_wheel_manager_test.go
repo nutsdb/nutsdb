@@ -147,7 +147,7 @@ func TestTimingWheelManager_DeregisterKey(t *testing.T) {
 		QueueSize:         100,
 	}
 	queue := newExpirationQueue(config.QueueSize)
-	mgr := NewTimingWheelManager(clock, config, queue)
+	mgr := NewTimingWheelManager(config, queue)
 
 	bucketId := uint64(1)
 	key := []byte("test-key")
@@ -175,13 +175,12 @@ func TestTimingWheelManager_DeregisterKey(t *testing.T) {
 }
 
 func TestTimingWheelManager_DeregisterKey_WhenDisabled(t *testing.T) {
-	clock := NewMockClock(1000000)
 	config := Config{
 		EnableTimingWheel: false,
 		QueueSize:         100,
 	}
 	queue := newExpirationQueue(config.QueueSize)
-	mgr := NewTimingWheelManager(clock, config, queue)
+	mgr := NewTimingWheelManager(config, queue)
 
 	bucketId := uint64(1)
 	key := []byte("test-key")
@@ -199,7 +198,7 @@ func TestTimingWheelManager_DeregisterKey_PreventsExpiration(t *testing.T) {
 		QueueSize:         100,
 	}
 	queue := newExpirationQueue(config.QueueSize)
-	mgr := NewTimingWheelManager(clock, config, queue)
+	mgr := NewTimingWheelManager(config, queue)
 
 	bucketId := uint64(1)
 	key := []byte("test-key")
@@ -232,7 +231,7 @@ func TestTimingWheelManager_OnKeyExpired_SuccessfulPush(t *testing.T) {
 		QueueSize:         100,
 	}
 	queue := newExpirationQueue(config.QueueSize)
-	mgr := NewTimingWheelManager(clock, config, queue)
+	mgr := NewTimingWheelManager(config, queue)
 
 	bucketId := uint64(1)
 	key := []byte("test-key")
@@ -275,7 +274,7 @@ func TestTimingWheelManager_OnKeyExpired_QueueFull(t *testing.T) {
 		QueueSize:         2, // Small queue to test full condition
 	}
 	queue := newExpirationQueue(config.QueueSize)
-	mgr := NewTimingWheelManager(clock, config, queue)
+	mgr := NewTimingWheelManager(config, queue)
 
 	for i := 0; i < config.QueueSize; i++ {
 		queue.push(&ExpirationEvent{
@@ -322,7 +321,7 @@ func TestTimingWheelManager_OnKeyExpired_MultiLap(t *testing.T) {
 		QueueSize:         100,
 	}
 	queue := newExpirationQueue(config.QueueSize)
-	mgr := NewTimingWheelManager(clock, config, queue)
+	mgr := NewTimingWheelManager(config, queue)
 	defer mgr.registry.clear()
 
 	bucketId := uint64(1)
@@ -364,7 +363,7 @@ func TestTimingWheelManager_OnKeyExpired_DeletedKeySkipped(t *testing.T) {
 		QueueSize:         100,
 	}
 	queue := newExpirationQueue(config.QueueSize)
-	mgr := NewTimingWheelManager(clock, config, queue)
+	mgr := NewTimingWheelManager(config, queue)
 
 	bucketId := uint64(1)
 	key := []byte("test-key")
@@ -388,7 +387,6 @@ func TestTimingWheelManager_OnKeyExpired_DeletedKeySkipped(t *testing.T) {
 // TestTimingWheelManager_Lifecycle tests the Start and Stop methods.
 func TestTimingWheelManager_Lifecycle(t *testing.T) {
 	t.Run("start and stop enabled wheel", func(t *testing.T) {
-		clock := NewMockClock(1000000)
 		config := Config{
 			EnableTimingWheel: true,
 			WheelSlotDuration: 100 * time.Millisecond,
@@ -396,7 +394,7 @@ func TestTimingWheelManager_Lifecycle(t *testing.T) {
 			QueueSize:         10,
 		}
 		queue := newExpirationQueue(config.QueueSize)
-		mgr := NewTimingWheelManager(clock, config, queue)
+		mgr := NewTimingWheelManager(config, queue)
 
 		ctx := context.Background()
 		err := mgr.Start(ctx)
@@ -411,13 +409,12 @@ func TestTimingWheelManager_Lifecycle(t *testing.T) {
 	})
 
 	t.Run("start and stop disabled wheel", func(t *testing.T) {
-		clock := NewMockClock(1000000)
 		config := Config{
 			EnableTimingWheel: false,
 			QueueSize:         10,
 		}
 		queue := newExpirationQueue(config.QueueSize)
-		mgr := NewTimingWheelManager(clock, config, queue)
+		mgr := NewTimingWheelManager(config, queue)
 
 		ctx := context.Background()
 		err := mgr.Start(ctx)
@@ -428,7 +425,6 @@ func TestTimingWheelManager_Lifecycle(t *testing.T) {
 	})
 
 	t.Run("stop is idempotent", func(t *testing.T) {
-		clock := NewMockClock(1000000)
 		config := Config{
 			EnableTimingWheel: true,
 			WheelSlotDuration: 100 * time.Millisecond,
@@ -436,7 +432,7 @@ func TestTimingWheelManager_Lifecycle(t *testing.T) {
 			QueueSize:         10,
 		}
 		queue := newExpirationQueue(config.QueueSize)
-		mgr := NewTimingWheelManager(clock, config, queue)
+		mgr := NewTimingWheelManager(config, queue)
 
 		ctx := context.Background()
 		err := mgr.Start(ctx)
@@ -450,7 +446,6 @@ func TestTimingWheelManager_Lifecycle(t *testing.T) {
 	})
 
 	t.Run("name returns correct value", func(t *testing.T) {
-		clock := NewMockClock(1000000)
 		config := Config{
 			EnableTimingWheel: true,
 			WheelSlotDuration: 100 * time.Millisecond,
@@ -458,7 +453,7 @@ func TestTimingWheelManager_Lifecycle(t *testing.T) {
 			QueueSize:         10,
 		}
 		queue := newExpirationQueue(config.QueueSize)
-		mgr := NewTimingWheelManager(clock, config, queue)
+		mgr := NewTimingWheelManager(config, queue)
 
 		assert.Equal(t, "TimingWheelManager", mgr.Name())
 	})
@@ -474,7 +469,7 @@ func TestTimingWheelManager_GetMetrics(t *testing.T) {
 		QueueSize:         10,
 	}
 	queue := newExpirationQueue(config.QueueSize)
-	mgr := NewTimingWheelManager(clock, config, queue)
+	mgr := NewTimingWheelManager(config, queue)
 
 	ctx := context.Background()
 	err := mgr.Start(ctx)
