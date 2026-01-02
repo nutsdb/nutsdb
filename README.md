@@ -22,7 +22,8 @@ It supports fully serializable transactions and many data structures such as lis
 We can learn more about NutsDB in details on the documents site of NutsDB: [NutsDB Documents](https://nutsdb.github.io/nutsdb-docs/)
 
 ## Announcement
-
+* v1.1.0 release, see for details: [https://github.com/nutsdb/nutsdb/releases/tag/v1.1.0](https://github.com/nutsdb/nutsdb/releases/tag/v1.1.0)
+* v1.0.4 release, see for details: [https://github.com/nutsdb/nutsdb/releases/tag/v1.0.4](https://github.com/nutsdb/nutsdb/releases/tag/v1.0.4)
 * v1.0.0 release, see for details: [https://github.com/nutsdb/nutsdb/releases/tag/v1.0.0](https://github.com/nutsdb/nutsdb/releases/tag/v1.0.0)
 * v0.14.3 release, see for details: [https://github.com/nutsdb/nutsdb/releases/tag/v0.14.3](https://github.com/nutsdb/nutsdb/releases/tag/v0.14.3)
 * v0.14.2 release, see for details: [https://github.com/nutsdb/nutsdb/releases/tag/v0.14.2](https://github.com/nutsdb/nutsdb/releases/tag/v0.14.2)
