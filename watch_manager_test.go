@@ -984,7 +984,10 @@ func TestWatchManager_DeleteBucket(t *testing.T) {
 func TestWatchManager_SendMessage(t *testing.T) {
 	t.Run("should send normal priority message successfully", func(t *testing.T) {
 		wm := startDistributor(t)
-		defer wm.close()
+		defer func() {
+			err := wm.close()
+			assert.NoError(t, err)
+		}()
 
 		bucket := "test_bucket"
 		key := "test_key"
@@ -1010,7 +1013,10 @@ func TestWatchManager_SendMessage(t *testing.T) {
 
 	t.Run("should send high priority message successfully", func(t *testing.T) {
 		wm := startDistributor(t)
-		defer wm.close()
+		defer func() {
+			err := wm.close()
+			assert.NoError(t, err)
+		}()
 
 		bucket := "test_bucket"
 		key := "test_key"
