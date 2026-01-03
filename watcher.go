@@ -41,14 +41,3 @@ func (w *Watcher) Run() error {
 
 	return w.watchingFunc()
 }
-
-func (w *Watcher) Cancel() {
-	w.muReady.Lock()
-	defer w.muReady.Unlock()
-	if !w.isReady {
-		return
-	}
-
-	w.ctx.Done()
-	w.isReady = false
-}

@@ -133,10 +133,11 @@ db, err := nutsdb.Open(opts, nutsdb.WithDir("/tmp/nutsdb"))
 The `Watch` function blocks and listens for changes to a specific key in a bucket.
 
 ```go
-func (db *DB) Watch(bucket string, key []byte, cb func(message *Message) error, opts ...WatchOptions) (*Watcher, error)
+func (db *DB) Watch(ctx context.Context, bucket string, key []byte, cb func(message *Message) error, opts ...WatchOptions) (*Watcher, error)
 ```
 
 ### Parameters
+- **ctx**: Pass context as a argument to allow user to cancel Watch Function manually. 
 - **bucket**: The bucket name to watch.
 - **key**: The key to watch.
 - **cb**: A callback function that handles the incoming `*Message`. Return an error to stop watching, or `nil` to continue. The callback is executed sequentially for each message with a timeout.
@@ -195,21 +196,6 @@ if err := watcher.WaitReady(5 * time.Second); err != nil {
 }
 ```
 
-#### `Cancel()`
-
-Manually cancels the watcher and stops it from receiving messages.
-
-- **Behavior**: 
-  - Triggers the context done signal
-  - Marks the watcher as not ready
-  - Safe to call multiple times
-
-**Usage**:
-```go
-watcher.Cancel()
-fmt.Println("Watcher cancelled")
-```
-
 ### Example
 
 ```go
@@ -247,6 +233,7 @@ func init() {
 func main() {
 	key := []byte("myKey")
 	done := make(chan struct{})
+	ctx, cancel := context.WithCancel(context.Background())
 
 	// Create bucket
 	if err := db.Update(func(tx *nutsdb.Tx) error {
@@ -255,7 +242,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	watcher, _ := db.Watch(bucket, key, func(msg *nutsdb.Message) error {
+	watcher, _ := db.Watch(ctx, bucket, key, func(msg *nutsdb.Message) error {
 		fmt.Printf("Received: Key=%s, Value=%s, Flag=%d\n", msg.Key, msg.Value, msg.Flag)
 
 		//signal that we received the message
@@ -285,7 +272,7 @@ func main() {
 	case <-done:
 		fmt.Println("Received message")
 		//manually cancel the watcher
-		watcher.Cancel()
+		cancel()
 		fmt.Println("Watcher cancelled")
 	case <-time.After(10 * time.Second):
 		fmt.Println("Timeout")

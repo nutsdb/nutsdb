@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -57,9 +58,10 @@ func main() {
 func basicWatchExample() {
 	fmt.Println("--- Example 1: Basic Watch ---")
 	key := []byte("watched_key")
+	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
 
-	watcher, err := db.Watch(bucket, key, func(msg *nutsdb.Message) error {
+	watcher, err := db.Watch(ctx, bucket, key, func(msg *nutsdb.Message) error {
 		fmt.Printf("  Bucket: %s\n", msg.BucketName)
 		fmt.Printf("  Key: %s\n", msg.Key)
 		fmt.Printf("  Value: %s\n", string(msg.Value))
@@ -67,6 +69,7 @@ func basicWatchExample() {
 		fmt.Printf("  Timestamp: %d\n", msg.Timestamp)
 
 		// signal that we received the message
+		cancel()
 		close(done)
 		return nil
 	})
@@ -95,8 +98,6 @@ func basicWatchExample() {
 	select {
 	case <-done:
 		fmt.Println("Received message")
-		//manually cancel the watcher
-		watcher.Cancel()
 	case <-time.After(10 * time.Second):
 		fmt.Println("Timeout")
 	}
@@ -107,10 +108,11 @@ func multipleOperationsExample() {
 	fmt.Println("--- Example 2: Watch Multiple Operations ---")
 	key := []byte("multi_op_key")
 	done := make(chan struct{})
+	ctx, cancel := context.WithCancel(context.Background())
 	mu := sync.Mutex{}
 
 	messageCount := 0
-	watcher, err := db.Watch(bucket, key, func(msg *nutsdb.Message) error {
+	watcher, err := db.Watch(ctx, bucket, key, func(msg *nutsdb.Message) error {
 		mu.Lock()
 		defer mu.Unlock()
 
@@ -125,6 +127,7 @@ func multipleOperationsExample() {
 		}
 
 		if messageCount >= 3 {
+			cancel()
 			close(done)
 		}
 		return nil
@@ -175,7 +178,6 @@ func multipleOperationsExample() {
 	case <-done:
 		fmt.Println("Received message")
 		//manually cancel the watcher
-		watcher.Cancel()
 	case <-time.After(10 * time.Second):
 		fmt.Println("Timeout")
 	}
@@ -186,10 +188,11 @@ func watchWithTTLExample() {
 	fmt.Println("--- Example 3: Watch with TTL ---")
 	key := []byte("ttl_key")
 	done := make(chan struct{})
+	ctx, cancel := context.WithCancel(context.Background())
 	mu := sync.Mutex{}
 
 	messageCount := 0
-	watcher, err := db.Watch(bucket, key, func(msg *nutsdb.Message) error {
+	watcher, err := db.Watch(ctx, bucket, key, func(msg *nutsdb.Message) error {
 		mu.Lock()
 		defer mu.Unlock()
 
@@ -204,6 +207,7 @@ func watchWithTTLExample() {
 		}
 
 		if messageCount >= 2 {
+			cancel()
 			close(done)
 		}
 		return nil
@@ -229,6 +233,15 @@ func watchWithTTLExample() {
 		log.Fatal(err)
 	}
 
+	time.Sleep(2100 * time.Millisecond)
+	// we must call the view to trigger the ttl expiration
+	if err := db.View(func(tx *nutsdb.Tx) error {
+		_, err := tx.Get(bucket, key)
+		return err
+	}); err != nil {
+		log.Fatal(err)
+	}
+
 	fmt.Println("Waiting for TTL expiration...")
 
 	time.Sleep(3 * time.Second)
@@ -236,8 +249,6 @@ func watchWithTTLExample() {
 	select {
 	case <-done:
 		fmt.Println("Received message")
-		//manually cancel the watcher
-		watcher.Cancel()
 	case <-time.After(10 * time.Second):
 		fmt.Println("Timeout")
 	}

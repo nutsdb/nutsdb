@@ -1181,6 +1181,7 @@ func (db *DB) rebuildBucketManager() error {
  * Watch watches the key and bucket and calls the callback function for each message received.
  * The callback will be called once for each individual message in the batch.
  *
+ * @param ctx - the context for the watch, we provide the context as the way of cancel manually watcher
  * @param bucket - the bucket name to watch
  * @param key - the key in the bucket to watch
  * @param cb - the callback function to call for each message received
@@ -1190,9 +1191,8 @@ func (db *DB) rebuildBucketManager() error {
  * @return watcher - the watcher object
  * @return error - the error if the watch is stopped
  */
-func (db *DB) Watch(bucket string, key []byte, cb func(message *Message) error, opts ...WatchOptions) (*Watcher, error) {
+func (db *DB) Watch(ctx context.Context, bucket string, key []byte, cb func(message *Message) error, opts ...WatchOptions) (*Watcher, error) {
 	watchOpts := NewWatchOptions()
-	ctx := context.Background()
 
 	if len(opts) > 0 {
 		watchOpts = &opts[0]
@@ -1295,7 +1295,6 @@ func (db *DB) Watch(bucket string, key []byte, cb func(message *Message) error, 
 		readyCh:      make(chan struct{}),
 		watchingFunc: watchingFunc,
 		isReady:      false,
-		ctx:          ctx,
 	}
 
 	return watcher, nil
