@@ -3532,6 +3532,7 @@ func TestDB_WatchDeleteBucket(t *testing.T) {
 			count := 0
 			expectCount := 200
 			done := make(chan struct{})
+			isDone := false
 
 			for i := 0; i < countOfKeys; i++ {
 				keys[i] = testutils.GetTestBytes(i)
@@ -3549,9 +3550,9 @@ func TestDB_WatchDeleteBucket(t *testing.T) {
 
 					countL.Lock()
 					count++
-					if done != nil && count == expectCount {
+					if !isDone && count == expectCount {
 						close(done)
-						done = nil
+						isDone = true
 					}
 					countL.Unlock()
 					return nil
