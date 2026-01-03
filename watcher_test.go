@@ -39,7 +39,9 @@ func TestWatcher_Run(t *testing.T) {
 			isReady: false,
 		}
 
-		go watcher.Run()
+		go func() {
+			_ = watcher.Run()
+		}()
 
 		// Wait for readyCh to be closed
 		select {
@@ -82,7 +84,9 @@ func TestWatcher_Run(t *testing.T) {
 		}
 
 		// First call
-		go watcher.Run()
+		go func() {
+			_ = watcher.Run()
+		}()
 		time.Sleep(10 * time.Millisecond) // Let it start
 
 		// Second call should return immediately without executing
@@ -111,7 +115,8 @@ func TestWatcher_Run(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			watcher.Run()
+			err := watcher.Run()
+			assert.NoError(t, err)
 		}()
 
 		// Wait for ready
@@ -139,7 +144,10 @@ func TestWatcher_WaitReady(t *testing.T) {
 		}
 
 		// Start watcher in background
-		go watcher.Run()
+		go func() {
+			err := watcher.Run()
+			assert.NoError(t, err)
+		}()
 
 		// WaitReady should return nil quickly
 		err := watcher.WaitReady(5 * time.Second)
@@ -201,7 +209,7 @@ func TestWatcher_WaitReady(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			watcher.Run()
+			_ = watcher.Run()
 		}()
 
 		wg.Add(1)
@@ -238,7 +246,8 @@ func TestWatcher_ThreadSafety(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				watcher.Run()
+				err := watcher.Run()
+				assert.NoError(t, err)
 			}()
 		}
 
@@ -276,7 +285,8 @@ func TestWatcher_ThreadSafety(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			time.Sleep(10 * time.Millisecond) // Slight delay to ensure WaitReady starts first
-			watcher.Run()
+			err := watcher.Run()
+			assert.NoError(t, err)
 		}()
 
 		wg.Wait()
