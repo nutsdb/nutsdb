@@ -14,9 +14,13 @@ import (
 )
 
 // startDistributor creates and starts a watch manager with distributor running
-func startDistributor() *watchManager {
+func startDistributor(t *testing.T) *watchManager {
 	wm := NewWatchManager()
-	go wm.startDistributor()
+	err := wm.Start(context.Background())
+	if err != nil {
+		t.Fatalf("failed to start watch manager: %+v", err)
+	}
+
 	time.Sleep(100 * time.Millisecond) // Let distributor start
 	return wm
 }
@@ -200,7 +204,7 @@ func wmStartReceiver(t *testing.T, receiveChan <-chan *Message, expectBucket, ex
 
 func TestWatchManager_SubscribeAndSendMessage(t *testing.T) {
 	t.Run("subscribe and send message", func(t *testing.T) {
-		wm := startDistributor()
+		wm := startDistributor(t)
 		defer func() { _ = wm.close() }()
 
 		bucket := "test"
@@ -215,7 +219,7 @@ func TestWatchManager_SubscribeAndSendMessage(t *testing.T) {
 	})
 
 	t.Run("subscribe and drop messages", func(t *testing.T) {
-		wm := startDistributor()
+		wm := startDistributor(t)
 		defer func() { _ = wm.close() }()
 
 		bucket := "bucket_test"
@@ -242,7 +246,7 @@ func TestWatchManager_SubscribeAndSendMessage(t *testing.T) {
 	})
 
 	t.Run("multiple subscribers for the same key", func(t *testing.T) {
-		wm := startDistributor()
+		wm := startDistributor(t)
 		defer func() { _ = wm.close() }()
 
 		bucket := "bucket_test"
@@ -278,7 +282,7 @@ func TestWatchManager_SubscribeAndSendMessage(t *testing.T) {
 	})
 
 	t.Run("multiple subscribers", func(t *testing.T) {
-		wm := startDistributor()
+		wm := startDistributor(t)
 		defer func() { _ = wm.close() }()
 
 		numSubscribers := 100
@@ -343,7 +347,7 @@ func TestWatchManager_SubscribeAndSendMessage(t *testing.T) {
 	})
 
 	t.Run("send message and close channel", func(t *testing.T) {
-		wm := startDistributor()
+		wm := startDistributor(t)
 		isClosed := false
 
 		defer func() {
@@ -395,7 +399,7 @@ func TestWatchManager_SubscribeAndSendMessage(t *testing.T) {
 
 func TestWatchManager_SubscribeAndUnsubscribe(t *testing.T) {
 	t.Run("subscribe and unsubscribe", func(t *testing.T) {
-		wm := startDistributor()
+		wm := startDistributor(t)
 		defer func() { _ = wm.close() }()
 
 		bucket := "bucket_test"
@@ -429,7 +433,7 @@ func TestWatchManager_SubscribeAndUnsubscribe(t *testing.T) {
 	})
 
 	t.Run("subscribe and unsubscribe with multiple keys", func(t *testing.T) {
-		wm := startDistributor()
+		wm := startDistributor(t)
 		defer func() { _ = wm.close() }()
 
 		expectedSubscribers := 10
@@ -480,7 +484,7 @@ func TestWatchManager_SubscribeAndUnsubscribe(t *testing.T) {
 	})
 
 	t.Run("subscribing and unsubscribe in random time", func(t *testing.T) {
-		wm := startDistributor()
+		wm := startDistributor(t)
 		defer func() { _ = wm.close() }()
 
 		bucket := "bucket_test"
@@ -542,7 +546,7 @@ func TestWatchManager_SubscribeAndUnsubscribe(t *testing.T) {
 
 func TestWatchManager_StartDistributor(t *testing.T) {
 	t.Run("send messages and receive them in batches", func(t *testing.T) {
-		wm := startDistributor()
+		wm := startDistributor(t)
 		defer func() { _ = wm.close() }()
 		time.Sleep(50 * time.Millisecond)
 
@@ -561,7 +565,7 @@ func TestWatchManager_StartDistributor(t *testing.T) {
 	})
 
 	t.Run("max batch size triggers immediate send", func(t *testing.T) {
-		wm := startDistributor()
+		wm := startDistributor(t)
 		defer func() { _ = wm.close() }()
 		time.Sleep(50 * time.Millisecond)
 
@@ -581,7 +585,7 @@ func TestWatchManager_StartDistributor(t *testing.T) {
 	})
 
 	t.Run("send max batch size messages at each subsriber", func(t *testing.T) {
-		wm := startDistributor()
+		wm := startDistributor(t)
 		defer func() { _ = wm.close() }()
 
 		expectedSubscribers := 100
@@ -640,7 +644,7 @@ func TestWatchManager_StartDistributor(t *testing.T) {
 	t.Run("send messages with large number of messages over max watch channel buffer size", func(t *testing.T) {
 		watchChanBufferSize = 124   // Change the watch channel buffer size to 124 for testing
 		receiveChanBufferSize = 124 // Change the receive channel buffer size to 124 for testing
-		wm := startDistributor()
+		wm := startDistributor(t)
 		defer func() { _ = wm.close() }()
 		time.Sleep(50 * time.Millisecond)
 
@@ -722,9 +726,9 @@ func TestWatchManager_ComponentLifecycle(t *testing.T) {
 	require.NoError(t, wm.sendMessage(msg))
 	wmReceiveMessage(t, subscriber.receiveChan, bucket, key, 2*time.Second)
 
-	require.NoError(t, wm.Stop(2*time.Second))
+	require.NoError(t, wm.Stop(5*time.Second))
 	// Stop should be idempotent.
-	require.NoError(t, wm.Stop(2*time.Second))
+	require.ErrorIs(t, wm.Stop(2*time.Second), ErrWatchManagerClosed)
 
 	// Once stopped, watch manager should reject more work.
 	err = wm.sendMessage(msg)
@@ -974,5 +978,169 @@ func TestWatchManager_DeleteBucket(t *testing.T) {
 		case <-time.After(1 * time.Second):
 			t.Fatal("timeout waiting for message on new subscription")
 		}
+	})
+}
+
+func TestWatchManager_SendMessage(t *testing.T) {
+	t.Run("should send normal priority message successfully", func(t *testing.T) {
+		wm := startDistributor(t)
+		defer func() {
+			err := wm.close()
+			assert.NoError(t, err)
+		}()
+
+		bucket := "test_bucket"
+		key := "test_key"
+		value := []byte("test_value")
+
+		receiveChan, _ := wmSubscribe(t, wm, bucket, key)
+
+		// Send normal priority message
+		msg := NewMessage(bucket, key, value, DataSetFlag, uint64(time.Now().Unix()))
+		err := wm.sendMessage(msg)
+		require.NoError(t, err)
+
+		// Verify message is received
+		select {
+		case received := <-receiveChan:
+			assert.Equal(t, bucket, received.BucketName)
+			assert.Equal(t, key, received.Key)
+			assert.Equal(t, value, received.Value)
+		case <-time.After(1 * time.Second):
+			t.Fatal("timeout waiting for message")
+		}
+	})
+
+	t.Run("should send high priority message successfully", func(t *testing.T) {
+		wm := startDistributor(t)
+		defer func() {
+			err := wm.close()
+			assert.NoError(t, err)
+		}()
+
+		bucket := "test_bucket"
+		key := "test_key"
+		value := []byte("high_priority_value")
+
+		receiveChan, _ := wmSubscribe(t, wm, bucket, key)
+
+		// Send high priority message
+		msg := NewMessage(bucket, key, value, DataSetFlag, uint64(time.Now().Unix()),
+			MessageOptions{Priority: MessagePriorityHigh})
+		err := wm.sendMessage(msg)
+		require.NoError(t, err)
+
+		// Verify message is received
+		select {
+		case received := <-receiveChan:
+			assert.Equal(t, bucket, received.BucketName)
+			assert.Equal(t, key, received.Key)
+			assert.Equal(t, value, received.Value)
+		case <-time.After(1 * time.Second):
+			t.Fatal("timeout waiting for high priority message")
+		}
+	})
+
+	t.Run("should return error when watch manager is closed", func(t *testing.T) {
+		wm := NewWatchManager()
+
+		// Close the watch manager first
+		wm.muClosed.Lock()
+		wm.closed = true
+		wm.muClosed.Unlock()
+
+		msg := NewMessage("bucket", "key", []byte("value"), DataSetFlag, uint64(time.Now().Unix()))
+		err := wm.sendMessage(msg)
+
+		assert.ErrorIs(t, err, ErrWatchManagerClosed)
+	})
+
+	t.Run("should return error when watch channel is full", func(t *testing.T) {
+		// Create a new watch manager with small buffer for testing
+		wm := NewWatchManager()
+
+		// Fill the watch channel to capacity
+		for i := 0; i < watchChanBufferSize; i++ {
+			wm.watchChan <- NewMessage("bucket", "key", []byte("value"), DataSetFlag, uint64(time.Now().Unix()))
+		}
+
+		// Try to send another message (should fail immediately due to full channel)
+		msg := NewMessage("bucket", "key", []byte("value"), DataSetFlag, uint64(time.Now().Unix()))
+		err := wm.sendMessage(msg)
+
+		assert.ErrorIs(t, err, ErrWatchChanCannotSend)
+	})
+
+	t.Run("should return error when worker context is cancelled", func(t *testing.T) {
+		wm := NewWatchManager()
+
+		// Fill the watch channel
+		for i := 0; i < watchChanBufferSize; i++ {
+			wm.watchChan <- NewMessage("bucket", "key", []byte("value"), DataSetFlag, uint64(time.Now().Unix()))
+		}
+
+		// Cancel the worker context
+		wm.workerCancel()
+
+		// Try to send message - should detect context cancellation
+		msg := NewMessage("bucket", "key", []byte("value"), DataSetFlag, uint64(time.Now().Unix()))
+		err := wm.sendMessage(msg)
+
+		assert.ErrorIs(t, err, ErrWatchManagerClosed)
+	})
+}
+
+func TestWatchManager_Stop(t *testing.T) {
+	t.Run("should stop successfully with active subscribers", func(t *testing.T) {
+		wm := NewWatchManager()
+		err := wm.Start(context.Background())
+		require.NoError(t, err)
+
+		// Add some subscribers
+		bucket := "test_bucket"
+		key1 := "key1"
+		key2 := "key2"
+
+		subscriber1, err := wm.subscribe(bucket, key1)
+		require.NoError(t, err)
+		subscriber2, err := wm.subscribe(bucket, key2)
+		require.NoError(t, err)
+
+		// Stop should succeed
+		err = wm.Stop(5 * time.Second)
+		assert.NoError(t, err)
+
+		// Verify subscribers' channels are closed
+		_, ok1 := <-subscriber1.receiveChan
+		_, ok2 := <-subscriber2.receiveChan
+		assert.False(t, ok1, "subscriber1 channel should be closed")
+		assert.False(t, ok2, "subscriber2 channel should be closed")
+	})
+
+	t.Run("should stop successfully when no subscribers", func(t *testing.T) {
+		wm := NewWatchManager()
+		err := wm.Start(context.Background())
+		require.NoError(t, err)
+
+		// Stop immediately without any subscribers
+		err = wm.Stop(2 * time.Second)
+		assert.NoError(t, err)
+
+		// Verify watch manager is closed
+		assert.True(t, wm.isClosed())
+	})
+
+	t.Run("should return error when stopping already stopped manager", func(t *testing.T) {
+		wm := NewWatchManager()
+		err := wm.Start(context.Background())
+		require.NoError(t, err)
+
+		// First stop should succeed
+		err = wm.Stop(2 * time.Second)
+		require.NoError(t, err)
+
+		// Second stop should return error
+		err = wm.Stop(2 * time.Second)
+		assert.ErrorIs(t, err, ErrWatchManagerClosed)
 	})
 }

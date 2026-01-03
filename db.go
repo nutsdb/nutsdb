@@ -1181,7 +1181,7 @@ func (db *DB) rebuildBucketManager() error {
  * Watch watches the key and bucket and calls the callback function for each message received.
  * The callback will be called once for each individual message in the batch.
  *
- * @param ctx - the context for the watch - used to cancel the watch manually
+ * @param ctx - the context for the watch, we provide the context as the way of cancel manually watcher
  * @param bucket - the bucket name to watch
  * @param key - the key in the bucket to watch
  * @param cb - the callback function to call for each message received
