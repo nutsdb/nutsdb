@@ -535,7 +535,7 @@ func (wm *watchManager) close() error {
 	wm.muClosed.Lock()
 	defer wm.muClosed.Unlock()
 
-	if wm.closed == true {
+	if wm.closed {
 		return ErrWatchManagerClosed
 	}
 

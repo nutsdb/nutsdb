@@ -14,9 +14,13 @@ import (
 )
 
 // startDistributor creates and starts a watch manager with distributor running
-func startDistributor() *watchManager {
+func startDistributor(t *testing.T) *watchManager {
 	wm := NewWatchManager()
-	go wm.Start(context.Background())
+	err := wm.Start(context.Background())
+	if err != nil {
+		t.Fatalf("failed to start watch manager: %+v", err)
+	}
+
 	time.Sleep(100 * time.Millisecond) // Let distributor start
 	return wm
 }
@@ -200,7 +204,7 @@ func wmStartReceiver(t *testing.T, receiveChan <-chan *Message, expectBucket, ex
 
 func TestWatchManager_SubscribeAndSendMessage(t *testing.T) {
 	t.Run("subscribe and send message", func(t *testing.T) {
-		wm := startDistributor()
+		wm := startDistributor(t)
 		defer func() { _ = wm.close() }()
 
 		bucket := "test"
@@ -215,7 +219,7 @@ func TestWatchManager_SubscribeAndSendMessage(t *testing.T) {
 	})
 
 	t.Run("subscribe and drop messages", func(t *testing.T) {
-		wm := startDistributor()
+		wm := startDistributor(t)
 		defer func() { _ = wm.close() }()
 
 		bucket := "bucket_test"
@@ -242,7 +246,7 @@ func TestWatchManager_SubscribeAndSendMessage(t *testing.T) {
 	})
 
 	t.Run("multiple subscribers for the same key", func(t *testing.T) {
-		wm := startDistributor()
+		wm := startDistributor(t)
 		defer func() { _ = wm.close() }()
 
 		bucket := "bucket_test"
@@ -278,7 +282,7 @@ func TestWatchManager_SubscribeAndSendMessage(t *testing.T) {
 	})
 
 	t.Run("multiple subscribers", func(t *testing.T) {
-		wm := startDistributor()
+		wm := startDistributor(t)
 		defer func() { _ = wm.close() }()
 
 		numSubscribers := 100
@@ -343,7 +347,7 @@ func TestWatchManager_SubscribeAndSendMessage(t *testing.T) {
 	})
 
 	t.Run("send message and close channel", func(t *testing.T) {
-		wm := startDistributor()
+		wm := startDistributor(t)
 		isClosed := false
 
 		defer func() {
@@ -395,7 +399,7 @@ func TestWatchManager_SubscribeAndSendMessage(t *testing.T) {
 
 func TestWatchManager_SubscribeAndUnsubscribe(t *testing.T) {
 	t.Run("subscribe and unsubscribe", func(t *testing.T) {
-		wm := startDistributor()
+		wm := startDistributor(t)
 		defer func() { _ = wm.close() }()
 
 		bucket := "bucket_test"
@@ -429,7 +433,7 @@ func TestWatchManager_SubscribeAndUnsubscribe(t *testing.T) {
 	})
 
 	t.Run("subscribe and unsubscribe with multiple keys", func(t *testing.T) {
-		wm := startDistributor()
+		wm := startDistributor(t)
 		defer func() { _ = wm.close() }()
 
 		expectedSubscribers := 10
@@ -480,7 +484,7 @@ func TestWatchManager_SubscribeAndUnsubscribe(t *testing.T) {
 	})
 
 	t.Run("subscribing and unsubscribe in random time", func(t *testing.T) {
-		wm := startDistributor()
+		wm := startDistributor(t)
 		defer func() { _ = wm.close() }()
 
 		bucket := "bucket_test"
@@ -542,7 +546,7 @@ func TestWatchManager_SubscribeAndUnsubscribe(t *testing.T) {
 
 func TestWatchManager_StartDistributor(t *testing.T) {
 	t.Run("send messages and receive them in batches", func(t *testing.T) {
-		wm := startDistributor()
+		wm := startDistributor(t)
 		defer func() { _ = wm.close() }()
 		time.Sleep(50 * time.Millisecond)
 
@@ -561,7 +565,7 @@ func TestWatchManager_StartDistributor(t *testing.T) {
 	})
 
 	t.Run("max batch size triggers immediate send", func(t *testing.T) {
-		wm := startDistributor()
+		wm := startDistributor(t)
 		defer func() { _ = wm.close() }()
 		time.Sleep(50 * time.Millisecond)
 
@@ -581,7 +585,7 @@ func TestWatchManager_StartDistributor(t *testing.T) {
 	})
 
 	t.Run("send max batch size messages at each subsriber", func(t *testing.T) {
-		wm := startDistributor()
+		wm := startDistributor(t)
 		defer func() { _ = wm.close() }()
 
 		expectedSubscribers := 100
@@ -640,7 +644,7 @@ func TestWatchManager_StartDistributor(t *testing.T) {
 	t.Run("send messages with large number of messages over max watch channel buffer size", func(t *testing.T) {
 		watchChanBufferSize = 124   // Change the watch channel buffer size to 124 for testing
 		receiveChanBufferSize = 124 // Change the receive channel buffer size to 124 for testing
-		wm := startDistributor()
+		wm := startDistributor(t)
 		defer func() { _ = wm.close() }()
 		time.Sleep(50 * time.Millisecond)
 
@@ -979,7 +983,7 @@ func TestWatchManager_DeleteBucket(t *testing.T) {
 
 func TestWatchManager_SendMessage(t *testing.T) {
 	t.Run("should send normal priority message successfully", func(t *testing.T) {
-		wm := startDistributor()
+		wm := startDistributor(t)
 		defer wm.close()
 
 		bucket := "test_bucket"
@@ -1005,7 +1009,7 @@ func TestWatchManager_SendMessage(t *testing.T) {
 	})
 
 	t.Run("should send high priority message successfully", func(t *testing.T) {
-		wm := startDistributor()
+		wm := startDistributor(t)
 		defer wm.close()
 
 		bucket := "test_bucket"
