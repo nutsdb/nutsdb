@@ -19,6 +19,8 @@ NutsDB 是一个用纯 Go 编写的简单、快速、可嵌入且持久的键/�
 
 
 ### 公告
+* v1.1.0 发布，详情见： [https://github.com/nutsdb/nutsdb/releases/tag/v1.1.0](https://github.com/nutsdb/nutsdb/releases/tag/v1.1.0)
+* v1.0.4 发布，详情见： [https://github.com/nutsdb/nutsdb/releases/tag/v1.0.4](https://github.com/nutsdb/nutsdb/releases/tag/v1.0.4)
 * v1.0.0 发布，详情见： [https://github.com/nutsdb/nutsdb/releases/tag/v1.0.0](https://github.com/nutsdb/nutsdb/releases/tag/v1.0.0)
 * v0.14.3 发布，详情见： [https://github.com/nutsdb/nutsdb/releases/tag/v0.14.3](https://github.com/nutsdb/nutsdb/releases/tag/v0.14.3)
 * v0.14.2 发布，详情见：[https://github.com/nutsdb/nutsdb/releases/tag/v0.14.2](https://github.com/nutsdb/nutsdb/releases/tag/v0.14.2)
