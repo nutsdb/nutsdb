@@ -223,7 +223,7 @@ func getUncommittedUpdateInSameTransaction() {
 	currBucket := "bucketForTransactionNew"
 	key := []byte("testkey")
 	val1 := []byte("value1")
-	// val2 := []byte("value2")
+	val2 := []byte("value2")
 	must := func(f func() error) {
 		if err := f(); err != nil {
 			panic(err)
@@ -237,7 +237,18 @@ func getUncommittedUpdateInSameTransaction() {
 			return tx.Put(currBucket, key, val1, 0)
 		})
 		vcurr, err := tx.Get(currBucket, key)
-		log.Printf("%v, %v", string(vcurr), err)
+		log.Printf("expect value is '%v', value is '%v', %v", string(val1), string(vcurr), err)
+		return
+	}); err != nil {
+		log.Printf("failed update: %v", err)
+		return
+	}
+	if err := db.Update(func(tx *nutsdb.Tx) (err error) {
+		must(func() error {
+			return tx.Put(currBucket, key, val2, 0)
+		})
+		vcurr, err := tx.Get(currBucket, key)
+		log.Printf("expect value is '%v', value is '%v', %v", string(val2), string(vcurr), err)
 		return
 	}); err != nil {
 		log.Printf("failed update: %v", err)

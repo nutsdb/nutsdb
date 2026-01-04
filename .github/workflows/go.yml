@@ -43,7 +43,8 @@ jobs:
     - name: Run coverage tests
       run: |
         # Set longer timeout for coverage collection
-        timeout 25m go test -race -timeout 20m -coverprofile=coverage.out -covermode=atomic ./...
+        timeout 25m go test -race -timeout 20m -coverprofile=_coverage.out -covermode=atomic ./...
+        cat _coverage.out | grep -v github.com/nutsdb/nutsdb/examples > coverage.out
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v5

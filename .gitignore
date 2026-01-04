@@ -5,4 +5,5 @@ bin/
 .gocache
 .vscode
 coverage.out
+_coverage.out
 coverage.html
