@@ -532,8 +532,8 @@ func (wm *watchManager) cleanUpSubscribers() {
 }
 
 func (wm *watchManager) close() error {
-	wm.muClosed.RLock()
-	defer wm.muClosed.RUnlock()
+	wm.muClosed.Lock()
+	defer wm.muClosed.Unlock()
 
 	if wm.closed {
 		return ErrWatchManagerClosed
@@ -566,6 +566,7 @@ func (wm *watchManager) done() <-chan struct{} {
 func (wm *watchManager) isClosed() bool {
 	wm.muClosed.RLock()
 	defer wm.muClosed.RUnlock()
+
 	return wm.closed
 }
 
