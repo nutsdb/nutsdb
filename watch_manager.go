@@ -123,8 +123,8 @@ type watchManager struct {
 	started     bool // indicates whether Start() has been called
 	idGenerator *IDGenerator
 
-	muClosed  sync.Mutex
-	muStarted sync.Mutex
+	muClosed  sync.RWMutex
+	muStarted sync.RWMutex
 	mu        sync.Mutex
 }
 
@@ -532,8 +532,8 @@ func (wm *watchManager) cleanUpSubscribers() {
 }
 
 func (wm *watchManager) close() error {
-	wm.muClosed.Lock()
-	defer wm.muClosed.Unlock()
+	wm.muClosed.RLock()
+	defer wm.muClosed.RUnlock()
 
 	if wm.closed {
 		return ErrWatchManagerClosed
@@ -564,8 +564,8 @@ func (wm *watchManager) done() <-chan struct{} {
 }
 
 func (wm *watchManager) isClosed() bool {
-	wm.muClosed.Lock()
-	defer wm.muClosed.Unlock()
+	wm.muClosed.RLock()
+	defer wm.muClosed.RUnlock()
 	return wm.closed
 }
 
@@ -610,14 +610,14 @@ func (wm *watchManager) Start(ctx context.Context) error {
 		return ErrWatchManagerClosed
 	}
 
-	wm.muStarted.Lock()
+	wm.muStarted.RLock()
 	if wm.started {
-		wm.muStarted.Unlock()
+		wm.muStarted.RUnlock()
 		return nil
 	}
 
 	wm.started = true
-	wm.muStarted.Unlock()
+	wm.muStarted.RUnlock()
 
 	// use a local ready channel to wait for goroutine startup
 	ready := make(chan struct{})
