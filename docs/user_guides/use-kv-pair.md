@@ -216,7 +216,7 @@ if err := db.Update(func(tx *nutsdb.Tx) error {
 }
 ```
 
-* Use `PutIfExits`` set the value for a key in  bucket only if the key already exits in the bucket.
+* Use `PutIfExists`` set the value for a key in  bucket only if the key already exist in the bucket.
 
 ```golang
 if err := db.Update(func(tx *nutsdb.Tx) error {
