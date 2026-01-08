@@ -27,12 +27,15 @@ func (w *Watcher) WaitReady(timeout time.Duration) error {
 
 func (w *Watcher) Run() error {
 	w.muReady.Lock()
-	defer w.muReady.Unlock()
+
 	if w.isReady {
+		w.muReady.Unlock()
 		return nil
 	}
 
 	w.isReady = true
 	close(w.readyCh)
+	w.muReady.Unlock()
+
 	return w.watchingFunc()
 }

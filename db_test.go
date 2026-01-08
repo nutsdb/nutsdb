@@ -3367,6 +3367,8 @@ func TestDB_WatchTTL(t *testing.T) {
 
 			txPut(t, db, bucket, key, []byte("value"), 1, nil, nil)
 			time.Sleep(1100 * time.Millisecond)
+			// NOTE: Because the active expire cause heavy bad performance, so we need to
+			// get the entry for merge trigger
 			txGet(t, db, bucket, key, []byte("value"), ErrKeyNotFound)
 
 			select {
@@ -3530,6 +3532,7 @@ func TestDB_WatchDeleteBucket(t *testing.T) {
 			count := 0
 			expectCount := 200
 			done := make(chan struct{})
+			isDone := false
 
 			for i := 0; i < countOfKeys; i++ {
 				keys[i] = testutils.GetTestBytes(i)
@@ -3547,9 +3550,9 @@ func TestDB_WatchDeleteBucket(t *testing.T) {
 
 					countL.Lock()
 					count++
-					if done != nil && count == expectCount {
+					if !isDone && count == expectCount {
 						close(done)
-						done = nil
+						isDone = true
 					}
 					countL.Unlock()
 					return nil
