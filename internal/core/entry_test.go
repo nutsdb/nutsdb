@@ -37,7 +37,8 @@ func Test_EntryCreation(t *testing.T) {
 			core.NewMetaData().
 				WithTTL(uint32(ttl)).
 				WithTxID(uint64(txId)).
-				WithDs(core.DataStructureBTree),
+				WithDs(core.DataStructureBTree).
+				WithKeySize(1).WithValueSize(1),
 		)
 
 	assert.Equal(
@@ -52,9 +53,10 @@ func Test_EntryCreation(t *testing.T) {
 	assert.Equal(t, entry.Key, k)
 	assert.Equal(t, entry.Value, v)
 	assert.True(t, entry.IsBelongsToBTree())
+	assert.False(t, entry.IsZero())
 }
 
-func Test_EntryEncode(t *testing.T) {
+func Test_EntryMostFunctions(t *testing.T) {
 	r := require.New(t)
 	k := []byte("key")
 	v := []byte("value")
@@ -76,7 +78,7 @@ func Test_EntryEncode(t *testing.T) {
 
 	r.Equal(entry.Key, k)
 	data := entry.Encode()
-
+	// test encode
 	checkFuncs := []func(buf []byte) []byte{
 		func(buf []byte) []byte {
 			// crc32 check
@@ -148,4 +150,18 @@ func Test_EntryEncode(t *testing.T) {
 		data = f(data)
 	}
 	r.Equal("keyvalue", string(data))
+
+	// test GetRawKey
+	key, err := entry.GetRawKey()
+	r.Nil(err)
+	r.Equal(k, key)
+
+	// test is belong to btree
+	r.True(entry.IsBelongsToBTree())
+
+	// test Entry valid
+	r.Nil(entry.Valid())
+
+	// test isfilter
+	r.False(entry.IsFilter())
 }
