@@ -1144,3 +1144,412 @@ func TestWatchManager_Stop(t *testing.T) {
 		assert.ErrorIs(t, err, ErrWatchManagerClosed)
 	})
 }
+
+func TestWatchManager_StatsSuccessCount(t *testing.T) {
+	t.Run("success when message delivered to subscriber", func(t *testing.T) {
+		wm := startDistributor(t)
+		defer func() { _ = wm.close() }()
+
+		bucket := "test_bucket"
+		key := "test_key"
+
+		receiveChan, _ := wmSubscribe(t, wm, bucket, key)
+
+		// Send message
+		wmSendMessage(t, wm, bucket, key, []byte("value"))
+
+		// Receive message
+		wmReceiveMessage(t, receiveChan, bucket, key, 1*time.Second)
+
+		// Wait for distributor to process
+		time.Sleep(100 * time.Millisecond)
+
+		// Verify stats
+		assert.Equal(t, int64(1), wm.stats.GetSuccessCount(), "should count 1 success")
+		assert.Equal(t, int64(0), wm.stats.GetFailureCount(), "should count 0 failures")
+		assert.Equal(t, int64(1), wm.stats.GetTotalCount(), "total should be 1")
+	})
+
+	t.Run("success when no bucket watchers", func(t *testing.T) {
+		wm := startDistributor(t)
+		defer func() { _ = wm.close() }()
+
+		bucket := "test_bucket"
+		key := "test_key"
+
+		// Send message WITHOUT subscribing - no watchers for bucket
+		wmSendMessage(t, wm, bucket, key, []byte("value"))
+
+		// Wait for distributor to process
+		time.Sleep(100 * time.Millisecond)
+
+		// Should count as success (no subscribers = success per your philosophy)
+		assert.Equal(t, int64(1), wm.stats.GetSuccessCount(), "should count 1 success when no watchers")
+		assert.Equal(t, int64(0), wm.stats.GetFailureCount(), "should count 0 failures")
+	})
+
+	t.Run("success when no key watchers", func(t *testing.T) {
+		wm := startDistributor(t)
+		defer func() { _ = wm.close() }()
+
+		bucket := "test_bucket"
+		key1 := "watched_key"
+		key2 := "unwatched_key"
+
+		// Subscribe to key1 but not key2
+		_, _ = wmSubscribe(t, wm, bucket, key1)
+
+		// Send message to unwatched key2 (bucket exists, but key not watched)
+		wmSendMessage(t, wm, bucket, key2, []byte("value"))
+
+		// Wait for distributor to process
+		time.Sleep(100 * time.Millisecond)
+
+		// Should count as success
+		assert.Equal(t, int64(1), wm.stats.GetSuccessCount(), "should count 1 success when key not watched")
+		assert.Equal(t, int64(0), wm.stats.GetFailureCount(), "should count 0 failures")
+	})
+
+	t.Run("success for bucket delete message", func(t *testing.T) {
+		wm := startDistributor(t)
+		defer func() { _ = wm.close() }()
+
+		bucket := core.BucketName("test_bucket")
+		key := "test_key"
+
+		// Subscribe to bucket
+		receiveChan, _ := wmSubscribe(t, wm, bucket, key)
+
+		// Send bucket delete message
+		deleteMsg := NewMessage(bucket, "", nil, DataBucketDeleteFlag,
+			uint64(time.Now().Unix()), MessageOptions{Priority: MessagePriorityHigh})
+		err := wm.sendMessage(deleteMsg)
+		require.NoError(t, err)
+
+		// Receive delete message
+		select {
+		case msg, ok := <-receiveChan:
+			if ok {
+				assert.Equal(t, DataBucketDeleteFlag, msg.Flag)
+			}
+		case <-time.After(1 * time.Second):
+			t.Fatal("timeout waiting for delete message")
+		}
+
+		// Wait for processing
+		time.Sleep(100 * time.Millisecond)
+
+		// Should count as success
+		assert.Equal(t, int64(1), wm.stats.GetSuccessCount(), "should count bucket delete as success")
+		assert.Equal(t, int64(0), wm.stats.GetFailureCount(), "should count 0 failures")
+	})
+
+	t.Run("success when at least one subscriber receives", func(t *testing.T) {
+		wm := startDistributor(t)
+		defer func() { _ = wm.close() }()
+
+		bucket := "test_bucket"
+		key := "test_key"
+
+		// Subscribe multiple times
+		receiveChan1, _ := wmSubscribe(t, wm, bucket, key)
+		receiveChan2, _ := wmSubscribe(t, wm, bucket, key)
+
+		// Send message
+		wmSendMessage(t, wm, bucket, key, []byte("value"))
+
+		// Receive on both channels
+		wmReceiveMessage(t, receiveChan1, bucket, key, 1*time.Second)
+		wmReceiveMessage(t, receiveChan2, bucket, key, 1*time.Second)
+
+		// Wait for distributor
+		time.Sleep(100 * time.Millisecond)
+
+		// Should count as 1 success (message-level, not per-subscriber)
+		assert.Equal(t, int64(1), wm.stats.GetSuccessCount(), "should count 1 success")
+		assert.Equal(t, int64(0), wm.stats.GetFailureCount(), "should count 0 failures")
+	})
+
+	t.Run("multiple successful messages", func(t *testing.T) {
+		wm := startDistributor(t)
+		defer func() { _ = wm.close() }()
+
+		bucket := "test_bucket"
+		key := "test_key"
+		messageCount := 10
+
+		receiveChan, _ := wmSubscribe(t, wm, bucket, key)
+
+		// Send multiple messages
+		for i := 0; i < messageCount; i++ {
+			wmSendMessage(t, wm, bucket, key, []byte(fmt.Sprintf("value_%d", i)))
+		}
+
+		// Receive all messages
+		received := wmReceiveMessages(t, receiveChan, bucket, key, messageCount, 2*time.Second)
+		assert.Equal(t, messageCount, received)
+
+		// Wait for distributor
+		time.Sleep(100 * time.Millisecond)
+
+		// Should count all as success
+		assert.Equal(t, int64(messageCount), wm.stats.GetSuccessCount(), "should count all successes")
+		assert.Equal(t, int64(0), wm.stats.GetFailureCount(), "should count 0 failures")
+	})
+}
+
+func TestWatchManager_StatsFailureCount(t *testing.T) {
+	t.Run("failure when sendMessage channel full", func(t *testing.T) {
+		wm := NewWatchManager()
+		// Don't start distributor - messages will accumulate
+
+		bucket := "test_bucket"
+		key := "test_key"
+
+		// Fill the watchChan
+		for i := 0; i < watchChanBufferSize; i++ {
+			msg := NewMessage(bucket, key, []byte(fmt.Sprintf("value_%d", i)), DataSetFlag, uint64(time.Now().Unix()))
+			err := wm.sendMessage(msg)
+			require.NoError(t, err)
+		}
+
+		// Next message should fail (channel full)
+		msg := NewMessage(bucket, key, []byte("overflow"), DataSetFlag, uint64(time.Now().Unix()))
+		err := wm.sendMessage(msg)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrWatchChanCannotSend)
+
+		// Should count as failure
+		assert.Equal(t, int64(0), wm.stats.GetSuccessCount(), "should count 0 successes")
+		assert.Equal(t, int64(1), wm.stats.GetFailureCount(), "should count 1 failure")
+
+		_ = wm.close()
+	})
+
+	t.Run("failure when watch manager closed", func(t *testing.T) {
+		wm := NewWatchManager()
+
+		// Close immediately
+		wm.close()
+
+		bucket := "test_bucket"
+		key := "test_key"
+
+		// Try to send message
+		msg := NewMessage(bucket, key, []byte("value"), DataSetFlag, uint64(time.Now().Unix()))
+		err := wm.sendMessage(msg)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrWatchManagerClosed)
+
+		// Should count as failure
+		assert.Equal(t, int64(1), wm.stats.GetFailureCount(), "should count 1 failure")
+	})
+
+	t.Run("failure when all subscribers fail to receive", func(t *testing.T) {
+		wm := startDistributor(t)
+		defer func() { _ = wm.close() }()
+
+		bucket := "test_bucket"
+		key := "test_key"
+
+		// Subscribe but don't consume messages
+		receiveChan, _ := wmSubscribe(t, wm, bucket, key)
+
+		// Fill the subscriber's receiveChan (1024 buffer)
+		for i := 0; i < receiveChanBufferSize; i++ {
+			wmSendMessage(t, wm, bucket, key, []byte(fmt.Sprintf("value_%d", i)))
+		}
+
+		// Wait for processing
+		time.Sleep(200 * time.Millisecond)
+
+		// Send more messages - these will fail to deliver
+		failCount := 150 // Enough to trigger failures and force-unsubscribe
+		for i := 0; i < failCount; i++ {
+			wmSendMessage(t, wm, bucket, key, []byte(fmt.Sprintf("overflow_%d", i)))
+		}
+
+		// Wait for distributor to process and force-unsubscribe
+		time.Sleep(500 * time.Millisecond)
+
+		// Drain channel
+		wmDrainChannel(t, receiveChan, 2*time.Second)
+
+		// Should have some failures (messages that couldn't be delivered)
+		failureCount := wm.stats.GetFailureCount()
+		assert.Greater(t, failureCount, int64(0), "should have some failures")
+		t.Logf("Success: %d, Failures: %d, Total: %d",
+			wm.stats.GetSuccessCount(),
+			failureCount,
+			wm.stats.GetTotalCount())
+	})
+
+	t.Run("failure when preprocessing getBucketName fails", func(t *testing.T) {
+		wm := startDistributor(t)
+		defer func() { _ = wm.close() }()
+
+		// Create an entry with invalid bucket ID
+		entry := &core.Entry{
+			Key:   []byte("test_key"),
+			Value: []byte("test_value"),
+			Meta: &core.MetaData{
+				BucketId:  999999, // Non-existent bucket ID
+				KeySize:   8,
+				ValueSize: 10,
+			},
+		}
+
+		// getBucketName function that fails for this ID
+		getBucketName := func(bucketId core.BucketId) (core.BucketName, error) {
+			if bucketId == 999999 {
+				return "", fmt.Errorf("bucket not found")
+			}
+			return "test_bucket", nil
+		}
+
+		// Call sendUpdatedEntries with failing entry
+		err := wm.sendUpdatedEntries([]*core.Entry{entry}, nil, getBucketName)
+		require.NoError(t, err) // Function returns nil, but counts failure internally
+
+		// Wait for processing
+		time.Sleep(100 * time.Millisecond)
+
+		// Should count as failure
+		assert.Equal(t, int64(1), wm.stats.GetFailureCount(), "should count preprocessing failure")
+		assert.Equal(t, int64(0), wm.stats.GetSuccessCount(), "should count 0 successes")
+	})
+
+	t.Run("failure when collector drops batch", func(t *testing.T) {
+		// Create watch manager with small distributeChan buffer
+		oldDistributeChanSize := distributeChanBufferSize
+		distributeChanBufferSize = 2
+		defer func() { distributeChanBufferSize = oldDistributeChanSize }()
+
+		wm := NewWatchManager()
+
+		// Start only collector (not distributor) so distributeChan fills up
+		go wm.runCollector()
+		time.Sleep(50 * time.Millisecond)
+
+		bucket := "test_bucket"
+		key := "test_key"
+
+		// Send enough messages to fill watchChan and cause collector to try sending batches
+		// The distributeChan will fill up and cause drops
+		messagesToSend := maxBatchSize * 5
+		for i := 0; i < messagesToSend; i++ {
+			msg := NewMessage(bucket, key, []byte(fmt.Sprintf("value_%d", i)), DataSetFlag, uint64(time.Now().Unix()))
+			_ = wm.sendMessage(msg) // Some will succeed, some will fail
+		}
+
+		// Wait for collector to process and drop batches
+		time.Sleep(500 * time.Millisecond)
+
+		_ = wm.close()
+
+		// Should have failures from dropped batches
+		failureCount := wm.stats.GetFailureCount()
+		assert.Greater(t, failureCount, int64(0), "should have failures from dropped batches")
+		t.Logf("Failures from collector drops: %d", failureCount)
+	})
+}
+
+func TestWatchManager_StatsMixedScenarios(t *testing.T) {
+	t.Run("mixed success and failure", func(t *testing.T) {
+		wm := startDistributor(t)
+		defer func() { _ = wm.close() }()
+
+		bucket := "test_bucket"
+		key1 := "watched_key"
+		key2 := "unwatched_key"
+
+		// Subscribe to key1 only
+		receiveChan, _ := wmSubscribe(t, wm, bucket, key1)
+
+		// Send to watched key (success)
+		wmSendMessage(t, wm, bucket, key1, []byte("value1"))
+
+		// Send to unwatched key (success - no subscribers)
+		wmSendMessage(t, wm, bucket, key2, []byte("value2"))
+
+		// Receive from watched key
+		wmReceiveMessage(t, receiveChan, bucket, key1, 1*time.Second)
+
+		// Wait for processing
+		time.Sleep(100 * time.Millisecond)
+
+		// Both should be successes
+		assert.Equal(t, int64(2), wm.stats.GetSuccessCount(), "should count 2 successes")
+		assert.Equal(t, int64(0), wm.stats.GetFailureCount(), "should count 0 failures")
+		assert.Equal(t, int64(2), wm.stats.GetTotalCount(), "total should be 2")
+	})
+
+	t.Run("concurrent messages track correctly", func(t *testing.T) {
+		wm := startDistributor(t)
+		defer func() { _ = wm.close() }()
+
+		bucket := "test_bucket"
+		numKeys := 10
+		messagesPerKey := 10
+
+		wg := sync.WaitGroup{}
+
+		// Start multiple subscribers and senders
+		for i := 0; i < numKeys; i++ {
+			key := fmt.Sprintf("key_%d", i)
+			receiveChan, _ := wmSubscribe(t, wm, bucket, key)
+
+			// Start receiver
+			wg.Add(1)
+			go func(ch <-chan *Message, k string) {
+				defer wg.Done()
+				wmReceiveMessages(t, ch, bucket, k, messagesPerKey, 5*time.Second)
+			}(receiveChan, key)
+
+			// Start sender
+			wg.Add(1)
+			go func(k string) {
+				defer wg.Done()
+				wmSendMessages(t, wm, bucket, k, messagesPerKey)
+			}(key)
+		}
+
+		wg.Wait()
+
+		// Wait for distributor
+		time.Sleep(200 * time.Millisecond)
+
+		expectedTotal := numKeys * messagesPerKey
+		assert.Equal(t, int64(expectedTotal), wm.stats.GetSuccessCount(), "should count all successes")
+		assert.Equal(t, int64(0), wm.stats.GetFailureCount(), "should count 0 failures")
+		assert.Equal(t, int64(expectedTotal), wm.stats.GetTotalCount())
+	})
+
+	t.Run("stats persist across operations", func(t *testing.T) {
+		wm := startDistributor(t)
+		defer func() { _ = wm.close() }()
+
+		bucket := "test_bucket"
+		key := "test_key"
+
+		// First batch of messages
+		receiveChan1, id1 := wmSubscribe(t, wm, bucket, key)
+		wmSendMessages(t, wm, bucket, key, 5)
+		wmReceiveMessages(t, receiveChan1, bucket, key, 5, 2*time.Second)
+		time.Sleep(100 * time.Millisecond)
+
+		firstSuccess := wm.stats.GetSuccessCount()
+		assert.Equal(t, int64(5), firstSuccess)
+
+		// Unsubscribe
+		wmUnsubscribe(t, wm, bucket, key, id1)
+
+		// Second batch - no subscribers (still counts as success)
+		wmSendMessages(t, wm, bucket, key, 3)
+		time.Sleep(100 * time.Millisecond)
+
+		// Stats should accumulate
+		assert.Equal(t, int64(8), wm.stats.GetSuccessCount(), "stats should accumulate")
+		assert.Equal(t, int64(8), wm.stats.GetTotalCount())
+	})
+}
