@@ -18,7 +18,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"log"
 	"strings"
 	"sync/atomic"
 
@@ -876,7 +875,7 @@ func (tx *Tx) sendUpdatedEntries(pendingWriteList []*core.Entry, deletedBuckets 
 	})
 
 	if err != nil {
-		log.Println("send updated entries error: ", err)
+		// log.Println("send updated entries error: ", err)
 	}
 }
 
