@@ -73,7 +73,8 @@ func Test_EntryMostFunctions(t *testing.T) {
 				WithDs(core.DataStructureBTree).
 				WithBucketId(bucketId).
 				WithKeySize(3).
-				WithValueSize(5),
+				WithValueSize(5).
+				WithFlag(core.DataBTreeBucketDeleteFlag),
 		)
 
 	r.Equal(entry.Key, k)
