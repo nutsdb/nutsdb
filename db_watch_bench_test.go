@@ -88,27 +88,26 @@ func BenchmarkWatcherManager(b *testing.B) {
 		messageSize     int  // message size in bytes
 	}{
 		// Baseline
-		// {"single_key_single_watcher_low_freq", 1, 1, 1, true, 0},
-		// {"medium_scale_balanced", 10, 10, 5, true, 0},
+		{"single_key_single_watcher_low_freq", 1, 1, 1, true, 0},
+		{"medium_scale_balanced", 10, 10, 5, true, 0},
 
-		// // Throughput
-		// {"single_key_single_watcher_high_freq", 1, 1, 10, true, 0},
-		// {"single_key_extreme_freq", 1, 1, 1000, true, 0},
-		// {"multi_key_very_high_freq", 10, 5, 100, true, 0},
+		// Throughput
+		{"single_key_single_watcher_high_freq", 1, 1, 10, true, 0},
+		{"single_key_extreme_freq", 1, 1, 1000, true, 0},
+		{"multi_key_very_high_freq", 10, 5, 100, true, 0},
 
-		// // Scalability
+		// Scalability
 		{"single_key_multi_watcher_low_freq", 1, 50, 1, true, 0}, // Fan-Out
-		{"hot_keys", 5, 100, 10, true, 0},                        // Asymmetric
-		{"multi_key_multi_watcher_high_freq", 50, 50, 10, true, 0},
+		{"hot_keys", 5, 50, 10, true, 0},                         // Asymmetric
+		{"multi_key_multi_watcher", 50, 10, 1, true, 0},
 
-		// // DataVolume
-		// {"large_messages_1kb", 1, 1, 10, true, 1024},
-		// {"large_messages_10kb", 1, 1, 10, true, 10240},
+		// DataVolume
+		{"large_messages_1kb", 1, 1, 10, true, 1024},
+		{"large_messages_10kb", 1, 1, 10, true, 10240},
 
-		// // Real World Scenarios
-		// {"stress_default_buffers", 10, 10, 10, false, 0}, // Small buffers
-		// {"callback_light_work", 10, 10, 10, false, 0},    // Slow consumer
-		// {"no_subscribers_baseline", 10, 0, 10, false, 0}, // Filtering cost
+		// Real World Scenarios
+		{"stress_default_buffers", 10, 10, 10, false, 0}, // Small buffers
+		{"no_subscribers_baseline", 10, 0, 10, false, 0}, // Filtering cost
 	}
 
 	for _, s := range scenarios {
@@ -136,6 +135,8 @@ func BenchmarkWatcherManager(b *testing.B) {
 				for j := 0; j < s.numWatchers; j++ {
 					watcher, err := db.Watch(ctx, bucketName, keys[i], func(msg *Message) error {
 						return nil
+					}, WatchOptions{
+						CallbackTimeout: 60 * time.Second,
 					})
 					if err != nil {
 						b.Fatalf("Failed to watch: %v", err)
@@ -164,7 +165,7 @@ func BenchmarkWatcherManager(b *testing.B) {
 			}
 
 			go func() {
-				ticker := time.NewTicker(10 * time.Millisecond)
+				ticker := time.NewTicker(100 * time.Millisecond)
 				for {
 					select {
 					case <-ticker.C:
@@ -194,13 +195,6 @@ func BenchmarkWatcherManager(b *testing.B) {
 				}
 			}
 
-			// select {
-			// case <-done:
-			// 	break
-			// case <-time.After(10 * time.Second):
-			// 	totalReceived := db.watchMgr.stats.GetTotalCount()
-			// 	b.Fatalf("Timeout waiting for benchmark to finish. Expected %d total, got %d", expectedTotal, totalReceived)
-			// }
 			<-done
 
 			// wait for process all messages
