@@ -100,6 +100,42 @@ func (opts *WatchOptions) WithCallbackTimeout(timeout time.Duration) {
 	opts.CallbackTimeout = timeout
 }
 
+// Currently, use stats to track the success and failure of the watch manager
+// for testing and benchmark
+type WatcherManagerStat struct {
+	successCnt atomic.Int64
+	failureCnt atomic.Int64
+	totalCnt   atomic.Int64
+}
+
+func NewWatcherManagerStat() *WatcherManagerStat {
+	return &WatcherManagerStat{
+		successCnt: atomic.Int64{},
+		failureCnt: atomic.Int64{},
+		totalCnt:   atomic.Int64{},
+	}
+}
+
+func (ws *WatcherManagerStat) AddSuccess() {
+	ws.successCnt.Add(1)
+	ws.totalCnt.Add(1)
+}
+
+func (ws *WatcherManagerStat) AddFailure() {
+	ws.failureCnt.Add(1)
+	ws.totalCnt.Add(1)
+}
+
+func (ws *WatcherManagerStat) Reset() {
+	ws.successCnt.Store(0)
+	ws.failureCnt.Store(0)
+	ws.totalCnt.Store(0)
+}
+
+func (ws *WatcherManagerStat) GetSuccessCount() int64 { return ws.successCnt.Load() }
+func (ws *WatcherManagerStat) GetFailureCount() int64 { return ws.failureCnt.Load() }
+func (ws *WatcherManagerStat) GetTotalCount() int64   { return ws.totalCnt.Load() }
+
 type subscriber struct {
 	id           uint64
 	bucketName   core.BucketName
@@ -126,11 +162,14 @@ type watchManager struct {
 	muClosed  sync.RWMutex
 	muStarted sync.RWMutex
 	mu        sync.Mutex
+	stats     *WatcherManagerStat
 }
 
 func NewWatchManager() *watchManager {
 	ctx := context.Background()
 	workerCtx, workerCancel := context.WithCancel(ctx)
+	stats := NewWatcherManagerStat()
+
 	return &watchManager{
 		lookup:         make(bucketToSubscribers),
 		watchChan:      make(chan *Message, watchChanBufferSize),
@@ -142,6 +181,7 @@ func NewWatchManager() *watchManager {
 		idGenerator:    &IDGenerator{currentMaxId: 0},
 		victimMaps:     make(victimBucketToSubscribers),
 		victimChan:     make(victimBucketChan, victimBucketBufferSize),
+		stats:          stats,
 	}
 }
 
@@ -152,7 +192,16 @@ func (wm *watchManager) Name() string {
 
 // send a message to the watch manager
 func (wm *watchManager) sendMessage(message *Message) error {
+	isError := false
+
+	defer func() {
+		if isError {
+			wm.stats.AddFailure()
+		}
+	}()
+
 	if wm.isClosed() {
+		isError = true
 		return ErrWatchManagerClosed
 	}
 
@@ -161,7 +210,9 @@ func (wm *watchManager) sendMessage(message *Message) error {
 		select {
 		case wm.watchChan <- message:
 			log.Printf("[watch_manager] Sent high priority message %s/%s to watch channel\n", message.BucketName, message.Key)
+			return nil
 		case <-wm.workerCtx.Done():
+			isError = true
 			return ErrWatchManagerClosed
 		}
 	}
@@ -170,8 +221,10 @@ func (wm *watchManager) sendMessage(message *Message) error {
 	case wm.watchChan <- message:
 		return nil
 	case <-wm.workerCtx.Done():
+		isError = true
 		return ErrWatchManagerClosed
 	default:
+		isError = true
 		return ErrWatchChanCannotSend
 	}
 }
@@ -186,11 +239,13 @@ func (wm *watchManager) sendUpdatedEntries(entries []*core.Entry, deletedbuckets
 		for _, entry := range entries {
 			bucketName, err := getBucketName(entry.Meta.BucketId)
 			if err != nil {
+				wm.stats.AddFailure()
 				continue
 			}
 
 			rawKey, err := entry.GetRawKey()
 			if err != nil {
+				wm.stats.AddFailure()
 				log.Printf("get raw key %+v error: %+v", entry.Key, err)
 				continue
 			}
@@ -247,6 +302,13 @@ func (wm *watchManager) startDistributor() {
 func (wm *watchManager) runCollector() {
 	batches := make([]*Message, 0, maxBatchSize)
 
+	// Used for counting of batch faild to collect
+	incrementBatchFailure := func(failedBatch []*Message) {
+		for range failedBatch {
+			wm.stats.AddFailure()
+		}
+	}
+
 	defer func() {
 		// drain and send final batch before exiting
 		if len(batches) > 0 {
@@ -254,6 +316,7 @@ func (wm *watchManager) runCollector() {
 			case wm.distributeChan <- batches:
 			default:
 				log.Printf("[watch_manager] Dropping final batch of %d messages\n", len(batches))
+				incrementBatchFailure(batches)
 			}
 		}
 
@@ -261,6 +324,7 @@ func (wm *watchManager) runCollector() {
 		close(wm.watchChan)
 	}()
 
+	// function send the batch to the distributor
 	sendBatchToDistributor := func(batch []*Message) {
 		sendBatch := make([]*Message, len(batch))
 		copy(sendBatch, batch)
@@ -270,6 +334,7 @@ func (wm *watchManager) runCollector() {
 		case <-wm.workerCtx.Done():
 		default:
 			log.Printf("[watch_manager] Distribution channel full, dropping batch of %d messages\n", len(sendBatch))
+			incrementBatchFailure(sendBatch)
 		}
 	}
 
@@ -412,20 +477,25 @@ func (wm *watchManager) distributeAllMessages(messages []*Message) error {
 	for _, message := range messages {
 		bucketMap, ok := wm.lookup[message.BucketName]
 		if !ok {
+			wm.stats.AddSuccess()
 			continue
 		}
 
 		if message.Flag == DataBucketDeleteFlag {
 			// delete the bucket from the lookup
-			wm.deleteBucket(*message)
+			wm.deleteBucket(message.BucketName)
+			wm.stats.AddSuccess()
 			continue
 		}
 
 		key := message.Key
 		subscriberMap, ok := bucketMap[key]
 		if !ok {
+			wm.stats.AddSuccess()
 			continue
 		}
+
+		isSuccess := false
 
 		// avoid blocking the distributor, all messages blocked will be dropped
 		for _, subscriber := range subscriberMap {
@@ -436,15 +506,25 @@ func (wm *watchManager) distributeAllMessages(messages []*Message) error {
 
 			select {
 			case subscriber.receiveChan <- message:
+				isSuccess = true
 				subscriber.deadMessages = 0
 			default:
-				// when the messages are not pushed to dropChan, we consider it as dead
+				// when the messages are not pushed to receiveChan, we consider it as dead
 				subscriber.deadMessages++
 				if subscriber.deadMessages >= deadMessageThreshold {
 					dropMessage(message, subscriber)
 				}
 			}
 		}
+
+		// currently, i just view the message as success if there is at least one subscriber that receives the message
+		// or it fails, if all subscribers fail to receive the message
+		if !isSuccess {
+			wm.stats.AddFailure()
+		} else {
+			wm.stats.AddSuccess()
+		}
+
 	}
 
 	return nil
@@ -575,9 +655,7 @@ func (wm *watchManager) isClosed() bool {
 * and notify the subscribers that the keys are deleted due to deleted buckets
 * @param deletedbuckets: the buckets to be deleted
  */
-func (wm *watchManager) deleteBucket(deletingMessageBucket Message) {
-	bucketName := deletingMessageBucket.BucketName
-
+func (wm *watchManager) deleteBucket(bucketName core.BucketName) {
 	if _, ok := wm.lookup[bucketName]; !ok {
 		return
 	}

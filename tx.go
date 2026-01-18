@@ -898,7 +898,6 @@ func (tx *Tx) getDeletedBuckets() (deletedBuckets map[core.BucketName]bool) {
 			if _, ok := deletedBuckets[name]; !ok && bucket.Meta.Op == core.BucketDeleteOperation && isAllDsDeleted {
 				deletedBuckets[name] = true
 			}
-
 		}
 	}
 
