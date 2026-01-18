@@ -18,8 +18,8 @@ const (
 func setupBenchmarkDBWatch(b *testing.B, dir string, incrBufferSizes bool) *DB {
 	opts := DefaultOptions
 	opts.Dir = dir
-	opts.SegmentSize = 128 * 1024 * 1024 // 128MB
-	opts.SyncEnable = false              // Disable sync for better performance
+	opts.SegmentSize = 128 * MB
+	opts.SyncEnable = false // Disable sync for better performance
 	opts.EnableWatch = true
 
 	// modify the buffer size for benchmark
