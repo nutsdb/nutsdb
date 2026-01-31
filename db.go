@@ -20,7 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -91,7 +90,8 @@ func (sm *SnowflakeManager) GetNode() *snowflake.Node {
 		var err error
 		sm.node, err = snowflake.NewNode(sm.nodeNum)
 		if err != nil {
-			log.Fatalf("Failed to initialize snowflake node with nodeNum=%d: %v", sm.nodeNum, err)
+			utils.GetLogger().Printf("Failed to initialize snowflake node with nodeNum=%d: %v", sm.nodeNum, err)
+			panic(err)
 		}
 	})
 	return sm.node
@@ -281,7 +281,7 @@ func (db *DB) release() error {
 	// Close TTL service first to stop the scanner goroutine
 	if db.ttlService != nil {
 		if err := db.ttlService.Stop(5 * time.Second); err != nil {
-			log.Printf("TTLService stop error: %v", err)
+			utils.GetLogger().Printf("TTLService stop error: %v", err)
 		}
 	}
 
@@ -307,7 +307,7 @@ func (db *DB) release() error {
 
 	if db.watchMgr != nil {
 		if err := db.watchMgr.close(); err != nil {
-			log.Printf("watch manager closed already")
+			utils.GetLogger().Printf("watch manager closed already")
 		}
 	}
 
@@ -428,7 +428,8 @@ func (db *DB) doWrites() {
 	pendingCh := make(chan struct{}, 1)
 	writeRequests := func(reqs []*request) {
 		if err := db.writeRequests(reqs); err != nil {
-			log.Fatal("writeRequests fail, err=", err)
+			utils.GetLogger().Printf("writeRequests fail, err=%v", err)
+			panic(err)
 		}
 		<-pendingCh
 	}
@@ -539,7 +540,7 @@ func (db *DB) parseDataFiles(dataFileIds []int64) (err error) {
 	parseDataInTx := func() error {
 		for _, entry := range dataInTx.Es {
 			// if this bucket is not existed in bucket manager right now
-			// its because it already deleted in the feature WAL log.
+			// its because it already deleted in the feature WAL utils.GetLogger().
 			// so we can just ignore here.
 			bucketId := entry.Meta.BucketId
 			if _, err := db.bucketMgr.GetBucketById(bucketId); errors.Is(err, ErrBucketNotExist) {
@@ -664,7 +665,7 @@ func (db *DB) loadHintFile(fid int64) (bool, error) {
 	defer func() {
 		if err := reader.Close(); err != nil {
 			// Log error but don't fail the operation
-			log.Printf("Warning: failed to close hint file reader: %v", err)
+			utils.GetLogger().Printf("Warning: failed to close hint file reader: %v", err)
 		}
 	}()
 
