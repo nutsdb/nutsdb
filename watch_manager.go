@@ -4,12 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/nutsdb/nutsdb/internal/core"
+	"github.com/nutsdb/nutsdb/internal/utils"
 )
 
 // errors
@@ -160,7 +160,7 @@ func (wm *watchManager) sendMessage(message *Message) error {
 	if message.priority == MessagePriorityHigh {
 		select {
 		case wm.watchChan <- message:
-			log.Printf("[watch_manager] Sent high priority message %s/%s to watch channel\n", message.BucketName, message.Key)
+			utils.GetLogger().Printf("[watch_manager] Sent high priority message %s/%s to watch channel\n", message.BucketName, message.Key)
 		case <-wm.workerCtx.Done():
 			return ErrWatchManagerClosed
 		}
@@ -191,7 +191,7 @@ func (wm *watchManager) sendUpdatedEntries(entries []*core.Entry, deletedbuckets
 
 			rawKey, err := entry.GetRawKey()
 			if err != nil {
-				log.Printf("get raw key %+v error: %+v", entry.Key, err)
+				utils.GetLogger().Printf("get raw key %+v error: %+v", entry.Key, err)
 				continue
 			}
 
@@ -253,7 +253,7 @@ func (wm *watchManager) runCollector() {
 			select {
 			case wm.distributeChan <- batches:
 			default:
-				log.Printf("[watch_manager] Dropping final batch of %d messages\n", len(batches))
+				utils.GetLogger().Printf("[watch_manager] Dropping final batch of %d messages\n", len(batches))
 			}
 		}
 
@@ -269,7 +269,7 @@ func (wm *watchManager) runCollector() {
 		case wm.distributeChan <- sendBatch:
 		case <-wm.workerCtx.Done():
 		default:
-			log.Printf("[watch_manager] Distribution channel full, dropping batch of %d messages\n", len(sendBatch))
+			utils.GetLogger().Printf("[watch_manager] Distribution channel full, dropping batch of %d messages\n", len(sendBatch))
 		}
 	}
 
@@ -391,7 +391,7 @@ func (wm *watchManager) distributeAllMessages(messages []*Message) error {
 	}
 
 	dropMessage := func(message *Message, subscriber *subscriber) {
-		log.Printf("[watch_manager] Force-unsubscribing slow subscriber with id %d for message %s/%s\n",
+		utils.GetLogger().Printf("[watch_manager] Force-unsubscribing slow subscriber with id %d for message %s/%s\n",
 			subscriber.id, message.BucketName, message.Key)
 
 		if _, err := wm.findSubscriber(message.BucketName, message.Key, subscriber.id); err == nil {
@@ -430,7 +430,7 @@ func (wm *watchManager) distributeAllMessages(messages []*Message) error {
 		// avoid blocking the distributor, all messages blocked will be dropped
 		for _, subscriber := range subscriberMap {
 			if !subscriber.active.Load() {
-				log.Printf("[watch_manager] Skipping inactive subscriber with id %d for message %s/%s\n", subscriber.id, message.BucketName, message.Key)
+				utils.GetLogger().Printf("[watch_manager] Skipping inactive subscriber with id %d for message %s/%s\n", subscriber.id, message.BucketName, message.Key)
 				continue
 			}
 
@@ -588,14 +588,14 @@ func (wm *watchManager) deleteBucket(deletingMessageBucket Message) {
 	delete(wm.lookup, bucketName)
 
 	// Log before sending to avoid race condition with victimCollector
-	log.Printf("[watch_manager] Moving bucket %s to victim channel (identifier: %d)\n", bucketName, identifierId)
+	utils.GetLogger().Printf("[watch_manager] Moving bucket %s to victim channel (identifier: %d)\n", bucketName, identifierId)
 
 	// wait for the victim channel to be available
 	timeOut := time.After(10 * time.Second)
 	for {
 		select {
 		case <-timeOut:
-			log.Printf("[watch_manager] Timeout sending victim bucket %s to channel\n", bucketName)
+			utils.GetLogger().Printf("[watch_manager] Timeout sending victim bucket %s to channel\n", bucketName)
 			return
 		case wm.victimChan <- victimBucketToSubscribers:
 			// Successfully sent - victimCollector now owns the map, don't access it anymore
@@ -631,7 +631,7 @@ func (wm *watchManager) Start(ctx context.Context) error {
 	// wait for distributor goroutine to start before returning
 	select {
 	case <-ready:
-		log.Printf("[watch_manager] Watch manager distributor started\n")
+		utils.GetLogger().Printf("[watch_manager] Watch manager distributor started\n")
 		return nil
 	case <-time.After(5 * time.Second):
 		return fmt.Errorf("timeout waiting for watch manager distributor to start")
