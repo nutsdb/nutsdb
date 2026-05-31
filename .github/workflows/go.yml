@@ -5,9 +5,9 @@ name: Build and Coverage
 
 on:
   push:
-    branches: [ "master" ]
+    branches: [ "master", "nutsdb-next" ]
   pull_request:
-    branches: [ "master" ]
+    branches: [ "master", "nutsdb-next" ]
 
 jobs:
 
