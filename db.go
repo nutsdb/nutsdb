@@ -73,6 +73,7 @@ type (
 		hintKeyAndRAMIdxModeLru *utils.LRUCache // lru cache for HintKeyAndRAMIdxMode
 		snowflakeMgr            *SnowflakeManager
 		watchMgr                *watchManager
+		dataFileManager         DataFileManager
 	}
 )
 
@@ -108,6 +109,8 @@ func open(opt Options) (*DB, error) {
 		hintKeyAndRAMIdxModeLru: utils.NewLruCache(opt.HintKeyAndRAMIdxCacheSize),
 		snowflakeMgr:            NewSnowflakeManager(opt.NodeNum),
 	}
+
+	db.dataFileManager = newDataFileManager(db.fm)
 
 	db.ttlService = ttl.NewService(ttl.NewRealClock(), opt.TTLConfig, db.handleExpiredKeys)
 
@@ -335,7 +338,7 @@ func (db *DB) getValueByRecord(record *core.Record) ([]byte, error) {
 	}
 
 	dirPath := getDataPath(record.FileID, db.opt.Dir)
-	df, err := db.fm.GetDataFileReadOnly(dirPath, db.opt.SegmentSize)
+	df, err := db.dataFileManager.GetDataFileReadOnly(dirPath, db.opt.SegmentSize)
 	if err != nil {
 		return nil, err
 	}
@@ -347,7 +350,11 @@ func (db *DB) getValueByRecord(record *core.Record) ([]byte, error) {
 	}(df.rwManager)
 
 	payloadSize := int64(len(record.Key)) + int64(record.ValueSize)
-	item, err := df.ReadEntry(int(record.DataPos), payloadSize)
+	buf, err := df.ReadData(int(record.DataPos), payloadSize)
+	if err != nil {
+		return nil, err
+	}
+	item, err := core.DecodeEntryWithError(buf, payloadSize, err)
 	if err != nil {
 		return nil, fmt.Errorf("read err. pos %d, key %s, err %s", record.DataPos, record.Key, err)
 	}
@@ -493,7 +500,7 @@ func (db *DB) doWrites() {
 // setActiveFile sets the ActiveFile (DataFile object).
 func (db *DB) setActiveFile() (err error) {
 	activeFilePath := getDataPath(db.MaxFileID, db.opt.Dir)
-	db.ActiveFile, err = db.fm.GetDataFile(activeFilePath, db.opt.SegmentSize)
+	db.ActiveFile, err = db.dataFileManager.GetDataFile(activeFilePath, db.opt.SegmentSize)
 	if err != nil {
 		return
 	}

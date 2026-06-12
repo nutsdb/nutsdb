@@ -15,20 +15,8 @@
 package nutsdb
 
 import (
-	"errors"
-
 	"github.com/nutsdb/nutsdb/internal/core"
 	"github.com/nutsdb/nutsdb/internal/fileio"
-)
-
-var (
-	// ErrCrc is returned when crc is error
-	ErrCrc = errors.New("crc error")
-
-	// ErrCapacity is returned when capacity is error.
-	ErrCapacity = errors.New("capacity error")
-
-	ErrEntryZero = errors.New("entry is zero ")
 )
 
 const (
@@ -54,48 +42,22 @@ func NewDataFile(path string, rwManager fileio.RWManager) *DataFile {
 	return dataFile
 }
 
-// ReadEntry returns entry at the given off(offset).
+// ReadData returns data at the given off(offset).
 // payloadSize = bucketSize + keySize + valueSize
-func (df *DataFile) ReadEntry(off int, payloadSize int64) (e *core.Entry, err error) {
+func (df *DataFile) ReadData(off int, payloadSize int64) (buf []byte, err error) {
 	size := core.MaxEntryHeaderSize + payloadSize
 	// Since core.MaxEntryHeaderSize + payloadSize may be larger than the actual entry size, it needs to be calculated
 	if int64(off)+size > df.rwManager.Size() {
 		size = df.rwManager.Size() - int64(off)
 	}
-	buf := make([]byte, size)
+	buf = make([]byte, size)
 
-	if _, err := df.rwManager.ReadAt(buf, int64(off)); err != nil {
-		return nil, err
-	}
-
-	e = new(core.Entry)
-	headerSize, err := e.ParseMeta(buf)
+	_, err = df.rwManager.ReadAt(buf, int64(off))
 	if err != nil {
 		return nil, err
 	}
 
-	// Remove the content after the Header
-	buf = buf[:int(headerSize+payloadSize)]
-
-	if e.IsZero() {
-		return nil, ErrEntryZero
-	}
-
-	if err := e.CheckPayloadSize(payloadSize); err != nil {
-		return nil, err
-	}
-
-	err = e.ParsePayload(buf[headerSize:])
-	if err != nil {
-		return nil, err
-	}
-
-	crc := e.GetCrc(buf[:headerSize])
-	if crc != e.Meta.Crc {
-		return nil, ErrCrc
-	}
-
-	return
+	return buf, nil
 }
 
 // WriteAt copies data to mapped region from the b slice starting at
@@ -122,4 +84,58 @@ func (df *DataFile) Close() (err error) {
 
 func (df *DataFile) Release() (err error) {
 	return df.rwManager.Release()
+}
+
+// DataFileManager is an interface that provides methods to manage data files.
+type DataFileManager interface {
+	// GetDataFile will return a DataFile Object for read-write operations
+	GetDataFile(path string, capacity int64) (datafile *DataFile, err error)
+
+	// GetDataFileReadOnly will return a DataFile Object for read-only operations
+	// This method skips file truncation to improve read performance
+	GetDataFileReadOnly(path string, capacity int64) (datafile *DataFile, err error)
+
+	// GetDataFileByID will return a DataFile Object by file ID
+	GetDataFileByID(dir string, fileID int64, capacity int64) (*DataFile, error)
+
+	Close() error
+}
+
+type dataFileManagerImpl struct {
+	fm *FileManager
+}
+
+func newDataFileManager(fm *FileManager) DataFileManager {
+	return &dataFileManagerImpl{
+		fm: fm,
+	}
+}
+
+func (dfm *dataFileManagerImpl) GetDataFile(path string, capacity int64) (datafile *DataFile, err error) {
+	rwmanager, err := dfm.fm.GetRWManager(path, capacity, dfm.fm.segmentSize, false)
+	if err != nil {
+		return nil, err
+	}
+	return NewDataFile(path, rwmanager), nil
+}
+
+func (dfm *dataFileManagerImpl) GetDataFileReadOnly(path string, capacity int64) (datafile *DataFile, err error) {
+	rwmanager, err := dfm.fm.GetRWManager(path, capacity, dfm.fm.segmentSize, true)
+	if err != nil {
+		return nil, err
+	}
+	return NewDataFile(path, rwmanager), nil
+}
+
+func (dfm *dataFileManagerImpl) GetDataFileByID(dir string, fileID int64, capacity int64) (*DataFile, error) {
+	path := getDataPath(fileID, dir)
+	rwmanager, err := dfm.fm.GetRWManager(path, capacity, dfm.fm.segmentSize, false)
+	if err != nil {
+		return nil, err
+	}
+	return NewDataFile(path, rwmanager), nil
+}
+
+func (dfm *dataFileManagerImpl) Close() error {
+	return dfm.fm.Close()
 }

@@ -33,6 +33,14 @@ var (
 	ErrKeyEmpty                  = errors.New("key cannot be empty")
 	ErrInvalidKey                = errors.New("invalid key")
 	ErrDataStructureNotSupported = errors.New("this data structure is not supported for now")
+
+	// ErrCrc is returned when crc is error
+	ErrCrc = errors.New("crc error")
+
+	// ErrCapacity is returned when capacity is error.
+	ErrCapacity = errors.New("capacity error")
+
+	ErrEntryZero = errors.New("entry is zero")
 )
 
 const (
@@ -220,6 +228,48 @@ func (e *Entry) Valid() error {
 		return ErrDataSizeExceed
 	}
 	return nil
+}
+
+func DecodeEntry(buf []byte, payloadSize int64) (*Entry, error) {
+	e := NewEntry()
+	headerSize, err := e.ParseMeta(buf)
+	if err != nil {
+		return nil, err
+	}
+
+	// Remove the content after the Header
+	buf = buf[:int(headerSize+payloadSize)]
+
+	if e.IsZero() {
+		return nil, ErrEntryZero
+	}
+
+	if err := e.CheckPayloadSize(payloadSize); err != nil {
+		return nil, err
+	}
+
+	err = e.ParsePayload(buf[headerSize:])
+	if err != nil {
+		return nil, err
+	}
+
+	crc := e.GetCrc(buf[:headerSize])
+	if crc != e.Meta.Crc {
+		return nil, ErrCrc
+	}
+
+	return e, nil
+}
+
+func DecodeEntryWithError(
+	buf []byte,
+	payloadSize int64,
+	err error,
+) (*Entry, error) {
+	if err != nil {
+		return nil, err
+	}
+	return DecodeEntry(buf, payloadSize)
 }
 
 // NewEntry new Entry Object
