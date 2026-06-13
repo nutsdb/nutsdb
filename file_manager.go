@@ -1,10 +1,6 @@
 package nutsdb
 
-import (
-	"errors"
-
-	"github.com/nutsdb/nutsdb/internal/fileio"
-)
+import "github.com/nutsdb/nutsdb/internal/fileio"
 
 // RWMode represents the read and write mode.
 type RWMode int
@@ -34,6 +30,47 @@ func NewFileManager(rwMode RWMode, maxFdNums int, cleanThreshold float64, segmen
 	return fm
 }
 
+// GetDataFile will return a DataFile Object
+func (fm *FileManager) GetDataFile(path string, capacity int64) (datafile *DataFile, err error) {
+	return fm.getDataFileWithMode(path, capacity, false)
+}
+
+// GetDataFileReadOnly will return a DataFile Object for read-only operations
+// This method skips file truncation to improve read performance
+func (fm *FileManager) GetDataFileReadOnly(path string, capacity int64) (datafile *DataFile, err error) {
+	return fm.getDataFileWithMode(path, capacity, true)
+}
+
+// getDataFileWithMode will return a DataFile Object with specified read-only mode
+func (fm *FileManager) getDataFileWithMode(path string, capacity int64, readOnly bool) (datafile *DataFile, err error) {
+	if capacity <= 0 {
+		return nil, ErrCapacity
+	}
+
+	var rwManager fileio.RWManager
+
+	if fm.rwMode == FileIO {
+		rwManager, err = fm.GetFileRWManager(path, capacity, fm.segmentSize, readOnly)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if fm.rwMode == MMap {
+		rwManager, err = fm.GetMMapRWManager(path, capacity, fm.segmentSize, readOnly)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return NewDataFile(path, rwManager), nil
+}
+
+func (fm *FileManager) GetDataFileByID(dir string, fileID int64, capacity int64) (*DataFile, error) {
+	path := getDataPath(fileID, dir)
+	return fm.GetDataFile(path, capacity)
+}
+
 // GetFileRWManager will return a FileIORWManager Object
 func (fm *FileManager) GetFileRWManager(path string, capacity int64, segmentSize int64, readOnly bool) (*fileio.FileIORWManager, error) {
 	fd, err := fm.fdm.GetFd(path)
@@ -61,24 +98,6 @@ func (fm *FileManager) GetMMapRWManager(path string, capacity int64, segmentSize
 	}
 
 	return fileio.GetMMapRWManager(fd, path, fm.fdm, segmentSize), nil
-}
-
-func (fm *FileManager) GetRWManager(
-	path string,
-	capacity int64,
-	segmentSize int64,
-	readOnly bool,
-) (fileio.RWManager, error) {
-	if capacity <= 0 {
-		return nil, ErrCapacity
-	}
-	if fm.rwMode == FileIO {
-		return fm.GetFileRWManager(path, capacity, segmentSize, readOnly)
-	}
-	if fm.rwMode == MMap {
-		return fm.GetMMapRWManager(path, capacity, segmentSize, readOnly)
-	}
-	return nil, errors.New("invalid rw mode")
 }
 
 // Close will Close fdm resource

@@ -63,6 +63,7 @@ type (
 		statusMgr               *StatusManager
 		transactionMgr          *txManager
 		mergeWorker             *mergeWorker
+		fm                      *FileManager
 		flock                   *flock.Flock
 		commitBuffer            *bytes.Buffer
 		writeCh                 chan *request
@@ -72,7 +73,6 @@ type (
 		hintKeyAndRAMIdxModeLru *utils.LRUCache // lru cache for HintKeyAndRAMIdxMode
 		snowflakeMgr            *SnowflakeManager
 		watchMgr                *watchManager
-		dataFileManager         DataFileManager
 	}
 )
 
@@ -100,17 +100,10 @@ func (sm *SnowflakeManager) GetNode() *snowflake.Node {
 // open returns a newly initialized DB object.
 func open(opt Options) (*DB, error) {
 	db := &DB{
-		MaxFileID: 0,
-		opt:       opt,
-		KeyCount:  0,
-		dataFileManager: newDataFileManager(
-			NewFileManager(
-				opt.RWMode,
-				opt.MaxFdNumsInCache,
-				opt.CleanFdsCacheThreshold,
-				opt.SegmentSize,
-			),
-		),
+		MaxFileID:               0,
+		opt:                     opt,
+		KeyCount:                0,
+		fm:                      NewFileManager(opt.RWMode, opt.MaxFdNumsInCache, opt.CleanFdsCacheThreshold, opt.SegmentSize),
 		writeCh:                 make(chan *request, KvWriteChCapacity),
 		hintKeyAndRAMIdxModeLru: utils.NewLruCache(opt.HintKeyAndRAMIdxCacheSize),
 		snowflakeMgr:            NewSnowflakeManager(opt.NodeNum),
@@ -278,12 +271,11 @@ func (db *DB) release() error {
 
 	db.ActiveFile = nil
 
-	if db.dataFileManager != nil {
-		err := db.dataFileManager.Close()
+	if db.fm != nil {
+		err := db.fm.Close()
 		if err != nil {
 			return err
 		}
-		db.dataFileManager = nil
 	}
 
 	// Close TTL service first to stop the scanner goroutine
@@ -302,6 +294,8 @@ func (db *DB) release() error {
 			return err
 		}
 	}
+
+	db.fm = nil
 
 	db.commitBuffer = nil
 
@@ -341,7 +335,7 @@ func (db *DB) getValueByRecord(record *core.Record) ([]byte, error) {
 	}
 
 	dirPath := getDataPath(record.FileID, db.opt.Dir)
-	df, err := db.dataFileManager.GetDataFileReadOnly(dirPath, db.opt.SegmentSize)
+	df, err := db.fm.GetDataFileReadOnly(dirPath, db.opt.SegmentSize)
 	if err != nil {
 		return nil, err
 	}
@@ -353,11 +347,7 @@ func (db *DB) getValueByRecord(record *core.Record) ([]byte, error) {
 	}(df.rwManager)
 
 	payloadSize := int64(len(record.Key)) + int64(record.ValueSize)
-	buf, err := df.ReadData(int(record.DataPos), payloadSize)
-	if err != nil {
-		return nil, err
-	}
-	item, err := core.DecodeEntryWithError(buf, payloadSize, err)
+	item, err := df.ReadEntry(int(record.DataPos), payloadSize)
 	if err != nil {
 		return nil, fmt.Errorf("read err. pos %d, key %s, err %s", record.DataPos, record.Key, err)
 	}
@@ -503,7 +493,7 @@ func (db *DB) doWrites() {
 // setActiveFile sets the ActiveFile (DataFile object).
 func (db *DB) setActiveFile() (err error) {
 	activeFilePath := getDataPath(db.MaxFileID, db.opt.Dir)
-	db.ActiveFile, err = db.dataFileManager.GetDataFile(activeFilePath, db.opt.SegmentSize)
+	db.ActiveFile, err = db.fm.GetDataFile(activeFilePath, db.opt.SegmentSize)
 	if err != nil {
 		return
 	}

@@ -909,7 +909,7 @@ func TestDB_Close_CompleteShutdownFlow(t *testing.T) {
 	// Verify resources are released
 	require.Nil(t, db.ActiveFile)
 	require.Nil(t, db.Index)
-	require.Nil(t, db.dataFileManager)
+	require.Nil(t, db.fm)
 	require.Nil(t, db.commitBuffer)
 
 	// Verify file lock is released
@@ -1286,7 +1286,7 @@ func TestDB_Close_ResourceCleanup(t *testing.T) {
 	// Verify all resources are released
 	require.Nil(t, db.ActiveFile, "ActiveFile should be nil")
 	require.Nil(t, db.Index, "Index should be nil")
-	require.Nil(t, db.dataFileManager, "DataFileManager should be nil")
+	require.Nil(t, db.fm, "FileManager should be nil")
 	require.Nil(t, db.commitBuffer, "commitBuffer should be nil")
 
 	// Verify file lock is released

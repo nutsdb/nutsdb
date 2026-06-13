@@ -113,7 +113,4 @@ const (
 
 var (
 	ErrIndexOutOfBound = fileio.ErrIndexOutOfBound
-	ErrCrc             = core.ErrCrc
-	ErrCapacity        = core.ErrCapacity
-	ErrEntryZero       = core.ErrEntryZero
 )

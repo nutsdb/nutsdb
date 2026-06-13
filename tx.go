@@ -495,7 +495,7 @@ func (tx *Tx) rotateActiveFile() error {
 
 	// reset ActiveFile
 	path := getDataPath(tx.db.MaxFileID, tx.db.opt.Dir)
-	tx.db.ActiveFile, err = tx.db.dataFileManager.GetDataFile(path, tx.db.opt.SegmentSize)
+	tx.db.ActiveFile, err = tx.db.fm.GetDataFile(path, tx.db.opt.SegmentSize)
 	if err != nil {
 		return err
 	}
