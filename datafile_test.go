@@ -44,11 +44,11 @@ func TestDataFile_Err(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip()
 	}
-	fm := NewFileManager(MMap, 1024, 0.5, 256*MB)
-	defer func() { _ = fm.Close() }()
-	_, err := fm.GetDataFile(filePath, -1)
+	dfm := newDataFileManager(NewFileManager(MMap, 1024, 0.5, 256*MB))
+	defer func() { _ = dfm.Close() }()
+	_, err := dfm.GetDataFile(filePath, -1)
 	defer func() {
-		_ = fm.Close()
+		_ = dfm.Close()
 		_ = os.Remove(filePath)
 	}()
 
@@ -59,9 +59,9 @@ func TestDataFile1(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip()
 	}
-	fm := NewFileManager(MMap, 1024, 0.5, 256*MB)
-	defer func() { _ = fm.Close() }()
-	df, err := fm.GetDataFile(filePath, 1024)
+	dfm := newDataFileManager(NewFileManager(MMap, 1024, 0.5, 256*MB))
+	defer func() { _ = dfm.Close() }()
+	df, err := dfm.GetDataFile(filePath, 1024)
 	defer func() { _ = os.Remove(filePath) }()
 	if err != nil {
 		t.Fatal(err)
@@ -73,26 +73,38 @@ func TestDataFile1(t *testing.T) {
 	}
 
 	payloadSize := entry.Meta.PayloadSize()
-	e, err := df.ReadEntry(n, payloadSize)
+	buf, err := df.ReadData(n, payloadSize)
+	if err != nil {
+		t.Errorf("err TestDataFile_All ReadData: %v", err)
+	}
+	e, err := core.DecodeEntryWithError(buf, payloadSize, err)
 	assert.Nil(t, e)
 	assert.Error(t, err, ErrEntryZero)
 
-	e, err = df.ReadEntry(0, payloadSize)
+	buf, err = df.ReadData(0, payloadSize)
+	if err != nil {
+		t.Errorf("err TestDataFile_All ReadData: %v", err)
+	}
+	e, err = core.DecodeEntryWithError(buf, payloadSize, err)
 	if err != nil || string(e.Key) != "key_0001" || string(e.Value) != "val_0001" || e.Meta.Timestamp != 1547707905 {
 		t.Error("err TestDataFile_All ReadAt")
 	}
 
-	e, err = df.ReadEntry(1, payloadSize)
+	buf, err = df.ReadData(1, payloadSize)
+	if err != nil {
+		t.Errorf("err TestDataFile_All ReadData: %v", err)
+	}
+	e, err = core.DecodeEntryWithError(buf, payloadSize, err)
 	if err == nil || e != nil {
 		t.Error("err TestDataFile_All ReadAt")
 	}
 }
 
 func TestDataFile2(t *testing.T) {
-	fm := NewFileManager(FileIO, 1024, 0.5, 256*MB)
+	dfm := newDataFileManager(NewFileManager(FileIO, 1024, 0.5, 256*MB))
 	tmpdir := t.TempDir()
 	filePath2 := filepath.Join(tmpdir, "foo2")
-	df, err := fm.GetDataFile(filePath2, 64)
+	df, err := dfm.GetDataFile(filePath2, 64)
 	assert.Nil(t, err)
 	defer func() { _ = os.Remove(filePath2) }()
 	headerSize := entry.Meta.Size()
@@ -103,14 +115,18 @@ func TestDataFile2(t *testing.T) {
 	}
 
 	payloadSize := entry.Meta.PayloadSize()
-	e, err := df.ReadEntry(0, payloadSize)
+	buf, err := df.ReadData(0, payloadSize)
+	if err == nil {
+		t.Error("err TestDataFile_All ReadData not EOF")
+	}
+	e, err := core.DecodeEntryWithError(buf, payloadSize, err)
 	if err == nil || e != nil {
 		t.Error("err TestDataFile_All ReadAt")
 	}
 
 	filePath3 := filepath.Join(tmpdir, "foo3")
 
-	df2, err := fm.GetDataFile(filePath3, 64)
+	df2, err := dfm.GetDataFile(filePath3, 64)
 	defer func() { _ = os.Remove(filePath3) }()
 	assert.Nil(t, err)
 
@@ -119,7 +135,11 @@ func TestDataFile2(t *testing.T) {
 	_, err = df2.WriteAt(content, 0)
 	assert.Nil(t, err)
 
-	e, err = df2.ReadEntry(0, payloadSize)
+	buf, err = df2.ReadData(0, payloadSize)
+	if err == nil {
+		t.Error("err TestDataFile_All ReadData not EOF")
+	}
+	e, err = core.DecodeEntryWithError(buf, payloadSize, err)
 	if err == nil || e != nil {
 		t.Error("err TestDataFile_All ReadAt")
 	}
@@ -128,19 +148,19 @@ func TestDataFile2(t *testing.T) {
 	assert.Nil(t, err)
 	err = df2.Release()
 	assert.Nil(t, err)
-	err = fm.Close()
+	err = dfm.Close()
 	assert.Nil(t, err)
 }
 
 func TestDataFile_ReadRecord(t *testing.T) {
-	fm := NewFileManager(FileIO, 1024, 0.5, 256*MB)
+	dfm := newDataFileManager(NewFileManager(FileIO, 1024, 0.5, 256*MB))
 	tmpdir := t.TempDir()
 	filePath4 := filepath.Join(tmpdir, "foo4")
-	df, err := fm.GetDataFile(filePath4, 1024)
+	df, err := dfm.GetDataFile(filePath4, 1024)
 	defer func() {
 		err = df.Release()
 		assert.Nil(t, err)
-		err = fm.Close()
+		err = dfm.Close()
 		assert.Nil(t, err)
 	}()
 	assert.Nil(t, err)
@@ -149,38 +169,46 @@ func TestDataFile_ReadRecord(t *testing.T) {
 	}
 
 	payloadSize := entry.Meta.PayloadSize()
-	e, err := df.ReadEntry(0, payloadSize)
+	buf, err := df.ReadData(0, payloadSize)
+	if err != nil {
+		t.Errorf("err TestDataFile_All ReadData: %v", err)
+	}
+	e, err := core.DecodeEntryWithError(buf, payloadSize, err)
 	if err != nil && e != nil {
 		t.Error("err ReadAt")
 	}
 
-	e, err = df.ReadEntry(1025, payloadSize)
+	buf, err = df.ReadData(1025, payloadSize)
+	if err == nil {
+		t.Error("err TestDataFile_All ReadData not EOF")
+	}
+	e, err = core.DecodeEntryWithError(buf, payloadSize, err)
 	if err == nil && e != nil {
 		t.Error("err ReadAt")
 	}
 }
 
 func TestDataFile_Err_Path(t *testing.T) {
-	fm := NewFileManager(FileIO, 1024, 0.5, 256*MB)
-	defer func() { _ = fm.Close() }()
+	dfm := newDataFileManager(NewFileManager(FileIO, 1024, 0.5, 256*MB))
+	defer func() { _ = dfm.Close() }()
 	filePath5 := ":/tmp/foo5"
-	df, err := fm.GetDataFile(filePath5, entry.Size())
+	df, err := dfm.GetDataFile(filePath5, entry.Size())
 	if err == nil && df != nil {
 		t.Error("err TestDataFile_All open")
 	}
 }
 
 func TestDataFile_Crc_Err(t *testing.T) {
-	fm := NewFileManager(FileIO, 1024, 0.5, 256*MB)
+	dfm := newDataFileManager(NewFileManager(FileIO, 1024, 0.5, 256*MB))
 	filePath6 := filepath.Join(t.TempDir(), "foo6")
 
-	df, err := fm.GetDataFile(filePath6, entry.Size())
+	df, err := dfm.GetDataFile(filePath6, entry.Size())
 	assert.Nil(t, err)
 	assert.NotNil(t, df)
 	defer func() {
 		err = df.Release()
 		assert.Nil(t, err)
-		err = fm.Close()
+		err = dfm.Close()
 		assert.Nil(t, err)
 		err = os.Remove(filePath6)
 		assert.Nil(t, err)
@@ -194,21 +222,25 @@ func TestDataFile_Crc_Err(t *testing.T) {
 	assert.Nil(t, err)
 
 	payloadSize := entry.Meta.PayloadSize()
-	e, err := df.ReadEntry(0, payloadSize)
+	buf, err := df.ReadData(0, payloadSize)
+	if err == nil {
+		t.Error("err TestDataFile_All ReadData not EOF")
+	}
+	e, err := core.DecodeEntryWithError(buf, payloadSize, err)
 	if err == nil || e != nil {
 		t.Error("err TestDataFile_All ReadAt")
 	}
 }
 
 func TestFileManager1(t *testing.T) {
-	fm := NewFileManager(FileIO, 1024, 0.5, 256*MB)
+	dfm := newDataFileManager(NewFileManager(FileIO, 1024, 0.5, 256*MB))
 	filePath6 := filepath.Join(t.TempDir(), "foo2")
-	df, err := fm.GetDataFile(filePath6, entry.Size())
+	df, err := dfm.GetDataFile(filePath6, entry.Size())
 	assert.Nil(t, err)
 	defer func() {
 		err = df.Release()
 		assert.Nil(t, err)
-		err = fm.Close()
+		err = dfm.Close()
 		assert.Nil(t, err)
 		_ = os.Remove(filePath)
 	}()

@@ -179,7 +179,7 @@ func (job *mergeV2Job) prepare() error {
 	// Create new active file for writes during merge
 	job.db.MaxFileID++
 	path := getDataPath(job.db.MaxFileID, job.db.opt.Dir)
-	activeFile, err := job.db.fm.GetDataFile(path, job.db.opt.SegmentSize)
+	activeFile, err := job.db.dataFileManager.GetDataFile(path, job.db.opt.SegmentSize)
 	if err != nil {
 		job.db.mu.Unlock()
 		return fmt.Errorf("failed to create new active file: %w", err)
@@ -304,7 +304,7 @@ func (job *mergeV2Job) commit() error {
 func (job *mergeV2Job) cleanupOldFiles() error {
 	// Close and remove old data files
 	for _, path := range job.oldData {
-		_ = job.db.fm.fdm.CloseByPath(path)
+		_ = job.db.dataFileManager.CloseByPath(path)
 		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return err
 		}
@@ -521,7 +521,7 @@ func (job *mergeV2Job) newOutput() (*mergeOutput, error) {
 	}
 
 	// Create the data file with merge-specific file ID
-	dataFile, err := job.db.fm.GetDataFileByID(job.db.opt.Dir, fileID, job.db.opt.SegmentSize)
+	dataFile, err := job.db.dataFileManager.GetDataFileByID(job.db.opt.Dir, fileID, job.db.opt.SegmentSize)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get data file: %w", err)
 	}
