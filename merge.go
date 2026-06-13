@@ -84,7 +84,7 @@ func (db *DB) mergeLegacy() error {
 
 	var err error
 	path := getDataPath(db.MaxFileID, db.opt.Dir)
-	db.ActiveFile, err = db.dataFileManager.GetDataFile(path, db.opt.SegmentSize)
+	db.ActiveFile, err = db.fm.GetDataFile(path, db.opt.SegmentSize)
 	if err != nil {
 		db.mu.Unlock()
 		return err
@@ -199,7 +199,7 @@ func (db *DB) mergeLegacy() error {
 	defer db.mu.Unlock()
 
 	for i := 0; i < len(mergingPath); i++ {
-		if err := db.dataFileManager.CloseByPath(mergingPath[i]); err != nil {
+		if err := db.fm.fdm.CloseByPath(mergingPath[i]); err != nil {
 			return fmt.Errorf("close merge path %s", err)
 		}
 		if err := os.Remove(mergingPath[i]); err != nil {

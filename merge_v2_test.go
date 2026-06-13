@@ -498,11 +498,11 @@ func TestMergeV2PrepareWhileAlreadyMerging(t *testing.T) {
 	opts.SyncEnable = false
 
 	db := &DB{
-		opt:             opts,
-		ActiveFile:      &DataFile{rwManager: &mockRWManager{}},
-		dataFileManager: newDataFileManager(NewFileManager(opts.RWMode, opts.MaxFdNumsInCache, opts.CleanFdsCacheThreshold, opts.SegmentSize)),
+		opt:        opts,
+		ActiveFile: &DataFile{rwManager: &mockRWManager{}},
+		fm:         NewFileManager(opts.RWMode, opts.MaxFdNumsInCache, opts.CleanFdsCacheThreshold, opts.SegmentSize),
 	}
-	defer func() { _ = db.dataFileManager.Close() }()
+	defer func() { _ = db.fm.Close() }()
 
 	// Note: Concurrent merge prevention is now handled by mergeWorker.performMerge()
 	// This test verifies that prepare() succeeds when called with valid setup
@@ -534,9 +534,9 @@ func TestMergeV2PrepareSyncError(t *testing.T) {
 
 	mock := &mockRWManager{syncErr: errors.New("sync boom")}
 	db := &DB{
-		opt:             opts,
-		ActiveFile:      &DataFile{rwManager: mock},
-		dataFileManager: newDataFileManager(NewFileManager(opts.RWMode, opts.MaxFdNumsInCache, opts.CleanFdsCacheThreshold, opts.SegmentSize)),
+		opt:        opts,
+		ActiveFile: &DataFile{rwManager: mock},
+		fm:         NewFileManager(opts.RWMode, opts.MaxFdNumsInCache, opts.CleanFdsCacheThreshold, opts.SegmentSize),
 	}
 
 	job := &mergeV2Job{db: db}
@@ -578,8 +578,8 @@ func TestMergeV2NewOutputOldHintRemovalFailure(t *testing.T) {
 	opts.SegmentSize = 1 << 12
 
 	db := &DB{
-		opt:             opts,
-		dataFileManager: newDataFileManager(NewFileManager(opts.RWMode, 4, 0.5, opts.SegmentSize)),
+		opt: opts,
+		fm:  NewFileManager(opts.RWMode, 4, 0.5, opts.SegmentSize),
 	}
 
 	job := &mergeV2Job{db: db}
@@ -598,8 +598,8 @@ func TestMergeV2EnsureOutputRolloverCreatesNewSegment(t *testing.T) {
 	opts.RWMode = FileIO
 
 	db := &DB{
-		opt:             opts,
-		dataFileManager: newDataFileManager(NewFileManager(opts.RWMode, 4, 0.5, opts.SegmentSize)),
+		opt: opts,
+		fm:  NewFileManager(opts.RWMode, 4, 0.5, opts.SegmentSize),
 	}
 
 	job := &mergeV2Job{db: db}
@@ -2159,10 +2159,7 @@ func TestMergeV2CleanupOldFilesPropagatesErrors(t *testing.T) {
 	}
 
 	job := &mergeV2Job{
-		db: &DB{
-			opt:             Options{Dir: dir},
-			dataFileManager: newDataFileManager(NewFileManager(FileIO, 1, 0.5, 1<<12)),
-		},
+		db:      &DB{opt: Options{Dir: dir}, fm: NewFileManager(FileIO, 1, 0.5, 1<<12)},
 		oldData: []string{nested},
 	}
 
