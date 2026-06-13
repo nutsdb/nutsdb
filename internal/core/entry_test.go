@@ -466,3 +466,34 @@ func Test_EntryGetRawKey_Various(t *testing.T) {
 	r.Equal(core.ErrDataStructureNotSupported, err)
 	r.Equal([]byte("k"), rawKey)
 }
+
+func Test_EntryDecode(t *testing.T) {
+	r := require.New(t)
+
+	k := []byte("key")
+	v := []byte("value")
+	entry := core.NewEntry().
+		WithKey(k).
+		WithValue(v).
+		WithMeta(
+			core.NewMetaData().
+				WithDs(uint16(core.DataStructureBTree)).
+				WithFlag(uint16(core.DataSetFlag)).
+				WithKeySize(uint32(len(k))).
+				WithValueSize(uint32(len(v))),
+		)
+	encoded := entry.Encode()
+	decoded, err := core.DecodeEntry(encoded, entry.Meta.PayloadSize())
+	r.NoError(err)
+	r.Equal(entry.Key, decoded.Key)
+	r.Equal(entry.Value, decoded.Value)
+	r.Equal(entry.Meta.Timestamp, decoded.Meta.Timestamp)
+	r.Equal(entry.Meta.KeySize, decoded.Meta.KeySize)
+	r.Equal(entry.Meta.ValueSize, decoded.Meta.ValueSize)
+	r.Equal(entry.Meta.Flag, decoded.Meta.Flag)
+	r.Equal(entry.Meta.TTL, decoded.Meta.TTL)
+	r.Equal(entry.Meta.Status, decoded.Meta.Status)
+	r.Equal(entry.Meta.Ds, decoded.Meta.Ds)
+	r.Equal(entry.Meta.TxID, decoded.Meta.TxID)
+	r.Equal(entry.Meta.BucketId, decoded.Meta.BucketId)
+}
