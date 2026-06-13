@@ -468,9 +468,7 @@ func Test_EntryGetRawKey_Various(t *testing.T) {
 	r.Equal([]byte("k"), rawKey)
 }
 
-func Test_EntryDecode(t *testing.T) {
-	r := require.New(t)
-
+func newEncodedTestEntry() (*core.Entry, []byte) {
 	k := []byte("key")
 	v := []byte("value")
 	entry := core.NewEntry().
@@ -483,62 +481,114 @@ func Test_EntryDecode(t *testing.T) {
 				WithKeySize(uint32(len(k))).
 				WithValueSize(uint32(len(v))),
 		)
-	encoded := entry.Encode()
-	decoded, err := core.DecodeEntry(encoded, entry.Meta.PayloadSize())
-	r.NoError(err)
-	r.Equal(entry.Key, decoded.Key)
-	r.Equal(entry.Value, decoded.Value)
-	r.Equal(entry.Meta.Timestamp, decoded.Meta.Timestamp)
-	r.Equal(entry.Meta.KeySize, decoded.Meta.KeySize)
-	r.Equal(entry.Meta.ValueSize, decoded.Meta.ValueSize)
-	r.Equal(entry.Meta.Flag, decoded.Meta.Flag)
-	r.Equal(entry.Meta.TTL, decoded.Meta.TTL)
-	r.Equal(entry.Meta.Status, decoded.Meta.Status)
-	r.Equal(entry.Meta.Ds, decoded.Meta.Ds)
-	r.Equal(entry.Meta.TxID, decoded.Meta.TxID)
-	r.Equal(entry.Meta.BucketId, decoded.Meta.BucketId)
+	return entry, entry.Encode()
 }
 
-func Test_EntryDecodeError_NoError(t *testing.T) {
-	r := require.New(t)
+func assertDecodedEntryEqual(
+	t *testing.T,
+	r *require.Assertions,
+	orig,
+	decoded *core.Entry,
+) {
+	t.Helper()
+	r.Equal(orig.Key, decoded.Key)
+	r.Equal(orig.Value, decoded.Value)
+	r.Equal(orig.Meta.Timestamp, decoded.Meta.Timestamp)
+	r.Equal(orig.Meta.KeySize, decoded.Meta.KeySize)
+	r.Equal(orig.Meta.ValueSize, decoded.Meta.ValueSize)
+	r.Equal(orig.Meta.Flag, decoded.Meta.Flag)
+	r.Equal(orig.Meta.TTL, decoded.Meta.TTL)
+	r.Equal(orig.Meta.Status, decoded.Meta.Status)
+	r.Equal(orig.Meta.Ds, decoded.Meta.Ds)
+	r.Equal(orig.Meta.TxID, decoded.Meta.TxID)
+	r.Equal(orig.Meta.BucketId, decoded.Meta.BucketId)
+}
 
-	k := []byte("key")
-	v := []byte("value")
-	entry := core.NewEntry().
-		WithKey(k).
-		WithValue(v).
-		WithMeta(
-			core.NewMetaData().
-				WithDs(uint16(core.DataStructureBTree)).
-				WithFlag(uint16(core.DataSetFlag)).
-				WithKeySize(uint32(len(k))).
-				WithValueSize(uint32(len(v))),
-		)
-	encoded := entry.Encode()
-	decoded, err := core.DecodeEntryWithError(encoded, entry.Meta.PayloadSize(), nil)
-	r.NoError(err)
-	r.Equal(entry.Key, decoded.Key)
-	r.Equal(entry.Value, decoded.Value)
-	r.Equal(entry.Meta.Timestamp, decoded.Meta.Timestamp)
-	r.Equal(entry.Meta.KeySize, decoded.Meta.KeySize)
-	r.Equal(entry.Meta.ValueSize, decoded.Meta.ValueSize)
-	r.Equal(entry.Meta.Flag, decoded.Meta.Flag)
-	r.Equal(entry.Meta.TTL, decoded.Meta.TTL)
-	r.Equal(entry.Meta.Status, decoded.Meta.Status)
-	r.Equal(entry.Meta.Ds, decoded.Meta.Ds)
-	r.Equal(entry.Meta.TxID, decoded.Meta.TxID)
-	r.Equal(entry.Meta.BucketId, decoded.Meta.BucketId)
+func Test_EntryDecode(t *testing.T) {
+	entry, encoded := newEncodedTestEntry()
+	payloadSize := entry.Meta.PayloadSize()
+
+	t.Run("success", func(t *testing.T) {
+		r := require.New(t)
+		decoded, err := core.DecodeEntry(encoded, payloadSize)
+		r.NoError(err)
+		assertDecodedEntryEqual(t, r, entry, decoded)
+	})
+
+	t.Run("success with trailing bytes", func(t *testing.T) {
+		r := require.New(t)
+		buf := append(encoded, []byte("trailing garbage")...)
+		decoded, err := core.DecodeEntry(buf, payloadSize)
+		r.NoError(err)
+		assertDecodedEntryEqual(t, r, entry, decoded)
+	})
+
+	t.Run("header too short", func(t *testing.T) {
+		r := require.New(t)
+		short := make([]byte, core.MinEntryHeaderSize-1)
+		decoded, err := core.DecodeEntry(short, payloadSize)
+		r.Nil(decoded)
+		r.Equal(core.ErrHeaderSizeOutOfBounds, err)
+	})
+
+	t.Run("zero entry", func(t *testing.T) {
+		r := require.New(t)
+		zeroBuf := make([]byte, core.MinEntryHeaderSize)
+		decoded, err := core.DecodeEntry(zeroBuf, 0)
+		r.Nil(decoded)
+		r.Equal(core.ErrEntryZero, err)
+	})
+
+	t.Run("payload size mismatch", func(t *testing.T) {
+		r := require.New(t)
+		decoded, err := core.DecodeEntry(encoded, payloadSize+1)
+		r.Nil(decoded)
+		r.Equal(core.ErrPayLoadSizeMismatch, err)
+	})
+
+	t.Run("crc mismatch", func(t *testing.T) {
+		r := require.New(t)
+		badCrc := append([]byte(nil), encoded...)
+		badCrc[len(badCrc)-1] ^= 0xff
+		decoded, err := core.DecodeEntry(badCrc, payloadSize)
+		r.Nil(decoded)
+		r.Equal(core.ErrCrc, err)
+	})
 }
 
 func Test_EntryDecodeWithError(t *testing.T) {
-	r := require.New(t)
+	entry, encoded := newEncodedTestEntry()
+	payloadSize := entry.Meta.PayloadSize()
 
-	entry := core.NewEntry().WithKey([]byte("key")).WithValue([]byte("value")).WithMeta(
-		core.NewMetaData().
-			WithDs(uint16(core.DataStructureBTree)),
-	)
-	encoded := entry.Encode()
-	expectErr := errors.New("test error")
-	_, err := core.DecodeEntryWithError(encoded, entry.Meta.PayloadSize(), expectErr)
-	r.Equal(expectErr, err)
+	t.Run("success when input error is nil", func(t *testing.T) {
+		r := require.New(t)
+		decoded, err := core.DecodeEntryWithError(encoded, payloadSize, nil)
+		r.NoError(err)
+		assertDecodedEntryEqual(t, r, entry, decoded)
+	})
+
+	t.Run("returns input error without decoding", func(t *testing.T) {
+		r := require.New(t)
+		expectErr := errors.New("test error")
+		decoded, err := core.DecodeEntryWithError(encoded, payloadSize, expectErr)
+		r.Nil(decoded)
+		r.Equal(expectErr, err)
+	})
+
+	t.Run("propagates decode error when input error is nil", func(t *testing.T) {
+		r := require.New(t)
+		short := make([]byte, core.MinEntryHeaderSize-1)
+		decoded, err := core.DecodeEntryWithError(short, payloadSize, nil)
+		r.Nil(decoded)
+		r.Equal(core.ErrHeaderSizeOutOfBounds, err)
+	})
+
+	t.Run("input error takes precedence over decode error", func(t *testing.T) {
+		r := require.New(t)
+		expectErr := errors.New("input error")
+		short := make([]byte, core.MinEntryHeaderSize-1)
+		decoded, err := core.DecodeEntryWithError(short, payloadSize, expectErr)
+		r.Nil(decoded)
+		r.Equal(expectErr, err)
+	})
 }
