@@ -98,6 +98,9 @@ type DataFileManager interface {
 	// GetDataFileByID will return a DataFile Object by file ID
 	GetDataFileByID(dir string, fileID int64, capacity int64) (*DataFile, error)
 
+	// CloseByPath closes the data file by path
+	CloseByPath(path string) error
+
 	Close() error
 }
 
@@ -134,6 +137,10 @@ func (dfm *dataFileManagerImpl) GetDataFileByID(dir string, fileID int64, capaci
 		return nil, err
 	}
 	return NewDataFile(path, rwmanager), nil
+}
+
+func (dfm *dataFileManagerImpl) CloseByPath(path string) error {
+	return dfm.fm.fdm.CloseByPath(path)
 }
 
 func (dfm *dataFileManagerImpl) Close() error {

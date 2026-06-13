@@ -304,7 +304,7 @@ func (job *mergeV2Job) commit() error {
 func (job *mergeV2Job) cleanupOldFiles() error {
 	// Close and remove old data files
 	for _, path := range job.oldData {
-		_ = job.db.fm.fdm.CloseByPath(path)
+		_ = job.db.dataFileManager.CloseByPath(path)
 		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return err
 		}

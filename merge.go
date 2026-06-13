@@ -199,7 +199,7 @@ func (db *DB) mergeLegacy() error {
 	defer db.mu.Unlock()
 
 	for i := 0; i < len(mergingPath); i++ {
-		if err := db.fm.fdm.CloseByPath(mergingPath[i]); err != nil {
+		if err := db.dataFileManager.CloseByPath(mergingPath[i]); err != nil {
 			return fmt.Errorf("close merge path %s", err)
 		}
 		if err := os.Remove(mergingPath[i]); err != nil {

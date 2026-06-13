@@ -63,7 +63,6 @@ type (
 		statusMgr               *StatusManager
 		transactionMgr          *txManager
 		mergeWorker             *mergeWorker
-		fm                      *FileManager
 		flock                   *flock.Flock
 		commitBuffer            *bytes.Buffer
 		writeCh                 chan *request
@@ -101,16 +100,21 @@ func (sm *SnowflakeManager) GetNode() *snowflake.Node {
 // open returns a newly initialized DB object.
 func open(opt Options) (*DB, error) {
 	db := &DB{
-		MaxFileID:               0,
-		opt:                     opt,
-		KeyCount:                0,
-		fm:                      NewFileManager(opt.RWMode, opt.MaxFdNumsInCache, opt.CleanFdsCacheThreshold, opt.SegmentSize),
+		MaxFileID: 0,
+		opt:       opt,
+		KeyCount:  0,
+		dataFileManager: newDataFileManager(
+			NewFileManager(
+				opt.RWMode,
+				opt.MaxFdNumsInCache,
+				opt.CleanFdsCacheThreshold,
+				opt.SegmentSize,
+			),
+		),
 		writeCh:                 make(chan *request, KvWriteChCapacity),
 		hintKeyAndRAMIdxModeLru: utils.NewLruCache(opt.HintKeyAndRAMIdxCacheSize),
 		snowflakeMgr:            NewSnowflakeManager(opt.NodeNum),
 	}
-
-	db.dataFileManager = newDataFileManager(db.fm)
 
 	db.ttlService = ttl.NewService(ttl.NewRealClock(), opt.TTLConfig, db.handleExpiredKeys)
 
@@ -274,11 +278,12 @@ func (db *DB) release() error {
 
 	db.ActiveFile = nil
 
-	if db.fm != nil {
-		err := db.fm.Close()
+	if db.dataFileManager != nil {
+		err := db.dataFileManager.Close()
 		if err != nil {
 			return err
 		}
+		db.dataFileManager = nil
 	}
 
 	// Close TTL service first to stop the scanner goroutine
@@ -297,8 +302,6 @@ func (db *DB) release() error {
 			return err
 		}
 	}
-
-	db.fm = nil
 
 	db.commitBuffer = nil
 
