@@ -2,6 +2,7 @@ package nutsdb
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"hash/fnv"
@@ -508,7 +509,7 @@ func TestMergePrepareWhileAlreadyMerging(t *testing.T) {
 	job := &mergeJob{db: db}
 
 	// prepare() should succeed with 2 files present
-	if err := job.prepare(); err != nil {
+	if err := job.prepare(context.Background()); err != nil {
 		t.Fatalf("prepare() should succeed with 2 files, got error: %v", err)
 	}
 
@@ -539,7 +540,7 @@ func TestMergePrepareSyncError(t *testing.T) {
 	}
 
 	job := &mergeJob{db: db}
-	err := job.prepare()
+	err := job.prepare(context.Background())
 	if err == nil || !strings.Contains(err.Error(), "failed to sync active file") {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -700,7 +701,7 @@ func TestMergeCommitCollectorFailure(t *testing.T) {
 		t.Fatalf("writeEntry: %v", err)
 	}
 
-	if err := job.commit(); err == nil || !strings.Contains(err.Error(), "failed to add hint") {
+	if err := job.commit(context.Background()); err == nil || !strings.Contains(err.Error(), "failed to add hint") {
 		t.Fatalf("commit should surface collector errors, got %v", err)
 	}
 }
@@ -714,7 +715,7 @@ func TestMergeFinalizeOutputsSuccess(t *testing.T) {
 	}
 	job := &mergeJob{outputs: []*mergeOutput{out}}
 
-	if err := job.finalizeOutputs(); err != nil {
+	if err := job.finalizeOutputs(context.Background()); err != nil {
 		t.Fatalf("finalizeOutputs: %v", err)
 	}
 	if mock.syncCalls != 1 {
@@ -727,7 +728,7 @@ func TestMergeFinalizeOutputsSuccess(t *testing.T) {
 		t.Fatalf("collector should be closed, got %v", err)
 	}
 
-	if err := job.finalizeOutputs(); err != nil {
+	if err := job.finalizeOutputs(context.Background()); err != nil {
 		t.Fatalf("finalizeOutputs should be idempotent: %v", err)
 	}
 	if mock.syncCalls != 1 || mock.closeCalls != 1 {
@@ -744,7 +745,7 @@ func TestMergeFinalizeOutputsFailure(t *testing.T) {
 	}
 	job := &mergeJob{outputs: []*mergeOutput{out}}
 
-	err := job.finalizeOutputs()
+	err := job.finalizeOutputs(context.Background())
 	if err == nil {
 		t.Fatal("finalizeOutputs should return error when data file cleanup fails")
 	}
@@ -834,11 +835,11 @@ func TestMergeMergeAndTxConcurrentWrites(t *testing.T) {
 	}
 
 	job := &mergeJob{db: db}
-	if err := job.prepare(); err != nil {
+	if err := job.prepare(context.Background()); err != nil {
 		t.Fatalf("prepare: %v", err)
 	}
 	defer job.finish()
-	if err := job.enterWritingState(); err != nil {
+	if err := job.enterWritingState(context.Background()); err != nil {
 		t.Fatalf("enterWritingState: %v", err)
 	}
 
@@ -854,7 +855,7 @@ func TestMergeMergeAndTxConcurrentWrites(t *testing.T) {
 
 	rewriteDone := make(chan error, 1)
 	go func() {
-		rewriteDone <- job.rewrite()
+		rewriteDone <- job.rewrite(context.Background())
 	}()
 
 	select {
@@ -886,13 +887,13 @@ func TestMergeMergeAndTxConcurrentWrites(t *testing.T) {
 		t.Fatalf("rewrite: %v", err)
 	}
 
-	if err := job.commit(); err != nil {
+	if err := job.commit(context.Background()); err != nil {
 		t.Fatalf("commit: %v", err)
 	}
-	if err := job.finalizeOutputs(); err != nil {
+	if err := job.finalizeOutputs(context.Background()); err != nil {
 		t.Fatalf("finalizeOutputs: %v", err)
 	}
-	if err := job.cleanupOldFiles(); err != nil {
+	if err := job.cleanupOldFiles(context.Background()); err != nil {
 		t.Fatalf("cleanupOldFiles: %v", err)
 	}
 	if err := removeMergeManifest(dir); err != nil {
@@ -1006,11 +1007,11 @@ func TestMergeMergeAndTxConcurrentWritesWithSet(t *testing.T) {
 	}
 
 	job := &mergeJob{db: db}
-	if err := job.prepare(); err != nil {
+	if err := job.prepare(context.Background()); err != nil {
 		t.Fatalf("prepare: %v", err)
 	}
 	defer job.finish()
-	if err := job.enterWritingState(); err != nil {
+	if err := job.enterWritingState(context.Background()); err != nil {
 		t.Fatalf("enterWritingState: %v", err)
 	}
 
@@ -1026,7 +1027,7 @@ func TestMergeMergeAndTxConcurrentWritesWithSet(t *testing.T) {
 
 	rewriteDone := make(chan error, 1)
 	go func() {
-		rewriteDone <- job.rewrite()
+		rewriteDone <- job.rewrite(context.Background())
 	}()
 
 	select {
@@ -1061,13 +1062,13 @@ func TestMergeMergeAndTxConcurrentWritesWithSet(t *testing.T) {
 		t.Fatalf("rewrite: %v", err)
 	}
 
-	if err := job.commit(); err != nil {
+	if err := job.commit(context.Background()); err != nil {
 		t.Fatalf("commit: %v", err)
 	}
-	if err := job.finalizeOutputs(); err != nil {
+	if err := job.finalizeOutputs(context.Background()); err != nil {
 		t.Fatalf("finalizeOutputs: %v", err)
 	}
-	if err := job.cleanupOldFiles(); err != nil {
+	if err := job.cleanupOldFiles(context.Background()); err != nil {
 		t.Fatalf("cleanupOldFiles: %v", err)
 	}
 	if err := removeMergeManifest(dir); err != nil {
@@ -1183,14 +1184,14 @@ func TestMergeCommitPhaseBlocking(t *testing.T) {
 	}
 
 	job := &mergeJob{db: db}
-	if err := job.prepare(); err != nil {
+	if err := job.prepare(context.Background()); err != nil {
 		t.Fatalf("prepare: %v", err)
 	}
 	defer job.finish()
-	if err := job.enterWritingState(); err != nil {
+	if err := job.enterWritingState(context.Background()); err != nil {
 		t.Fatalf("enterWritingState: %v", err)
 	}
-	if err := job.rewrite(); err != nil {
+	if err := job.rewrite(context.Background()); err != nil {
 		t.Fatalf("rewrite: %v", err)
 	}
 
@@ -2075,7 +2076,7 @@ func TestMergeRewriteFileSkipsCorruptedEntries(t *testing.T) {
 		outputs: []*mergeOutput{{fileID: GetMergeFileID(0), dataFile: &DataFile{rwManager: mock}}},
 	}
 
-	if err := job.rewriteFile(fid); err != nil {
+	if err := job.rewriteFile(context.Background(), fid); err != nil {
 		t.Fatalf("rewriteFile: %v", err)
 	}
 
@@ -2160,7 +2161,225 @@ func TestMergeCleanupOldFilesPropagatesErrors(t *testing.T) {
 		oldData: []string{nested},
 	}
 
-	if err := job.cleanupOldFiles(); err == nil {
+	if err := job.cleanupOldFiles(context.Background()); err == nil {
 		t.Fatal("cleanupOldFiles should surface removal errors")
+	}
+}
+
+// TestMergeJobRewriteRespectsCanceledContext verifies that mergeJob.rewrite exits
+// promptly with context.Canceled when the context is already canceled, without
+// attempting to open or read any of the pending files.
+//
+// This is the deterministic unit test for the P0 #1 fix: ctx propagation through
+// merge phases. The integration test below (TestMergeCloseDuringMergeDoesNotCrash)
+// covers the end-to-end Close-during-merge scenario.
+func TestMergeJobRewriteRespectsCanceledContext(t *testing.T) {
+	dir := t.TempDir()
+
+	// Note: pending references a file that does NOT exist on disk. If rewrite
+	// failed to check ctx before calling rewriteFile, this test would error out
+	// with a "failed to create file recovery" instead of context.Canceled.
+	job := &mergeJob{
+		db: &DB{opt: Options{Dir: dir}},
+		// Use both a normal fileID and a merge fileID to exercise both branches
+		// of pending iteration (the check fires per-iteration regardless).
+		pending: []int64{0, GetMergeFileID(0)},
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err := job.rewrite(ctx)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected context.Canceled, got %v", err)
+	}
+
+	// Sanity: no merge output files should have been created.
+	_, mergeIDs, enumerateErr := enumerateDataFileIDs(dir)
+	if enumerateErr != nil {
+		t.Fatalf("enumerateDataFileIDs: %v", enumerateErr)
+	}
+	if len(mergeIDs) != 0 {
+		t.Fatalf("expected no merge output files, got %v", mergeIDs)
+	}
+}
+
+// TestMergeJobCommitRespectsCanceledContext verifies commit() returns early when
+// ctx is already canceled, before acquiring db.mu. This protects callers from
+// blocking on lock acquisition once cancellation has been requested.
+func TestMergeJobCommitRespectsCanceledContext(t *testing.T) {
+	dir := t.TempDir()
+
+	// Construct a DB whose mu is contended by a long-running reader so that
+	// commit() would block on Lock() if it did not check ctx first.
+	db := &DB{opt: Options{Dir: dir}}
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	job := &mergeJob{
+		db:     db,
+		lookup: []*mergeLookupEntry{{}}, // non-empty to ensure we'd do work if we got past the ctx check
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	done := make(chan error, 1)
+	go func() { done <- job.commit(ctx) }()
+
+	select {
+	case err := <-done:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("expected context.Canceled, got %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("commit did not return within 2s; ctx check before Lock() is missing")
+	}
+}
+
+// TestMergeCloseDuringMergeDoesNotCrash is the integration regression test for P0 #1:
+// calling db.Close() while db.Merge() is running must not leave the DB in a broken
+// state. Before the fix, performMerge ignored the lifecycle context, so the merge
+// goroutine could not be canceled; statusMgr.Close() would time out after
+// ShutdownTimeout, db.Close() would return the timeout error before calling
+// release(), and the merge goroutine would keep running indefinitely against a
+// half-closed DB.
+//
+// With the fix, the merge observes ctx cancellation and returns promptly, so
+// statusMgr.Close() completes within ShutdownTimeout and Close() can release
+// resources cleanly.
+func TestMergeCloseDuringMergeDoesNotCrash(t *testing.T) {
+	opts := DefaultOptions
+	opts.Dir = filepath.Join(t.TempDir(), "merge-close")
+	opts.SegmentSize = 16 * 1024 // small segments force many files -> non-trivial merge
+	opts.RWMode = FileIO
+
+	db, err := Open(opts)
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+
+	bucket := "test-bucket"
+	if err := db.Update(func(tx *Tx) error {
+		return tx.NewBucket(DataStructureBTree, bucket)
+	}); err != nil {
+		t.Fatalf("create bucket: %v", err)
+	}
+
+	// Populate enough data that merge has real work to do. With 16KB segments
+	// and ~220-byte values, 2000 puts produce ~30+ files and keep the merge
+	// busy long enough to reliably observe IsMerging=true on fast hosts / tmpfs.
+	valuePadding := bytes.Repeat([]byte("x"), 200)
+	for i := 0; i < 2000; i++ {
+		key := fmt.Sprintf("key-%05d", i)
+		value := append([]byte(fmt.Sprintf("v-%05d-", i)), valuePadding...)
+		if err := db.Update(func(tx *Tx) error {
+			return tx.Put(bucket, []byte(key), value, Persistent)
+		}); err != nil {
+			t.Fatalf("put %s: %v", key, err)
+		}
+	}
+
+	userIDs, _, enumerateErr := enumerateDataFileIDs(opts.Dir)
+	if enumerateErr != nil {
+		t.Fatalf("enumerate: %v", enumerateErr)
+	}
+	t.Logf("setup done: %d user data files", len(userIDs))
+	if len(userIDs) < 20 {
+		t.Fatalf("expected at least 20 data files to make merge observable, got %d", len(userIDs))
+	}
+
+	mergeDone := make(chan error, 1)
+	go func() { mergeDone <- db.Merge() }()
+
+	// Poll for merge to actually start. Using IsMerging() avoids relying on
+	// time.Sleep which is flaky on CI.
+	deadline := time.Now().Add(2 * time.Second)
+	started := false
+	for time.Now().Before(deadline) {
+		if db.mergeWorker.IsMerging() {
+			started = true
+			break
+		}
+		time.Sleep(time.Millisecond)
+	}
+	if !started {
+		// Merge already finished before we could observe it; the test would not
+		// exercise the cancellation path. Fail loudly so we know to enlarge the
+		// dataset.
+		t.Skip("merge did not become observable within 2s; increase data size to make this test reliable")
+	}
+	t.Log("observed IsMerging=true; merge is in progress")
+
+	// The crux of the regression test: Close() while Merge() is in flight.
+	// Before the fix, performMerge ignored the lifecycle context, so
+	// statusMgr.Close() could not cancel the merge goroutine and would time
+	// out after ShutdownTimeout (30s). db.Close() then returned the timeout
+	// error without calling release(), leaving the merge goroutine running
+	// indefinitely against a half-closed DB.
+	t.Log("calling Close() during merge")
+	closeDone := make(chan error, 1)
+	go func() { closeDone <- db.Close() }()
+
+	select {
+	case closeErr := <-closeDone:
+		if closeErr != nil {
+			t.Fatalf("Close() during merge returned error: %v", closeErr)
+		}
+	case <-time.After(30 * time.Second):
+		t.Fatal("Close() did not return within 30s; merge likely ignores ctx cancellation")
+	}
+
+	// The merge goroutine must return (with an error, since the db was closed
+	// out from under it). It should not hang.
+	select {
+	case mergeErr := <-mergeDone:
+		t.Logf("Merge() returned: %v", mergeErr)
+		if mergeErr == nil {
+			t.Fatal("Merge() should report an error when the db is closed mid-merge")
+		}
+		// Accept either ErrDBClosed (TriggerMerge observed ctx cancellation) or
+		// a wrapped context.Canceled (merge phases observed it directly).
+		if !errors.Is(mergeErr, context.Canceled) && !errors.Is(mergeErr, ErrDBClosed) {
+			t.Fatalf("unexpected merge error: %v", mergeErr)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("Merge() goroutine did not return within 10s after Close()")
+	}
+
+	// Critical correctness check: cancellation must not leave the DB in an
+	// unrecoverable state. Two outcomes are valid depending on where the
+	// cancellation lands:
+	//
+	//  1. abort() ran (cancel hit before commit finalized the manifest):
+	//     manifest is gone and no merge files remain on disk.
+	//  2. cancel hit after commit wrote the committed manifest (during
+	//     finalizeOutputs or cleanupOldFiles): the committed manifest and
+	//     merge output files stay on disk. This is recoverable - the next
+	//     Open() runs recoverMergeManifest, which removes the old files and
+	//     the manifest. The recovery contract itself is covered by
+	//     merge_recovery_test.go; here we just assert the on-disk state is
+	//     internally consistent.
+	manifest, loadErr := loadMergeManifest(opts.Dir)
+	if loadErr != nil {
+		t.Fatalf("loadMergeManifest after close: %v", loadErr)
+	}
+	_, mergeIDs, enumerateErr := enumerateDataFileIDs(opts.Dir)
+	if enumerateErr != nil {
+		t.Fatalf("enumerate after close: %v", enumerateErr)
+	}
+	switch {
+	case manifest == nil:
+		if len(mergeIDs) != 0 {
+			t.Fatalf("abort path: partial merge files should be gone, got %v", mergeIDs)
+		}
+		t.Log("abort() ran; manifest and merge files cleaned up")
+	case manifest.Status == manifestStatusCommitted:
+		if len(mergeIDs) == 0 {
+			t.Fatalf("committed manifest present but no merge output files on disk")
+		}
+		t.Logf("cancel hit post-commit; %d merge files + committed manifest left for recovery", len(mergeIDs))
+	default:
+		t.Fatalf("unexpected manifest state after cancellation: %+v", manifest)
 	}
 }

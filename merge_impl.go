@@ -1,6 +1,7 @@
 package nutsdb
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"hash"
@@ -85,37 +86,45 @@ type mergeOutput struct {
 
 // merge executes the complete merge operation using the merge algorithm.
 // This is the main entry point for the merge process, orchestrating all phases.
-func (db *DB) merge() error {
+//
+// The ctx parameter allows cancellation of the merge mid-flight (e.g., when the
+// DB is being closed). On cancellation, partial outputs are cleaned up via abort()
+// and ctx.Err() is returned.
+func (db *DB) merge(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
 	job := &mergeJob{db: db}
 
 	// Prepare merge job - validate state and enumerate files
-	if err := job.prepare(); err != nil {
+	if err := job.prepare(ctx); err != nil {
 		return err
 	}
 	defer job.finish()
 
 	// Enter writing state - prepare for merge operations
-	if err := job.enterWritingState(); err != nil {
+	if err := job.enterWritingState(ctx); err != nil {
 		return job.abort(err)
 	}
 
 	// Rewrite phase - process all pending files and create merge outputs
-	if err := job.rewrite(); err != nil {
+	if err := job.rewrite(ctx); err != nil {
 		return job.abort(err)
 	}
 
 	// Commit phase - update indexes and write hint files
-	if err := job.commit(); err != nil {
+	if err := job.commit(ctx); err != nil {
 		return job.abort(err)
 	}
 
 	// Finalize outputs - ensure all data is persisted
-	if err := job.finalizeOutputs(); err != nil {
+	if err := job.finalizeOutputs(ctx); err != nil {
 		return job.abort(err)
 	}
 
 	// Clean up old files to reclaim disk space
-	if err := job.cleanupOldFiles(); err != nil {
+	if err := job.cleanupOldFiles(ctx); err != nil {
 		return fmt.Errorf("cleanup old files: %w", err)
 	}
 
@@ -124,7 +133,11 @@ func (db *DB) merge() error {
 
 // prepare initializes the merge job by validating state, enumerating files, and setting up the database.
 // It ensures the database is ready for merge and creates a new active file for ongoing writes.
-func (job *mergeJob) prepare() error {
+func (job *mergeJob) prepare(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
 	job.db.mu.Lock()
 
 	// Note: Concurrent merge prevention is handled by mergeWorker.performMerge()
@@ -201,7 +214,11 @@ func (job *mergeJob) finish() {
 
 // enterWritingState initializes the merge job for writing entries.
 // Creates the merge manifest and prepares necessary data structures.
-func (job *mergeJob) enterWritingState() error {
+func (job *mergeJob) enterWritingState(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
 	// Initialize lookup entries for tracking merged entries
 	job.lookup = make([]*mergeLookupEntry, 0)
 
@@ -226,9 +243,14 @@ func (job *mergeJob) enterWritingState() error {
 
 // rewrite processes all pending files and rewrites their valid entries to merge outputs.
 // This is the main phase where data compaction happens.
-func (job *mergeJob) rewrite() error {
+//
+// The ctx is checked between files to allow cancellation of long merges.
+func (job *mergeJob) rewrite(ctx context.Context) error {
 	for _, fid := range job.pending {
-		if err := job.rewriteFile(fid); err != nil {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if err := job.rewriteFile(ctx, fid); err != nil {
 			return err
 		}
 	}
@@ -237,7 +259,10 @@ func (job *mergeJob) rewrite() error {
 
 // finalizeOutputs ensures all output files are properly closed and synced to disk.
 // This must be called after all entries have been written.
-func (job *mergeJob) finalizeOutputs() error {
+func (job *mergeJob) finalizeOutputs(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	for _, out := range job.outputs {
 		if err := out.finalize(); err != nil {
 			return err
@@ -251,7 +276,13 @@ func (job *mergeJob) finalizeOutputs() error {
 // we'll write the stale version to the hint file. This is safe because during index rebuild,
 // merge files (negative FileIDs) are processed before normal files (positive FileIDs), so
 // newer values will overwrite stale ones. This tradeoff saves significant memory.
-func (job *mergeJob) commit() error {
+//
+// The ctx is checked before acquiring db.mu to allow cancellation while waiting for the lock.
+func (job *mergeJob) commit(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
 	job.db.mu.Lock()
 	defer job.db.mu.Unlock()
 
@@ -301,7 +332,14 @@ func (job *mergeJob) commit() error {
 
 // cleanupOldFiles removes the old data and hint files that were merged, as well as the manifest file.
 // This is called after a successful merge to reclaim disk space.
-func (job *mergeJob) cleanupOldFiles() error {
+//
+// Note: Unlike abort(), this method respects ctx to allow bailing out before file removal begins,
+// but once it starts removing files it completes them all (does not check ctx mid-loop) to avoid
+// leaving the directory in a half-cleaned state.
+func (job *mergeJob) cleanupOldFiles(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	// Close and remove old data files
 	for _, path := range job.oldData {
 		_ = job.db.dataFileManager.CloseByPath(path)
@@ -358,7 +396,10 @@ func (job *mergeJob) abort(err error) error {
 
 // rewriteFile processes a single data file during merge, rewriting valid entries to new merge files.
 // It reads entries sequentially, filters out invalid/expired entries, and rewrites remaining entries.
-func (job *mergeJob) rewriteFile(fid int64) error {
+//
+// The ctx is checked on every iteration so that cancellation latency is bounded by the cost of
+// processing a single entry.
+func (job *mergeJob) rewriteFile(ctx context.Context, fid int64) error {
 	path := getDataPath(fid, job.db.opt.Dir)
 	fr, err := newFileRecovery(path, job.db.opt.BufferSizeOfRecovery)
 	if err != nil {
@@ -370,6 +411,13 @@ func (job *mergeJob) rewriteFile(fid int64) error {
 
 	off := int64(0)
 	for off < fr.size {
+		// Check for cancellation before doing per-entry work. The check is cheap
+		// (one atomic load + channel select) and keeps cancellation latency bounded
+		// by the cost of reading a single entry.
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+
 		entry, err := fr.readEntry(off)
 		if err != nil {
 			if errors.Is(err, io.EOF) || errors.Is(err, ErrIndexOutOfBound) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, core.ErrHeaderSizeOutOfBounds) {

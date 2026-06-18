@@ -288,7 +288,11 @@ func (mw *mergeWorker) performMerge() error {
 	}
 	defer mw.isMerging.Store(false)
 
-	return mw.db.merge()
+	// Propagate the worker's lifecycle context so that merge phases can be
+	// canceled when the DB is shutting down. This prevents Close() from racing
+	// with in-flight merge work (which would otherwise touch db.ActiveFile /
+	// db.Index after they have been nil-ed by release()).
+	return mw.db.merge(mw.lifecycle.Context())
 }
 
 func (mw *mergeWorker) SetMergeInterval(interval time.Duration) {
