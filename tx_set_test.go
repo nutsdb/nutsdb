@@ -284,6 +284,53 @@ func TestTx_SMoveByTwoBuckets(t *testing.T) {
 	})
 }
 
+func TestTx_SMoveByTwoBuckets_MemberNotInSource(t *testing.T) {
+	bucket1 := "bucket1"
+	bucket2 := "bucket2"
+	key1 := testutils.GetTestBytes(0)
+	key2 := testutils.GetTestBytes(1)
+	valInSource := testutils.GetTestBytes(1)
+	valOnlyInDest := testutils.GetTestBytes(2)
+
+	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureSet, bucket1, nil)
+		txCreateBucket(t, db, DataStructureSet, bucket2, nil)
+		txSAdd(t, db, bucket1, key1, valInSource, nil, nil)
+		txSAdd(t, db, bucket2, key2, valOnlyInDest, nil, nil)
+
+		txSMoveByTwoBuckets(t, db, bucket1, key1, bucket2, key2, valOnlyInDest, false, ErrSetMemberNotExist)
+		txSIsMember(t, db, bucket1, key1, valInSource, true)
+		txSIsMember(t, db, bucket2, key2, valOnlyInDest, true)
+	})
+}
+
+func TestTx_SMoveByTwoBuckets_MemberAlreadyInDestination(t *testing.T) {
+	bucket1 := "bucket1"
+	bucket2 := "bucket2"
+	key1 := testutils.GetTestBytes(0)
+	key2 := testutils.GetTestBytes(1)
+	val1 := testutils.GetTestBytes(1)
+	sharedVal := testutils.GetTestBytes(2)
+	destOnlyVal := testutils.GetTestBytes(3)
+
+	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureSet, bucket1, nil)
+		txCreateBucket(t, db, DataStructureSet, bucket2, nil)
+		txSAdd(t, db, bucket1, key1, val1, nil, nil)
+		txSAdd(t, db, bucket1, key1, sharedVal, nil, nil)
+		txSAdd(t, db, bucket2, key2, sharedVal, nil, nil)
+		txSAdd(t, db, bucket2, key2, destOnlyVal, nil, nil)
+
+		txSMoveByTwoBuckets(t, db, bucket1, key1, bucket2, key2, sharedVal, true, nil)
+		txSIsMember(t, db, bucket1, key1, sharedVal, false)
+		txSIsMember(t, db, bucket1, key1, val1, true)
+		txSIsMember(t, db, bucket2, key2, sharedVal, true)
+		txSIsMember(t, db, bucket2, key2, destOnlyVal, true)
+		txSCard(t, db, bucket1, key1, 1, nil)
+		txSCard(t, db, bucket2, key2, 2, nil)
+	})
+}
+
 func TestTx_SUnionByOneBucket(t *testing.T) {
 	bucket := "bucket"
 	fakeBucket := "fake_bucket"
@@ -339,6 +386,53 @@ func TestTx_SUnionByTwoBuckets(t *testing.T) {
 		txSUnionByTwoBuckets(t, db, bucket1, key1, fmt.Sprintf(fakeBucket, 2), key2, nil, ErrBucketNotExist)
 		txSUnionByTwoBuckets(t, db, bucket1, fakeKey1, bucket2, key2, nil, ErrNotFoundKey)
 		txSUnionByTwoBuckets(t, db, bucket1, key1, bucket2, fakeKey2, nil, ErrNotFoundKey)
+	})
+}
+
+func TestTx_SUnionByTwoBuckets_OverlappingMembers(t *testing.T) {
+	bucket1 := "bucket1"
+	bucket2 := "bucket2"
+	key1 := testutils.GetTestBytes(0)
+	key2 := testutils.GetTestBytes(1)
+	val1 := testutils.GetTestBytes(1)
+	val2 := testutils.GetTestBytes(2)
+	sharedVal := testutils.GetTestBytes(3)
+	val4 := testutils.GetTestBytes(4)
+
+	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureSet, bucket1, nil)
+		txCreateBucket(t, db, DataStructureSet, bucket2, nil)
+		txSAdd(t, db, bucket1, key1, val1, nil, nil)
+		txSAdd(t, db, bucket1, key1, val2, nil, nil)
+		txSAdd(t, db, bucket1, key1, sharedVal, nil, nil)
+		txSAdd(t, db, bucket2, key2, sharedVal, nil, nil)
+		txSAdd(t, db, bucket2, key2, val4, nil, nil)
+
+		union := [][]byte{val1, val2, sharedVal, val4}
+		txSUnionByTwoBuckets(t, db, bucket1, key1, bucket2, key2, union, nil)
+	})
+}
+
+func TestTx_SUnionByTwoBuckets_OneSetSubsetOfOther(t *testing.T) {
+	bucket1 := "bucket1"
+	bucket2 := "bucket2"
+	key1 := testutils.GetTestBytes(0)
+	key2 := testutils.GetTestBytes(1)
+	val1 := testutils.GetTestBytes(1)
+	val2 := testutils.GetTestBytes(2)
+	val3 := testutils.GetTestBytes(3)
+
+	runNutsDBTest(t, nil, func(t *testing.T, db *DB) {
+		txCreateBucket(t, db, DataStructureSet, bucket1, nil)
+		txCreateBucket(t, db, DataStructureSet, bucket2, nil)
+		txSAdd(t, db, bucket1, key1, val1, nil, nil)
+		txSAdd(t, db, bucket1, key1, val2, nil, nil)
+		txSAdd(t, db, bucket1, key1, val3, nil, nil)
+		txSAdd(t, db, bucket2, key2, val1, nil, nil)
+		txSAdd(t, db, bucket2, key2, val2, nil, nil)
+
+		union := [][]byte{val1, val2, val3}
+		txSUnionByTwoBuckets(t, db, bucket1, key1, bucket2, key2, union, nil)
 	})
 }
 
