@@ -47,13 +47,13 @@ func (tx *Tx) sPut(bucket string, key []byte, dataFlag uint16, values ...[]byte)
 		bucketId := b1.Id
 
 		if set, ok := tx.db.Index.Set.exist(bucketId); ok {
-
-			if _, ok := set.M[string(key)]; ok {
-				for hash := range set.M[string(key)] {
-					filter[hash] = struct{}{}
-				}
+			err := set.RangeMembers(string(key), func(hash uint32, record *core.Record) bool {
+				filter[hash] = struct{}{}
+				return true
+			})
+			if err != nil && err != ErrSetNotExist {
+				return err
 			}
-
 		}
 
 		for _, value := range values {
@@ -215,17 +215,19 @@ func (tx *Tx) SPop(bucket string, key []byte) ([]byte, error) {
 	bucketId := b.Id
 
 	if set, ok := tx.db.Index.Set.exist(bucketId); ok {
-		for _, items := range set.M[string(key)] {
-			value, err := tx.db.getValueByRecord(items)
-			if err != nil {
-				return nil, err
-			}
-			err = tx.sPut(bucket, key, DataDeleteFlag, value)
-			if err != nil {
-				return nil, err
-			}
-			return value, err
+		record := set.SPop(string(key))
+		if record == nil {
+			return nil, ErrBucketNotFound
 		}
+		value, err := tx.db.getValueByRecord(record)
+		if err != nil {
+			return nil, err
+		}
+		err = tx.sPut(bucket, key, DataDeleteFlag, value)
+		if err != nil {
+			return nil, err
+		}
+		return value, nil
 	}
 
 	return nil, ErrBucketNotFound
@@ -312,14 +314,19 @@ func (tx *Tx) SDiffByTwoBuckets(bucket1 string, key1 []byte, bucket2 string, key
 
 	values := make([][]byte, 0)
 
-	for hash, item := range set1.M[string(key1)] {
-		if _, ok := set2.M[string(key2)][hash]; !ok {
-			value, err := tx.db.getValueByRecord(item)
-			if err != nil {
-				return nil, err
+	err = set1.RangeMembers(string(key1), func(hash uint32, item *core.Record) bool {
+		if _, ok := set2.GetMember(string(key2), hash); !ok {
+			value, getErr := tx.db.getValueByRecord(item)
+			if getErr != nil {
+				err = getErr
+				return false
 			}
 			values = append(values, value)
 		}
+		return true
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	return values, nil
@@ -387,8 +394,13 @@ func (tx *Tx) SMoveByTwoBuckets(bucket1 string, key1 []byte, bucket2 string, key
 		return false, err
 	}
 
-	if r, ok := set2.M[string(key2)][hash]; !ok {
-		err := set2.SAdd(string(key2), [][]byte{item}, []*core.Record{r})
+	member, ok := set1.GetMember(string(key1), hash)
+	if !ok {
+		return false, ErrSetMemberNotExist
+	}
+
+	if _, exists := set2.GetMember(string(key2), hash); !exists {
+		err := set2.SAdd(string(key2), [][]byte{item}, []*core.Record{member})
 		if err != nil {
 			return false, err
 		}
@@ -474,22 +486,40 @@ func (tx *Tx) SUnionByTwoBuckets(bucket1 string, key1 []byte, bucket2 string, ke
 
 	values := make([][]byte, 0)
 
-	for _, r := range set1.M[string(key1)] {
-		value, err := tx.db.getValueByRecord(r)
-		if err != nil {
-			return nil, err
-		}
-		values = append(values, value)
+	var traverseErr error
+	if err := set1.RangeMembers(
+		string(key1),
+		func(_ uint32, r *core.Record) bool {
+			value, getErr := tx.db.getValueByRecord(r)
+			if getErr != nil {
+				traverseErr = getErr
+				return false
+			}
+			values = append(values, value)
+			return true
+		},
+	); err != nil {
+		return nil, err
+	}
+	if traverseErr != nil {
+		return nil, traverseErr
 	}
 
-	for hash, r := range set2.M[string(key2)] {
-		if _, ok := set1.M[string(key1)][hash]; !ok {
-			value, err := tx.db.getValueByRecord(r)
-			if err != nil {
-				return nil, err
+	if err := set2.RangeMembers(string(key2), func(hash uint32, r *core.Record) bool {
+		if _, ok := set1.GetMember(string(key1), hash); !ok {
+			value, getErr := tx.db.getValueByRecord(r)
+			if getErr != nil {
+				traverseErr = getErr
+				return false
 			}
 			values = append(values, value)
 		}
+		return true
+	}); err != nil {
+		return nil, err
+	}
+	if traverseErr != nil {
+		return nil, traverseErr
 	}
 
 	return values, nil
@@ -508,13 +538,14 @@ func (tx *Tx) SKeys(bucket, pattern string, f func(key string) bool) error {
 	if set, ok := tx.db.Index.Set.exist(bucketId); !ok {
 		return ErrBucket
 	} else {
-		for key := range set.M {
-			if end, err := utils.MatchForRange(pattern, key, f); end || err != nil {
-				return err
-			}
-		}
+		var rangeErr error = nil
+		set.RangeKeys(func(key string) bool {
+			var end bool
+			end, rangeErr = utils.MatchForRange(pattern, key, f)
+			return !end && rangeErr == nil
+		})
+		return rangeErr
 	}
-	return nil
 }
 
 // ErrBucketAndKey returns when bucket or key not found.

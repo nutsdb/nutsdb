@@ -780,9 +780,7 @@ func (tx *Tx) getChangeCountInBucketChanges() int64 {
 				}
 			case DataStructureSet:
 				if set, ok := tx.db.Index.Set.Idx[bucketId]; ok {
-					for key := range set.M {
-						res -= int64(set.SCard(key))
-					}
+					res -= set.SCardAll()
 				}
 			case DataStructureSortedSet:
 				if sortedSet, ok := tx.db.Index.SortedSet.Idx[bucketId]; ok {

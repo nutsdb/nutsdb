@@ -782,9 +782,7 @@ func (db *DB) getRecordCount() (int64, error) {
 
 	// Iterate through the Set indices
 	for _, setItem := range db.Index.Set.Idx {
-		for key := range setItem.M {
-			res += int64(setItem.SCard(key))
-		}
+		res += setItem.SCardAll()
 	}
 
 	// Iterate through the SortedSet indices

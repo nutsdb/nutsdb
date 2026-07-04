@@ -19,6 +19,7 @@ import (
 
 	"github.com/nutsdb/nutsdb/internal/core"
 	"github.com/nutsdb/nutsdb/internal/testutils"
+	"github.com/nutsdb/nutsdb/internal/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -452,4 +453,52 @@ func TestSet_SUnion(t *testing.T) {
 			require.ElementsMatchf(t, tt.want, got, "Get() got = %v, want %v", got, tt.want)
 		})
 	}
+}
+
+func TestSet_QueryAPIs(t *testing.T) {
+	set := NewSet()
+	key := "myset"
+	expectRecords := testutils.GenerateRecords(3)
+	values := make([][]byte, 3)
+	for i := range expectRecords {
+		values[i] = expectRecords[i].Value
+	}
+	require.NoError(t, set.SAdd(key, values, expectRecords))
+
+	t.Run("GetMember", func(t *testing.T) {
+		hash, err := utils.GetFnv32(values[0])
+		require.NoError(t, err)
+		record, ok := set.GetMember(key, hash)
+		require.True(t, ok)
+		require.Equal(t, expectRecords[0], record)
+		_, ok = set.GetMember(key, hash+1)
+		require.False(t, ok)
+		_, ok = set.GetMember("missing", hash)
+		require.False(t, ok)
+	})
+
+	t.Run("RangeMembers", func(t *testing.T) {
+		count := 0
+		require.NoError(t, set.RangeMembers(key, func(_ uint32, record *core.Record) bool {
+			count++
+			require.Contains(t, expectRecords, record)
+			return true
+		}))
+		require.Equal(t, 3, count)
+		require.ErrorIs(t, set.RangeMembers("missing", func(uint32, *core.Record) bool { return true }), ErrSetNotExist)
+	})
+
+	t.Run("RangeKeys", func(t *testing.T) {
+		keys := make([]string, 0)
+		set.RangeKeys(func(k string) bool {
+			keys = append(keys, k)
+			return true
+		})
+		require.Equal(t, []string{key}, keys)
+	})
+
+	t.Run("SCardAll", func(t *testing.T) {
+		require.Equal(t, int64(3), set.SCardAll())
+		require.Equal(t, int64(0), NewSet().SCardAll())
+	})
 }

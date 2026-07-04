@@ -687,15 +687,11 @@ func (job *mergeJob) applyLookup(entry *mergeLookupEntry) {
 		if !exist {
 			return
 		}
-		members, ok := setIdx.M[string(hint.Key)]
-		if !ok {
-			return
-		}
 		// Value hash is required for Set to identify the specific member
 		if !entry.hasValueHash {
 			return
 		}
-		record, ok := members[entry.valueHash]
+		record, ok := setIdx.GetMember(string(hint.Key), entry.valueHash)
 		if !ok || record == nil {
 			return
 		}
