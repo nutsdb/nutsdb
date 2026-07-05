@@ -16,6 +16,8 @@ package store
 
 import (
 	"bytes"
+
+	"github.com/nutsdb/nutsdb/internal/core"
 )
 
 // MemStore is a memory store for the nutsdb.
@@ -27,16 +29,16 @@ import (
 type MemStore interface {
 	// Put a key - value pair into the memstore.
 	// operation: upsert.
-	Put(key []byte, value []byte) error
+	Put(key []byte, value *core.Record) error
 	// Get a value by key from the memstore.
-	Get(key []byte) ([]byte, error)
+	Get(key []byte) (*core.Record, error)
 	// Delete a key - value pair from the memstore.
 	// if key is not found, return nil and false.
 	// if key is found, return the value and true.
-	Delete(key []byte) ([]byte, bool)
+	Delete(key []byte) (*core.Record, bool)
 	// Iterate walks all keys and values in sorted key order and invokes callback function;
 	// iteration stops when callback returns false.
-	Iterate(callback func(key []byte, value []byte) bool)
+	Iterate(callback func(key []byte, value *core.Record) bool)
 }
 
 type color bool
@@ -81,7 +83,7 @@ func newRBTree[V any]() *RBTree[V] {
 }
 
 func NewMemStore() MemStore {
-	return newRBTree[[]byte]()
+	return newRBTree[*core.Record]()
 }
 
 func newRBNode[V any](key []byte, value V) *rbNode[V] {

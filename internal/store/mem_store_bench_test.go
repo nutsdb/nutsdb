@@ -17,12 +17,18 @@ package store
 import (
 	"fmt"
 	"testing"
+
+	"github.com/nutsdb/nutsdb/internal/core"
 )
 
-var benchValue = []byte("benchmark-value-payload")
+var benchRecord = core.NewRecord().WithValue([]byte("benchmark-value-payload"))
 
 func benchKey(i int) []byte {
 	return []byte(fmt.Sprintf("memstore-bench-key-%012d", i))
+}
+
+func benchRecordForKey(key []byte) *core.Record {
+	return core.NewRecord().WithKey(key).WithValue(benchRecord.Value)
 }
 
 func newPopulatedMemStore(b *testing.B, n int) (MemStore, [][]byte) {
@@ -33,7 +39,7 @@ func newPopulatedMemStore(b *testing.B, n int) (MemStore, [][]byte) {
 	for i := 0; i < n; i++ {
 		key := benchKey(i)
 		keys[i] = key
-		if err := ms.Put(key, benchValue); err != nil {
+		if err := ms.Put(key, benchRecordForKey(key)); err != nil {
 			b.Fatalf("populate store: %v", err)
 		}
 	}
@@ -46,7 +52,8 @@ func BenchmarkMemStore_Put(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if err := ms.Put(benchKey(i), benchValue); err != nil {
+		key := benchKey(i)
+		if err := ms.Put(key, benchRecordForKey(key)); err != nil {
 			b.Fatalf("put: %v", err)
 		}
 	}
@@ -60,7 +67,8 @@ func BenchmarkMemStore_PutOverwrite(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				if err := ms.Put(keys[i%n], benchValue); err != nil {
+				key := keys[i%n]
+				if err := ms.Put(key, benchRecordForKey(key)); err != nil {
 					b.Fatalf("put overwrite: %v", err)
 				}
 			}
@@ -114,7 +122,7 @@ func BenchmarkMemStore_Delete(b *testing.B) {
 				b.StopTimer()
 				ms := NewMemStore()
 				for _, key := range keys {
-					if err := ms.Put(key, benchValue); err != nil {
+					if err := ms.Put(key, benchRecordForKey(key)); err != nil {
 						b.Fatalf("populate store: %v", err)
 					}
 				}
@@ -139,7 +147,7 @@ func BenchmarkMemStore_Iterate(b *testing.B) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				var count int
-				ms.Iterate(func(key, value []byte) bool {
+				ms.Iterate(func(key []byte, value *core.Record) bool {
 					count++
 					return true
 				})
@@ -160,7 +168,8 @@ func BenchmarkMemStore_Mixed(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		switch i % 4 {
 		case 0:
-			if err := ms.Put(keys[i%storeSize], benchValue); err != nil {
+			key := keys[i%storeSize]
+			if err := ms.Put(key, benchRecordForKey(key)); err != nil {
 				b.Fatalf("mixed put: %v", err)
 			}
 		case 1:
@@ -168,13 +177,14 @@ func BenchmarkMemStore_Mixed(b *testing.B) {
 				b.Fatalf("mixed get: %v", err)
 			}
 		case 2:
-			if _, ok := ms.Delete(keys[i%storeSize]); !ok {
-				if err := ms.Put(keys[i%storeSize], benchValue); err != nil {
+			key := keys[i%storeSize]
+			if _, ok := ms.Delete(key); !ok {
+				if err := ms.Put(key, benchRecordForKey(key)); err != nil {
 					b.Fatalf("mixed repopulate: %v", err)
 				}
 			}
 		case 3:
-			ms.Iterate(func(key, value []byte) bool {
+			ms.Iterate(func(key []byte, value *core.Record) bool {
 				return i%100 != 0
 			})
 		}
