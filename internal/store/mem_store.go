@@ -127,21 +127,6 @@ func (rb *RBTree[V]) Put(key []byte, value V) error {
 	return rb.Add(key, value)
 }
 
-// KeyValues returns all keys and values in sorted key order.
-func (rb *RBTree[V]) KeyValues() ([][]byte, []V) {
-	keys := make([][]byte, 0, rb.Size())
-	values := make([]V, 0, rb.Size())
-	if rb.root == nil {
-		return keys, values
-	}
-	rb.inOrderTraversal(func(node *rbNode[V]) bool {
-		keys = append(keys, node.key)
-		values = append(values, node.value)
-		return true
-	})
-	return keys, values
-}
-
 // Iterate walks nodes in key order and invokes cb; iteration stops when cb returns false.
 func (rb *RBTree[V]) Iterate(cb func(key []byte, value V) bool) {
 	rb.inOrderTraversal(func(node *rbNode[V]) bool {

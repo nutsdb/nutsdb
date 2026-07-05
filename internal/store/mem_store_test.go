@@ -15,6 +15,9 @@
 package store
 
 import (
+	"bytes"
+	"fmt"
+	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -146,4 +149,190 @@ func TestMemStore_EmptyStoreIterate(t *testing.T) {
 		return true
 	})
 	require.False(t, called)
+}
+
+func TestMemStore_RandomInsert(t *testing.T) {
+	const n = 500
+	ms := NewMemStore()
+	entries := make([][2][]byte, n)
+	for i := 0; i < n; i++ {
+		entries[i] = [2][]byte{
+			[]byte(fmt.Sprintf("key-%04d", i)),
+			[]byte(fmt.Sprintf("val-%04d", i)),
+		}
+	}
+
+	rng := rand.New(rand.NewSource(42))
+	for _, idx := range rng.Perm(n) {
+		entry := entries[idx]
+		require.NoError(t, ms.Put(entry[0], entry[1]))
+	}
+
+	for _, entry := range entries {
+		got, err := ms.Get(entry[0])
+		require.NoError(t, err)
+		require.Equal(t, entry[1], got)
+	}
+
+	var keys [][]byte
+	ms.Iterate(func(key, value []byte) bool {
+		if len(keys) > 0 {
+			require.Less(t, bytes.Compare(keys[len(keys)-1], key), 0)
+		}
+		keys = append(keys, append([]byte(nil), key...))
+		return true
+	})
+	require.Len(t, keys, n)
+}
+
+func assertMemStoreState(t *testing.T, ms MemStore, want map[string][]byte) {
+	t.Helper()
+
+	var prev []byte
+	var count int
+	ms.Iterate(func(key, value []byte) bool {
+		count++
+		if len(prev) > 0 {
+			require.Less(t, bytes.Compare(prev, key), 0)
+		}
+		prev = append(prev[:0], key...)
+
+		expect, ok := want[string(key)]
+		require.True(t, ok, "unexpected key %q", key)
+		require.Equal(t, expect, value)
+		return true
+	})
+	require.Equal(t, len(want), count)
+}
+
+func TestMemStore_RandomInsertAndDelete(t *testing.T) {
+	const n = 1000
+	ms := NewMemStore()
+	entries := make([][2][]byte, n)
+	for i := 0; i < n; i++ {
+		entries[i] = [2][]byte{
+			[]byte(fmt.Sprintf("key-%06d", i)),
+			[]byte(fmt.Sprintf("val-%06d", i)),
+		}
+	}
+
+	rng := rand.New(rand.NewSource(99))
+	for _, idx := range rng.Perm(n) {
+		entry := entries[idx]
+		require.NoError(t, ms.Put(entry[0], entry[1]))
+	}
+
+	remaining := make(map[string][]byte, n)
+	for _, entry := range entries {
+		remaining[string(entry[0])] = entry[1]
+	}
+
+	for _, idx := range rng.Perm(n) {
+		entry := entries[idx]
+		got, ok := ms.Delete(entry[0])
+		require.True(t, ok)
+		require.Equal(t, entry[1], got)
+
+		delete(remaining, string(entry[0]))
+		assertMemStoreState(t, ms, remaining)
+	}
+
+	assertMemStoreState(t, ms, map[string][]byte{})
+}
+
+func TestMemStore_DeleteStructuralCases(t *testing.T) {
+	t.Run("sole_root", func(t *testing.T) {
+		ms := NewMemStore()
+		key := []byte("root")
+		val := []byte("value")
+
+		require.NoError(t, ms.Put(key, val))
+		got, ok := ms.Delete(key)
+		require.True(t, ok)
+		require.Equal(t, val, got)
+		assertMemStoreState(t, ms, map[string][]byte{})
+	})
+
+	t.Run("delete_root_with_children", func(t *testing.T) {
+		ms := NewMemStore()
+		keys := []string{"key-002", "key-000", "key-001", "key-003", "key-004"}
+		want := make(map[string][]byte, len(keys))
+		for _, key := range keys {
+			val := []byte("v-" + key)
+			require.NoError(t, ms.Put([]byte(key), val))
+			want[key] = val
+		}
+
+		got, ok := ms.Delete([]byte("key-002"))
+		require.True(t, ok)
+		require.Equal(t, want["key-002"], got)
+		delete(want, "key-002")
+		assertMemStoreState(t, ms, want)
+	})
+
+	t.Run("delete_internal_then_leaves", func(t *testing.T) {
+		ms := NewMemStore()
+		keys := []string{
+			"key-004", "key-002", "key-006", "key-001", "key-003",
+			"key-005", "key-007", "key-000", "key-008", "key-009",
+		}
+		want := make(map[string][]byte, len(keys))
+		for _, key := range keys {
+			val := []byte("v-" + key)
+			require.NoError(t, ms.Put([]byte(key), val))
+			want[key] = val
+		}
+
+		deleteOrder := []string{
+			"key-004", "key-001", "key-006", "key-000", "key-008",
+			"key-002", "key-005", "key-009", "key-003", "key-007",
+		}
+		for _, key := range deleteOrder {
+			got, ok := ms.Delete([]byte(key))
+			require.True(t, ok)
+			require.Equal(t, want[key], got)
+			delete(want, key)
+			assertMemStoreState(t, ms, want)
+		}
+	})
+
+	t.Run("delete_in_sorted_order", func(t *testing.T) {
+		ms := NewMemStore()
+		want := make(map[string][]byte)
+		for i := 0; i < 32; i++ {
+			key := fmt.Sprintf("sorted-%02d", i)
+			val := []byte("v-" + key)
+			require.NoError(t, ms.Put([]byte(key), val))
+			want[key] = val
+		}
+
+		for i := 0; i < 32; i++ {
+			key := fmt.Sprintf("sorted-%02d", i)
+			got, ok := ms.Delete([]byte(key))
+			require.True(t, ok)
+			require.Equal(t, want[key], got)
+			delete(want, key)
+			assertMemStoreState(t, ms, want)
+		}
+	})
+
+	t.Run("delete_in_reverse_sorted_order", func(t *testing.T) {
+		ms := NewMemStore()
+		want := make(map[string][]byte)
+		for i := 0; i < 32; i++ {
+			key := fmt.Sprintf("rev-%02d", i)
+			val := []byte("v-" + key)
+			require.NoError(t, ms.Put([]byte(key), val))
+			want[key] = val
+		}
+
+		for i := 31; i >= 0; i-- {
+			key := fmt.Sprintf("rev-%02d", i)
+			got, ok := ms.Delete([]byte(key))
+			require.True(t, ok)
+			require.Equal(t, want[key], got)
+			delete(want, key)
+			assertMemStoreState(t, ms, want)
+		}
+	})
 }
