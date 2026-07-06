@@ -15,6 +15,9 @@
 package nutsdb
 
 import (
+	"path/filepath"
+	"strconv"
+
 	"github.com/nutsdb/nutsdb/internal/core"
 	"github.com/nutsdb/nutsdb/internal/fileio"
 )
@@ -23,6 +26,11 @@ const (
 	// DataSuffix returns the data suffix
 	DataSuffix = ".dat"
 )
+
+// getDataPath returns the data file path for the given file ID.
+func getDataPath(fID int64, dir string) string {
+	return filepath.Join(dir, strconv.FormatInt(fID, 10)+DataSuffix)
+}
 
 // DataFile records about data file information.
 type DataFile struct {

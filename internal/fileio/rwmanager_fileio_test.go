@@ -4,7 +4,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/nutsdb/nutsdb"
 	"github.com/nutsdb/nutsdb/internal/fileio"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -24,7 +23,7 @@ func TestRWManager_FileIO_All(t *testing.T) {
 			require.NoError(t, err)
 		}
 
-		rwManager := &fileio.FileIORWManager{fd, filePath, fdm, 256 * nutsdb.MB}
+		rwManager := &fileio.FileIORWManager{fd, filePath, fdm, 256 * fileio.MB}
 		b := []byte("hello")
 		off := int64(3)
 		_, err = rwManager.WriteAt(b, off)

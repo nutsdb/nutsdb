@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/nutsdb/nutsdb/internal/core"
+	"github.com/nutsdb/nutsdb/internal/fileio"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -16,8 +17,7 @@ func Test_readEntry(t *testing.T) {
 	fd, err := os.OpenFile(path, os.O_TRUNC|os.O_CREATE|os.O_RDWR, os.ModePerm)
 	require.NoError(t, err)
 	meta := core.NewMetaData().WithKeySize(uint32(len("key"))).
-		WithValueSize(uint32(len("val"))).WithTimeStamp(1547707905).
-		WithTTL(Persistent).WithFlag(DataSetFlag).WithBucketId(1)
+		WithValueSize(uint32(len("val"))).WithTimeStamp(1547707905).WithBucketId(1)
 
 	expect := core.NewEntry().WithKey([]byte("key")).WithMeta(meta).WithValue([]byte("val"))
 
@@ -43,7 +43,6 @@ func Test_fileRecovery_readBucket(t *testing.T) {
 			Op: core.BucketInsertOperation,
 		},
 		Id:   1,
-		Ds:   DataStructureBTree,
 		Name: "bucket_1",
 	}
 	bytes := bucket.Encode()
@@ -59,7 +58,7 @@ func Test_fileRecovery_readBucket(t *testing.T) {
 	_, err = fd.Write(bytes)
 	assert.Nil(t, err)
 
-	fr, err := newFileRecovery(filePath, 4*MB)
+	fr, err := newFileRecovery(filePath, 4*fileio.MB)
 	assert.Nil(t, err)
 	readBucket, err := fr.readBucket()
 	assert.Nil(t, err)

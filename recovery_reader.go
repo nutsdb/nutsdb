@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/nutsdb/nutsdb/internal/core"
+	"github.com/nutsdb/nutsdb/internal/fileio"
 )
 
 // fileRecovery use bufio.Reader to read entry
@@ -124,7 +125,7 @@ func (fr *fileRecovery) readBucket() (b *core.Bucket, err error) {
 // if the size < 4 * KB, use 4 * KB as the size of buffer in bufio.Reader
 // if the size > 4 * KB, use the nearly blockSize buffer as the size of buffer in bufio.Reader
 func calBufferSize(size int) int {
-	blockSize := 4 * KB
+	blockSize := 4 * fileio.KB
 	if size < blockSize {
 		return blockSize
 	}

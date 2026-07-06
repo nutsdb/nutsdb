@@ -1,40 +1,17 @@
 package nutsdb
 
-import (
-	"errors"
+import "github.com/nutsdb/nutsdb/internal/core"
+
+// Public errors. These are re-exports of the definitions in internal/core so
+// that they are part of the nutsdb public API while keeping a single error
+// identity (errors.Is works across nutsdb.ErrXxx and core.ErrXxx).
+//
+// They are defined as aliases rather than moved out of internal/core to avoid
+// an import cycle (internal/core is imported by this package).
+var (
+	// ErrCrc is returned when a CRC check fails while reading an entry.
+	ErrCrc = core.ErrCrc
+	// ErrCapacity is returned when an invalid capacity is provided.
+	ErrCapacity  = core.ErrCapacity
+	ErrEntryZero = core.ErrEntryZero
 )
-
-// IsDBClosed is true if the error indicates the db was closed.
-func IsDBClosed(err error) bool {
-	return errors.Is(err, ErrDBClosed)
-}
-
-// IsKeyNotFound is true if the error indicates the key is not found.
-func IsKeyNotFound(err error) bool {
-	return errors.Is(err, ErrNotFoundKey)
-}
-
-// IsBucketNotFound is true if the error indicates the bucket is not exists.
-func IsBucketNotFound(err error) bool {
-	return errors.Is(err, ErrBucketNotFound)
-}
-
-// IsBucketEmpty is true if the bucket is empty.
-func IsBucketEmpty(err error) bool {
-	return errors.Is(err, ErrBucketEmpty)
-}
-
-// IsKeyEmpty is true if the key is empty.
-func IsKeyEmpty(err error) bool {
-	return errors.Is(err, ErrKeyEmpty)
-}
-
-// IsPrefixScan is true if prefix scanning not found the result.
-func IsPrefixScan(err error) bool {
-	return errors.Is(err, ErrPrefixScan)
-}
-
-// IsPrefixSearchScan is true if prefix and search scanning not found the result.
-func IsPrefixSearchScan(err error) bool {
-	return errors.Is(err, ErrPrefixSearchScan)
-}
