@@ -23,18 +23,41 @@ import (
 	"github.com/nutsdb/nutsdb/internal/utils"
 )
 
-// Store is the storage I/O layer facade.
+// Store is the storage I/O layer facade for append-only segment files.
 type Store interface {
+	// Append encodes and appends a record to the active segment.
+	// It does not wait for durability; callers that need fsync should use AppendSync or Sync.
+	// Returns a stable Location of the written record.
 	Append(payload []byte, typ RecordType) (Location, error)
+
+	// AppendSync appends a record and then Syncs so the record is durable before return.
 	AppendSync(payload []byte, typ RecordType) (Location, error)
+
+	// Sync flushes the write buffer and fsyncs the active segment so durable_offset
+	// catches up with written_offset.
 	Sync() error
 
+	// Read loads the record at loc, verifies its checksum, and returns a copy of the payload
+	// together with its RecordType. The returned slice is owned by the caller.
 	Read(loc Location) (payload []byte, typ RecordType, err error)
+
+	// ReadInto is like Read but prefers writing the payload into buf to avoid allocation
+	// when buf has enough capacity; otherwise it allocates a new slice.
 	ReadInto(loc Location, buf []byte) (payload []byte, typ RecordType, err error)
+
+	// Iterate walks records in fileID in offset order and invokes fn for each complete record.
+	// Iteration stops and returns the first non-nil error from fn.
 	Iterate(fileID uint32, fn func(loc Location, typ RecordType, payload []byte) error) error
 
+	// SealIfNeeded seals the active segment when remaining space cannot fit MaxRecordSize,
+	// then creates a new active segment.
 	SealIfNeeded() error
+
+	// DeleteSegment removes a sealed segment file and drops it from the open-segment cache.
+	// Deleting the active segment is rejected.
 	DeleteSegment(fileID uint32) error
+
+	// Close flushes buffered writes, releases mmap/fd resources, and makes the Store unusable.
 	Close() error
 }
 
