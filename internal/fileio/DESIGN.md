@@ -1,8 +1,7 @@
-# AI_DESIGN: KV 存储交互层（Storage I/O Layer）
+# DESIGN: KV 存储交互层（Storage I/O Layer）
 
 > 本文档描述一套面向 KV 存储系统的**磁盘交互层**设计方案。  
 > 目标优先保证：**顺序写吞吐**与**随机读延迟**。  
-> 本方案为独立设计，不要求兼容现有 `DataFile` / `RWManager` 实现。
 
 ---
 
@@ -159,13 +158,23 @@ usable = SegmentSize - header_size - footer_size
 <data_dir>/<fileID>.seg
 ```
 
+`fileID` 在文件名中为 **10 位十进制、前导零补齐**（与 `uint32` 十进制最大宽度一致），例如：
+
+```text
+<data_dir>/0000000001.seg
+<data_dir>/0000000042.seg
+```
+
 可选分片目录（启用 shard 时）：
 
 ```text
 <data_dir>/shard-<id>/<fileID>.seg
 ```
 
+示例：`data/shard-0/0000000001.seg`。
+
 `FileID` **全局唯一**（跨 shard 不复用进行中的 ID；obsolete 删除后可复用，见 §6.2）。
+内存与 API 中仍使用 `uint32` 数值；仅磁盘文件名使用零填充形式，便于目录排序与对齐。
 
 预分配：优先 `fallocate(capacity)` 硬分配；不支持时降级 `Truncate(capacity)`，并在文档/日志中标记可能稀疏。
 
@@ -359,6 +368,7 @@ create(preallocate)
 ### 6.2 FileID 分配
 
 - 启动时扫描现有 `max(FileID)`，新段用 `max+1`
+- 磁盘文件名固定为 `%010d`（10 位前导零）；解析时要求恰好 10 位数字
 - `uint32` 耗尽前应报警；允许复用 **已 Delete 的 obsolete** ID（不得复用仍被索引引用的 ID）
 - 删除段文件前，上层须保证无引用（compaction 完成）
 
@@ -394,7 +404,7 @@ create(preallocate)
 shard = hash(key) % N
 each shard: ActiveSegment + Appender
 Location 不含 ShardID（FileID 全局唯一即可）
-目录: data/shard-<n>/<fileID>.seg
+目录: data/shard-<n>/<fileID>.seg   // fileID 为 10 位前导零，如 0000000001.seg
 ```
 
 恢复与 compaction 按 shard 独立；跨 shard 无共享 active。
@@ -482,7 +492,7 @@ Get:  payload, _ = Store.Read(memIndex[key])
 
 ## 13. 总结
 
-1. **契约**：`Location{FileID, Offset:u64, Length:u32}`；盘上单条 `payload_len` 为 u32 且受 `MaxRecordSize` 约束。  
+1. **契约**：`Location{FileID, Offset:u64, Length:u32}`；盘上单条 `payload_len` 为 u32 且受 `MaxRecordSize` 约束；文件名中 `FileID` 为 10 位前导零。  
 2. **布局**：`header_size=footer_size=4096`；footer 固定在文件尾；LE + CRC-32C。  
 3. **写**：单 active 顺序追加；小包聚合、大包旁路；Sync 策略可配。  
 4. **读**：一跳点查；可见性区分进程内与崩溃后。  

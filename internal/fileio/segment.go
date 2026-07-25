@@ -46,8 +46,12 @@ type segment struct {
 	mmapData mmap.MMap
 }
 
+func formatFileID(id uint32) string {
+	return fmt.Sprintf("%0*d", FileIDWidth, id)
+}
+
 func segmentPath(dir string, id uint32) string {
-	return filepath.Join(dir, strconv.FormatUint(uint64(id), 10)+segmentSuffix)
+	return filepath.Join(dir, formatFileID(id)+segmentSuffix)
 }
 
 func parseSegmentID(name string) (uint32, bool) {
@@ -55,6 +59,14 @@ func parseSegmentID(name string) (uint32, bool) {
 		return 0, false
 	}
 	idStr := strings.TrimSuffix(name, segmentSuffix)
+	if len(idStr) != FileIDWidth {
+		return 0, false
+	}
+	for i := 0; i < len(idStr); i++ {
+		if idStr[i] < '0' || idStr[i] > '9' {
+			return 0, false
+		}
+	}
 	v, err := strconv.ParseUint(idStr, 10, 32)
 	if err != nil {
 		return 0, false
