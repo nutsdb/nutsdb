@@ -21,7 +21,6 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/nutsdb/nutsdb"
 	"github.com/nutsdb/nutsdb/internal/fileio"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -48,7 +47,7 @@ func (s *rwMgrMMapTestSuite) isFileDescriptorClosed(fd uintptr) error {
 func (s *rwMgrMMapTestSuite) TestRWManager_MMap_Release() {
 	t := s.T()
 	filePath := filepath.Join(t.TempDir(), "foo_rw_MMap")
-	fdm := nutsdb.NewFileManager(nutsdb.MMap, 8*fileio.MB, 0.5, 8*fileio.MB)
+	fdm := fileio.NewFileManager(fileio.MMap, 8*fileio.MB, 0.5, 8*fileio.MB)
 	rwmanager, err := fdm.GetMMapRWManager(filePath, 8*fileio.MB, 8*fileio.MB, false)
 	if err != nil {
 		t.Error("err TestRWManager_MMap_Release GetMMapRWManager")

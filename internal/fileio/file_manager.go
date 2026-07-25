@@ -1,9 +1,9 @@
-package nutsdb
+package fileio
 
 import (
 	"errors"
 
-	"github.com/nutsdb/nutsdb/internal/fileio"
+	"github.com/nutsdb/nutsdb/internal/core"
 )
 
 // RWMode represents the read and write mode.
@@ -20,7 +20,7 @@ const (
 // FileManager holds the fd cache and file-related operations go through the manager to obtain the file processing object
 type FileManager struct {
 	rwMode      RWMode
-	fdm         *fileio.FdManager
+	fdm         *FdManager
 	segmentSize int64
 }
 
@@ -28,39 +28,39 @@ type FileManager struct {
 func NewFileManager(rwMode RWMode, maxFdNums int, cleanThreshold float64, segmentSize int64) (fm *FileManager) {
 	fm = &FileManager{
 		rwMode:      rwMode,
-		fdm:         fileio.NewFdm(maxFdNums, cleanThreshold),
+		fdm:         NewFdm(maxFdNums, cleanThreshold),
 		segmentSize: segmentSize,
 	}
 	return fm
 }
 
 // GetFileRWManager will return a FileIORWManager Object
-func (fm *FileManager) GetFileRWManager(path string, capacity int64, segmentSize int64, readOnly bool) (*fileio.FileIORWManager, error) {
+func (fm *FileManager) GetFileRWManager(path string, capacity int64, segmentSize int64, readOnly bool) (*FileIORWManager, error) {
 	fd, err := fm.fdm.GetFd(path)
 	if err != nil {
 		return nil, err
 	}
-	err = fileio.Truncate(path, capacity, fd, readOnly)
+	err = Truncate(path, capacity, fd, readOnly)
 	if err != nil {
 		return nil, err
 	}
 
-	return &fileio.FileIORWManager{Fd: fd, Path: path, Fdm: fm.fdm, SegmentSize: segmentSize}, nil
+	return &FileIORWManager{Fd: fd, Path: path, Fdm: fm.fdm, SegmentSize: segmentSize}, nil
 }
 
 // GetMMapRWManager will return a MMapRWManager Object
-func (fm *FileManager) GetMMapRWManager(path string, capacity int64, segmentSize int64, readOnly bool) (*fileio.MMapRWManager, error) {
+func (fm *FileManager) GetMMapRWManager(path string, capacity int64, segmentSize int64, readOnly bool) (*MMapRWManager, error) {
 	fd, err := fm.fdm.GetFd(path)
 	if err != nil {
 		return nil, err
 	}
 
-	err = fileio.Truncate(path, capacity, fd, readOnly)
+	err = Truncate(path, capacity, fd, readOnly)
 	if err != nil {
 		return nil, err
 	}
 
-	return fileio.GetMMapRWManager(fd, path, fm.fdm, segmentSize), nil
+	return GetMMapRWManager(fd, path, fm.fdm, segmentSize), nil
 }
 
 func (fm *FileManager) GetRWManager(
@@ -68,9 +68,9 @@ func (fm *FileManager) GetRWManager(
 	capacity int64,
 	segmentSize int64,
 	readOnly bool,
-) (fileio.RWManager, error) {
+) (RWManager, error) {
 	if capacity <= 0 {
-		return nil, ErrCapacity
+		return nil, core.ErrCapacity
 	}
 	if fm.rwMode == FileIO {
 		return fm.GetFileRWManager(path, capacity, segmentSize, readOnly)

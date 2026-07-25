@@ -30,21 +30,6 @@ func TestRecord(t *testing.T) {
 	rec = rec.WithValue([]byte("1112"))
 	r.Equal([]byte("1112"), rec.Value)
 
-	rec = rec.WithFileId(int64(1))
-	r.Equal(int64(1), rec.FileID)
-
-	rec = rec.WithDataPos(uint64(12))
-	r.Equal(uint64(12), rec.DataPos)
-
-	rec = rec.WithValueSize(uint32(123))
-	r.Equal(uint32(123), rec.ValueSize)
-
-	rec = rec.WithTimestamp(uint64(121314))
-	r.Equal(uint64(121314), rec.Timestamp)
-
 	rec = rec.WithTTL(uint32(9))
 	r.Equal(uint32(9), rec.TTL)
-
-	rec = rec.WithTxID(uint64(99))
-	r.Equal(uint64(99), rec.TxID)
 }

@@ -12,14 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package nutsdb
+package fileio
 
 import (
 	"path/filepath"
 	"strconv"
 
 	"github.com/nutsdb/nutsdb/internal/core"
-	"github.com/nutsdb/nutsdb/internal/fileio"
 )
 
 const (
@@ -38,11 +37,11 @@ type DataFile struct {
 	fileID     int64
 	writeOff   int64
 	ActualSize int64
-	rwManager  fileio.RWManager
+	rwManager  RWManager
 }
 
 // NewDataFile will return a new DataFile Object.
-func NewDataFile(path string, rwManager fileio.RWManager) *DataFile {
+func NewDataFile(path string, rwManager RWManager) *DataFile {
 	dataFile := &DataFile{
 		path:      path,
 		rwManager: rwManager,
@@ -116,7 +115,8 @@ type dataFileManagerImpl struct {
 	fm *FileManager
 }
 
-func newDataFileManager(fm *FileManager) DataFileManager {
+// NewDataFileManager creates a DataFileManager backed by the given FileManager.
+func NewDataFileManager(fm *FileManager) DataFileManager {
 	return &dataFileManagerImpl{
 		fm: fm,
 	}

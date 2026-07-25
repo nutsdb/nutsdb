@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package nutsdb
+package fileio_test
 
 import (
 	"os"
@@ -33,8 +33,7 @@ var (
 func init() {
 	filePath = filepath.Join(os.TempDir(), "foo")
 	entry = core.Entry{
-		Key:   []byte("key_0001"),
-		Value: []byte("val_0001"),
+		Record: *core.NewRecord().WithKey([]byte("key_0001")).WithValue([]byte("val_0001")),
 		Meta: core.NewMetaData().WithKeySize(uint32(len("key_0001"))).
 			WithValueSize(uint32(len("val_0001"))).WithTimeStamp(1547707905).WithBucketId(1),
 	}
@@ -44,7 +43,7 @@ func TestDataFile_Err(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip()
 	}
-	dfm := newDataFileManager(NewFileManager(MMap, 1024, 0.5, 256*fileio.MB))
+	dfm := fileio.NewDataFileManager(fileio.NewFileManager(fileio.MMap, 1024, 0.5, 256*fileio.MB))
 	defer func() { _ = dfm.Close() }()
 	_, err := dfm.GetDataFile(filePath, -1)
 	defer func() {
@@ -59,7 +58,7 @@ func TestDataFile1(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip()
 	}
-	dfm := newDataFileManager(NewFileManager(MMap, 1024, 0.5, 256*fileio.MB))
+	dfm := fileio.NewDataFileManager(fileio.NewFileManager(fileio.MMap, 1024, 0.5, 256*fileio.MB))
 	defer func() { _ = dfm.Close() }()
 	df, err := dfm.GetDataFile(filePath, 1024)
 	defer func() { _ = os.Remove(filePath) }()
@@ -79,7 +78,7 @@ func TestDataFile1(t *testing.T) {
 	}
 	e, err := core.DecodeEntryWithError(buf, payloadSize, err)
 	assert.Nil(t, e)
-	assert.Error(t, err, ErrEntryZero)
+	assert.Error(t, err, core.ErrEntryZero)
 
 	buf, err = df.ReadData(0, payloadSize)
 	if err != nil {
@@ -101,7 +100,7 @@ func TestDataFile1(t *testing.T) {
 }
 
 func TestDataFile2(t *testing.T) {
-	dfm := newDataFileManager(NewFileManager(FileIO, 1024, 0.5, 256*fileio.MB))
+	dfm := fileio.NewDataFileManager(fileio.NewFileManager(fileio.FileIO, 1024, 0.5, 256*fileio.MB))
 	tmpdir := t.TempDir()
 	filePath2 := filepath.Join(tmpdir, "foo2")
 	df, err := dfm.GetDataFile(filePath2, 64)
@@ -153,7 +152,7 @@ func TestDataFile2(t *testing.T) {
 }
 
 func TestDataFile_ReadRecord(t *testing.T) {
-	dfm := newDataFileManager(NewFileManager(FileIO, 1024, 0.5, 256*fileio.MB))
+	dfm := fileio.NewDataFileManager(fileio.NewFileManager(fileio.FileIO, 1024, 0.5, 256*fileio.MB))
 	tmpdir := t.TempDir()
 	filePath4 := filepath.Join(tmpdir, "foo4")
 	df, err := dfm.GetDataFile(filePath4, 1024)
@@ -189,7 +188,7 @@ func TestDataFile_ReadRecord(t *testing.T) {
 }
 
 func TestDataFile_Err_Path(t *testing.T) {
-	dfm := newDataFileManager(NewFileManager(FileIO, 1024, 0.5, 256*fileio.MB))
+	dfm := fileio.NewDataFileManager(fileio.NewFileManager(fileio.FileIO, 1024, 0.5, 256*fileio.MB))
 	defer func() { _ = dfm.Close() }()
 	filePath5 := ":/tmp/foo5"
 	df, err := dfm.GetDataFile(filePath5, entry.Size())
@@ -199,7 +198,7 @@ func TestDataFile_Err_Path(t *testing.T) {
 }
 
 func TestDataFile_Crc_Err(t *testing.T) {
-	dfm := newDataFileManager(NewFileManager(FileIO, 1024, 0.5, 256*fileio.MB))
+	dfm := fileio.NewDataFileManager(fileio.NewFileManager(fileio.FileIO, 1024, 0.5, 256*fileio.MB))
 	filePath6 := filepath.Join(t.TempDir(), "foo6")
 
 	df, err := dfm.GetDataFile(filePath6, entry.Size())
@@ -233,7 +232,7 @@ func TestDataFile_Crc_Err(t *testing.T) {
 }
 
 func TestFileManager1(t *testing.T) {
-	dfm := newDataFileManager(NewFileManager(FileIO, 1024, 0.5, 256*fileio.MB))
+	dfm := fileio.NewDataFileManager(fileio.NewFileManager(fileio.FileIO, 1024, 0.5, 256*fileio.MB))
 	filePath6 := filepath.Join(t.TempDir(), "foo2")
 	df, err := dfm.GetDataFile(filePath6, entry.Size())
 	assert.Nil(t, err)

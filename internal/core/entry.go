@@ -54,9 +54,9 @@ const (
 type (
 	// Entry represents the data item.
 	Entry struct {
-		Key   []byte
-		Value []byte
-		Meta  *MetaData
+		Record
+		Meta     *MetaData
+		HintData *HintData
 	}
 )
 
