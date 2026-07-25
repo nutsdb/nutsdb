@@ -1,4 +1,4 @@
-// Copyright 2019 The nutsdb Author. All rights reserved.
+// Copyright 2026 The nutsdb Author. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,14 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//go:build !linux
+
 package fileio
 
-// RWManager represents an interface to a RWManager.
-type RWManager interface {
-	WriteAt(b []byte, off int64) (n int, err error)
-	ReadAt(b []byte, off int64) (n int, err error)
-	Sync() (err error)
-	Release() (err error)
-	Size() int64
-	Close() (err error)
+import "os"
+
+func fallocate(fd *os.File, size int64) error {
+	return fd.Truncate(size)
 }
