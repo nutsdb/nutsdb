@@ -57,6 +57,12 @@ type Store interface {
 	// Deleting the active segment is rejected.
 	DeleteSegment(fileID uint32) error
 
+	// ActiveFileID returns the current active segment FileID, or 0 if none.
+	ActiveFileID() uint32
+
+	// ListFileIDs returns all segment FileIDs found under the store directory.
+	ListFileIDs() ([]uint32, error)
+
 	// Close flushes buffered writes, releases mmap/fd resources, and makes the Store unusable.
 	Close() error
 }
@@ -488,6 +494,24 @@ func (s *store) DeleteSegment(fileID uint32) error {
 		return err
 	}
 	return nil
+}
+
+func (s *store) ActiveFileID() uint32 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.active == nil {
+		return 0
+	}
+	return s.active.id
+}
+
+func (s *store) ListFileIDs() ([]uint32, error) {
+	ids, err := listSegmentIDs(s.opts.Dir)
+	if err != nil {
+		return nil, err
+	}
+	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+	return ids, nil
 }
 
 func (s *store) Close() error {
