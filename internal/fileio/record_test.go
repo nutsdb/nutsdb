@@ -1,4 +1,4 @@
-// Copyright 2019 The nutsdb Author. All rights reserved.
+// Copyright 2026 The nutsdb Author. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,24 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package core_test
+package fileio
 
 import (
 	"testing"
 
-	"github.com/nutsdb/nutsdb/internal/core"
 	"github.com/stretchr/testify/require"
 )
 
-func TestRecord(t *testing.T) {
-	r := require.New(t)
-	rec := core.NewRecord()
-	rec = rec.WithKey([]byte("111"))
-	r.Equal([]byte("111"), rec.Key)
+func TestEncodeDecodeRecord(t *testing.T) {
+	payload := []byte("abc")
+	raw := encodeRecord(nil, payload, RecordPut)
+	require.Equal(t, RecordHeaderSize+len(payload), len(raw))
 
-	rec = rec.WithValue([]byte("1112"))
-	r.Equal([]byte("1112"), rec.Value)
+	got, typ, err := decodeRecord(raw)
+	require.NoError(t, err)
+	require.Equal(t, RecordPut, typ)
+	require.Equal(t, payload, got)
 
-	rec = rec.WithTTL(uint32(9))
-	r.Equal(uint32(9), rec.TTL)
+	raw[0] ^= 0xff
+	_, _, err = decodeRecord(raw)
+	require.ErrorIs(t, err, ErrCorrupt)
 }

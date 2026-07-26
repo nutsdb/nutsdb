@@ -20,27 +20,25 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/nutsdb/nutsdb/internal/core"
+	"github.com/nutsdb/nutsdb/internal/fileio"
 	"github.com/stretchr/testify/require"
 )
 
-func newTestRecord(key, value []byte) *core.Record {
-	return core.NewRecord().WithKey(key).WithValue(value)
+func testLoc(fileID uint32, offset uint64, length uint32) fileio.Location {
+	return fileio.Location{FileID: fileID, Offset: offset, Length: length}
 }
 
-func requireRecordEqual(t *testing.T, expect, got *core.Record) {
+func requireLocationEqual(t *testing.T, expect, got fileio.Location) {
 	t.Helper()
-	require.NotNil(t, got)
-	require.Equal(t, expect.Value, got.Value)
-	require.Equal(t, expect.Key, got.Key)
+	require.Equal(t, expect, got)
 }
 
-func assertMemStoreState(t *testing.T, ms MemStore, want map[string]*core.Record) {
+func assertMemStoreState(t *testing.T, ms MemStore, want map[string]fileio.Location) {
 	t.Helper()
 
 	var prev []byte
 	var count int
-	ms.Iterate(func(key []byte, value *core.Record) bool {
+	ms.Iterate(func(key []byte, value fileio.Location) bool {
 		count++
 		if len(prev) > 0 {
 			require.Less(t, bytes.Compare(prev, key), 0)
@@ -49,7 +47,7 @@ func assertMemStoreState(t *testing.T, ms MemStore, want map[string]*core.Record
 
 		expect, ok := want[string(key)]
 		require.True(t, ok, "unexpected key %q", key)
-		requireRecordEqual(t, expect, value)
+		requireLocationEqual(t, expect, value)
 		return true
 	})
 	require.Equal(t, len(want), count)
@@ -58,26 +56,26 @@ func assertMemStoreState(t *testing.T, ms MemStore, want map[string]*core.Record
 func TestMemStore_PutGet(t *testing.T) {
 	ms := NewMemStore()
 	key := []byte("key")
-	rec := newTestRecord(key, []byte("value"))
+	loc := testLoc(1, fileio.HeaderSize, 32)
 
-	require.NoError(t, ms.Put(key, rec))
+	require.NoError(t, ms.Put(key, loc))
 
 	got, err := ms.Get(key)
 	require.NoError(t, err)
-	requireRecordEqual(t, rec, got)
+	requireLocationEqual(t, loc, got)
 }
 
 func TestMemStore_PutOverwrite(t *testing.T) {
 	ms := NewMemStore()
 	key := []byte("key")
 
-	require.NoError(t, ms.Put(key, newTestRecord(key, []byte("v1"))))
-	recV2 := newTestRecord(key, []byte("v2"))
-	require.NoError(t, ms.Put(key, recV2))
+	require.NoError(t, ms.Put(key, testLoc(1, fileio.HeaderSize, 16)))
+	locV2 := testLoc(2, fileio.HeaderSize+16, 24)
+	require.NoError(t, ms.Put(key, locV2))
 
 	got, err := ms.Get(key)
 	require.NoError(t, err)
-	requireRecordEqual(t, recV2, got)
+	requireLocationEqual(t, locV2, got)
 }
 
 func TestMemStore_GetNotFound(t *testing.T) {
@@ -90,13 +88,13 @@ func TestMemStore_GetNotFound(t *testing.T) {
 func TestMemStore_DeleteFound(t *testing.T) {
 	ms := NewMemStore()
 	key := []byte("key")
-	rec := newTestRecord(key, []byte("value"))
+	loc := testLoc(1, fileio.HeaderSize, 32)
 
-	require.NoError(t, ms.Put(key, rec))
+	require.NoError(t, ms.Put(key, loc))
 
 	got, ok := ms.Delete(key)
 	require.True(t, ok)
-	requireRecordEqual(t, rec, got)
+	requireLocationEqual(t, loc, got)
 
 	_, err := ms.Get(key)
 	require.ErrorIs(t, err, ErrKeyNotFound)
@@ -107,38 +105,41 @@ func TestMemStore_DeleteNotFound(t *testing.T) {
 
 	got, ok := ms.Delete([]byte("missing"))
 	require.False(t, ok)
-	require.Nil(t, got)
+	require.Equal(t, fileio.Location{}, got)
 }
 
 func TestMemStore_DeleteIdempotent(t *testing.T) {
 	ms := NewMemStore()
 	key := []byte("key")
 
-	require.NoError(t, ms.Put(key, newTestRecord(key, []byte("value"))))
+	require.NoError(t, ms.Put(key, testLoc(1, fileio.HeaderSize, 16)))
 
 	_, ok := ms.Delete(key)
 	require.True(t, ok)
 
 	got, ok := ms.Delete(key)
 	require.False(t, ok)
-	require.Nil(t, got)
+	require.Equal(t, fileio.Location{}, got)
 }
 
 func TestMemStore_IterateSortedOrder(t *testing.T) {
 	ms := NewMemStore()
-	entries := []*core.Record{
-		newTestRecord([]byte("c"), []byte("3")),
-		newTestRecord([]byte("a"), []byte("1")),
-		newTestRecord([]byte("b"), []byte("2")),
+	entries := []struct {
+		key []byte
+		loc fileio.Location
+	}{
+		{[]byte("c"), testLoc(1, 100, 10)},
+		{[]byte("a"), testLoc(1, 200, 10)},
+		{[]byte("b"), testLoc(1, 300, 10)},
 	}
-	for _, rec := range entries {
-		require.NoError(t, ms.Put(rec.Key, rec))
+	for _, e := range entries {
+		require.NoError(t, ms.Put(e.key, e.loc))
 	}
 
 	var keys [][]byte
-	ms.Iterate(func(key []byte, value *core.Record) bool {
+	ms.Iterate(func(key []byte, value fileio.Location) bool {
 		keys = append(keys, append([]byte(nil), key...))
-		require.NotNil(t, value)
+		require.NotEqual(t, fileio.Location{}, value)
 		return true
 	})
 	require.Equal(t, [][]byte{[]byte("a"), []byte("b"), []byte("c")}, keys)
@@ -146,12 +147,12 @@ func TestMemStore_IterateSortedOrder(t *testing.T) {
 
 func TestMemStore_IterateEarlyStop(t *testing.T) {
 	ms := NewMemStore()
-	for _, k := range [][]byte{[]byte("a"), []byte("b"), []byte("c")} {
-		require.NoError(t, ms.Put(k, newTestRecord(k, k)))
+	for i, k := range [][]byte{[]byte("a"), []byte("b"), []byte("c")} {
+		require.NoError(t, ms.Put(k, testLoc(1, uint64(fileio.HeaderSize+i*16), 16)))
 	}
 
 	var count int
-	ms.Iterate(func(key []byte, value *core.Record) bool {
+	ms.Iterate(func(key []byte, value fileio.Location) bool {
 		count++
 		return false
 	})
@@ -162,22 +163,23 @@ func TestMemStore_BinaryKey(t *testing.T) {
 	ms := NewMemStore()
 	original := []byte{0x00, 0xff, 0x00, 'k'}
 	other := []byte{0x01, 0xff, 0x00, 'k'}
+	loc := testLoc(3, fileio.HeaderSize, 40)
 
-	require.NoError(t, ms.Put(original, newTestRecord(original, []byte("binary"))))
+	require.NoError(t, ms.Put(original, loc))
 
 	_, err := ms.Get(other)
 	require.ErrorIs(t, err, ErrKeyNotFound)
 
 	got, err := ms.Get([]byte{0x00, 0xff, 0x00, 'k'})
 	require.NoError(t, err)
-	require.Equal(t, []byte("binary"), got.Value)
+	requireLocationEqual(t, loc, got)
 }
 
 func TestMemStore_EmptyStoreIterate(t *testing.T) {
 	ms := NewMemStore()
 
 	var called bool
-	ms.Iterate(func(key []byte, value *core.Record) bool {
+	ms.Iterate(func(key []byte, value fileio.Location) bool {
 		called = true
 		return true
 	})
@@ -189,33 +191,33 @@ func TestMemStore_RandomInsert(t *testing.T) {
 	ms := NewMemStore()
 	entries := make([]struct {
 		key []byte
-		rec *core.Record
+		loc fileio.Location
 	}, n)
 	for i := 0; i < n; i++ {
 		key := []byte(fmt.Sprintf("key-%04d", i))
 		entries[i] = struct {
 			key []byte
-			rec *core.Record
+			loc fileio.Location
 		}{
 			key: key,
-			rec: newTestRecord(key, []byte(fmt.Sprintf("val-%04d", i))),
+			loc: testLoc(1, uint64(fileio.HeaderSize+i*32), 32),
 		}
 	}
 
 	rng := rand.New(rand.NewSource(42))
 	for _, idx := range rng.Perm(n) {
 		entry := entries[idx]
-		require.NoError(t, ms.Put(entry.key, entry.rec))
+		require.NoError(t, ms.Put(entry.key, entry.loc))
 	}
 
 	for _, entry := range entries {
 		got, err := ms.Get(entry.key)
 		require.NoError(t, err)
-		requireRecordEqual(t, entry.rec, got)
+		requireLocationEqual(t, entry.loc, got)
 	}
 
 	var keys [][]byte
-	ms.Iterate(func(key []byte, value *core.Record) bool {
+	ms.Iterate(func(key []byte, value fileio.Location) bool {
 		if len(keys) > 0 {
 			require.Less(t, bytes.Compare(keys[len(keys)-1], key), 0)
 		}
@@ -230,69 +232,69 @@ func TestMemStore_RandomInsertAndDelete(t *testing.T) {
 	ms := NewMemStore()
 	entries := make([]struct {
 		key []byte
-		rec *core.Record
+		loc fileio.Location
 	}, n)
 	for i := 0; i < n; i++ {
 		key := []byte(fmt.Sprintf("key-%06d", i))
 		entries[i] = struct {
 			key []byte
-			rec *core.Record
+			loc fileio.Location
 		}{
 			key: key,
-			rec: newTestRecord(key, []byte(fmt.Sprintf("val-%06d", i))),
+			loc: testLoc(1, uint64(fileio.HeaderSize+i*32), 32),
 		}
 	}
 
 	rng := rand.New(rand.NewSource(99))
 	for _, idx := range rng.Perm(n) {
 		entry := entries[idx]
-		require.NoError(t, ms.Put(entry.key, entry.rec))
+		require.NoError(t, ms.Put(entry.key, entry.loc))
 	}
 
-	remaining := make(map[string]*core.Record, n)
+	remaining := make(map[string]fileio.Location, n)
 	for _, entry := range entries {
-		remaining[string(entry.key)] = entry.rec
+		remaining[string(entry.key)] = entry.loc
 	}
 
 	for _, idx := range rng.Perm(n) {
 		entry := entries[idx]
 		got, ok := ms.Delete(entry.key)
 		require.True(t, ok)
-		requireRecordEqual(t, entry.rec, got)
+		requireLocationEqual(t, entry.loc, got)
 
 		delete(remaining, string(entry.key))
 		assertMemStoreState(t, ms, remaining)
 	}
 
-	assertMemStoreState(t, ms, map[string]*core.Record{})
+	assertMemStoreState(t, ms, map[string]fileio.Location{})
 }
 
 func TestMemStore_DeleteStructuralCases(t *testing.T) {
 	t.Run("sole_root", func(t *testing.T) {
 		ms := NewMemStore()
 		key := []byte("root")
-		rec := newTestRecord(key, []byte("value"))
+		loc := testLoc(1, fileio.HeaderSize, 16)
 
-		require.NoError(t, ms.Put(key, rec))
+		require.NoError(t, ms.Put(key, loc))
 		got, ok := ms.Delete(key)
 		require.True(t, ok)
-		requireRecordEqual(t, rec, got)
-		assertMemStoreState(t, ms, map[string]*core.Record{})
+		requireLocationEqual(t, loc, got)
+		assertMemStoreState(t, ms, map[string]fileio.Location{})
 	})
 
 	t.Run("delete_root_with_children", func(t *testing.T) {
 		ms := NewMemStore()
 		keys := []string{"key-002", "key-000", "key-001", "key-003", "key-004"}
-		want := make(map[string]*core.Record, len(keys))
-		for _, key := range keys {
-			rec := newTestRecord([]byte(key), []byte("v-"+key))
-			require.NoError(t, ms.Put([]byte(key), rec))
-			want[key] = rec
+		want := make(map[string]fileio.Location, len(keys))
+		for i, key := range keys {
+			loc := testLoc(1, uint64(fileio.HeaderSize+i*16), 16)
+			require.NoError(t, ms.Put([]byte(key), loc))
+			want[key] = loc
 		}
 
 		got, ok := ms.Delete([]byte("key-002"))
 		require.True(t, ok)
-		requireRecordEqual(t, want["key-002"], got)
+		requireLocationEqual(t, want["key-002"], got)
 		delete(want, "key-002")
 		assertMemStoreState(t, ms, want)
 	})
@@ -303,11 +305,11 @@ func TestMemStore_DeleteStructuralCases(t *testing.T) {
 			"key-004", "key-002", "key-006", "key-001", "key-003",
 			"key-005", "key-007", "key-000", "key-008", "key-009",
 		}
-		want := make(map[string]*core.Record, len(keys))
-		for _, key := range keys {
-			rec := newTestRecord([]byte(key), []byte("v-"+key))
-			require.NoError(t, ms.Put([]byte(key), rec))
-			want[key] = rec
+		want := make(map[string]fileio.Location, len(keys))
+		for i, key := range keys {
+			loc := testLoc(1, uint64(fileio.HeaderSize+i*16), 16)
+			require.NoError(t, ms.Put([]byte(key), loc))
+			want[key] = loc
 		}
 
 		deleteOrder := []string{
@@ -317,7 +319,7 @@ func TestMemStore_DeleteStructuralCases(t *testing.T) {
 		for _, key := range deleteOrder {
 			got, ok := ms.Delete([]byte(key))
 			require.True(t, ok)
-			requireRecordEqual(t, want[key], got)
+			requireLocationEqual(t, want[key], got)
 			delete(want, key)
 			assertMemStoreState(t, ms, want)
 		}
@@ -325,19 +327,19 @@ func TestMemStore_DeleteStructuralCases(t *testing.T) {
 
 	t.Run("delete_in_sorted_order", func(t *testing.T) {
 		ms := NewMemStore()
-		want := make(map[string]*core.Record)
+		want := make(map[string]fileio.Location)
 		for i := 0; i < 32; i++ {
 			key := fmt.Sprintf("sorted-%02d", i)
-			rec := newTestRecord([]byte(key), []byte("v-"+key))
-			require.NoError(t, ms.Put([]byte(key), rec))
-			want[key] = rec
+			loc := testLoc(1, uint64(fileio.HeaderSize+i*16), 16)
+			require.NoError(t, ms.Put([]byte(key), loc))
+			want[key] = loc
 		}
 
 		for i := 0; i < 32; i++ {
 			key := fmt.Sprintf("sorted-%02d", i)
 			got, ok := ms.Delete([]byte(key))
 			require.True(t, ok)
-			requireRecordEqual(t, want[key], got)
+			requireLocationEqual(t, want[key], got)
 			delete(want, key)
 			assertMemStoreState(t, ms, want)
 		}
@@ -345,19 +347,19 @@ func TestMemStore_DeleteStructuralCases(t *testing.T) {
 
 	t.Run("delete_in_reverse_sorted_order", func(t *testing.T) {
 		ms := NewMemStore()
-		want := make(map[string]*core.Record)
+		want := make(map[string]fileio.Location)
 		for i := 0; i < 32; i++ {
 			key := fmt.Sprintf("rev-%02d", i)
-			rec := newTestRecord([]byte(key), []byte("v-"+key))
-			require.NoError(t, ms.Put([]byte(key), rec))
-			want[key] = rec
+			loc := testLoc(1, uint64(fileio.HeaderSize+i*16), 16)
+			require.NoError(t, ms.Put([]byte(key), loc))
+			want[key] = loc
 		}
 
 		for i := 31; i >= 0; i-- {
 			key := fmt.Sprintf("rev-%02d", i)
 			got, ok := ms.Delete([]byte(key))
 			require.True(t, ok)
-			requireRecordEqual(t, want[key], got)
+			requireLocationEqual(t, want[key], got)
 			delete(want, key)
 			assertMemStoreState(t, ms, want)
 		}

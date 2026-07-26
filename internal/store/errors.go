@@ -28,4 +28,16 @@ var (
 
 	// ErrRBTreeSameRBNode is returned when a duplicate key is added to the RBTree.
 	ErrRBTreeSameRBNode = errors.New("RBTree cannot add duplicate key")
+
+	// ErrDiskStoreClosed is returned when operating on a closed disk store.
+	ErrDiskStoreClosed = errors.New("disk store closed")
+
+	// ErrInvalidRecord is returned when a Put record is nil or invalid.
+	ErrInvalidRecord = errors.New("invalid record")
+
+	// ErrKeyMismatch is returned when Record.Key does not match the API key.
+	ErrKeyMismatch = errors.New("record key mismatch")
+
+	// ErrCorruptEntry is returned when an on-disk entry payload cannot be decoded.
+	ErrCorruptEntry = errors.New("corrupt entry")
 )

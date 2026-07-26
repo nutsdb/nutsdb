@@ -1,4 +1,4 @@
-// Copyright 2019 The nutsdb Author. All rights reserved.
+// Copyright 2026 The nutsdb Author. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,24 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package core_test
+//go:build linux
+
+package fileio
 
 import (
-	"testing"
+	"os"
 
-	"github.com/nutsdb/nutsdb/internal/core"
-	"github.com/stretchr/testify/require"
+	"golang.org/x/sys/unix"
 )
 
-func TestRecord(t *testing.T) {
-	r := require.New(t)
-	rec := core.NewRecord()
-	rec = rec.WithKey([]byte("111"))
-	r.Equal([]byte("111"), rec.Key)
-
-	rec = rec.WithValue([]byte("1112"))
-	r.Equal([]byte("1112"), rec.Value)
-
-	rec = rec.WithTTL(uint32(9))
-	r.Equal(uint32(9), rec.TTL)
+func fallocate(fd *os.File, size int64) error {
+	return unix.Fallocate(int(fd.Fd()), 0, 0, size)
 }

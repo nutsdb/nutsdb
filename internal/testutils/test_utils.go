@@ -64,12 +64,8 @@ func GenerateRecords(count int) []*core.Record {
 		record := &core.Record{
 			Key:       key,
 			Value:     val,
-			FileID:    int64(i),
-			DataPos:   uint64(rand.Uint32()),
-			ValueSize: uint32(len(val)),
 			Timestamp: uint64(time.Now().Unix()),
 			TTL:       uint32(rand.Intn(3600)),
-			TxID:      uint64(rand.Intn(1000)),
 		}
 		records[i] = record
 	}
