@@ -20,7 +20,7 @@ import (
 )
 
 func benchKey(i int) []byte {
-	return []byte(fmt.Sprintf("memtree-bench-key-%012d", i))
+	return fmt.Appendf(nil, "memtree-bench-key-%012d", i)
 }
 
 func newPopulatedMemTree(b *testing.B, n int) (MemTree[testVal], [][]byte) {
