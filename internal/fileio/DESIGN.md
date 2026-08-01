@@ -2,6 +2,10 @@
 
 > 本文档描述一套面向 KV 存储系统的**磁盘交互层**设计方案。  
 > 目标优先保证：**顺序写吞吐**与**随机读延迟**。  
+>
+> **引擎定位**：在 [LSM + ValueLog](../store/LSM_VALUELOG_DESIGN.md) 中，本层的 `Store`（`.seg`）担任 **ValueLog**（及可选 **WAL 后端**）；  
+> **不**在本层实现 MemTable / SST / Compaction / HintFile。  
+> 相关：[LSM_VALUELOG_DESIGN.md](../store/LSM_VALUELOG_DESIGN.md)。
 
 ---
 
@@ -66,13 +70,28 @@ used_bytes = written_offset = durable_offset = header_size
 
 ## 1. 背景与目标
 
-KV 引擎（Bitcask / WiscKey / LSM-ValueLog 一类）的典型 I/O 形态是：
+KV 引擎（WiscKey / **LSM-ValueLog**）的典型 I/O 形态是：
 
 - **写路径**：几乎只有 append（顺序写）
-- **读路径**：根据内存索引中的 `Location` 做点查（随机读）
-- **删改**：逻辑删除 / 新版本追加；物理回收由 compaction 负责
+- **读路径**：根据上层持有的 `Location` 做点查（随机读）
+- **删改**：逻辑删除 / 新版本追加；物理回收由上层 GC / compaction 负责
 
 因此交互层应做成**为上述访问模式特化的段式存储引擎**，而不是通用 POSIX 封装。
+
+### 1.0 在 LSM + ValueLog 中的角色
+
+| 角色 | 目录建议 | 说明 |
+|------|----------|------|
+| **ValueLog（主）** | `<data_dir>/vlog/` | Put 的大 value 经 `Append` 落盘；LSM 的 `ValueRef` 持有返回的 `Location` |
+| **WAL 后端（可选）** | `<data_dir>/wal/` | 另一 `Store` 实例，payload 为 WAL 记录；见 [WAL_DESIGN.md](../store/WAL_DESIGN.md) |
+
+**不变量（对本层的约束）**：
+
+```text
+Location 一经 Append 返回且段未 Delete，地址稳定可读（sealed 后尤其如此）
+本层不解释 payload 内的 key；不维护 key → Location
+ValueLog GC / 删段由上层在确认无引用后调用 DeleteSegment
+```
 
 ### 1.1 目标
 
@@ -82,7 +101,7 @@ KV 引擎（Bitcask / WiscKey / LSM-ValueLog 一类）的典型 I/O 形态是：
 | 随机读高效 | 按 `Offset`/`Length` 一次 I/O 读完；fd/mmap 缓存 |
 | 地址稳定 | sealed 段只读，`Location` 长期有效 |
 | 崩溃可恢复 | 以 `durable_offset` 为准截断脏尾 |
-| 职责清晰 | 只做字节持久化与定位；不做 key 索引 / 事务 / TTL |
+| 职责清晰 | 只做字节持久化与定位；不做 key 索引 / 事务 / TTL / SST |
 
 ### 1.2 非目标
 
@@ -90,34 +109,36 @@ KV 引擎（Bitcask / WiscKey / LSM-ValueLog 一类）的典型 I/O 形态是：
 - 不实现 SQL / 二级索引 / 事务协议
 - 不在本层做跨文件 GC 策略（只提供扫描与删段）
 - 不保证跨进程并发写同一 active segment
+- 不实现 LSM 的 MemTable / SST / MANIFEST / HintFile（见 `internal/store`）
 
 ---
 
 ## 2. 总体架构
 
 ```text
-┌──────────────────────────────────────────────┐
-│              Upper KV Engine                 │
-│   (MemIndex / Tx / Compaction / TTL ...)     │
-└──────────────────────┬───────────────────────┘
-                       │ Store.Append / Store.Read (Location)
-┌──────────────────────▼───────────────────────┐
-│              Store (门面)                      │
-│         ┌──────────┴──────────┐              │
-│         ▼                     ▼              │
-│   SegmentManager          Appender/Reader    │
-│   (生命周期/FD LRU)        (顺序写/随机读)      │
-│         │                     │              │
-│         └──────────┬──────────┘              │
-│                    ▼                         │
-│            Segment Backend                   │
-│         FileIO / MMap(Sealed)                │
-└────────────────────┬─────────────────────────┘
+┌──────────────────────────────────────────────────────────┐
+│  Upper: LSM StoreManager                                 │
+│  MemTable / SST / MANIFEST / WAL / ValueLog GC           │
+└────────────────────────────┬─────────────────────────────┘
+                             │ Store.Append / Store.Read (Location)
+┌────────────────────────────▼─────────────────────────────┐
+│              Store (门面) = ValueLog 或 WAL 后端           │
+│         ┌──────────┴──────────┐                          │
+│         ▼                     ▼                          │
+│   SegmentManager          Appender/Reader                │
+│   (生命周期/FD LRU)        (顺序写/随机读)                  │
+│         │                     │                          │
+│         └──────────┬──────────┘                          │
+│                    ▼                                     │
+│            Segment Backend                               │
+│         FileIO / MMap(Sealed)                            │
+└────────────────────┬─────────────────────────────────────┘
                      ▼
                   Disk / FS
 ```
 
-调用关系：上层只依赖 `Store`；`Store` 内部组合 `SegmentManager` + `Appender` + `Reader`。
+调用关系：上层只依赖 `Store`；`Store` 内部组合 `SegmentManager` + `Appender` + `Reader`。  
+同一进程可打开 **两个** `Store` 实例（`vlog/` 与 `wal/`），彼此 FileID 空间独立。
 
 | 对象 | 职责 |
 |------|------|
@@ -462,12 +483,21 @@ type Options struct {
 
 建议指标：`append_bytes`、`fsync_latency`、`read_iops`、`fd_cache_hit`、`recovery_scan_bytes`。
 
-上层：
+上层（**LSM + ValueLog**）：
 
 ```text
-Put:  loc = Store.Append(encode(entry)); memIndex[key] = loc
-Get:  payload, _ = Store.Read(memIndex[key])
+Put(大 value):
+  loc = vlog.Append(encode(entry))
+  wal.Append(key → ValueRef{Location: loc})
+  memTable.Put(key, ref)
+  // flush/compaction 后 key→ref 进入 SST；Get 时 SST/Mem 取 ref 再 vlog.Read(loc)
+
+Put(小 value / Inline):
+  wal.Append(key → ValueRef{Inline: value})  // 可不写 vlog
+  memTable.Put(...)
 ```
+
+详见 [LSM_VALUELOG_DESIGN.md](../store/LSM_VALUELOG_DESIGN.md)。
 
 ---
 
@@ -497,5 +527,6 @@ Get:  payload, _ = Store.Read(memIndex[key])
 3. **写**：单 active 顺序追加；小包聚合、大包旁路；Sync 策略可配。  
 4. **读**：一跳点查；可见性区分进程内与崩溃后。  
 5. **恢复**：信任合法 footer；否则扫描未 seal 段重建 `used_bytes`。  
+6. **定位**：本层作为 **ValueLog**（及可选 WAL 后端）；LSM 索引在 `internal/store`。
 
-交互层只把顺序写与随机读做对；索引、事务、compaction 留在上层。
+交互层只把顺序写与随机读做对；索引、事务、SST compaction、ValueLog GC 策略留在上层。

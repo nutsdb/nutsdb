@@ -1,232 +1,157 @@
-# DESIGN: StoreMgr（MemStore + DiskStore 协调层）
+# DESIGN: StoreMgr（LSM StoreManager 入口）
 
-> StoreMgr 是对外的 [`StoreManager`](./store_manager.go) 实现。  
-> 它协调 **MemStore**（`key → Location` 内存索引）与 **DiskStore/fileio**（持久化），保证写路径上两边一致；**磁盘更新失败时回滚内存索引**。
-
-相关文档：[DISKSTORE_DESIGN.md](./DISKSTORE_DESIGN.md)、[fileio/DESIGN.md](../fileio/DESIGN.md)、[HINTFILE_DESIGN.md](../fileio/HINTFILE_DESIGN.md)。
+> StoreMgr 是对外 [`StoreManager`](./store_manager.go) 的实现入口。  
+> **唯一引擎：LSM + ValueLog（路径 C）**。  
+> 主设计：[LSM_VALUELOG_DESIGN.md](./LSM_VALUELOG_DESIGN.md)；组件：[WAL_DESIGN.md](./WAL_DESIGN.md)、[SST_DESIGN.md](./SST_DESIGN.md)、[MANIFEST_DESIGN.md](./MANIFEST_DESIGN.md)、[fileio/DESIGN.md](../fileio/DESIGN.md)。
 
 ---
 
 ## 0. 需求（已确认）
 
 1. 实现 `StoreManager` / `BatchAPI` 全套 API。  
-2. **设计原则**：`mem_store` 与 `disk_store` **同时更新**；若 **disk 更新失败**，必须 **revert mem_store** 上对应操作，使索引回到写之前的状态。  
-3. 持久化语义、Entry 格式、Hint/Recovery 遵循 DiskStore 设计；本层只规定「谁先谁后、如何回滚」。
+2. **`OpenStoreManager(opts LSMOptions)`** 打开 LSM + ValueLog 引擎（无多引擎分派）。  
+3. 写路径耐久顺序：ValueLog（如需）→ WAL → MemTable（见 LSM / WAL 设计）。  
+4. 读路径：MemTable → Immutable → SST levels → `resolve(ValueRef)` → ValueLog 点读。
 
 ---
 
-## 1. 背景与目标
-
-| 组件 | 角色 |
-|------|------|
-| `MemStore` | 有序内存索引：`key → fileio.Location` |
-| Disk / fileio | Append/Read `.seg`，Hint 恢复 |
-| **StoreMgr** | 实现 `StoreManager`；编排双写与回滚 |
-
-### 1.1 目标
-
-- API 对齐 `StoreManager`
-- 写成功 ⇒ mem 与 disk 对同一 key 指向一致的最新 Location（或 Delete 后均无该 key）
-- **disk 失败 ⇒ mem 与写前一致**（不出现「索引已变、盘上无对应成功写入」的窗口被提交）
-- 读路径：mem 查 Location → disk `Read` → decode `core.Record`
-
-### 1.2 非目标
-
-- 跨进程共享同一 MemStore
-- 分布式事务 / 两阶段提交到外部系统
-- disk 成功但进程在更新 mem 前崩溃的补偿（重启靠 Recovery 重建 mem，见 §6）
-
----
-
-## 2. 总体架构
+## 1. 总体架构
 
 ```text
-                 StoreManager (StoreMgr)
-                           │
-           ┌───────────────┴───────────────┐
-           ▼                               ▼
-     MemStore                         Disk Engine
-  key → Location                 fileio.Store + Hint
-  (RBTree)                       entry codec / recover
+                 OpenStoreManager(LSMOptions)
+                              │
+                              ▼
+                        lsmStoreMgr
+           ┌─────────┬────────┼────────┬──────────┐
+           ▼         ▼        ▼        ▼          ▼
+       MemTable     WAL   VersionSet  ValueLog   Compactor
+           │                  SST         │
+           │               (MANIFEST)     │
+           └──────────────────────────────┘
+                    fileio.Store (vlog/)
 ```
 
 ```go
-type storeMgr struct {
-    opts    DiskStoreOptions
-    mem     MemStore           // 内存索引
-    store   fileio.Store       // 段文件
-    hintMgr fileio.HintManager
-    mu      sync.RWMutex
-    closed  bool
+func OpenStoreManager(opts LSMOptions) (StoreManager, error)
+```
+
+---
+
+## 2. 组件
+
+```go
+type lsmStoreMgr struct {
+    opts     LSMOptions
+    vlog     fileio.Store
+    wal      WAL
+    mem      MemTable
+    imms     []*MemTable
+    versions VersionSet
+    mu       sync.RWMutex
+    closed   bool
 }
 ```
 
-对外构造：
-
-```go
-func OpenStoreManager(opts DiskStoreOptions) (StoreManager, error)
-```
-
-`OpenDiskStore` 可作为兼容别名，内部转到 `OpenStoreManager`。
+细节协议以 [LSM_VALUELOG_DESIGN.md](./LSM_VALUELOG_DESIGN.md) 为准。
 
 ---
 
-## 3. 双写协议（核心）
-
-因 `MemStore` 存的是 **Location**，合法 Location **只能在 disk Append 成功后**获得，故采用：
+## 3. 写 / 读（摘要）
 
 ```text
-Disk-first, then Mem；Mem 提交失败则 Revert Mem
-```
+Put:
+  可选 vlog.Append → ValueRef
+  wal.Append(ref) → mem.Put(ref)
+  超限 → freeze + Flush → MANIFEST.LogAndApply
 
-### 3.1 Put
+Delete:
+  wal.Append(tombstone) → mem.Put(tombstone)
 
-```text
-Put(key, record):
-  1. 校验；规范化 Record（Timestamp 等）
-  2. snapshot:
-       oldLoc, hadOld = mem.Get(key)   // hadOld=false 表示原先不存在
-  3. payload = encodePutPayload(...)
-  4. loc = disk.Append*(payload, RecordPut)
-       若失败 → return err          // mem 未改，无需 revert
-  5. err = mem.Put(key, loc)
-       若失败 → revertMemPut(key, oldLoc, hadOld); return err
-  6. seal/hint 副作用（失败只打日志，不回滚已提交的 mem/disk）
-  7. return nil
-```
-
-`revertMemPut`：
-
-```text
-if hadOld: mem.Put(key, oldLoc)
-else:      mem.Delete(key)
-```
-
-### 3.2 Delete
-
-```text
-Delete(key):
-  1. snapshot: oldLoc, hadOld = mem.Get(key)
-  2. 若不存在且 !DeleteWritesTombstoneIfMissing → return nil
-  3. disk.Append*(encodeDeletePayload(key), RecordDelete)
-       若失败 → return err          // mem 未改
-  4. mem.Delete(key)
-       // Delete 对 MemStore 几乎不失败；若扩展实现失败：
-       //   revert: mem.Put(key, oldLoc) when hadOld
-  5. seal/hint 副作用
-  6. return nil
-```
-
-### 3.3 BatchPut / BatchDelete
-
-- 同一把写锁下按条执行与单条相同的 disk→mem 协议。  
-- **中途失败**：已成功条目保持提交（append-only 无法回滚 disk）；**当前失败条目**若已 Append 成功但 mem 失败，对该 key 做 revert。  
-- 批末按 SyncMode 调用 `store.Sync()`（与 DiskStore 设计一致）。
-
-### 3.4 不变量
-
-```text
-写路径返回成功 ⇒ mem[key] 与 disk 上该 key 最新可见记录一致
-写路径因 disk 错误返回失败 ⇒ mem[key] 与调用前一致
-写路径因 mem 错误返回失败 ⇒ mem[key] 与调用前一致（已 revert）；disk 可能多一条孤儿 record（可接受，Recovery/compaction 可忽略）
+Get:
+  MemTable → Imm → SST levels → resolve(ValueRef)
 ```
 
 ---
 
-## 4. 读路径
-
-| API | 行为 |
-|-----|------|
-| Get | mem.Get → disk.Read → decode；TTL 过滤；未命中 `ErrKeyNotFound` |
-| Iterate | 拷贝 mem 有序 (key,loc) → 逐条 Read/decode/回调 |
-| BatchGet | 对每个 key 调 Get；缺失 `Value=nil` |
-
-读不修改 mem（惰性删过期索引为首版可选，默认不改索引）。
-
----
-
-## 5. 与 DiskStore 设计的关系
-
-| 能力 | 归属 |
-|------|------|
-| Entry 编解码、TTL、SyncMode、Hint、Recovery | 同 [DISKSTORE_DESIGN.md](./DISKSTORE_DESIGN.md) |
-| 双写顺序与 mem 回滚 | **本设计（StoreMgr）强制** |
-| `MemStore` 数据结构 | [mem_store.go](./mem_store.go) |
-
-StoreMgr 内部复用 DiskStore 的引擎逻辑（fileio / hint / recover / entry），对外只暴露一个 `StoreManager`。
-
----
-
-## 6. 启动与关闭
-
-### Open
+## 4. Open / Close
 
 ```text
-OpenStoreManager(opts):
-  1. fileio.Open + NewHintManager + NewMemStore
-  2. Recovery（hint 优先，active Iterate）写入 mem
-  3. return StoreMgr
-```
+Open:
+  1. 初始化目录布局（vlog/ wal/ sst/ MANIFEST）
+  2. fileio.Open(vlog) + OpenWAL + RecoverVersionSet
+  3. ReplayWAL → MemTable
+  4. 启动 flush / compaction 后台（可配）
 
-Recovery 直接构建 mem，不走 Put 双写（盘上已是真相）。
-
-### Close
-
-```text
-Sync → SealIfNeeded（若 rotate 则 BuildHint）→ Close fileio → 标记 closed
+Close:
+  1. 停后台；可选 flush MemTable
+  2. wal.Sync + vlog.Sync + Close
 ```
 
 ---
 
-## 7. 错误
+## 5. ValueLog Entry Payload
 
-沿用 store / fileio 错误；另：
+Put 写入 ValueLog 的 payload（Little-Endian），与 `entry.go` 一致：
+
+```text
+key_len(4) | value_len(4) | timestamp(8) | ttl(4) | key | value
+```
+
+Delete 默认 **不写** ValueLog，仅 WAL / MemTable / SST tombstone。
+
+---
+
+## 6. 错误
 
 | 情况 | 行为 |
 |------|------|
-| disk Append 失败 | 返回原错误；mem 不变 |
-| mem.Put 失败 | revert mem；返回该错误 |
-| ctx 取消 | 锁前/批间隙检查；返回 `ctx.Err()` |
+| WAL / vlog Append 失败 | 返回错误；MemTable 不发布该键 |
+| 已 closed | `ErrStoreClosed` |
+| 未实现阶段 | `ErrNotImplemented`（实现完成前） |
+| ctx 取消 | 锁前/批间隙返回 `ctx.Err()` |
 
 ---
 
-## 8. 建议代码布局
+## 7. 建议代码布局
 
 ```text
 internal/store/
-  STORE_MGR_DESIGN.md   # 本文档
-  store_manager.go      # 接口
-  store_mgr.go          # StoreMgr + OpenStoreManager
-  disk_store.go         # 引擎：recover / append / hint / options
-  mem_store.go
-  entry.go
-  store_mgr_test.go
+  DESIGN_INDEX.md
+  LSM_VALUELOG_DESIGN.md
+  SST_DESIGN.md / MANIFEST_DESIGN.md / WAL_DESIGN.md
+  STORE_MGR_DESIGN.md     # 本文
+  store_manager.go        # 接口
+  lsm_options.go          # LSMOptions + OpenStoreManager
+  lsm_store_mgr.go        # 实现（待建）
+  entry.go                # ValueLog Put payload
+  mem_store.go            # 可复用为 MemTable 有序结构
 ```
 
 ---
 
-## 9. 测试要点
+## 8. 测试要点
 
-1. Put/Get/Delete/Iterate/Batch 与 DiskStore 语义一致  
-2. **Revert**：注入会失败的 `MemStore.Put`，断言 disk Append 后 mem 仍为旧 Location（或仍不存在）  
-3. disk Append 失败时 mem 完全不变  
-4. Persist + Reopen 后与关闭前可见集合一致  
-5. seal 后生成 `.hint`，重启可恢复  
-
----
-
-## 10. 里程碑
-
-1. **S1**：本文档定稿  
-2. **S2**：`OpenStoreManager` + 写路径 disk→mem + revert  
-3. **S3**：与现有 disk_store 测试对齐；增加 revert 单测  
-4. **S4**：`OpenDiskStore` 委托 `OpenStoreManager`（兼容）  
+1. Put/Get/Delete/Iterate + Persist/Reopen（WAL + SST）  
+2. Flush 后砍 WAL 仍可 Get  
+3. Compaction 后旧 SST 删除与读一致  
+4. ValueLog GC 后 Location 更新正确  
 
 ---
 
-## 11. 总结
+## 9. 里程碑
 
-1. StoreMgr 是唯一对外的 `StoreManager` 实现入口。  
-2. **Disk Append 成功后再提交 MemStore**；Mem 提交失败则 **revert 到 snapshot**。  
-3. Disk 失败时 Mem 从未修改，自然满足「失败不脏读索引」。  
-4. 崩溃恢复不依赖双写原子性，而依赖 `.seg` + `.hint` 重建 MemStore。
+| 阶段 | 内容 |
+|------|------|
+| **S0** | 文档定稿；移除 Bitcask / HintFile |
+| **S1** | WAL + MemTable + ValueLog Get/Put |
+| **S2** | Flush L0 + MANIFEST |
+| **S3** | Compaction + Iterate 归并 |
+| **S4** | ValueLog GC |
+
+---
+
+## 10. 总结
+
+1. **唯一入口** `OpenStoreManager` → LSM + ValueLog。  
+2. 不再提供 Bitcask / HintFile / `EngineMode` 分派。  
+3. Value 大块在 `fileio.Store`；索引在 MemTable + SST。

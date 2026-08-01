@@ -20,12 +20,9 @@ import (
 	"github.com/nutsdb/nutsdb/internal/fileio"
 )
 
-// MemStore is a memory store for the nutsdb.
-// it is used to store data in memory.
-// currently, memstore only provide basic operations for
-// a bytes type key - value pair.
-// we can mapping all data operation as a bunch of k - v operations.
-// Each memstore managed a bucket memory data.
+// MemStore is a thin facade over RBTree[fileio.Location] used by unit tests /
+// benchmarks for the ordered-map implementation. The LSM engine uses MemTable
+// (RBTree[memValue]) instead; this type is not on the StoreManager path.
 type MemStore interface {
 	// Put a key - value pair into the memstore.
 	// operation: upsert.

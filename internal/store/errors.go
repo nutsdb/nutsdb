@@ -17,9 +17,6 @@ package store
 import "errors"
 
 var (
-	// ErrMemStoreClosed is returned when operating on a closed mem store.
-	ErrMemStoreClosed = errors.New("mem store closed")
-
 	// ErrKeyNotFound is returned when a key is not found or has expired.
 	ErrKeyNotFound = errors.New("key not found")
 
@@ -29,8 +26,8 @@ var (
 	// ErrRBTreeSameRBNode is returned when a duplicate key is added to the RBTree.
 	ErrRBTreeSameRBNode = errors.New("RBTree cannot add duplicate key")
 
-	// ErrDiskStoreClosed is returned when operating on a closed disk store.
-	ErrDiskStoreClosed = errors.New("disk store closed")
+	// ErrStoreClosed is returned when operating on a closed StoreManager.
+	ErrStoreClosed = errors.New("store closed")
 
 	// ErrInvalidRecord is returned when a Put record is nil or invalid.
 	ErrInvalidRecord = errors.New("invalid record")
