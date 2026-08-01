@@ -1,8 +1,9 @@
 # DESIGN: StoreMgr（LSM StoreManager 入口）
 
-> StoreMgr 是对外 [`StoreManager`](./store_manager.go) 的实现入口。  
+> StoreMgr 是对外 [`StoreManager`](../../../internal/store/store_manager.go) 的实现入口。  
 > **唯一引擎：LSM + ValueLog（路径 C）**。  
-> 主设计：[LSM_VALUELOG_DESIGN.md](./LSM_VALUELOG_DESIGN.md)；组件：[WAL_DESIGN.md](./WAL_DESIGN.md)、[SST_DESIGN.md](./SST_DESIGN.md)、[MANIFEST_DESIGN.md](./MANIFEST_DESIGN.md)、[fileio/DESIGN.md](../fileio/DESIGN.md)。
+> 主设计：[LSM_VALUELOG_DESIGN.md](./LSM_VALUELOG_DESIGN.md)；组件：[WAL_DESIGN.md](./WAL_DESIGN.md)、[SST_DESIGN.md](./SST_DESIGN.md)、[MANIFEST_DESIGN.md](./MANIFEST_DESIGN.md)、[STORAGE_IO.md](../fileio/STORAGE_IO.md)。  
+> 索引：[../README.md](../README.md)。
 
 ---
 
@@ -115,16 +116,19 @@ Delete 默认 **不写** ValueLog，仅 WAL / MemTable / SST tombstone。
 ## 7. 建议代码布局
 
 ```text
-internal/store/
-  DESIGN_INDEX.md
-  LSM_VALUELOG_DESIGN.md
-  SST_DESIGN.md / MANIFEST_DESIGN.md / WAL_DESIGN.md
-  STORE_MGR_DESIGN.md     # 本文
-  store_manager.go        # 接口
-  lsm_options.go          # LSMOptions + OpenStoreManager
-  lsm_store_mgr.go        # 实现（待建）
-  entry.go                # ValueLog Put payload
-  mem_store.go            # 可复用为 MemTable 有序结构
+docs/design/                  # 设计文档（本文所在树）
+  README.md
+  fileio/STORAGE_IO.md
+  store/*.md
+
+internal/store/               # 实现代码
+  store_manager.go            # 接口
+  lsm_options.go              # LSMOptions + OpenStoreManager
+  lsm_store.go                # LSM 实现
+  wal.go / sst.go / manifest.go / compaction.go
+  entry.go / memtable.go / value_ref.go
+  mem_tree.go                 # MemTree 接口（有序 map）
+  rb_tree.go                  # MemTree 默认实现
 ```
 
 ---

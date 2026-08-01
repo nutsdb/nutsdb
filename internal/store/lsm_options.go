@@ -21,7 +21,7 @@ import (
 )
 
 // LSMOptions configures the LSM + ValueLog StoreManager.
-// See LSM_VALUELOG_DESIGN.md.
+// See docs/design/store/LSM_VALUELOG_DESIGN.md.
 type LSMOptions struct {
 	Dir string
 
@@ -36,7 +36,7 @@ type LSMOptions struct {
 	WALSyncMode                fileio.SyncMode
 }
 
-// DefaultLSMOptions returns defaults aligned with LSM_VALUELOG_DESIGN.md.
+// DefaultLSMOptions returns defaults aligned with docs/design/store/LSM_VALUELOG_DESIGN.md.
 func DefaultLSMOptions(dir string) LSMOptions {
 	fio := fileio.DefaultOptions(filepath.Join(dir, "vlog"))
 	return LSMOptions{

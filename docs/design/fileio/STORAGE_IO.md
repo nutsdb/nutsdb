@@ -5,7 +5,8 @@
 >
 > **引擎定位**：在 [LSM + ValueLog](../store/LSM_VALUELOG_DESIGN.md) 中，本层的 `Store`（`.seg`）担任 **ValueLog**（及可选 **WAL 后端**）；  
 > **不**在本层实现 MemTable / SST / Compaction / HintFile。  
-> 相关：[LSM_VALUELOG_DESIGN.md](../store/LSM_VALUELOG_DESIGN.md)。
+> 相关：[LSM_VALUELOG_DESIGN.md](../store/LSM_VALUELOG_DESIGN.md)；索引：[../README.md](../README.md)。  
+> 对应代码：[`internal/fileio`](../../../internal/fileio)。
 
 ---
 

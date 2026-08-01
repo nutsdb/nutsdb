@@ -2,7 +2,8 @@
 
 > 本文档是 **唯一存储引擎** 的总体设计。  
 > 选型：**LSM-Tree 管 key / 版本 / 索引；现有 `fileio.Store`（`.seg`）作为 ValueLog 存 value（及墓碑元数据可选）**。  
-> 相关文档：[SST_DESIGN.md](./SST_DESIGN.md)、[MANIFEST_DESIGN.md](./MANIFEST_DESIGN.md)、[WAL_DESIGN.md](./WAL_DESIGN.md)、[STORE_MGR_DESIGN.md](./STORE_MGR_DESIGN.md)、[fileio/DESIGN.md](../fileio/DESIGN.md)。
+> 相关文档：[SST_DESIGN.md](./SST_DESIGN.md)、[MANIFEST_DESIGN.md](./MANIFEST_DESIGN.md)、[WAL_DESIGN.md](./WAL_DESIGN.md)、[STORE_MGR_DESIGN.md](./STORE_MGR_DESIGN.md)、[STORAGE_IO.md](../fileio/STORAGE_IO.md)。  
+> 索引：[../README.md](../README.md)。
 
 ---
 
@@ -13,10 +14,9 @@
 | 项 | 选择 |
 |----|------|
 | 架构 | **LSM + ValueLog（路径 C）**（唯一引擎） |
-| ValueLog | 复用 [fileio.Store](../fileio/DESIGN.md)：`.seg` Append / Read / Seal / Delete |
+| ValueLog | 复用 [fileio.Store](../fileio/STORAGE_IO.md)：`.seg` Append / Read / Seal / Delete |
 | 索引层 | MemTable + Immutable + 多层 SST；SST 存 **`key → ValueRef`**，默认不内嵌大 value |
 | 恢复 | **WAL + MANIFEST + SST** |
-| 已移除 | Bitcask / HintFile / `EngineMode` 多引擎分派 |
 
 ### 0.2 目标
 
@@ -64,7 +64,7 @@
 
 | 组件 | 职责 | 文档 |
 |------|------|------|
-| **ValueLog** | 追加存 Put value（及可选 Delete 旁路记录）；按 `Location` 点读 | [fileio/DESIGN.md](../fileio/DESIGN.md) |
+| **ValueLog** | 追加存 Put value（及可选 Delete 旁路记录）；按 `Location` 点读 | [STORAGE_IO.md](../fileio/STORAGE_IO.md) |
 | **WAL** | 保证 MemTable 崩溃可恢复 | [WAL_DESIGN.md](./WAL_DESIGN.md) |
 | **MemTable** | 可变有序表：`key → ValueRef \| Tombstone \| Inline` | 本文 §3 |
 | **SST** | 不可变有序表文件；点查 / 范围扫 | [SST_DESIGN.md](./SST_DESIGN.md) |
@@ -126,8 +126,8 @@ ValueKindInline ⇒ 不访问 ValueLog；Inline 即用户 value 字节
 
 ### 3.1 结构
 
-- 有序：skiplist 或复用 / 改造现有 `RBTree`（value 改为 `ValueRef`）
-- 容量：按 **条目数** 或 **估算字节数** 触发 freeze（默认如 64MiB 估算）
+- 有序：`MemTree[memValue]`（默认实现 `RBTree`；`memValue = ValueRef + Seq`，见 `mem_tree.go` / `rb_tree.go` / `memtable.go`）
+- 容量：按 **估算字节数** 触发 freeze（默认如 64MiB）
 - 冻结后变为 Immutable，进入 flush 队列；同时分配新的可变 MemTable
 
 ### 3.2 与全量内存索引的差异
@@ -280,21 +280,7 @@ OpenLSM(opts):
 
 ---
 
-## 9. 已移除的模型
-
-以下不再支持，也无兼容路径：
-
-| 已移除 | 原用途 |
-|--------|--------|
-| HintFile (`.hint`) | Bitcask 启动加速 |
-| 全量 `key → Location` MemStore 作为主索引 | Bitcask 运行期索引 |
-| `EngineMode` / Bitcask DiskStore | 多引擎分派 |
-
-`.seg` **仅**作为 ValueLog（及可选 WAL 后端）。
-
----
-
-## 10. 目录布局
+## 9. 目录布局
 
 ```text
 <data_dir>/
@@ -308,11 +294,11 @@ OpenLSM(opts):
     <fileID>.seg
 ```
 
-ValueLog 使用子目录 `vlog/`，避免与 SST/WAL 混名。
+ValueLog 使用子目录 `vlog/`，避免与 SST/WAL 混名。`.seg` 仅作为 ValueLog（及可选 WAL 后端）。
 
 ---
 
-## 11. Options（建议）
+## 10. Options（建议）
 
 ```go
 type LSMOptions struct {
@@ -350,9 +336,9 @@ type LSMOptions struct {
 
 ---
 
-## 12. 对外 API
+## 11. 对外 API
 
-对外实现 [StoreManager](./store_manager.go)。
+对外实现 [`StoreManager`](../../../internal/store/store_manager.go)。
 
 内部可增加运维 API（首版可不导出）：
 
@@ -366,11 +352,11 @@ type LSMAdmin interface {
 
 ---
 
-## 13. 实施里程碑
+## 12. 实施里程碑
 
 | 阶段 | 内容 | 依赖 |
 |------|------|------|
-| **L0** | 本文档 + SST/MANIFEST/WAL 定稿；移除 Bitcask/Hint | — |
+| **L0** | 本文档 + SST/MANIFEST/WAL 定稿 | — |
 | **L1** | WAL + MemTable + ValueLog Put/Get（无 SST，重启靠 WAL） | fileio |
 | **L2** | Flush → L0 SST；MANIFEST；重启加载 SST | L1 |
 | **L3** | Leveled compaction；Iterate 多路归并 | L2 |
@@ -379,7 +365,7 @@ type LSMAdmin interface {
 
 ---
 
-## 14. 测试要点
+## 13. 测试要点
 
 1. Put → Close → Open → Get（WAL + ValueLog）  
 2. 超 MemTable 阈值后 flush，杀进程，仅靠 SST+WAL 恢复  
@@ -391,9 +377,8 @@ type LSMAdmin interface {
 
 ---
 
-## 15. 总结
+## 14. 总结
 
 1. **唯一引擎**：LSM 管索引与版本；`fileio.Store` 专任 **ValueLog**。  
-2. **已移除** HintFile / Bitcask / 全量内存 Location 主索引。  
-3. 写：ValueLog（大 value）→ WAL → MemTable；读：LSM 找 `ValueRef` → ValueLog 点读。  
-4. Compaction 回收索引与版本；ValueLog GC 回收 value 空间。
+2. 写：ValueLog（大 value）→ WAL → MemTable；读：LSM 找 `ValueRef` → ValueLog 点读。  
+3. Compaction 回收索引与版本；ValueLog GC 回收 value 空间。

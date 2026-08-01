@@ -22,13 +22,13 @@ type memValue struct {
 
 // MemTable is an ordered mutable table of key → memValue.
 type MemTable struct {
-	tree     *RBTree[memValue]
-	approx   int64
-	frozen   bool
+	tree   MemTree[memValue]
+	approx int64
+	frozen bool
 }
 
 func newMemTable() *MemTable {
-	return &MemTable{tree: newRBTree[memValue]()}
+	return &MemTable{tree: newMemTree[memValue]()}
 }
 
 func (m *MemTable) ApproxBytes() int64 {
