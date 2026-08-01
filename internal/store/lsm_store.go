@@ -434,18 +434,14 @@ type mergeItem struct {
 }
 
 func (m *lsmStoreMgr) collectMergedLocked() ([]mergeItem, error) {
-	type cand struct {
-		key []byte
-		ref ValueRef
-		seq uint64
-	}
-	best := map[string]cand{}
+
+	best := map[string]mergeItem{}
 	add := func(key []byte, ref ValueRef, seq uint64) {
 		s := string(key)
 		if old, ok := best[s]; ok && old.seq >= seq {
 			return
 		}
-		best[s] = cand{key: append([]byte(nil), key...), ref: cloneValueRef(ref), seq: seq}
+		best[s] = mergeItem{key: append([]byte(nil), key...), ref: cloneValueRef(ref), seq: seq}
 	}
 	m.mem.Iterate(func(key []byte, v memValue) bool {
 		add(key, v.Ref, v.Seq)
@@ -478,7 +474,7 @@ func (m *lsmStoreMgr) collectMergedLocked() ([]mergeItem, error) {
 		if c.ref.Kind == ValueKindTombstone {
 			continue
 		}
-		out = append(out, mergeItem{key: c.key, ref: c.ref, seq: c.seq})
+		out = append(out, c)
 	}
 	sort.Slice(out, func(i, j int) bool {
 		return bytesCompare(out[i].key, out[j].key) < 0

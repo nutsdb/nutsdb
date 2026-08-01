@@ -17,6 +17,7 @@ package store
 import (
 	"encoding/binary"
 	"hash/crc32"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -63,8 +64,11 @@ func (v *Version) clone() *Version {
 }
 
 type VersionEdit struct {
-	Added          []FileMeta
-	Deleted        []struct{ Level int; FileNumber uint64 }
+	Added   []FileMeta
+	Deleted []struct {
+		Level      int
+		FileNumber uint64
+	}
 	LastSequence   *uint64
 	NextFileNumber *uint64
 	LogNumber      *uint64
@@ -139,7 +143,7 @@ func recoverVersionSet(dir, sstDir string) (*VersionSet, error) {
 	if err != nil {
 		return nil, err
 	}
-	if _, err := fd.Seek(0, os.SEEK_END); err != nil {
+	if _, err := fd.Seek(0, io.SeekEnd); err != nil {
 		_ = fd.Close()
 		return nil, err
 	}

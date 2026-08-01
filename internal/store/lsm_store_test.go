@@ -41,7 +41,9 @@ func TestLSM_PutGetDelete(t *testing.T) {
 	dir := t.TempDir()
 	st, err := OpenStoreManager(testLSMOpts(dir))
 	require.NoError(t, err)
-	defer st.Close()
+	defer func() {
+		_ = st.Close()
+	}()
 
 	ctx := context.Background()
 	require.NoError(t, st.Put(ctx, []byte("a"), core.NewRecord().WithValue([]byte("1"))))
@@ -60,7 +62,9 @@ func TestLSM_InlineAndLocation(t *testing.T) {
 	opts.ValueInlineThreshold = 8
 	st, err := OpenStoreManager(opts)
 	require.NoError(t, err)
-	defer st.Close()
+	defer func() {
+		_ = st.Close()
+	}()
 	ctx := context.Background()
 
 	require.NoError(t, st.Put(ctx, []byte("small"), core.NewRecord().WithValue([]byte("abc"))))
@@ -90,7 +94,9 @@ func TestLSM_PersistAndReopen(t *testing.T) {
 
 	st2, err := OpenStoreManager(opts)
 	require.NoError(t, err)
-	defer st2.Close()
+	defer func() {
+		_ = st2.Close()
+	}()
 	rec, err := st2.Get(ctx, []byte("k"))
 	require.NoError(t, err)
 	require.Equal(t, []byte("v"), rec.Value)
@@ -113,7 +119,9 @@ func TestLSM_FlushAndReopen(t *testing.T) {
 
 	st2, err := OpenStoreManager(opts)
 	require.NoError(t, err)
-	defer st2.Close()
+	defer func() {
+		_ = st2.Close()
+	}()
 	rec, err := st2.Get(ctx, []byte("key-0042"))
 	require.NoError(t, err)
 	require.Equal(t, []byte("val-0042"), rec.Value)
@@ -123,7 +131,9 @@ func TestLSM_IterateOrderAndDelete(t *testing.T) {
 	dir := t.TempDir()
 	st, err := OpenStoreManager(testLSMOpts(dir))
 	require.NoError(t, err)
-	defer st.Close()
+	defer func() {
+		_ = st.Close()
+	}()
 	ctx := context.Background()
 
 	require.NoError(t, st.Put(ctx, []byte("c"), core.NewRecord().WithValue([]byte("3"))))
@@ -143,7 +153,9 @@ func TestLSM_Batch(t *testing.T) {
 	dir := t.TempDir()
 	st, err := OpenStoreManager(testLSMOpts(dir))
 	require.NoError(t, err)
-	defer st.Close()
+	defer func() {
+		_ = st.Close()
+	}()
 	ctx := context.Background()
 
 	require.NoError(t, st.BatchPut(ctx, []struct {
@@ -167,7 +179,9 @@ func TestLSM_TTLExpired(t *testing.T) {
 	dir := t.TempDir()
 	st, err := OpenStoreManager(testLSMOpts(dir))
 	require.NoError(t, err)
-	defer st.Close()
+	defer func() {
+		_ = st.Close()
+	}()
 	ctx := context.Background()
 
 	rec := core.NewRecord().WithValue([]byte("v"))
@@ -199,7 +213,9 @@ func TestLSM_UpdateOverwrite(t *testing.T) {
 
 	st2, err := OpenStoreManager(opts)
 	require.NoError(t, err)
-	defer st2.Close()
+	defer func() {
+		_ = st2.Close()
+	}()
 	rec, err = st2.Get(ctx, []byte("k"))
 	require.NoError(t, err)
 	require.Equal(t, []byte("v29"), rec.Value)

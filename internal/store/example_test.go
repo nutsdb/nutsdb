@@ -107,7 +107,9 @@ func ExampleStoreManager() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer st2.Close()
+	defer func() {
+		_ = st2.Close()
+	}()
 
 	rec, err = st2.Get(ctx, []byte("user:1"))
 	if err != nil {

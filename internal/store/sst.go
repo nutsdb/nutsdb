@@ -17,15 +17,16 @@ package store
 import (
 	"encoding/binary"
 	"hash/crc32"
+	"io"
 	"os"
 	"path/filepath"
 )
 
 const (
-	sstMagic          uint32 = 0x53535431 // SST1
-	sstFooterSize            = 48
-	sstFormatVersion         = uint16(1)
-	sstDefaultBlockSize      = 4 << 10
+	sstMagic            uint32 = 0x53535431 // SST1
+	sstFooterSize              = 48
+	sstFormatVersion           = uint16(1)
+	sstDefaultBlockSize        = 4 << 10
 )
 
 type sstEntry struct {
@@ -50,13 +51,13 @@ type sstWriter struct {
 	tmpPath    string
 	finalPath  string
 
-	buf       []byte
-	blockBuf  []byte
-	index     []indexEntry
-	count     int
-	smallest  []byte
-	largest   []byte
-	lastKey   []byte
+	buf      []byte
+	blockBuf []byte
+	index    []indexEntry
+	count    int
+	smallest []byte
+	largest  []byte
+	lastKey  []byte
 }
 
 type indexEntry struct {
@@ -128,7 +129,7 @@ func (w *sstWriter) Add(key []byte, ref ValueRef, seq uint64) error {
 		}
 	}
 	if len(w.blockBuf) == 0 {
-		pos, err := w.fd.Seek(0, os.SEEK_CUR)
+		pos, err := w.fd.Seek(0, io.SeekCurrent)
 		if err != nil {
 			return err
 		}
@@ -164,7 +165,7 @@ func (w *sstWriter) Finish() (sstFileMeta, error) {
 	if err := w.flushBlock(); err != nil {
 		return meta, err
 	}
-	indexOff, err := w.fd.Seek(0, os.SEEK_CUR)
+	indexOff, err := w.fd.Seek(0, io.SeekCurrent)
 	if err != nil {
 		return meta, err
 	}
@@ -181,7 +182,7 @@ func (w *sstWriter) Finish() (sstFileMeta, error) {
 		}
 	}
 	indexLen := uint32(0)
-	cur, err := w.fd.Seek(0, os.SEEK_CUR)
+	cur, err := w.fd.Seek(0, io.SeekCurrent)
 	if err != nil {
 		return meta, err
 	}
@@ -385,7 +386,6 @@ func (r *sstReader) Iterate(fn func(key []byte, ref ValueRef, seq uint64) error)
 	}
 	dataEnd := len(r.data) - sstFooterSize
 	if len(r.index) > 0 {
-		dataEnd = int(r.index[0].offset) // wait, data is before index
 		// data region is [0, indexOff)
 		footer := r.data[len(r.data)-sstFooterSize:]
 		indexOff := int(binary.LittleEndian.Uint64(footer[12:20]))
