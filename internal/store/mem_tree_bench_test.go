@@ -17,60 +17,50 @@ package store
 import (
 	"fmt"
 	"testing"
-
-	"github.com/nutsdb/nutsdb/internal/fileio"
 )
 
 func benchKey(i int) []byte {
-	return []byte(fmt.Sprintf("memstore-bench-key-%012d", i))
+	return fmt.Appendf(nil, "memtree-bench-key-%012d", i)
 }
 
-func benchLoc(i int) fileio.Location {
-	return fileio.Location{
-		FileID: 1,
-		Offset: uint64(fileio.HeaderSize + i*32),
-		Length: 32,
-	}
-}
-
-func newPopulatedMemStore(b *testing.B, n int) (MemStore, [][]byte) {
+func newPopulatedMemTree(b *testing.B, n int) (MemTree[testVal], [][]byte) {
 	b.Helper()
 
-	ms := NewMemStore()
+	tree := newMemTree[testVal]()
 	keys := make([][]byte, n)
 	for i := 0; i < n; i++ {
 		key := benchKey(i)
 		keys[i] = key
-		if err := ms.Put(key, benchLoc(i)); err != nil {
-			b.Fatalf("populate store: %v", err)
+		if err := tree.Put(key, tv(i)); err != nil {
+			b.Fatalf("populate tree: %v", err)
 		}
 	}
-	return ms, keys
+	return tree, keys
 }
 
-func BenchmarkMemStore_Put(b *testing.B) {
-	ms := NewMemStore()
+func BenchmarkMemTree_Put(b *testing.B) {
+	tree := newMemTree[testVal]()
 
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		key := benchKey(i)
-		if err := ms.Put(key, benchLoc(i)); err != nil {
+		if err := tree.Put(key, tv(i)); err != nil {
 			b.Fatalf("put: %v", err)
 		}
 	}
 }
 
-func BenchmarkMemStore_PutOverwrite(b *testing.B) {
+func BenchmarkMemTree_PutOverwrite(b *testing.B) {
 	for _, n := range []int{1_000, 10_000, 100_000} {
 		b.Run(fmt.Sprintf("size=%d", n), func(b *testing.B) {
-			ms, keys := newPopulatedMemStore(b, n)
+			tree, keys := newPopulatedMemTree(b, n)
 
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				key := keys[i%n]
-				if err := ms.Put(key, benchLoc(i%n)); err != nil {
+				if err := tree.Put(key, tv(i%n)); err != nil {
 					b.Fatalf("put overwrite: %v", err)
 				}
 			}
@@ -78,15 +68,15 @@ func BenchmarkMemStore_PutOverwrite(b *testing.B) {
 	}
 }
 
-func BenchmarkMemStore_Get(b *testing.B) {
+func BenchmarkMemTree_Get(b *testing.B) {
 	for _, n := range []int{1_000, 10_000, 100_000} {
 		b.Run(fmt.Sprintf("size=%d", n), func(b *testing.B) {
-			ms, keys := newPopulatedMemStore(b, n)
+			tree, keys := newPopulatedMemTree(b, n)
 
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				if _, err := ms.Get(keys[i%n]); err != nil {
+				if _, err := tree.Get(keys[i%n]); err != nil {
 					b.Fatalf("get: %v", err)
 				}
 			}
@@ -94,16 +84,16 @@ func BenchmarkMemStore_Get(b *testing.B) {
 	}
 }
 
-func BenchmarkMemStore_GetMiss(b *testing.B) {
+func BenchmarkMemTree_GetMiss(b *testing.B) {
 	for _, n := range []int{1_000, 10_000, 100_000} {
 		b.Run(fmt.Sprintf("size=%d", n), func(b *testing.B) {
-			ms, _ := newPopulatedMemStore(b, n)
-			missing := []byte("memstore-bench-missing-key")
+			tree, _ := newPopulatedMemTree(b, n)
+			missing := []byte("memtree-bench-missing-key")
 
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				if _, err := ms.Get(missing); err == nil {
+				if _, err := tree.Get(missing); err == nil {
 					b.Fatal("expected missing key error")
 				}
 			}
@@ -111,7 +101,7 @@ func BenchmarkMemStore_GetMiss(b *testing.B) {
 	}
 }
 
-func BenchmarkMemStore_Delete(b *testing.B) {
+func BenchmarkMemTree_Delete(b *testing.B) {
 	for _, n := range []int{1_000, 10_000, 100_000} {
 		b.Run(fmt.Sprintf("size=%d", n), func(b *testing.B) {
 			keys := make([][]byte, n)
@@ -122,16 +112,16 @@ func BenchmarkMemStore_Delete(b *testing.B) {
 			b.ReportAllocs()
 			for i := 0; i < b.N; i++ {
 				b.StopTimer()
-				ms := NewMemStore()
+				tree := newMemTree[testVal]()
 				for j, key := range keys {
-					if err := ms.Put(key, benchLoc(j)); err != nil {
-						b.Fatalf("populate store: %v", err)
+					if err := tree.Put(key, tv(j)); err != nil {
+						b.Fatalf("populate tree: %v", err)
 					}
 				}
 				b.StartTimer()
 
 				for _, key := range keys {
-					if _, ok := ms.Delete(key); !ok {
+					if _, ok := tree.Delete(key); !ok {
 						b.Fatal("delete existing key failed")
 					}
 				}
@@ -140,16 +130,16 @@ func BenchmarkMemStore_Delete(b *testing.B) {
 	}
 }
 
-func BenchmarkMemStore_Iterate(b *testing.B) {
+func BenchmarkMemTree_Iterate(b *testing.B) {
 	for _, n := range []int{1_000, 10_000, 100_000} {
 		b.Run(fmt.Sprintf("size=%d", n), func(b *testing.B) {
-			ms, _ := newPopulatedMemStore(b, n)
+			tree, _ := newPopulatedMemTree(b, n)
 
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				var count int
-				ms.Iterate(func(key []byte, value fileio.Location) bool {
+				tree.Iterate(func(key []byte, value testVal) bool {
 					count++
 					return true
 				})
@@ -161,9 +151,9 @@ func BenchmarkMemStore_Iterate(b *testing.B) {
 	}
 }
 
-func BenchmarkMemStore_Mixed(b *testing.B) {
+func BenchmarkMemTree_Mixed(b *testing.B) {
 	const storeSize = 10_000
-	ms, keys := newPopulatedMemStore(b, storeSize)
+	tree, keys := newPopulatedMemTree(b, storeSize)
 
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -171,22 +161,22 @@ func BenchmarkMemStore_Mixed(b *testing.B) {
 		switch i % 4 {
 		case 0:
 			key := keys[i%storeSize]
-			if err := ms.Put(key, benchLoc(i%storeSize)); err != nil {
+			if err := tree.Put(key, tv(i%storeSize)); err != nil {
 				b.Fatalf("mixed put: %v", err)
 			}
 		case 1:
-			if _, err := ms.Get(keys[i%storeSize]); err != nil {
+			if _, err := tree.Get(keys[i%storeSize]); err != nil {
 				b.Fatalf("mixed get: %v", err)
 			}
 		case 2:
 			key := keys[i%storeSize]
-			if _, ok := ms.Delete(key); !ok {
-				if err := ms.Put(key, benchLoc(i%storeSize)); err != nil {
+			if _, ok := tree.Delete(key); !ok {
+				if err := tree.Put(key, tv(i%storeSize)); err != nil {
 					b.Fatalf("mixed repopulate: %v", err)
 				}
 			}
 		case 3:
-			ms.Iterate(func(key []byte, value fileio.Location) bool {
+			tree.Iterate(func(key []byte, value testVal) bool {
 				return i%100 != 0
 			})
 		}

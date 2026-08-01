@@ -33,17 +33,6 @@ const (
 	// FileIDWidth is the zero-padded decimal width used in on-disk filenames
 	// (e.g. 0000000001.seg). uint32 max fits in 10 digits.
 	FileIDWidth = 10
-
-	HintSuffix           = ".hint"
-	HintHeaderSize       = 64
-	HintFooterSize       = 64
-	HintEntryHeaderSize  = 28
-	HintMagic     uint32 = 0x4E444248 // NDBH
-	HintSealMagic uint32 = 0x48465452 // HFTR
-	HintVersion          = uint16(1)
-	HintFlagComplete     = uint16(1 << 0)
-	DefaultHintBufferSize = 64 << 10 // 64KiB
-	MaxHintKeySize        = 1 << 20  // 1MiB
 )
 
 var (
@@ -55,12 +44,4 @@ var (
 	ErrStoreClosed     = errors.New("fileio: store closed")
 	ErrInvalidOptions  = errors.New("fileio: invalid options")
 	ErrSegmentFull     = errors.New("fileio: segment full")
-
-	ErrHintNotFound       = errors.New("fileio: hint not found")
-	ErrHintCorrupt        = errors.New("fileio: hint corrupt")
-	ErrHintIncomplete     = errors.New("fileio: hint incomplete")
-	ErrHintInvalidEntry   = errors.New("fileio: hint invalid entry")
-	ErrHintSegKeyMismatch = errors.New("fileio: hint/segment key mismatch")
-	ErrHintClosed         = errors.New("fileio: hint closed")
-	ErrHintSkipMeta       = errors.New("fileio: hint skip meta record")
 )

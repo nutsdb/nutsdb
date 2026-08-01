@@ -19,14 +19,13 @@ import (
 	"encoding/binary"
 
 	"github.com/nutsdb/nutsdb/internal/core"
-	"github.com/nutsdb/nutsdb/internal/fileio"
 )
 
 const (
 	putPayloadHeaderSize = 20 // key_len + value_len + timestamp + ttl
-	delPayloadHeaderSize = 4  // key_len
 )
 
+// encodePutPayload encodes a Put record for ValueLog (fileio.RecordPut payload).
 func encodePutPayload(key []byte, rec *core.Record) ([]byte, error) {
 	if len(key) == 0 {
 		return nil, ErrKeyEmpty
@@ -45,16 +44,6 @@ func encodePutPayload(key []byte, rec *core.Record) ([]byte, error) {
 	binary.LittleEndian.PutUint32(buf[16:20], rec.TTL)
 	copy(buf[putPayloadHeaderSize:], key)
 	copy(buf[putPayloadHeaderSize+len(key):], rec.Value)
-	return buf, nil
-}
-
-func encodeDeletePayload(key []byte) ([]byte, error) {
-	if len(key) == 0 {
-		return nil, ErrKeyEmpty
-	}
-	buf := make([]byte, delPayloadHeaderSize+len(key))
-	binary.LittleEndian.PutUint32(buf[0:4], uint32(len(key)))
-	copy(buf[delPayloadHeaderSize:], key)
 	return buf, nil
 }
 
@@ -82,37 +71,6 @@ func decodePutPayload(payload []byte) (key []byte, rec *core.Record, err error) 
 		TTL:       binary.LittleEndian.Uint32(payload[16:20]),
 	}
 	return key, rec, nil
-}
-
-func decodeDeletePayload(payload []byte) (key []byte, err error) {
-	if len(payload) < delPayloadHeaderSize {
-		return nil, ErrCorruptEntry
-	}
-	keyLen := binary.LittleEndian.Uint32(payload[0:4])
-	if keyLen == 0 {
-		return nil, ErrCorruptEntry
-	}
-	if len(payload) != delPayloadHeaderSize+int(keyLen) {
-		return nil, ErrCorruptEntry
-	}
-	key = make([]byte, keyLen)
-	copy(key, payload[delPayloadHeaderSize:])
-	return key, nil
-}
-
-// decodeKey extracts the business key from a Store record payload for HintFile.
-func decodeKey(payload []byte, typ fileio.RecordType) ([]byte, error) {
-	switch typ {
-	case fileio.RecordPut:
-		key, _, err := decodePutPayload(payload)
-		return key, err
-	case fileio.RecordDelete:
-		return decodeDeletePayload(payload)
-	case fileio.RecordMeta:
-		return nil, fileio.ErrHintSkipMeta
-	default:
-		return nil, ErrCorruptEntry
-	}
 }
 
 func isExpired(rec *core.Record, nowUnix uint64) bool {
