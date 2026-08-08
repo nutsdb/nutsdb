@@ -15,8 +15,6 @@
 package store
 
 import (
-	"path/filepath"
-
 	"github.com/nutsdb/nutsdb/internal/fileio"
 )
 
@@ -38,7 +36,7 @@ type LSMOptions struct {
 
 // DefaultLSMOptions returns defaults aligned with docs/design/store/LSM_VALUELOG_DESIGN.md.
 func DefaultLSMOptions(dir string) LSMOptions {
-	fio := fileio.DefaultOptions(filepath.Join(dir, "vlog"))
+	fio := fileio.DefaultOptions(defaultVLogDir(dir))
 	return LSMOptions{
 		Dir:                        dir,
 		ValueLog:                   fio,

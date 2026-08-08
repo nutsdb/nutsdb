@@ -15,6 +15,7 @@
 package store
 
 import (
+	"bytes"
 	"encoding/binary"
 	"hash/crc32"
 	"io"
@@ -27,6 +28,21 @@ const (
 	sstFooterSize              = 48
 	sstFormatVersion           = uint16(1)
 	sstDefaultBlockSize        = 4 << 10
+	sstFileSuffix              = ".sst"
+	sstTmpSuffix               = ".tmp"
+	sstFileIDWidth             = 20
+
+	// SST footer layout (little-endian), total sstFooterSize bytes.
+	sstFooterFilterOff    = 0  // u64
+	sstFooterFilterLenOff = 8  // u32
+	sstFooterIndexOffOff  = 12 // u64
+	sstFooterIndexLenOff  = 20 // u32
+	sstFooterMetaOffOff   = 24 // u64
+	sstFooterMetaLenOff   = 32 // u32
+	sstFooterMagicOff     = 36 // u32
+	sstFooterVersionOff   = 40 // u16
+	sstFooterFlagsOff     = 42 // u16
+	sstFooterCRCOff       = 44 // u32; covers footer[:sstFooterCRCOff]
 )
 
 type sstEntry struct {
@@ -67,13 +83,12 @@ type indexEntry struct {
 }
 
 func sstPath(dir string, num uint64) string {
-	return filepath.Join(dir, padUint64(num)+".sst")
+	return filepath.Join(dir, padUint64(num)+sstFileSuffix)
 }
 
 func padUint64(n uint64) string {
-	const w = 20
-	var b [w]byte
-	for i := w - 1; i >= 0; i-- {
+	var b [sstFileIDWidth]byte
+	for i := sstFileIDWidth - 1; i >= 0; i-- {
 		b[i] = byte('0' + n%10)
 		n /= 10
 	}
@@ -81,12 +96,12 @@ func padUint64(n uint64) string {
 }
 
 func newSSTWriter(sstDir string, fileNumber uint64) (*sstWriter, error) {
-	if err := os.MkdirAll(sstDir, 0o755); err != nil {
+	if err := os.MkdirAll(sstDir, dirPerm); err != nil {
 		return nil, err
 	}
 	final := sstPath(sstDir, fileNumber)
-	tmp := final + ".tmp"
-	fd, err := os.OpenFile(tmp, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0o644)
+	tmp := final + sstTmpSuffix
+	fd, err := os.OpenFile(tmp, os.O_CREATE|os.O_RDWR|os.O_TRUNC, filePerm)
 	if err != nil {
 		return nil, err
 	}
@@ -103,7 +118,7 @@ func newSSTWriter(sstDir string, fileNumber uint64) (*sstWriter, error) {
 }
 
 func (w *sstWriter) Add(key []byte, ref ValueRef, seq uint64) error {
-	if w.lastKey != nil && bytesCompare(key, w.lastKey) < 0 {
+	if w.lastKey != nil && bytes.Compare(key, w.lastKey) < 0 {
 		return ErrCorruptEntry
 	}
 	if w.count == 0 {
@@ -190,17 +205,17 @@ func (w *sstWriter) Finish() (sstFileMeta, error) {
 
 	footer := make([]byte, sstFooterSize)
 	// filter unused
-	binary.LittleEndian.PutUint64(footer[0:8], 0)
-	binary.LittleEndian.PutUint32(footer[8:12], 0)
-	binary.LittleEndian.PutUint64(footer[12:20], uint64(indexOff))
-	binary.LittleEndian.PutUint32(footer[20:24], indexLen)
-	binary.LittleEndian.PutUint64(footer[24:32], 0)
-	binary.LittleEndian.PutUint32(footer[32:36], 0)
-	binary.LittleEndian.PutUint32(footer[36:40], sstMagic)
-	binary.LittleEndian.PutUint16(footer[40:42], sstFormatVersion)
-	binary.LittleEndian.PutUint16(footer[42:44], 0)
-	crc := crc32.ChecksumIEEE(footer[:44])
-	binary.LittleEndian.PutUint32(footer[44:48], crc)
+	binary.LittleEndian.PutUint64(footer[sstFooterFilterOff:sstFooterFilterOff+8], 0)
+	binary.LittleEndian.PutUint32(footer[sstFooterFilterLenOff:sstFooterFilterLenOff+4], 0)
+	binary.LittleEndian.PutUint64(footer[sstFooterIndexOffOff:sstFooterIndexOffOff+8], uint64(indexOff))
+	binary.LittleEndian.PutUint32(footer[sstFooterIndexLenOff:sstFooterIndexLenOff+4], indexLen)
+	binary.LittleEndian.PutUint64(footer[sstFooterMetaOffOff:sstFooterMetaOffOff+8], 0)
+	binary.LittleEndian.PutUint32(footer[sstFooterMetaLenOff:sstFooterMetaLenOff+4], 0)
+	binary.LittleEndian.PutUint32(footer[sstFooterMagicOff:sstFooterMagicOff+4], sstMagic)
+	binary.LittleEndian.PutUint16(footer[sstFooterVersionOff:sstFooterVersionOff+2], sstFormatVersion)
+	binary.LittleEndian.PutUint16(footer[sstFooterFlagsOff:sstFooterFlagsOff+2], 0)
+	crc := crc32.ChecksumIEEE(footer[:sstFooterCRCOff])
+	binary.LittleEndian.PutUint32(footer[sstFooterCRCOff:sstFooterCRCOff+4], crc)
 	if _, err := w.fd.Write(footer); err != nil {
 		return meta, err
 	}
@@ -255,15 +270,15 @@ func openSSTReader(sstDir string, fileNumber uint64) (*sstReader, error) {
 		return nil, ErrCorruptEntry
 	}
 	footer := data[len(data)-sstFooterSize:]
-	if binary.LittleEndian.Uint32(footer[36:40]) != sstMagic {
+	if binary.LittleEndian.Uint32(footer[sstFooterMagicOff:sstFooterMagicOff+4]) != sstMagic {
 		return nil, ErrCorruptEntry
 	}
-	crc := binary.LittleEndian.Uint32(footer[44:48])
-	if crc32.ChecksumIEEE(footer[:44]) != crc {
+	crc := binary.LittleEndian.Uint32(footer[sstFooterCRCOff : sstFooterCRCOff+4])
+	if crc32.ChecksumIEEE(footer[:sstFooterCRCOff]) != crc {
 		return nil, ErrCorruptEntry
 	}
-	indexOff := binary.LittleEndian.Uint64(footer[12:20])
-	indexLen := binary.LittleEndian.Uint32(footer[20:24])
+	indexOff := binary.LittleEndian.Uint64(footer[sstFooterIndexOffOff : sstFooterIndexOffOff+8])
+	indexLen := binary.LittleEndian.Uint32(footer[sstFooterIndexLenOff : sstFooterIndexLenOff+4])
 	if indexOff+uint64(indexLen) > uint64(len(data)-sstFooterSize) {
 		return nil, ErrCorruptEntry
 	}
@@ -299,7 +314,7 @@ func (r *sstReader) Get(key []byte) (ref ValueRef, seq uint64, ok bool, err erro
 	}
 	// index key is the largest key in each block
 	bi := 0
-	for bi < len(r.index) && bytesCompare(r.index[bi].key, key) < 0 {
+	for bi < len(r.index) && bytes.Compare(r.index[bi].key, key) < 0 {
 		bi++
 	}
 	if bi >= len(r.index) {
@@ -318,7 +333,7 @@ func (r *sstReader) scanAllForKey(key []byte) (ValueRef, uint64, bool, error) {
 	var ref ValueRef
 	var seq uint64
 	err := r.Iterate(func(k []byte, rref ValueRef, s uint64) error {
-		c := bytesCompare(k, key)
+		c := bytes.Compare(k, key)
 		if c == 0 {
 			ref, seq, found = rref, s, true
 			return errStopIterate
@@ -346,7 +361,7 @@ func scanBlockForKey(block, key []byte) (ValueRef, uint64, bool, error) {
 		if err != nil {
 			return ValueRef{}, 0, false, err
 		}
-		c := bytesCompare(ent.Key, key)
+		c := bytes.Compare(ent.Key, key)
 		if c == 0 {
 			return ent.Ref, ent.Seq, true, nil
 		}
@@ -388,7 +403,7 @@ func (r *sstReader) Iterate(fn func(key []byte, ref ValueRef, seq uint64) error)
 	if len(r.index) > 0 {
 		// data region is [0, indexOff)
 		footer := r.data[len(r.data)-sstFooterSize:]
-		indexOff := int(binary.LittleEndian.Uint64(footer[12:20]))
+		indexOff := int(binary.LittleEndian.Uint64(footer[sstFooterIndexOffOff : sstFooterIndexOffOff+8]))
 		dataEnd = indexOff
 	}
 	for off := 0; off < dataEnd; {
@@ -405,23 +420,3 @@ func (r *sstReader) Iterate(fn func(key []byte, ref ValueRef, seq uint64) error)
 }
 
 func (r *sstReader) Close() error { return nil }
-
-func bytesCompare(a, b []byte) int {
-	al, bl := len(a), len(b)
-	for i := 0; i < al && i < bl; i++ {
-		if a[i] < b[i] {
-			return -1
-		}
-		if a[i] > b[i] {
-			return 1
-		}
-	}
-	switch {
-	case al < bl:
-		return -1
-	case al > bl:
-		return 1
-	default:
-		return 0
-	}
-}

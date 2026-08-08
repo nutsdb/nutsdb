@@ -15,6 +15,7 @@
 package store
 
 import (
+	"bytes"
 	"encoding/binary"
 	"hash/crc32"
 	"io"
@@ -29,6 +30,10 @@ import (
 const (
 	manifestRecordHeader = 9 // crc4 + len4 + type1
 	manifestTypeEdit     = 1
+
+	currentFileName    = "CURRENT"
+	currentTmpName     = "CURRENT.tmp"
+	manifestFilePrefix = "MANIFEST-"
 )
 
 type FileMeta struct {
@@ -85,10 +90,10 @@ type VersionSet struct {
 }
 
 func recoverVersionSet(dir, sstDir string) (*VersionSet, error) {
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, dirPerm); err != nil {
 		return nil, err
 	}
-	if err := os.MkdirAll(sstDir, 0o755); err != nil {
+	if err := os.MkdirAll(sstDir, dirPerm); err != nil {
 		return nil, err
 	}
 	vs := &VersionSet{
@@ -139,7 +144,7 @@ func recoverVersionSet(dir, sstDir string) (*VersionSet, error) {
 		}
 		vs.applyEditLocked(edit)
 	}
-	fd, err := os.OpenFile(vs.manPath, os.O_RDWR, 0o644)
+	fd, err := os.OpenFile(vs.manPath, os.O_RDWR, filePerm)
 	if err != nil {
 		return nil, err
 	}
@@ -155,7 +160,7 @@ func (vs *VersionSet) createNewManifest() error {
 	vs.manSeq++
 	name := formatManifestName(vs.manSeq)
 	path := filepath.Join(vs.dir, name)
-	fd, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0o644)
+	fd, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR|os.O_TRUNC, filePerm)
 	if err != nil {
 		return err
 	}
@@ -234,7 +239,7 @@ func applyEditToVersion(v *Version, edit *VersionEdit) {
 		v.Files[f.Level] = append(v.Files[f.Level], f)
 		if f.Level > 0 {
 			sort.Slice(v.Files[f.Level], func(i, j int) bool {
-				return bytesCompare(v.Files[f.Level][i].Smallest, v.Files[f.Level][j].Smallest) < 0
+				return bytes.Compare(v.Files[f.Level][i].Smallest, v.Files[f.Level][j].Smallest) < 0
 			})
 		}
 	}
@@ -403,7 +408,7 @@ func decodeFileMeta(buf []byte) (FileMeta, int, error) {
 }
 
 func readCURRENT(dir string) (string, error) {
-	b, err := os.ReadFile(filepath.Join(dir, "CURRENT"))
+	b, err := os.ReadFile(filepath.Join(dir, currentFileName))
 	if err != nil {
 		return "", err
 	}
@@ -411,21 +416,21 @@ func readCURRENT(dir string) (string, error) {
 }
 
 func writeCURRENT(dir, name string) error {
-	tmp := filepath.Join(dir, "CURRENT.tmp")
-	if err := os.WriteFile(tmp, []byte(name+"\n"), 0o644); err != nil {
+	tmp := filepath.Join(dir, currentTmpName)
+	if err := os.WriteFile(tmp, []byte(name+"\n"), filePerm); err != nil {
 		return err
 	}
-	return os.Rename(tmp, filepath.Join(dir, "CURRENT"))
+	return os.Rename(tmp, filepath.Join(dir, currentFileName))
 }
 
 func formatManifestName(seq uint64) string {
-	return "MANIFEST-" + padUint64(seq)
+	return manifestFilePrefix + padUint64(seq)
 }
 
 func parseManifestSeq(name string) uint64 {
-	if !strings.HasPrefix(name, "MANIFEST-") {
+	if !strings.HasPrefix(name, manifestFilePrefix) {
 		return 0
 	}
-	n, _ := strconv.ParseUint(strings.TrimPrefix(name, "MANIFEST-"), 10, 64)
+	n, _ := strconv.ParseUint(strings.TrimPrefix(name, manifestFilePrefix), 10, 64)
 	return n
 }

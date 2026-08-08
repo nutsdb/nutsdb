@@ -18,7 +18,6 @@ import (
 	"bytes"
 	"context"
 	"os"
-	"path/filepath"
 	"sort"
 	"sync"
 	"time"
@@ -46,13 +45,13 @@ type lsmStoreMgr struct {
 
 func openLSMStoreManager(opts LSMOptions) (StoreManager, error) {
 	opts = normalizeLSMOptions(opts)
-	if err := os.MkdirAll(opts.Dir, 0o755); err != nil {
+	if err := os.MkdirAll(opts.Dir, dirPerm); err != nil {
 		return nil, err
 	}
-	sstDir := filepath.Join(opts.Dir, "sst")
+	sstDir := defaultSSTDir(opts.Dir)
 	walDir := defaultWALDir(opts.Dir)
 	if opts.ValueLog.Dir == "" {
-		opts.ValueLog.Dir = filepath.Join(opts.Dir, "vlog")
+		opts.ValueLog.Dir = defaultVLogDir(opts.Dir)
 	}
 
 	vlog, err := fileio.Open(opts.ValueLog)
@@ -256,7 +255,7 @@ func (m *lsmStoreMgr) Get(ctx context.Context, key []byte) (*core.Record, error)
 	for level := 1; level < len(ver.Files); level++ {
 		files := ver.Files[level]
 		for _, fm := range files {
-			if bytesCompare(key, fm.Smallest) < 0 || bytesCompare(key, fm.Largest) > 0 {
+			if bytes.Compare(key, fm.Smallest) < 0 || bytes.Compare(key, fm.Largest) > 0 {
 				continue
 			}
 			ref, _, ok, err := m.getFromSSTLocked(fm.FileNumber, key)
@@ -477,7 +476,7 @@ func (m *lsmStoreMgr) collectMergedLocked() ([]mergeItem, error) {
 		out = append(out, c)
 	}
 	sort.Slice(out, func(i, j int) bool {
-		return bytesCompare(out[i].key, out[j].key) < 0
+		return bytes.Compare(out[i].key, out[j].key) < 0
 	})
 	return out, nil
 }
