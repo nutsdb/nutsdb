@@ -67,6 +67,9 @@ type sstWriter struct {
 	tmpPath    string
 	finalPath  string
 
+	filterPolicy  FilterPolicy
+	filterBuilder FilterBuilder
+
 	buf      []byte
 	blockBuf []byte
 	index    []indexEntry
@@ -96,6 +99,10 @@ func padUint64(n uint64) string {
 }
 
 func newSSTWriter(sstDir string, fileNumber uint64) (*sstWriter, error) {
+	return newSSTWriterWithFilter(sstDir, fileNumber, defaultFilterPolicy)
+}
+
+func newSSTWriterWithFilter(sstDir string, fileNumber uint64, policy FilterPolicy) (*sstWriter, error) {
 	if err := os.MkdirAll(sstDir, dirPerm); err != nil {
 		return nil, err
 	}
@@ -105,16 +112,21 @@ func newSSTWriter(sstDir string, fileNumber uint64) (*sstWriter, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &sstWriter{
-		dir:        sstDir,
-		fileNumber: fileNumber,
-		blockSize:  sstDefaultBlockSize,
-		fd:         fd,
-		tmpPath:    tmp,
-		finalPath:  final,
-		buf:        make([]byte, 0, 256),
-		blockBuf:   make([]byte, 0, sstDefaultBlockSize),
-	}, nil
+	w := &sstWriter{
+		dir:          sstDir,
+		fileNumber:   fileNumber,
+		blockSize:    sstDefaultBlockSize,
+		fd:           fd,
+		tmpPath:      tmp,
+		finalPath:    final,
+		filterPolicy: policy,
+		buf:          make([]byte, 0, 256),
+		blockBuf:     make([]byte, 0, sstDefaultBlockSize),
+	}
+	if policy != nil {
+		w.filterBuilder = policy.NewBuilder()
+	}
+	return w, nil
 }
 
 func (w *sstWriter) Add(key []byte, ref ValueRef, seq uint64) error {
@@ -155,6 +167,9 @@ func (w *sstWriter) Add(key []byte, ref ValueRef, seq uint64) error {
 	}
 	w.blockBuf = append(w.blockBuf, raw...)
 	w.count++
+	if w.filterBuilder != nil {
+		w.filterBuilder.Add(key)
+	}
 	return nil
 }
 
@@ -180,6 +195,25 @@ func (w *sstWriter) Finish() (sstFileMeta, error) {
 	if err := w.flushBlock(); err != nil {
 		return meta, err
 	}
+
+	// Layout: [data blocks][filter block?][index block][footer]
+	var filterOff uint64
+	var filterLen uint32
+	var flags uint16
+	if w.filterPolicy != nil && w.filterBuilder != nil && w.count > 0 {
+		pos, err := w.fd.Seek(0, io.SeekCurrent)
+		if err != nil {
+			return meta, err
+		}
+		filterOff = uint64(pos)
+		block := encodeFilterBlock(w.filterPolicy, w.filterBuilder.Finish())
+		if _, err := w.fd.Write(block); err != nil {
+			return meta, err
+		}
+		filterLen = uint32(len(block))
+		flags |= sstFlagHasFilter
+	}
+
 	indexOff, err := w.fd.Seek(0, io.SeekCurrent)
 	if err != nil {
 		return meta, err
@@ -204,16 +238,15 @@ func (w *sstWriter) Finish() (sstFileMeta, error) {
 	indexLen = uint32(cur - indexOff)
 
 	footer := make([]byte, sstFooterSize)
-	// filter unused
-	binary.LittleEndian.PutUint64(footer[sstFooterFilterOff:sstFooterFilterOff+8], 0)
-	binary.LittleEndian.PutUint32(footer[sstFooterFilterLenOff:sstFooterFilterLenOff+4], 0)
+	binary.LittleEndian.PutUint64(footer[sstFooterFilterOff:sstFooterFilterOff+8], filterOff)
+	binary.LittleEndian.PutUint32(footer[sstFooterFilterLenOff:sstFooterFilterLenOff+4], filterLen)
 	binary.LittleEndian.PutUint64(footer[sstFooterIndexOffOff:sstFooterIndexOffOff+8], uint64(indexOff))
 	binary.LittleEndian.PutUint32(footer[sstFooterIndexLenOff:sstFooterIndexLenOff+4], indexLen)
 	binary.LittleEndian.PutUint64(footer[sstFooterMetaOffOff:sstFooterMetaOffOff+8], 0)
 	binary.LittleEndian.PutUint32(footer[sstFooterMetaLenOff:sstFooterMetaLenOff+4], 0)
 	binary.LittleEndian.PutUint32(footer[sstFooterMagicOff:sstFooterMagicOff+4], sstMagic)
 	binary.LittleEndian.PutUint16(footer[sstFooterVersionOff:sstFooterVersionOff+2], sstFormatVersion)
-	binary.LittleEndian.PutUint16(footer[sstFooterFlagsOff:sstFooterFlagsOff+2], 0)
+	binary.LittleEndian.PutUint16(footer[sstFooterFlagsOff:sstFooterFlagsOff+2], flags)
 	crc := crc32.ChecksumIEEE(footer[:sstFooterCRCOff])
 	binary.LittleEndian.PutUint32(footer[sstFooterCRCOff:sstFooterCRCOff+4], crc)
 	if _, err := w.fd.Write(footer); err != nil {
@@ -256,6 +289,9 @@ type sstReader struct {
 	fileNumber uint64
 	data       []byte
 	index      []indexEntry
+	filter     Filter
+	filterOff  uint64
+	indexOff   uint64
 	smallest   []byte
 	largest    []byte
 }
@@ -277,12 +313,31 @@ func openSSTReader(sstDir string, fileNumber uint64) (*sstReader, error) {
 	if crc32.ChecksumIEEE(footer[:sstFooterCRCOff]) != crc {
 		return nil, ErrCorruptEntry
 	}
+	filterOff := binary.LittleEndian.Uint64(footer[sstFooterFilterOff : sstFooterFilterOff+8])
+	filterLen := binary.LittleEndian.Uint32(footer[sstFooterFilterLenOff : sstFooterFilterLenOff+4])
 	indexOff := binary.LittleEndian.Uint64(footer[sstFooterIndexOffOff : sstFooterIndexOffOff+8])
 	indexLen := binary.LittleEndian.Uint32(footer[sstFooterIndexLenOff : sstFooterIndexLenOff+4])
-	if indexOff+uint64(indexLen) > uint64(len(data)-sstFooterSize) {
+	fileEnd := uint64(len(data) - sstFooterSize)
+	if indexOff+uint64(indexLen) > fileEnd {
 		return nil, ErrCorruptEntry
 	}
-	r := &sstReader{path: path, fileNumber: fileNumber, data: data}
+	r := &sstReader{
+		path:       path,
+		fileNumber: fileNumber,
+		data:       data,
+		filterOff:  filterOff,
+		indexOff:   indexOff,
+	}
+	if filterLen > 0 {
+		if filterOff+uint64(filterLen) > indexOff {
+			return nil, ErrCorruptEntry
+		}
+		f, err := decodeFilterBlock(data[filterOff : filterOff+uint64(filterLen)])
+		if err != nil {
+			return nil, err
+		}
+		r.filter = f
+	}
 	idxBuf := data[indexOff : indexOff+uint64(indexLen)]
 	for off := 0; off < len(idxBuf); {
 		if off+4 > len(idxBuf) {
@@ -308,7 +363,13 @@ func openSSTReader(sstDir string, fileNumber uint64) (*sstReader, error) {
 }
 
 func (r *sstReader) Get(key []byte) (ref ValueRef, seq uint64, ok bool, err error) {
-	if r == nil || len(r.index) == 0 {
+	if r == nil {
+		return ValueRef{}, 0, false, nil
+	}
+	if r.filter != nil && !r.filter.MayContain(key) {
+		return ValueRef{}, 0, false, nil
+	}
+	if len(r.index) == 0 {
 		// fall back to full scan of data region
 		return r.scanAllForKey(key)
 	}
@@ -400,11 +461,11 @@ func (r *sstReader) Iterate(fn func(key []byte, ref ValueRef, seq uint64) error)
 		return nil
 	}
 	dataEnd := len(r.data) - sstFooterSize
-	if len(r.index) > 0 {
-		// data region is [0, indexOff)
-		footer := r.data[len(r.data)-sstFooterSize:]
-		indexOff := int(binary.LittleEndian.Uint64(footer[sstFooterIndexOffOff : sstFooterIndexOffOff+8]))
-		dataEnd = indexOff
+	// data region ends at filter (if present) else index
+	if r.filterOff > 0 && r.filterOff < uint64(dataEnd) {
+		dataEnd = int(r.filterOff)
+	} else if r.indexOff > 0 && r.indexOff < uint64(dataEnd) {
+		dataEnd = int(r.indexOff)
 	}
 	for off := 0; off < dataEnd; {
 		ent, n, err := decodeSSTEntry(r.data[off:dataEnd])
