@@ -25,20 +25,20 @@ func TestBloomFilter_MayContain(t *testing.T) {
 	p := NewBloomFilterPolicy(10)
 	b := p.NewBuilder()
 	for i := 0; i < 1000; i++ {
-		b.Add([]byte(fmt.Sprintf("key-%04d", i)))
+		b.Add(fmt.Appendf(nil, "key-%04d", i))
 	}
 	payload := b.Finish()
 	f, err := p.Open(payload)
 	require.NoError(t, err)
 
 	for i := 0; i < 1000; i++ {
-		require.True(t, f.MayContain([]byte(fmt.Sprintf("key-%04d", i))), "false negative at %d", i)
+		require.True(t, f.MayContain(fmt.Appendf(nil, "key-%04d", i)), "false negative at %d", i)
 	}
 
-	// Missing keys should usually be rejected; allow a small FPR budget.
+	// Missing keys should usually be rejected.
 	fp := 0
 	for i := 0; i < 1000; i++ {
-		if f.MayContain([]byte(fmt.Sprintf("miss-%04d", i))) {
+		if f.MayContain(fmt.Appendf(nil, "miss-%04d", i)) {
 			fp++
 		}
 	}
