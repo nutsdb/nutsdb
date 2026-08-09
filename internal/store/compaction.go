@@ -14,7 +14,10 @@
 
 package store
 
-import "os"
+import (
+	"bytes"
+	"os"
+)
 
 const maxLevel = 6
 
@@ -70,10 +73,10 @@ func (m *lsmStoreMgr) compactLevelLocked(level int) error {
 	// range covering inputs
 	smallest, largest := inputs[0].Smallest, inputs[0].Largest
 	for _, f := range inputs[1:] {
-		if bytesCompare(f.Smallest, smallest) < 0 {
+		if bytes.Compare(f.Smallest, smallest) < 0 {
 			smallest = f.Smallest
 		}
-		if bytesCompare(f.Largest, largest) > 0 {
+		if bytes.Compare(f.Largest, largest) > 0 {
 			largest = f.Largest
 		}
 	}
@@ -81,7 +84,7 @@ func (m *lsmStoreMgr) compactLevelLocked(level int) error {
 	var overlap []FileMeta
 	if nextLevel < len(ver.Files) {
 		for _, f := range ver.Files[nextLevel] {
-			if bytesCompare(f.Largest, smallest) < 0 || bytesCompare(f.Smallest, largest) > 0 {
+			if bytes.Compare(f.Largest, smallest) < 0 || bytes.Compare(f.Smallest, largest) > 0 {
 				continue
 			}
 			overlap = append(overlap, f)
@@ -121,7 +124,7 @@ func (m *lsmStoreMgr) compactLevelLocked(level int) error {
 	}
 	for i := 0; i < len(pairs); i++ {
 		for j := i + 1; j < len(pairs); j++ {
-			if bytesCompare(pairs[j].v.key, pairs[i].v.key) < 0 {
+			if bytes.Compare(pairs[j].v.key, pairs[i].v.key) < 0 {
 				pairs[i], pairs[j] = pairs[j], pairs[i]
 			}
 		}

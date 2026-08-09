@@ -121,7 +121,7 @@ func (w *walStore) Reset(dir string, syncMode fileio.SyncMode, base fileio.Optio
 	if err := os.RemoveAll(dir); err != nil {
 		return err
 	}
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, dirPerm); err != nil {
 		return err
 	}
 	opts := base
@@ -141,5 +141,5 @@ func (w *walStore) Close() error {
 }
 
 func defaultWALDir(root string) string {
-	return filepath.Join(root, "wal")
+	return filepath.Join(root, dirNameWAL)
 }
