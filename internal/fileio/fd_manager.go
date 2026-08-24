@@ -207,11 +207,13 @@ func (fdm *FdManager) cleanUselessFd() error {
 func (fdm *FdManager) CloseByPath(path string) error {
 	fdm.lock.Lock()
 	defer fdm.lock.Unlock()
-	fdInfo, ok := fdm.Cache[path]
+	cleanPath := filepath.Clean(path)
+	fdInfo, ok := fdm.Cache[cleanPath]
 	if !ok {
 		return nil
 	}
-	delete(fdm.Cache, path)
+	delete(fdm.Cache, cleanPath)
+	fdm.size--
 
 	fdm.fdList.removeNode(fdInfo)
 	return fdInfo.fd.Close()
