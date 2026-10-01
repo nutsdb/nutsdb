@@ -26,7 +26,7 @@ import (
 
 	mmap "github.com/edsrzf/mmap-go"
 
-	"github.com/nutsdb/nutsdb/internal/utils"
+	"github.com/nutsdb/nutsdb/internal/logger"
 )
 
 const segmentSuffix = ".seg"
@@ -317,7 +317,7 @@ func (s *segment) mapReadonly() error {
 		return err
 	}
 	s.mmapData = data
-	utils.GetLogger().Printf("fileio: mmap sealed segment id=%d path=%s size=%d", s.id, s.path, len(data))
+	logger.Infof("fileio: mmap sealed segment id=%d path=%s size=%d", s.id, s.path, len(data))
 	return nil
 }
 
@@ -329,10 +329,10 @@ func (s *segment) unmap() error {
 	err := s.mmapData.Unmap()
 	s.mmapData = nil
 	if err != nil {
-		utils.GetLogger().Printf("fileio: munmap sealed segment id=%d path=%s size=%d err=%v", s.id, s.path, size, err)
+		logger.Warnf("fileio: munmap sealed segment id=%d path=%s size=%d err=%v", s.id, s.path, size, err)
 		return err
 	}
-	utils.GetLogger().Printf("fileio: munmap sealed segment id=%d path=%s size=%d", s.id, s.path, size)
+	logger.Infof("fileio: munmap sealed segment id=%d path=%s size=%d", s.id, s.path, size)
 	return nil
 }
 
