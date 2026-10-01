@@ -300,3 +300,42 @@ func TestStore_DeleteSegment(t *testing.T) {
 	_, _, err = st2.Read(loc)
 	require.ErrorIs(t, err, fileio.ErrSegmentNotFound)
 }
+
+func TestStore_AppendSync_SealIfNeeded_ListIDs(t *testing.T) {
+	dir := t.TempDir()
+	opts := testOptions(dir)
+	opts.SegmentSize = fileio.HeaderSize + fileio.FooterSize + 256
+	opts.MaxRecordSize = 64
+	opts.WriteBufferSize = 32
+	st, err := fileio.Open(opts)
+	require.NoError(t, err)
+	defer func() { require.NoError(t, st.Close()) }()
+
+	loc, err := st.AppendSync([]byte("sync-me"), fileio.RecordPut)
+	require.NoError(t, err)
+	require.Equal(t, st.ActiveFileID(), loc.FileID)
+
+	got, typ, err := st.Read(loc)
+	require.NoError(t, err)
+	require.Equal(t, fileio.RecordPut, typ)
+	require.Equal(t, []byte("sync-me"), got)
+
+	// Not near full → no-op seal
+	require.NoError(t, st.SealIfNeeded())
+
+	// Fill until rotation, then SealIfNeeded should still be safe
+	for i := 0; i < 40; i++ {
+		_, err := st.Append(bytes.Repeat([]byte("x"), 20), fileio.RecordPut)
+		require.NoError(t, err)
+	}
+	require.NoError(t, st.SealIfNeeded())
+
+	ids, err := st.ListFileIDs()
+	require.NoError(t, err)
+	require.NotEmpty(t, ids)
+	require.Contains(t, ids, loc.FileID)
+
+	entries, err := filepath.Glob(filepath.Join(dir, "*.seg"))
+	require.NoError(t, err)
+	require.NotEmpty(t, entries)
+}

@@ -20,7 +20,7 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/nutsdb/nutsdb/internal/utils"
+	"github.com/nutsdb/nutsdb/internal/logger"
 )
 
 // Store is the storage I/O layer facade for append-only segment files.
@@ -100,7 +100,7 @@ func Open(opts Options) (Store, error) {
 		segments: make(map[uint32]*segment),
 		writeBuf: make([]byte, 0, opts.WriteBufferSize),
 	}
-	utils.GetLogger().Printf("fileio: open dir=%s backend=%s segment_size=%d",
+	logger.Infof("fileio: open dir=%s backend=%s segment_size=%d",
 		opts.Dir, opts.ReadBackend, opts.SegmentSize)
 	if err := s.recover(); err != nil {
 		_ = s.Close()
@@ -342,7 +342,7 @@ func (s *store) sealSegment(seg *segment) error {
 	seg.sealed = true
 	seg.durableOffset = seg.usedBytes
 	seg.writtenOffset = seg.usedBytes
-	utils.GetLogger().Printf("fileio: sealed segment id=%d used_bytes=%d records=%d",
+	logger.Infof("fileio: sealed segment id=%d used_bytes=%d records=%d",
 		seg.id, seg.usedBytes, seg.recordCount)
 	s.maybeMapSealedLocked(seg)
 	return nil
@@ -355,7 +355,7 @@ func (s *store) maybeMapSealedLocked(seg *segment) {
 		return
 	}
 	if err := seg.mapReadonly(); err != nil {
-		utils.GetLogger().Printf("fileio: mmap sealed segment id=%d failed: %v; fallback to fileio", seg.id, err)
+		logger.Warnf("fileio: mmap sealed segment id=%d failed: %v; fallback to fileio", seg.id, err)
 	}
 }
 
@@ -480,7 +480,7 @@ func (s *store) DeleteSegment(fileID uint32) error {
 	}
 	seg, ok := s.segments[fileID]
 	if ok {
-		utils.GetLogger().Printf("fileio: delete segment id=%d path=%s mmap=%v",
+		logger.Infof("fileio: delete segment id=%d path=%s mmap=%v",
 			fileID, seg.path, seg.mmapData != nil)
 		_ = seg.close()
 		delete(s.segments, fileID)
@@ -593,7 +593,7 @@ func (s *store) evictLRULocked() {
 			return
 		}
 		if seg, ok := s.segments[victim]; ok {
-			utils.GetLogger().Printf("fileio: evict segment id=%d mmap=%v open=%d/%d",
+			logger.Infof("fileio: evict segment id=%d mmap=%v open=%d/%d",
 				victim, seg.mmapData != nil, len(s.segments), s.opts.MaxOpenSegments)
 			_ = seg.close()
 			delete(s.segments, victim)

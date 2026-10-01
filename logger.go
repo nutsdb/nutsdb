@@ -14,16 +14,57 @@
 
 package nutsdb
 
-import "github.com/nutsdb/nutsdb/internal/utils"
+import "github.com/nutsdb/nutsdb/internal/logger"
 
-type ILogger = utils.ILogger
+// Logger is the pluggable logging sink used by nutsdb internals.
+type Logger = logger.Logger
 
-// SetLogger Set the internal logger for nutsdb.
-func SetLogger(logger ILogger) {
-	utils.SetLogger(logger)
+// Level is a log severity.
+type Level = logger.Level
+
+const (
+	LevelDebug = logger.LevelDebug
+	LevelInfo  = logger.LevelInfo
+	LevelWarn  = logger.LevelWarn
+	LevelError = logger.LevelError
+)
+
+// SetLogger installs the process-wide logger used by nutsdb internals.
+// Passing nil installs a no-op logger.
+func SetLogger(l Logger) {
+	logger.SetLogger(l)
 }
 
-// GetLogger Get the internal logger for nutsdb.
-func GetLogger() ILogger {
-	return utils.GetLogger()
+// GetLogger returns the current process-wide logger.
+func GetLogger() Logger {
+	return logger.GetLogger()
 }
+
+// SetLevel sets the minimum log level for package-level logging helpers.
+func SetLevel(min Level) {
+	logger.SetLevel(min)
+}
+
+// GetLevel returns the current minimum log level.
+func GetLevel() Level {
+	return logger.GetLevel()
+}
+
+// Default returns a Logger backed by the standard library log.Default().
+func Default() Logger {
+	return logger.Default()
+}
+
+// Nop returns a Logger that discards all messages.
+func Nop() Logger {
+	return logger.Nop()
+}
+
+// PrintfAdapter wraps a Printf-style logger (e.g. *log.Logger) as a Logger.
+func PrintfAdapter(l PrintfLogger) Logger {
+	return logger.PrintfAdapter(l)
+}
+
+// PrintfLogger is anything that implements Printf (e.g. *log.Logger).
+type PrintfLogger = logger.PrintfLogger
+
