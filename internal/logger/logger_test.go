@@ -136,6 +136,24 @@ func TestConcurrentSetAndLog(t *testing.T) {
 	wg.Wait()
 }
 
+func TestLevelString(t *testing.T) {
+	cases := map[Level]string{
+		LevelDebug: "DEBUG",
+		LevelInfo:  "INFO",
+		LevelWarn:  "WARN",
+		LevelError: "ERROR",
+		Level(99):  "LEVEL(99)",
+	}
+	for lv, want := range cases {
+		if got := lv.String(); got != want {
+			t.Fatalf("Level(%d).String()=%q want %q", lv, got, want)
+		}
+	}
+}
+
 func TestNop(t *testing.T) {
+	Nop().Debugf("d")
+	Nop().Infof("i")
+	Nop().Warnf("w")
 	Nop().Errorf("should discard")
 }

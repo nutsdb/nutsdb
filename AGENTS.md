@@ -3,6 +3,8 @@
 本文件为 AI 编码助手（Claude Code、Codex、Cursor、Gemini CLI 等）提供本仓库的工作指引。  
 当本文件与设计文档（`docs/design/`）冲突时，**以设计文档与代码实现为准**；若存在 `README.md` / `CONTRIBUTING.md`，人类文档优先于本文件中的流程约定。
 
+**工具无关原则：** 使用或新增 AI 能力、仓库级 rules / 约定时，尽量少出现与特定开发工具强绑定的路径、配置或术语（例如某 IDE 专属目录、扩展或产品名）。约定应优先写在本文件、`docs/`、CI 与通用配置（如 `codecov.yml`）中，使任意助手与贡献者都能遵循。
+
 ## Project Overview
 
 `github.com/nutsdb/nutsdb` 是 NutsDB 的下一代嵌入式 KV 存储引擎（Go 库），采用 **LSM + ValueLog** 架构：
@@ -157,6 +159,15 @@ CI：`.github/workflows/ci.yml`（`go test -race`，Linux / Windows）。
 - 表格驱动为默认；独立用例可用 `t.Parallel()`。
 - 导出行为至少覆盖一条测试；修 bug 必须带复现测试。
 - 存储相关：优先测 Put/Get/Delete、flush/reopen、Batch、TTL、compaction 与 Filter 短路。
+- **Codecov 总语句覆盖率必须 ≥ 70%**（权威配置见仓库根目录 `codecov.yml`；上传流程见 `.github/workflows/go.yml`）。本地核对：
+
+```bash
+go test -coverprofile=_coverage.out -covermode=atomic ./...
+grep -v github.com/nutsdb/nutsdb/examples _coverage.out | grep -v testutils > coverage.out
+go tool cover -func=coverage.out | grep total:
+```
+
+- 新增代码优先补对应测试；优先抬高薄弱包的覆盖，避免靠扩大 ignore 列表抬高数字。
 - 不要声称未经测试的代码可用；改完至少跑受影响包的 `go test`，合并前尽量 `go test -race ./...`。
 
 ## Documentation

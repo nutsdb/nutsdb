@@ -1,0 +1,15 @@
+# Codecov configuration for nutsdb.
+# See https://docs.codecov.com/docs/commit-status
+coverage:
+  status:
+    project:
+      default:
+        target: 70%
+        threshold: 1%
+    patch:
+      default:
+        target: 70%
+
+ignore:
+  - "examples/**"
+  - "internal/testutils/**"
