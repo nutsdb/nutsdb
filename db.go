@@ -354,7 +354,10 @@ func (db *DB) getValueByRecord(record *core.Record) ([]byte, error) {
 
 	// saved in cache
 	if db.getHintKeyAndRAMIdxCacheSize() > 0 {
-		db.hintKeyAndRAMIdxModeLru.Add(record, item)
+		actual, loaded := db.hintKeyAndRAMIdxModeLru.GetOrAdd(record, item)
+		if loaded {
+			item = actual.(*core.Entry)
+		}
 	}
 
 	return item.Value, nil

@@ -19,6 +19,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"testing"
 
 	"github.com/nutsdb/nutsdb"
@@ -290,6 +291,55 @@ func (s *rwMgrMMapTestSuite) TestRWManager_MMap_Close() {
 	if err == nil {
 		t.Error("expected file descriptor to be closed, but it's still open")
 	}
+}
+
+func (s *rwMgrMMapTestSuite) TestRWManager_MMap_ReadAt_ConcurrentSameOffset() {
+	t := s.T()
+	filePath := filepath.Join(t.TempDir(), "rw_mmap_concurrent")
+	fdm := fileio.NewFdm(1024, 0.5)
+
+	fd, err := fdm.GetFd(filePath)
+	require.NoError(t, err)
+	defer func() { _ = os.Remove(fd.Name()) }()
+
+	require.NoError(t, fileio.Truncate(filePath, 8*nutsdb.MB, fd, false))
+
+	payload := []byte("concurrent-mmap-read")
+	off := int64(16)
+	m, err := mmap.Map(fd, mmap.RDWR, 0)
+	require.NoError(t, err)
+	copy(m[off:], payload)
+	require.NoError(t, m.Unmap())
+
+	mmManager := fileio.GetMMapRWManager(fd, filePath, fdm, 8*fileio.MB)
+
+	const n = 32
+	var wg sync.WaitGroup
+	errCh := make(chan error, n)
+	start := make(chan struct{})
+	wg.Add(n)
+	for i := 0; i < n; i++ {
+		go func() {
+			defer wg.Done()
+			<-start
+			buf := make([]byte, len(payload))
+			nread, err := mmManager.ReadAt(buf, off)
+			if err != nil {
+				errCh <- err
+				return
+			}
+			if nread != len(payload) || string(buf) != string(payload) {
+				errCh <- errors.New("concurrent ReadAt returned unexpected bytes")
+			}
+		}()
+	}
+	close(start)
+	wg.Wait()
+	close(errCh)
+	for err := range errCh {
+		require.NoError(t, err)
+	}
+	require.Equal(t, 1, mmManager.ReadCache.Len())
 }
 
 func TestRWMgrMMapMain(t *testing.T) {

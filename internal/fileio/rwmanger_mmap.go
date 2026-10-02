@@ -157,11 +157,24 @@ func (mm *MMapRWManager) accessMMap(cache *utils.LRUCache, offset int64, prot in
 		if err != nil {
 			return nil, err
 		}
-		cache.Add(offset, newItem)
-		item = newItem
+		actual, loaded := cache.GetOrAdd(offset, newItem)
+		if loaded {
+			discardMMapData(newItem)
+		}
+		item = actual
 	}
 	data = item.(*mmapData)
 	return
+}
+
+// discardMMapData unmaps a mapping that lost the race to enter the cache.
+// The finalizer is cleared first so Close and the finalizer cannot both Unmap.
+// If Unmap fails, the finalizer is restored so a later GC can retry.
+func discardMMapData(md *mmapData) {
+	runtime.SetFinalizer(md, nil)
+	if err := md.Close(); err != nil {
+		runtime.SetFinalizer(md, (*mmapData).Close)
+	}
 }
 
 // mmapData is a struct to control the lifetime and access level of mmap.MMap
