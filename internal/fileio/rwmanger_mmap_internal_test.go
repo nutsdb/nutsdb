@@ -7,72 +7,61 @@ import (
 	"testing"
 
 	"github.com/edsrzf/mmap-go"
+	"github.com/stretchr/testify/suite"
 )
 
-func newTestMMapManager(t *testing.T) (*MMapRWManager, *os.File) {
-	t.Helper()
+type mmapInternalTestSuite struct {
+	suite.Suite
+}
+
+func (s *mmapInternalTestSuite) newManager() (*MMapRWManager, *os.File) {
+	t := s.T()
 	filePath := filepath.Join(t.TempDir(), "mmap")
 	fdm := NewFdm(1024, 0.5)
 	fd, err := fdm.GetFd(filePath)
-	if err != nil {
-		t.Fatal(err)
-	}
+	s.Require().NoError(err)
 	t.Cleanup(func() { _ = os.Remove(fd.Name()) })
-	if err = Truncate(filePath, 8*MB, fd, false); err != nil {
-		t.Fatal(err)
-	}
+	s.Require().NoError(Truncate(filePath, 8*MB, fd, false))
 	return GetMMapRWManager(fd, filePath, fdm, 8*MB), fd
 }
 
-func TestCacheNewMMap_KeepsFirstMapping(t *testing.T) {
-	mm, fd := newTestMMapManager(t)
+func (s *mmapInternalTestSuite) TestCacheNewMMap_KeepsFirstMapping() {
+	mm, fd := s.newManager()
 
 	first, err := mm.accessMMap(mm.ReadCache, 0, mmap.RDONLY)
-	if err != nil {
-		t.Fatal(err)
-	}
+	s.Require().NoError(err)
 	second, err := newMMapData(fd, 0, mmap.RDONLY)
-	if err != nil {
-		t.Fatal(err)
-	}
+	s.Require().NoError(err)
 
 	got := cacheNewMMap(mm.ReadCache, 0, second)
-	if got != first {
-		t.Fatal("lost race should return the mapping already in the cache")
-	}
-	if mm.ReadCache.Len() != 1 {
-		t.Fatalf("ReadCache.Len()=%d, want 1", mm.ReadCache.Len())
-	}
-	if len(first.data) == 0 {
-		t.Fatal("cached mapping was unmapped")
-	}
-	if err = second.Close(); err == nil {
-		t.Fatal("duplicate mapping should already have been unmapped")
-	}
+	s.Require().Equal(first, got, "lost race should return the mapping already in the cache")
+	s.Require().Equal(1, mm.ReadCache.Len())
+	s.Require().NotEmpty(first.data, "cached mapping was unmapped")
+	s.Require().Error(second.Close(), "duplicate mapping should already have been unmapped")
 }
 
-func TestDiscardMMapData_RestoresFinalizerWhenUnmapFails(t *testing.T) {
-	_, fd := newTestMMapManager(t)
+func (s *mmapInternalTestSuite) TestDiscardMMapData_RestoresFinalizerWhenUnmapFails() {
+	_, fd := s.newManager()
 	md, err := newMMapData(fd, 0, mmap.RDONLY)
-	if err != nil {
-		t.Fatal(err)
-	}
+	s.Require().NoError(err)
 
 	discardMMapData(md)
-	if err = md.Close(); err == nil {
-		t.Fatal("first discard should unmap the region")
-	}
+	s.Require().Error(md.Close(), "first discard should unmap the region")
 
 	discardMMapData(md)
 	runtime.SetFinalizer(md, nil)
 }
 
-func TestAccessMMap_MapError(t *testing.T) {
-	mm, fd := newTestMMapManager(t)
-	if err := fd.Close(); err != nil {
-		t.Fatal(err)
+func (s *mmapInternalTestSuite) TestAccessMMap_MapError() {
+	mm, fd := s.newManager()
+	s.Require().NoError(fd.Close())
+	_, err := mm.accessMMap(mm.ReadCache, 0, mmap.RDONLY)
+	s.Require().Error(err, "mapping a closed file should fail")
+}
+
+func TestMMapInternal(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip()
 	}
-	if _, err := mm.accessMMap(mm.ReadCache, 0, mmap.RDONLY); err == nil {
-		t.Fatal("mapping a closed file should fail")
-	}
+	suite.Run(t, new(mmapInternalTestSuite))
 }
