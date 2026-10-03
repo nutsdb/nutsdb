@@ -354,13 +354,20 @@ func (db *DB) getValueByRecord(record *core.Record) ([]byte, error) {
 
 	// saved in cache
 	if db.getHintKeyAndRAMIdxCacheSize() > 0 {
-		actual, loaded := db.hintKeyAndRAMIdxModeLru.GetOrAdd(record, item)
-		if loaded {
-			item = actual.(*core.Entry)
-		}
+		item = db.useCachedHintEntry(record, item)
 	}
 
 	return item.Value, nil
+}
+
+// useCachedHintEntry inserts item when record is not cached.
+// When record is already present, the cached entry is kept and item is dropped.
+func (db *DB) useCachedHintEntry(record *core.Record, item *core.Entry) *core.Entry {
+	actual, loaded := db.hintKeyAndRAMIdxModeLru.GetOrAdd(record, item)
+	if loaded {
+		return actual.(*core.Entry)
+	}
+	return item
 }
 
 func (db *DB) commitTransaction(tx *Tx) error {

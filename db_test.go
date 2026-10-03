@@ -34,6 +34,7 @@ import (
 	"github.com/nutsdb/nutsdb/internal/core"
 	"github.com/nutsdb/nutsdb/internal/testutils"
 	"github.com/nutsdb/nutsdb/internal/ttl"
+	"github.com/nutsdb/nutsdb/internal/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -1538,6 +1539,57 @@ func TestDB_HintKeyAndRAMIdxMode_LruCache(t *testing.T) {
 			_ = db.Close()
 		})
 	}
+}
+
+func TestUseCachedHintEntry(t *testing.T) {
+	db := &DB{hintKeyAndRAMIdxModeLru: utils.NewLruCache(1)}
+	record := core.NewRecord().WithKey([]byte("k"))
+	first := &core.Entry{Value: []byte("first")}
+
+	if got := db.useCachedHintEntry(record, first); got != first {
+		t.Fatalf("first insert returned %#v", got)
+	}
+	second := &core.Entry{Value: []byte("second")}
+	if got := db.useCachedHintEntry(record, second); got != first {
+		t.Fatalf("existing record should keep the cached entry, got %#v", got)
+	}
+	if db.hintKeyAndRAMIdxModeLru.Len() != 1 {
+		t.Fatalf("Len()=%d, want 1", db.hintKeyAndRAMIdxModeLru.Len())
+	}
+}
+
+func TestGetValueByRecord_MissLoadsAndCaches(t *testing.T) {
+	opts := DefaultOptions
+	opts.EntryIdxMode = HintKeyAndRAMIdxMode
+	opts.HintKeyAndRAMIdxCacheSize = 8
+	runNutsDBTest(t, &opts, func(t *testing.T, db *DB) {
+		bucket := "bucket"
+		key := []byte("k")
+		val := []byte("v")
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+		txPut(t, db, bucket, key, val, Persistent, nil, nil)
+
+		var record *core.Record
+		require.NoError(t, db.View(func(tx *Tx) error {
+			_, b := tx.getBucketAndItsStatus(DataStructureBTree, bucket)
+			idx, ok := tx.db.Index.BTree.exist(b.Id)
+			require.True(t, ok)
+			var found bool
+			record, found = idx.Find(key)
+			require.True(t, found)
+			return nil
+		}))
+
+		db.hintKeyAndRAMIdxModeLru.Remove(record)
+		got, err := db.getValueByRecord(record)
+		require.NoError(t, err)
+		require.Equal(t, val, got)
+
+		got, err = db.getValueByRecord(record)
+		require.NoError(t, err)
+		require.Equal(t, val, got)
+		require.Equal(t, 1, db.hintKeyAndRAMIdxModeLru.Len())
+	})
 }
 
 func TestDB_ChangeMode_RestartDB(t *testing.T) {
@@ -3094,7 +3146,7 @@ func TestDB_Watch(t *testing.T) {
 		var err error
 		opts := DefaultOptions
 		opts.EnableWatch = true
-		opts.Dir = "/tmp/test-watch-and-transaction-rollback/"
+		opts.Dir = filepath.Join(t.TempDir(), "test-watch-and-transaction-rollback")
 		removeDir(opts.Dir)
 
 		db, err := Open(opts)

@@ -140,6 +140,14 @@ func TestLRUCache_GetOrAdd(t *testing.T) {
 	}
 }
 
+func TestLRUCache_AddZeroCap(t *testing.T) {
+	c := NewLruCache(0)
+	c.Add("A", 1)
+	if c.Len() != 0 || c.Get("A") != nil {
+		t.Fatalf("non-positive capacity should store nothing, len=%d", c.Len())
+	}
+}
+
 func TestLRUCache_GetOrAddZeroCap(t *testing.T) {
 	c := NewLruCache(0)
 	actual, loaded := c.GetOrAdd("A", 1)
