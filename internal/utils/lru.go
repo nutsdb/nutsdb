@@ -23,7 +23,8 @@ func NewLruCache(cap int) *LRUCache {
 	}
 }
 
-// Add adds a new entry to the cache.
+// Add inserts key or, when key is already present, replaces its value and
+// marks it as most recently used. An update does not evict other entries.
 func (c *LRUCache) Add(key any, value any) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -32,6 +33,40 @@ func (c *LRUCache) Add(key any, value any) {
 		return
 	}
 
+	if elem, ok := c.m[key]; ok {
+		elem.Value.(*LruEntry).Value = value
+		c.l.MoveToFront(elem)
+		return
+	}
+
+	c.pushFront(key, value)
+}
+
+// GetOrAdd returns the cached value when key is already present.
+// loaded is then true and the provided value is left unused.
+// When key is absent, value is inserted and loaded is false.
+// A non-positive capacity stores nothing and returns value with loaded false,
+// so the caller keeps the only copy.
+func (c *LRUCache) GetOrAdd(key any, value any) (actual any, loaded bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.cap <= 0 {
+		return value, false
+	}
+
+	if elem, ok := c.m[key]; ok {
+		c.l.MoveToFront(elem)
+		return elem.Value.(*LruEntry).Value, true
+	}
+
+	c.pushFront(key, value)
+	return value, false
+}
+
+// pushFront inserts a new key at the front, evicting the oldest entry when at capacity.
+// Caller must hold c.mu, and key must not already be in the cache.
+func (c *LRUCache) pushFront(key any, value any) {
 	if c.l.Len() >= c.cap {
 		c.removeOldest()
 	}
@@ -40,9 +75,7 @@ func (c *LRUCache) Add(key any, value any) {
 		Key:   key,
 		Value: value,
 	}
-	entry := c.l.PushFront(e)
-
-	c.m[key] = entry
+	c.m[key] = c.l.PushFront(e)
 }
 
 // Get returns the entry associated with the given key, or nil if the key is not in the cache.
