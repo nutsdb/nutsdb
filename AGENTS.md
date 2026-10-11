@@ -141,7 +141,7 @@ gofmt -s -w .
 go vet ./...
 ```
 
-CI：`.github/workflows/ci.yml`（`go test -race`，Linux / Windows）。
+CI：`.github/workflows/ci.yml`（`gofmt -s` / `go vet`、`go test -race`，Linux / Windows）。
 
 ## Code Style & Conventions
 
