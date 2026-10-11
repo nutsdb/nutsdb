@@ -20,11 +20,11 @@ import (
 )
 
 const (
-	bloomPolicyName         = "nutsdb.BuiltinBloomV1"
-	defaultBloomBitsPerKey  = 10 // ~1% false-positive rate
-	bloomPayloadVersion     = 1
-	bloomPayloadHeaderSize  = 1 + 1 + 1 + 4 // ver | bits_per_key | probes | nbytes
-	bloomMinBits            = 64
+	bloomPolicyName        = "nutsdb.BuiltinBloomV1"
+	defaultBloomBitsPerKey = 10 // ~1% false-positive rate
+	bloomPayloadVersion    = 1
+	bloomPayloadHeaderSize = 1 + 1 + 1 + 4 // ver | bits_per_key | probes | nbytes
+	bloomMinBits           = 64
 )
 
 // bloomFilterPolicy is a simple Bloom FilterPolicy.

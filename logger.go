@@ -67,4 +67,3 @@ func PrintfAdapter(l PrintfLogger) Logger {
 
 // PrintfLogger is anything that implements Printf (e.g. *log.Logger).
 type PrintfLogger = logger.PrintfLogger
-
