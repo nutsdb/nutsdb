@@ -17,60 +17,57 @@ package store
 import (
 	"bytes"
 	"os"
+	"sort"
 )
 
 const maxLevel = 6
 
-func (m *lsmStoreMgr) maybeCompactLocked() error {
-	for {
-		ver := m.vs.Current()
-		if len(ver.Files) == 0 || len(ver.Files[0]) < m.opts.L0FileNumCompactionTrigger {
-			break
-		}
-		if err := m.compactLevelLocked(0); err != nil {
-			return err
-		}
-	}
-	// push oversized lower levels
-	for level := 1; level < maxLevel; level++ {
-		for {
-			ver := m.vs.Current()
-			if level >= len(ver.Files) {
-				break
-			}
-			var size uint64
-			for _, f := range ver.Files[level] {
-				size += f.Size
-			}
-			limit := uint64(m.opts.LevelBaseSize)
-			for i := 1; i < level; i++ {
-				limit *= uint64(m.opts.LevelSizeMultiplier)
-			}
-			if size <= limit {
-				break
-			}
-			if err := m.compactLevelLocked(level); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
+type compactJob struct {
+	level     int
+	nextLevel int
+	inputs    []FileMeta
+	overlap   []FileMeta
+	all       []FileMeta
+	fileNum   uint64
 }
 
-func (m *lsmStoreMgr) compactLevelLocked(level int) error {
+func (m *lsmStoreMgr) pickCompactJob() (compactJob, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	ver := m.vs.Current()
+	if len(ver.Files) > 0 && len(ver.Files[0]) >= m.opts.L0FileNumCompactionTrigger {
+		return m.buildCompactJobLocked(0, ver)
+	}
+	for level := 1; level < maxLevel; level++ {
+		if level >= len(ver.Files) {
+			break
+		}
+		var size uint64
+		for _, f := range ver.Files[level] {
+			size += f.Size
+		}
+		limit := uint64(m.opts.LevelBaseSize)
+		for i := 1; i < level; i++ {
+			limit *= uint64(m.opts.LevelSizeMultiplier)
+		}
+		if size > limit {
+			return m.buildCompactJobLocked(level, ver)
+		}
+	}
+	return compactJob{}, false
+}
+
+func (m *lsmStoreMgr) buildCompactJobLocked(level int, ver *Version) (compactJob, bool) {
 	if level >= len(ver.Files) || len(ver.Files[level]) == 0 {
-		return nil
+		return compactJob{}, false
 	}
 	nextLevel := level + 1
 	var inputs []FileMeta
 	if level == 0 {
 		inputs = append(inputs, ver.Files[0]...)
 	} else {
-		// pick first file at this level
 		inputs = append(inputs, ver.Files[level][0])
 	}
-	// range covering inputs
 	smallest, largest := inputs[0].Smallest, inputs[0].Largest
 	for _, f := range inputs[1:] {
 		if bytes.Compare(f.Smallest, smallest) < 0 {
@@ -80,7 +77,6 @@ func (m *lsmStoreMgr) compactLevelLocked(level int) error {
 			largest = f.Largest
 		}
 	}
-	// overlapping files in next level
 	var overlap []FileMeta
 	if nextLevel < len(ver.Files) {
 		for _, f := range ver.Files[nextLevel] {
@@ -91,15 +87,26 @@ func (m *lsmStoreMgr) compactLevelLocked(level int) error {
 		}
 	}
 	all := append(append([]FileMeta{}, inputs...), overlap...)
+	fileNum := m.vs.NewFileNumber()
+	return compactJob{
+		level:     level,
+		nextLevel: nextLevel,
+		inputs:    inputs,
+		overlap:   overlap,
+		all:       all,
+		fileNum:   fileNum,
+	}, true
+}
 
+func (m *lsmStoreMgr) runCompactJob(job compactJob) error {
 	type kv struct {
 		key []byte
 		ref ValueRef
 		seq uint64
 	}
 	best := map[string]kv{}
-	for _, fm := range all {
-		rd, err := m.getReaderLocked(fm.FileNumber)
+	for _, fm := range job.all {
+		rd, err := m.getReader(fm.FileNumber)
 		if err != nil {
 			return err
 		}
@@ -115,45 +122,38 @@ func (m *lsmStoreMgr) compactLevelLocked(level int) error {
 			return err
 		}
 	}
-	type pair struct {
-		v kv
-	}
-	pairs := make([]pair, 0, len(best))
+	pairs := make([]kv, 0, len(best))
 	for _, v := range best {
-		pairs = append(pairs, pair{v})
+		pairs = append(pairs, v)
 	}
-	for i := 0; i < len(pairs); i++ {
-		for j := i + 1; j < len(pairs); j++ {
-			if bytes.Compare(pairs[j].v.key, pairs[i].v.key) < 0 {
-				pairs[i], pairs[j] = pairs[j], pairs[i]
-			}
-		}
-	}
+	sort.Slice(pairs, func(i, j int) bool {
+		return bytes.Compare(pairs[i].key, pairs[j].key) < 0
+	})
 
-	fileNum := m.vs.NewFileNumber()
-	w, err := newSSTWriter(m.sstDir, fileNum)
+	w, err := newSSTWriter(m.sstDir, job.fileNum)
 	if err != nil {
 		return err
 	}
-	var outMeta sstFileMeta
 	hasOut := false
 	for _, p := range pairs {
-		if p.v.ref.Kind == ValueKindTombstone && nextLevel == maxLevel {
-			continue // drop tombstone at bottom
+		if p.ref.Kind == ValueKindTombstone && job.nextLevel == maxLevel {
+			continue
 		}
-		if err := w.Add(p.v.key, p.v.ref, p.v.seq); err != nil {
+		if err := w.Add(p.key, p.ref, p.seq); err != nil {
 			_ = w.Abandon()
 			return err
 		}
 		hasOut = true
 	}
+
 	edit := &VersionEdit{}
-	for _, f := range all {
+	for _, f := range job.all {
 		edit.Deleted = append(edit.Deleted, struct {
 			Level      int
 			FileNumber uint64
 		}{f.Level, f.FileNumber})
 	}
+	var outMeta sstFileMeta
 	if hasOut {
 		outMeta, err = w.Finish()
 		if err != nil {
@@ -161,7 +161,7 @@ func (m *lsmStoreMgr) compactLevelLocked(level int) error {
 		}
 		edit.Added = append(edit.Added, FileMeta{
 			FileNumber: outMeta.FileNumber,
-			Level:      nextLevel,
+			Level:      job.nextLevel,
 			Size:       outMeta.Size,
 			Smallest:   outMeta.Smallest,
 			Largest:    outMeta.Largest,
@@ -169,14 +169,23 @@ func (m *lsmStoreMgr) compactLevelLocked(level int) error {
 	} else {
 		_ = w.Abandon()
 	}
-	next := fileNum + 1
+	next := job.fileNum + 1
 	edit.NextFileNumber = &next
-	if err := m.vs.LogAndApply(edit); err != nil {
+
+	m.mu.Lock()
+	err = m.vs.LogAndApply(edit)
+	if err == nil {
+		m.readersMu.Lock()
+		for _, f := range job.all {
+			delete(m.readers, f.FileNumber)
+		}
+		m.readersMu.Unlock()
+	}
+	m.mu.Unlock()
+	if err != nil {
 		return err
 	}
-	// drop readers and delete old files
-	for _, f := range all {
-		delete(m.readers, f.FileNumber)
+	for _, f := range job.all {
 		_ = os.Remove(sstPath(m.sstDir, f.FileNumber))
 	}
 	return nil

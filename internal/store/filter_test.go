@@ -113,3 +113,32 @@ func TestSST_NoFilterPolicy(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, ok)
 }
+
+func TestSST_MultiBlockGet(t *testing.T) {
+	dir := t.TempDir()
+	w, err := newSSTWriterWithFilter(dir, 3, nil)
+	require.NoError(t, err)
+	w.blockSize = 64 // force many data blocks
+
+	const n = 80
+	for i := 0; i < n; i++ {
+		k := []byte(fmt.Sprintf("k%04d", i))
+		ref := ValueRef{Kind: ValueKindInline, Inline: []byte(fmt.Sprintf("v%04d", i)), Timestamp: 1}
+		require.NoError(t, w.Add(k, ref, uint64(i+1)))
+	}
+	_, err = w.Finish()
+	require.NoError(t, err)
+
+	rd, err := openSSTReader(dir, 3)
+	require.NoError(t, err)
+	require.Greater(t, len(rd.index), 1, "expected multiple index entries")
+
+	for i := 0; i < n; i++ {
+		k := []byte(fmt.Sprintf("k%04d", i))
+		ref, seq, ok, err := rd.Get(k)
+		require.NoError(t, err, "get %s", k)
+		require.True(t, ok, "get %s miss (likely bad block separator)", k)
+		require.Equal(t, uint64(i+1), seq)
+		require.Equal(t, []byte(fmt.Sprintf("v%04d", i)), ref.Inline)
+	}
+}

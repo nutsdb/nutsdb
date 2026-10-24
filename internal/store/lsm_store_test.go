@@ -127,6 +127,38 @@ func TestLSM_FlushAndReopen(t *testing.T) {
 	require.Equal(t, []byte("val-0042"), rec.Value)
 }
 
+func TestLSM_AsyncFlushBackground(t *testing.T) {
+	dir := t.TempDir()
+	opts := testLSMOpts(dir)
+	opts.MemTableSize = 256
+	opts.L0FileNumCompactionTrigger = 100 // avoid compact noise
+	ctx := context.Background()
+
+	st, err := OpenStoreManager(opts)
+	require.NoError(t, err)
+	defer func() { _ = st.Close() }()
+	mgr := st.(*lsmStoreMgr)
+
+	for i := 0; i < 40; i++ {
+		require.NoError(t, st.Put(ctx, []byte(fmt.Sprintf("af-%04d", i)), core.NewRecord().WithValue([]byte("v"))))
+	}
+	// Readable immediately from mem/imm without waiting for SST.
+	rec, err := st.Get(ctx, []byte("af-0007"))
+	require.NoError(t, err)
+	require.Equal(t, []byte("v"), rec.Value)
+
+	require.Eventually(t, func() bool {
+		mgr.mu.RLock()
+		defer mgr.mu.RUnlock()
+		ver := mgr.vs.Current()
+		return len(mgr.imms) == 0 && len(ver.Files) > 0 && len(ver.Files[0]) > 0
+	}, 3*time.Second, 20*time.Millisecond, "background flush should drain imms into L0")
+
+	rec, err = st.Get(ctx, []byte("af-0007"))
+	require.NoError(t, err)
+	require.Equal(t, []byte("v"), rec.Value)
+}
+
 func TestLSM_IterateOrderAndDelete(t *testing.T) {
 	dir := t.TempDir()
 	st, err := OpenStoreManager(testLSMOpts(dir))

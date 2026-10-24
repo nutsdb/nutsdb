@@ -136,8 +136,6 @@ func (w *sstWriter) Add(key []byte, ref ValueRef, seq uint64) error {
 	if w.count == 0 {
 		w.smallest = append([]byte(nil), key...)
 	}
-	w.largest = append([]byte(nil), key...)
-	w.lastKey = append(w.lastKey[:0], key...)
 
 	refBytes := encodeValueRef(w.buf[:0], ref)
 	entryLen := 4 + len(key) + len(refBytes) + 8 + 1
@@ -150,11 +148,17 @@ func (w *sstWriter) Add(key []byte, ref ValueRef, seq uint64) error {
 	binary.LittleEndian.PutUint64(raw[off:off+8], seq)
 	raw[off+8] = byte(ref.Kind)
 
+	// Flush before updating largest so the index separator stays the last key
+	// actually written into the previous block (not the first key of the next).
 	if len(w.blockBuf) > 0 && len(w.blockBuf)+len(raw) > w.blockSize {
 		if err := w.flushBlock(); err != nil {
 			return err
 		}
 	}
+
+	w.largest = append([]byte(nil), key...)
+	w.lastKey = append(w.lastKey[:0], key...)
+
 	if len(w.blockBuf) == 0 {
 		pos, err := w.fd.Seek(0, io.SeekCurrent)
 		if err != nil {

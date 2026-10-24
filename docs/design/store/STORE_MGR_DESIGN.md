@@ -46,30 +46,41 @@ type lsmStoreMgr struct {
     vlog     fileio.Store
     wal      WAL
     mem      MemTable
-    imms     []*MemTable
+    imms     []*MemTable          // 待 flush 队列（FIFO）
     versions VersionSet
-    mu       sync.RWMutex
+    mu       sync.RWMutex         // 见 LSM §6.3：写路径短临界区
+    flushCh  chan struct{}        // 或等价条件变量
+    compactCh chan struct{}
+    wg       sync.WaitGroup
     closed   bool
 }
 ```
 
-细节协议以 [LSM_VALUELOG_DESIGN.md](./LSM_VALUELOG_DESIGN.md) 为准。
+细节协议以 [LSM_VALUELOG_DESIGN.md](./LSM_VALUELOG_DESIGN.md) §4 / §6 为准。
 
 ---
 
 ## 3. 写 / 读（摘要）
 
 ```text
-Put:
+Put（写锁，短）:
   可选 vlog.Append → ValueRef
   wal.Append(ref) → mem.Put(ref)
-  超限 → freeze + Flush → MANIFEST.LogAndApply
+  超限 → freeze 入 imm 队列 + signal flush
+  unlock 后立即返回   // 不等待 SST
 
-Delete:
-  wal.Append(tombstone) → mem.Put(tombstone)
+Delete: 同 Put 的锁与异步约定；只写 tombstone 到 WAL/Mem
 
-Get:
+Get（读锁）:
   MemTable → Imm → SST levels → resolve(ValueRef)
+  不因后台写 SST / compaction I/O 而长时间阻塞
+```
+
+后台：
+
+```text
+flush worker:  pop imm → 写 SST（无写锁）→ LogAndApply（短写锁）→ signal compact
+compact worker: 选文件 → 合并写 SST（无写锁）→ LogAndApply + 删旧文件
 ```
 
 ---
@@ -80,12 +91,13 @@ Get:
 Open:
   1. 初始化目录布局（vlog/ wal/ sst/ MANIFEST）
   2. fileio.Open(vlog) + OpenWAL + RecoverVersionSet
-  3. ReplayWAL → MemTable
-  4. 启动 flush / compaction 后台（可配）
+  3. ReplayWAL → MemTable（跳过 seq <= LogNumber）
+  4. 启动 flush / compaction 后台协程（默认开启）
 
 Close:
-  1. 停后台；可选 flush MemTable
-  2. wal.Sync + vlog.Sync + Close
+  1. 拒绝新写；停后台并 Wait
+  2. 同步 flush 剩余 MemTable
+  3. wal.Sync + vlog.Sync + Close
 ```
 
 ---
