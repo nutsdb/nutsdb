@@ -213,7 +213,7 @@ func applyEditToVersion(v *Version, edit *VersionEdit) {
 	if edit.LastSequence != nil {
 		v.LastSequence = *edit.LastSequence
 	}
-	if edit.NextFileNumber != nil {
+	if edit.NextFileNumber != nil && *edit.NextFileNumber > v.NextFileNumber {
 		v.NextFileNumber = *edit.NextFileNumber
 	}
 	if edit.LogNumber != nil {

@@ -33,14 +33,19 @@ type lsmStoreMgr struct {
 	vs     *VersionSet
 	sstDir string
 
-	mu     sync.Mutex
+	mu     sync.RWMutex
 	mem    *MemTable
-	imms   []*MemTable
+	imms   []*MemTable // FIFO queue of frozen tables awaiting flush
 	seq    uint64
 	closed bool
 
-	// cache of open SST readers by file number
-	readers map[uint64]*sstReader
+	readersMu sync.Mutex
+	readers   map[uint64]*sstReader
+
+	flushCh   chan struct{}
+	compactCh chan struct{}
+	stopCh    chan struct{}
+	wg        sync.WaitGroup
 }
 
 func openLSMStoreManager(opts LSMOptions) (StoreManager, error) {
@@ -96,12 +101,15 @@ func openLSMStoreManager(opts LSMOptions) (StoreManager, error) {
 		return m.mem.Put(key, ref, seq)
 	})
 	if err != nil {
-		_ = m.Close()
+		_ = wal.Close()
+		_ = vlog.Close()
+		_ = vs.Close()
 		return nil, err
 	}
 	if maxSeq > m.seq {
 		m.seq = maxSeq
 	}
+	m.startBackground()
 	return m, nil
 }
 
@@ -222,8 +230,8 @@ func (m *lsmStoreMgr) Get(ctx context.Context, key []byte) (*core.Record, error)
 	if err := checkCtx(ctx); err != nil {
 		return nil, err
 	}
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	if m.closed {
 		return nil, ErrStoreClosed
 	}
@@ -271,14 +279,16 @@ func (m *lsmStoreMgr) Get(ctx context.Context, key []byte) (*core.Record, error)
 }
 
 func (m *lsmStoreMgr) getFromSSTLocked(num uint64, key []byte) (ValueRef, uint64, bool, error) {
-	rd, err := m.getReaderLocked(num)
+	rd, err := m.getReader(num)
 	if err != nil {
 		return ValueRef{}, 0, false, err
 	}
 	return rd.Get(key)
 }
 
-func (m *lsmStoreMgr) getReaderLocked(num uint64) (*sstReader, error) {
+func (m *lsmStoreMgr) getReader(num uint64) (*sstReader, error) {
+	m.readersMu.Lock()
+	defer m.readersMu.Unlock()
 	if rd, ok := m.readers[num]; ok {
 		return rd, nil
 	}
@@ -327,14 +337,12 @@ func (m *lsmStoreMgr) resolveLocked(key []byte, ref ValueRef) (*core.Record, err
 	}
 }
 
+// maybeFlushLocked freezes the memtable into the imm queue and signals the
+// background flusher. Caller must hold the write lock. Does not write SST.
 func (m *lsmStoreMgr) maybeFlushLocked() error {
 	if m.mem.ApproxBytes() < m.opts.MemTableSize {
 		return nil
 	}
-	return m.flushMemLocked()
-}
-
-func (m *lsmStoreMgr) flushMemLocked() error {
 	if m.mem.Size() == 0 {
 		return nil
 	}
@@ -342,64 +350,16 @@ func (m *lsmStoreMgr) flushMemLocked() error {
 	imm.Freeze()
 	m.imms = append(m.imms, imm)
 	m.mem = newMemTable()
-
-	fileNum := m.vs.NewFileNumber()
-	w, err := newSSTWriter(m.sstDir, fileNum)
-	if err != nil {
-		return err
-	}
-	var maxSeq uint64
-	imm.Iterate(func(key []byte, v memValue) bool {
-		if v.Seq > maxSeq {
-			maxSeq = v.Seq
-		}
-		if err2 := w.Add(key, v.Ref, v.Seq); err2 != nil {
-			err = err2
-			return false
-		}
-		return true
-	})
-	if err != nil {
-		_ = w.Abandon()
-		return err
-	}
-	meta, err := w.Finish()
-	if err != nil {
-		return err
-	}
-	nextFile := fileNum + 1
-	edit := &VersionEdit{
-		Added: []FileMeta{{
-			FileNumber: meta.FileNumber,
-			Level:      0,
-			Size:       meta.Size,
-			Smallest:   meta.Smallest,
-			Largest:    meta.Largest,
-		}},
-		LastSequence:   &maxSeq,
-		NextFileNumber: &nextFile,
-		LogNumber:      &maxSeq, // reuse as last flushed seq
-	}
-	if err := m.vs.LogAndApply(edit); err != nil {
-		return err
-	}
-	// drop immutable that we flushed (only one)
-	m.imms = m.imms[:len(m.imms)-1]
-	// reset WAL so reopen does not need flushed records
-	walDir := defaultWALDir(m.opts.Dir)
-	walBase := fileio.DefaultOptions(walDir)
-	if err := m.wal.Reset(walDir, m.opts.WALSyncMode, walBase); err != nil {
-		return err
-	}
-	return m.maybeCompactLocked()
+	m.signalFlush()
+	return nil
 }
 
 func (m *lsmStoreMgr) Iterate(ctx context.Context, callback func(key []byte, value *core.Record) bool) error {
 	if err := checkCtx(ctx); err != nil {
 		return err
 	}
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	if m.closed {
 		return ErrStoreClosed
 	}
@@ -455,7 +415,7 @@ func (m *lsmStoreMgr) collectMergedLocked() ([]mergeItem, error) {
 	ver := m.vs.Current()
 	for level := range ver.Files {
 		for _, fm := range ver.Files[level] {
-			rd, err := m.getReaderLocked(fm.FileNumber)
+			rd, err := m.getReader(fm.FileNumber)
 			if err != nil {
 				return nil, err
 			}
@@ -533,22 +493,31 @@ func (m *lsmStoreMgr) BatchGet(ctx context.Context, keys [][]byte) ([]struct {
 
 func (m *lsmStoreMgr) Close() error {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	if m.closed {
+		m.mu.Unlock()
 		return nil
 	}
-	if m.mem != nil && m.mem.Size() > 0 {
-		if err := m.flushMemLocked(); err != nil {
-			return err
-		}
-	}
 	m.closed = true
+	m.mu.Unlock()
+
+	if m.stopCh != nil {
+		close(m.stopCh)
+		m.wg.Wait()
+	}
+	if err := m.flushAllSync(); err != nil {
+		return err
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	_ = m.wal.Sync()
 	_ = m.vlog.Sync()
 	_ = m.wal.Close()
 	_ = m.vlog.Close()
 	_ = m.vs.Close()
+	m.readersMu.Lock()
 	m.readers = nil
+	m.readersMu.Unlock()
 	return nil
 }
 

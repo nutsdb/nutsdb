@@ -145,22 +145,21 @@ ValueKindInline ⇒ 不访问 ValueLog；Inline 即用户 value 字节
 ```text
 Put(key, record):
   1. 校验 key / record；规范化 Timestamp
-  2. 若 len(value) >= InlineThreshold:
-       payload = encodePutPayload(key, record)   // 与 DiskStore entry 格式对齐，便于 ValueLog 复用
-       loc = valueLog.Append*(payload, RecordPut)
-       ref = ValueRef{Kind: Location, Loc: loc, Timestamp, TTL}
-     else:
-       ref = ValueRef{Kind: Inline, Inline: value, Timestamp, TTL}
-  3. wal.Append(PutOp, key, ref)                 // 见 WAL_DESIGN；须先于或与 MemTable 同事务语义
-  4. mem.Put(key, ref)
-  5. 若 mem 超阈值 → freeze → 异步 FlushToL0
-  6. return
+  2. 持写锁（短临界区，见 §6.3）：
+     a. 若 len(value) >= InlineThreshold:
+          payload = encodePutPayload(key, record)
+          loc = valueLog.Append*(payload, RecordPut)
+          ref = ValueRef{Kind: Location, Loc: loc, Timestamp, TTL}
+        else:
+          ref = ValueRef{Kind: Inline, Inline: value, Timestamp, TTL}
+     b. wal.Append(PutOp, key, ref)
+     c. mem.Put(key, ref)
+     d. 若 mem 超限值 → freeze 当前 mem 进入 imm 队列，换新 mem，并通知 flush 协程
+  3. 释放写锁后 return（不等待 SST flush / compaction 完成）
 
 Delete(key):
-  1. wal.Append(DeleteOp, key, Tombstone)
-  2. mem.Put(key, Tombstone)                     // 或专用 Delete
-  3. 可选：不写 ValueLog（推荐）；tombstone 只在 LSM 侧可见
-  4. 阈值检查同 Put
+  1. 写锁内：wal.Append(DeleteOp, key, Tombstone) → mem.Put(tombstone) → 限值检查同 Put
+  2. 不写 ValueLog（tombstone 只在 LSM 侧）
 ```
 
 **顺序要求（崩溃安全）**：
@@ -170,11 +169,10 @@ ValueLog Append 成功（若需要）→ WAL 记录含最终 ValueRef → MemTab
 ```
 
 - ValueLog 已写但 WAL/Mem 未提交：重启后该 value 成孤儿，由 ValueLog GC 回收（可接受）。  
-- **禁止** MemTable 先可见而 WAL 未 durable（按 SyncMode）。
+- **禁止** MemTable 先可见而 WAL 未 durable（按 SyncMode）。  
+- Put/Delete **成功返回**只保证：在当前 `WALSyncMode` / ValueLog `SyncMode` 下，该条已进入 WAL（及必要的 ValueLog），**不**保证已进入 SST。
 
-BatchPut / BatchDelete：同一写锁下顺序执行；批末按 SyncMode `wal.Sync()` / `valueLog.Sync()`。
-
----
+BatchPut / BatchDelete：同一写锁下顺序执行；批末按 SyncMode `wal.Sync()` / `valueLog.Sync()`；同样不在批内同步等待 flush。
 
 ## 5. 读路径
 
@@ -199,23 +197,35 @@ Iterate：对 MemTable + Imm + 各 level SST 做 **多路归并**（同 key 取�
 
 ## 6. Flush 与 Compaction
 
-### 6.1 Flush（MemTable → L0）
+### 6.1 Flush（Immutable MemTable → L0）
+
+由 **后台 flush 协程**执行（与 Put 解耦）：
 
 ```text
 Flush(imm):
-  1. 将 imm 中条目按 key 排序写出 SST（已有序则直接写）
-  2. fsync SST
-  3. MANIFEST：LogAndApply( add L0 file, remove imm 引用 )
-  4. 可截断 / 归档对应 WAL 前缀（见 WAL_DESIGN）
+  1. （无写锁）将 imm 按 key 有序写出 SST.tmp → fsync → rename
+  2. 短写锁：
+       MANIFEST.LogAndApply( add L0 file,
+                             LastSequence/LogNumber = imm.maxSeq,
+                             NextFileNumber … )
+       从 imm 队列移除该 imm
+  3. WAL 回收（见下）；然后通知 compaction 检查
 ```
 
-L0 文件允许 key range **重叠**。
+L0 文件允许 key range **重叠**。允许多个 imm 排队；**按冻结顺序 FIFO** flush。
+
+**WAL 回收（异步 flush 约束）**：
+
+- 禁止在仍有并发 Put 追加同一 WAL 时对整个 `wal/` 做 `RemoveAll`。  
+- 正确做法：`LogNumber = 已 flush 的最大 sequence`；`Replay` 跳过 `seq <= LogNumber` 的记录（已实现语义）。  
+- 段级物理删除：仅删除「全部 record 的 seq 均 ≤ LogNumber」的已 seal WAL 段；首版可延后，允许 WAL 临时膨胀，Close 时再统一处理。  
+- 旧实现「每次 flush 后 `RemoveAll(wal/)`」**仅适用于同步 flush 且持写锁**；异步模型下废弃。
 
 ### 6.2 Compaction（建议首版：Leveled）
 
 | Level | 目标 | 说明 |
 |-------|------|------|
-| L0 | 文件数阈值触发 | 与 L1 重叠文件一并合并 |
+| L0 | 文件数限值触发 | 与 L1 重叠文件一并合并 |
 | L1…Ln | 层总大小 ≈ `base * multiplier^(n)` | 层内文件 key range **不重叠** |
 
 合并输出：
@@ -223,15 +233,53 @@ L0 文件允许 key range **重叠**。
 - 同 key 只保留 **最新** `ValueRef`（或 tombstone）
 - 可丢弃：已被更新覆盖的旧 Location 引用（**不**立刻删 ValueLog 数据）
 - tombstone：可在到达底层且无更旧数据时丢弃（标准 LSM 墓碑回收规则）
+- 输出 key 必须有序（实现用 `sort.Slice` / 等价 O(n log n)，禁止 O(n²) 演示排序）
 
 Compaction **只重写 SST**，默认 **不重写 ValueLog**（把 value 搬家交给 §7）。
 
-### 6.3 并发
+由 **后台 compaction 协程**执行；flush 完成后或 L0/层大小超限时调度。首版 **单线程** compaction，避免并行合并复杂度。
 
-- 单 compaction 线程首版即可；与 Get 通过 Version 不可变快照共存  
-- 写路径只碰 MemTable/WAL/ValueLog；Apply Version 时短临界区
+### 6.3 并发与锁模型（必须）
 
----
+目标：Put 延迟不包含 SST 写盘与 compaction；Get 不被长时间 flush/compact 阻塞。
+
+```text
+┌───────────── 写锁（短）──────────────┐
+│ Put/Delete: vlog? → WAL → mem       │
+│ freeze: mem → imm 队列，signal flush │
+│ LogAndApply / 摘除 imm / 更新读者表  │
+└─────────────────────────────────────┘
+
+┌───────────── 读锁 / Version 快照 ────┐
+│ Get / 部分 Iterate：mem + imm + SST  │
+│ Version 不可变；Apply 后读者换新视图 │
+└─────────────────────────────────────┘
+
+┌───────────── 后台（无持写锁做 I/O）──┐
+│ flush worker: 写 SST 文件            │
+│ compact worker: 读多 SST、写新 SST   │
+│ 仅在 Apply / 删旧文件时回到短写锁    │
+└─────────────────────────────────────┘
+```
+
+| 操作 | 锁 | 说明 |
+|------|-----|------|
+| Put / Delete / Batch* | 写锁 | 仅覆盖内存与 WAL/vlog 追加；**禁止**在锁内写 SST / 跑完整 compaction |
+| freeze + 入 imm 队列 | 写锁 | O(1) 指针切换 |
+| Flush 写 SST | **无写锁** | 只读 imm（已冻结） |
+| Flush 的 LogAndApply | 写锁 | 短 |
+| Compaction 读输入 SST、写输出 | **无写锁** | 基于 Apply 前拿到的 FileMeta 列表 / Version 快照 |
+| Compaction 的 LogAndApply + 删旧 SST | 写锁 | 短；删文件可在锁外（Apply 后） |
+| Get | 读锁（或等价：拷贝 mem/imm 指针 + `Version` 快照） | 不与 flush I/O 互斥等待 |
+
+**Close**：
+
+1. 置 `closing`，拒绝新写；  
+2. 停止并 `Wait` flush / compaction 协程；  
+3. 同步 flush 剩余 mem（可在写锁内或停写后单线程执行）；  
+4. `wal.Sync` + `vlog.Sync` + Close。
+
+**错误处理**：后台 flush/compaction 失败不得默默丢数据；应记录日志，保留 imm / 旧 Version，并支持重试。Put 已返回成功的键仍以 WAL+imm/mem 为准，重启可恢复。
 
 ## 7. ValueLog GC
 

@@ -117,7 +117,7 @@ MemTable/SST(key→ValueRef) + WAL + MANIFEST + fileio.Store(vlog)
 
 ## Build & Test Commands
 
-Go **1.24.x**（与 CI 一致）。无需 Makefile。
+Go **1.24+**（`go.mod` 为 `go 1.24.0`；CI 矩阵：`1.24.x` / `1.25.x` / `1.26.x` / `1.27.x`）。无需 Makefile。
 
 ```bash
 # 构建
@@ -141,7 +141,7 @@ gofmt -s -w .
 go vet ./...
 ```
 
-CI：`.github/workflows/ci.yml`（`gofmt -s` / `go vet`、`go test -race`，Linux / Windows）。
+CI：`.github/workflows/ci.yml`（`gofmt -s` / `go vet`、`go test -race`；Linux / Windows × Go 1.24–1.27）。
 
 ## Code Style & Conventions
 

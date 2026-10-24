@@ -145,11 +145,14 @@ ReplayWAL(wal, mem):
 
 ```text
 Flush 完成且 MANIFEST.LogAndApply 成功后：
-  Version.LogNumber = 本 flush 对应的 wal 序号
-  删除 / 回收所有 fileID 或 log 序号 ≤ LogNumber 的 WAL 段
+  Version.LogNumber = 本 flush 对应的最大 sequence
+  Replay 跳过 seq ≤ LogNumber 的记录（逻辑回收，必须）
+  物理删除：仅删除「段内全部 record 的 seq 均 ≤ LogNumber」的已 seal 段（可延后）
 ```
 
 进行中的 Immutable flush 所覆盖的写入必须已全部进入该 SST，才能推进 LogNumber。
+
+**异步 flush 约束**（见 [LSM §6.1](./LSM_VALUELOG_DESIGN.md)）：禁止在仍有并发 `Append` 时对整个 `wal/` 目录 `RemoveAll`；首版可只推进 `LogNumber`，允许 WAL 文件暂时膨胀。
 
 ---
 
