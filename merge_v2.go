@@ -83,6 +83,10 @@ type mergeOutput struct {
 	finalized bool           // Whether this output has been finalized
 }
 
+// mergeV2TestHookCommitted, when set by a test, runs right after the merge is
+// committed. A non-nil error stops the merge there, as if the process had died.
+var mergeV2TestHookCommitted func() error
+
 // mergeV2 executes the complete merge operation using the V2 algorithm.
 // This is the main entry point for the merge process, orchestrating all phases.
 func (db *DB) mergeV2() error {
@@ -104,14 +108,26 @@ func (db *DB) mergeV2() error {
 		return job.abort(err)
 	}
 
-	// Commit phase - update indexes and write hint files
-	if err := job.commit(); err != nil {
+	// Write the hints of the rewritten entries to the merge hint files
+	if err := job.writeHints(); err != nil {
 		return job.abort(err)
 	}
 
-	// Finalize outputs - ensure all data is persisted
+	// Finalize outputs - flush the hint files and sync the merge files. This
+	// must happen before commit: once the manifest says committed, recovery
+	// removes the old files and the merge files are all that is left.
 	if err := job.finalizeOutputs(); err != nil {
 		return job.abort(err)
+	}
+
+	// Commit phase - mark the merge committed and update indexes
+	if err := job.commit(); err != nil {
+		return job.abort(err)
+	}
+	if mergeV2TestHookCommitted != nil {
+		if err := mergeV2TestHookCommitted(); err != nil {
+			return err
+		}
 	}
 
 	// Clean up old files to reclaim disk space
@@ -246,17 +262,13 @@ func (job *mergeV2Job) finalizeOutputs() error {
 	return nil
 }
 
-// commit atomically updates in-memory indexes and writes hint files.
+// writeHints adds the hint of every rewritten entry to the hint collector of
+// its merge output. The collectors are flushed when the outputs are finalized.
 // Note: We don't validate staleness here. If an entry was updated concurrently during merge,
 // we'll write the stale version to the hint file. This is safe because during index rebuild,
 // merge files (negative FileIDs) are processed before normal files (positive FileIDs), so
 // newer values will overwrite stale ones. This tradeoff saves significant memory.
-func (job *mergeV2Job) commit() error {
-	job.db.mu.Lock()
-	defer job.db.mu.Unlock()
-
-	// Phase 1: Write all hints to hint files (even potentially stale ones)
-	// This ensures hints are available for fast index recovery
+func (job *mergeV2Job) writeHints() error {
 	for _, entry := range job.lookup {
 		if entry == nil {
 			continue
@@ -267,15 +279,17 @@ func (job *mergeV2Job) commit() error {
 			}
 		}
 	}
+	return nil
+}
 
-	// Phase 2: Update in-memory indexes (for current runtime correctness)
-	// This ensures the database continues to work correctly after merge
-	for _, entry := range job.lookup {
-		if entry == nil {
-			continue
-		}
-		job.applyLookup(entry)
-	}
+// commit marks the merge committed in the manifest and then points the
+// in-memory indexes at the merge files. The merge outputs must already be
+// finalized: from the committed manifest on, recovery treats the old files as
+// replaced. The indexes are updated only once the manifest is written, so a
+// failed commit leaves them pointing at the old files that abort keeps.
+func (job *mergeV2Job) commit() error {
+	job.db.mu.Lock()
+	defer job.db.mu.Unlock()
 
 	// Update merge manifest with completion status
 	if len(job.outputs) == 0 {
@@ -286,6 +300,15 @@ func (job *mergeV2Job) commit() error {
 	job.manifest.Status = manifestStatusCommitted
 	if err := writeMergeManifest(job.db.opt.Dir, job.manifest); err != nil {
 		return err
+	}
+
+	// Update in-memory indexes (for current runtime correctness)
+	// This ensures the database continues to work correctly after merge
+	for _, entry := range job.lookup {
+		if entry == nil {
+			continue
+		}
+		job.applyLookup(entry)
 	}
 
 	// Prepare list of old files for cleanup

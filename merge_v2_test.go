@@ -645,7 +645,7 @@ func TestMergeV2EnsureOutputRolloverCreatesNewSegment(t *testing.T) {
 	}
 }
 
-func TestMergeV2CommitCollectorFailure(t *testing.T) {
+func TestMergeV2WriteHintsCollectorFailure(t *testing.T) {
 	dir := t.TempDir()
 
 	opts := DefaultOptions
@@ -701,8 +701,8 @@ func TestMergeV2CommitCollectorFailure(t *testing.T) {
 		t.Fatalf("writeEntry: %v", err)
 	}
 
-	if err := job.commit(); err == nil || !strings.Contains(err.Error(), "failed to add hint") {
-		t.Fatalf("commit should surface collector errors, got %v", err)
+	if err := job.writeHints(); err == nil || !strings.Contains(err.Error(), "failed to add hint") {
+		t.Fatalf("writeHints should surface collector errors, got %v", err)
 	}
 }
 
@@ -888,11 +888,14 @@ func TestMergeV2MergeAndTxConcurrentWrites(t *testing.T) {
 		t.Fatalf("rewrite: %v", err)
 	}
 
-	if err := job.commit(); err != nil {
-		t.Fatalf("commit: %v", err)
+	if err := job.writeHints(); err != nil {
+		t.Fatalf("writeHints: %v", err)
 	}
 	if err := job.finalizeOutputs(); err != nil {
 		t.Fatalf("finalizeOutputs: %v", err)
+	}
+	if err := job.commit(); err != nil {
+		t.Fatalf("commit: %v", err)
 	}
 	if err := job.cleanupOldFiles(); err != nil {
 		t.Fatalf("cleanupOldFiles: %v", err)
@@ -1064,11 +1067,14 @@ func TestMergeV2MergeAndTxConcurrentWritesWithSet(t *testing.T) {
 		t.Fatalf("rewrite: %v", err)
 	}
 
-	if err := job.commit(); err != nil {
-		t.Fatalf("commit: %v", err)
+	if err := job.writeHints(); err != nil {
+		t.Fatalf("writeHints: %v", err)
 	}
 	if err := job.finalizeOutputs(); err != nil {
 		t.Fatalf("finalizeOutputs: %v", err)
+	}
+	if err := job.commit(); err != nil {
+		t.Fatalf("commit: %v", err)
 	}
 	if err := job.cleanupOldFiles(); err != nil {
 		t.Fatalf("cleanupOldFiles: %v", err)
@@ -2165,5 +2171,77 @@ func TestMergeV2CleanupOldFilesPropagatesErrors(t *testing.T) {
 
 	if err := job.cleanupOldFiles(); err == nil {
 		t.Fatal("cleanupOldFiles should surface removal errors")
+	}
+}
+
+// TestMergeV2CrashAfterCommitKeepsData stops a merge right after the manifest is
+// marked committed, before the old files are removed, and reopens the database.
+// Recovery removes the old files at that point, so the merge files and their hint
+// files must already be complete on disk.
+func TestMergeV2CrashAfterCommitKeepsData(t *testing.T) {
+	dir := t.TempDir()
+	opts := DefaultOptions
+	opts.Dir = dir
+	opts.SegmentSize = 256 * 1024
+	opts.EnableMergeV2 = true
+	opts.EnableHintFile = true
+
+	db, err := Open(opts)
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+
+	bucket := "bucket"
+	if err := db.Update(func(tx *Tx) error {
+		return tx.NewBucket(DataStructureBTree, bucket)
+	}); err != nil {
+		t.Fatalf("create bucket: %v", err)
+	}
+
+	const numKeys = 3000
+	value := bytes.Repeat([]byte("v"), 100)
+	for i := 0; i < numKeys; i++ {
+		key := []byte(fmt.Sprintf("key-%05d", i))
+		if err := db.Update(func(tx *Tx) error {
+			return tx.Put(bucket, key, value, Persistent)
+		}); err != nil {
+			t.Fatalf("put %d: %v", i, err)
+		}
+	}
+
+	errCrash := errors.New("simulated crash")
+	mergeV2TestHookCommitted = func() error { return errCrash }
+	defer func() { mergeV2TestHookCommitted = nil }()
+
+	if err := db.Merge(); !errors.Is(err, errCrash) {
+		t.Fatalf("merge: expected simulated crash, got %v", err)
+	}
+	mergeV2TestHookCommitted = nil
+	if err := db.Close(); err != nil {
+		t.Fatalf("close: %v", err)
+	}
+
+	db, err = Open(opts)
+	if err != nil {
+		t.Fatalf("reopen db: %v", err)
+	}
+	defer func() {
+		_ = db.Close()
+	}()
+
+	missing := 0
+	if err := db.View(func(tx *Tx) error {
+		for i := 0; i < numKeys; i++ {
+			got, err := tx.Get(bucket, []byte(fmt.Sprintf("key-%05d", i)))
+			if err != nil || !bytes.Equal(got, value) {
+				missing++
+			}
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("view: %v", err)
+	}
+	if missing != 0 {
+		t.Fatalf("%d of %d keys lost after a crash right after the merge commit", missing, numKeys)
 	}
 }
