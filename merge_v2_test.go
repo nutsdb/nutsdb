@@ -2245,3 +2245,120 @@ func TestMergeV2CrashAfterCommitKeepsData(t *testing.T) {
 		t.Fatalf("%d of %d keys lost after a crash right after the merge commit", missing, numKeys)
 	}
 }
+
+func TestMergeV2KeepsEveryEntryOfMultiEntryTx(t *testing.T) {
+	for _, hint := range []bool{false, true} {
+		t.Run(fmt.Sprintf("hint=%v", hint), func(t *testing.T) {
+			opts := DefaultOptions
+			opts.Dir = t.TempDir()
+			opts.SegmentSize = 64 * KB
+			opts.EnableMergeV2 = true
+			opts.EnableHintFile = hint
+
+			db, err := Open(opts)
+			if err != nil {
+				t.Fatalf("open: %v", err)
+			}
+			if err := db.Update(func(tx *Tx) error {
+				if err := tx.NewBucket(DataStructureBTree, "kv"); err != nil {
+					return err
+				}
+				if err := tx.NewBucket(DataStructureList, "list"); err != nil {
+					return err
+				}
+				return tx.NewBucket(DataStructureSet, "set")
+			}); err != nil {
+				t.Fatalf("create buckets: %v", err)
+			}
+
+			// Transactions with several entries each. Only the last entry of
+			// a transaction carries the Committed status.
+			if err := db.Update(func(tx *Tx) error {
+				if err := tx.RPush("list", []byte("l"), []byte("a"), []byte("b"), []byte("c")); err != nil {
+					return err
+				}
+				return tx.SAdd("set", []byte("s"), []byte("x"), []byte("y"), []byte("z"))
+			}); err != nil {
+				t.Fatalf("write list and set: %v", err)
+			}
+			if err := db.Update(func(tx *Tx) error {
+				for i := 0; i < 3; i++ {
+					if err := tx.Put("kv", []byte(fmt.Sprintf("key-%d", i)), []byte("old"), Persistent); err != nil {
+						return err
+					}
+				}
+				return nil
+			}); err != nil {
+				t.Fatalf("write kv: %v", err)
+			}
+
+			// Overwrite key-2, the entry that carried the Committed status, so
+			// the merge copies key-0 and key-1 without it, and add another
+			// entry after them.
+			if err := db.Update(func(tx *Tx) error {
+				return tx.Put("kv", []byte("key-2"), []byte("val-2"), Persistent)
+			}); err != nil {
+				t.Fatalf("overwrite: %v", err)
+			}
+			if err := db.Update(func(tx *Tx) error {
+				return tx.Put("kv", []byte("after"), []byte("after"), Persistent)
+			}); err != nil {
+				t.Fatalf("write after: %v", err)
+			}
+
+			// Fill a few segments with overwrites so the merge has files to rewrite.
+			for i := 0; i < 2000; i++ {
+				if err := db.Update(func(tx *Tx) error {
+					return tx.Put("kv", []byte("hot"), make([]byte, 100), Persistent)
+				}); err != nil {
+					t.Fatalf("fill: %v", err)
+				}
+			}
+
+			if err := db.Merge(); err != nil {
+				t.Fatalf("merge: %v", err)
+			}
+			if err := db.Close(); err != nil {
+				t.Fatalf("close: %v", err)
+			}
+
+			db, err = Open(opts)
+			if err != nil {
+				t.Fatalf("reopen: %v", err)
+			}
+			defer func() { _ = db.Close() }()
+
+			if err := db.View(func(tx *Tx) error {
+				for i, want := range []string{"old", "old", "val-2"} {
+					v, err := tx.Get("kv", []byte(fmt.Sprintf("key-%d", i)))
+					if err != nil {
+						return fmt.Errorf("get key-%d: %w", i, err)
+					}
+					if string(v) != want {
+						return fmt.Errorf("key-%d = %q, want %q", i, v, want)
+					}
+				}
+				if _, err := tx.Get("kv", []byte("after")); err != nil {
+					return fmt.Errorf("get after: %w", err)
+				}
+				items, err := tx.LRange("list", []byte("l"), 0, -1)
+				if err != nil {
+					return fmt.Errorf("lrange: %w", err)
+				}
+				if got := string(bytes.Join(items, []byte(","))); got != "a,b,c" {
+					return fmt.Errorf("list = %q, want %q", got, "a,b,c")
+				}
+				members, err := tx.SMembers("set", []byte("s"))
+				if err != nil {
+					return fmt.Errorf("smembers: %w", err)
+				}
+				if len(members) != 3 {
+					return fmt.Errorf("set has %d members, want 3", len(members))
+				}
+				return nil
+			}); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
