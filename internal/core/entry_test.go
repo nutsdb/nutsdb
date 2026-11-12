@@ -244,6 +244,25 @@ func Test_EntryParsePayloadAndCheckPayloadSize(t *testing.T) {
 	r.Equal(core.ErrPayLoadSizeMismatch, err)
 }
 
+func Test_EntryParsePayloadCopiesKey(t *testing.T) {
+	r := require.New(t)
+
+	k := []byte("abc")
+	v := []byte("defgh")
+
+	meta := core.NewMetaData().
+		WithKeySize(uint32(len(k))).
+		WithValueSize(uint32(len(v)))
+
+	e := core.NewEntry().WithMeta(meta)
+	payload := append(append([]byte{}, k...), v...)
+	r.NoError(e.ParsePayload(payload))
+
+	// The key must not share the payload buffer, which also holds the value.
+	payload[0] = 'x'
+	r.Equal(k, e.Key)
+}
+
 func Test_EntryParseMeta(t *testing.T) {
 	r := require.New(t)
 

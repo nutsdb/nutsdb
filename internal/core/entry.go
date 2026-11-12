@@ -128,7 +128,10 @@ func (e *Entry) ParsePayload(data []byte) error {
 	valueHighBound := meta.KeySize + meta.ValueSize
 
 	// parse key
-	e.Key = data[keyLowBound:keyHighBound]
+	// Copy the key: data also holds the value, and the key outlives this call in
+	// the index. A sub-slice would keep the whole buffer, value included,
+	// reachable, even in HintKeyAndRAMIdxMode.
+	e.Key = append([]byte(nil), data[keyLowBound:keyHighBound]...)
 	// parse value
 	e.Value = data[valueLowBound:valueHighBound]
 	return nil

@@ -287,6 +287,36 @@ func TestDB_ReopenWithDelete(t *testing.T) {
 	}
 }
 
+// In HintKeyAndRAMIdxMode the index holds only keys, so after a reopen a key in
+// the index must not share the buffer its entry was read into, or every value
+// read during recovery stays in memory.
+func TestDB_ReopenIndexKeyDoesNotHoldValue(t *testing.T) {
+	opt := DefaultOptions
+	opt.Dir = filepath.Join(t.TempDir(), "nutsdb-test")
+	opt.EntryIdxMode = HintKeyAndRAMIdxMode
+
+	db, err := Open(opt)
+	require.NoError(t, err)
+
+	bucket := "bucket"
+	key := testutils.GetTestBytes(0)
+	value := make([]byte, 1024)
+	txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+	txPut(t, db, bucket, key, value, Persistent, nil, nil)
+	require.NoError(t, db.Close())
+
+	db, err = Open(opt)
+	require.NoError(t, err)
+	defer func() { require.NoError(t, db.Close()) }()
+
+	b, err := db.bucketMgr.GetBucket(DataStructureBTree, bucket)
+	require.NoError(t, err)
+	r, ok := db.Index.BTree.GetWithDefault(b.Id).Find(key)
+	require.True(t, ok)
+	require.Equal(t, key, r.Key)
+	require.Less(t, cap(r.Key), len(key)+len(value), "the key shares its buffer with the value")
+}
+
 func TestDB_Flock(t *testing.T) {
 	testDir := filepath.Join(t.TempDir(), "testdb_flock")
 	opt := DefaultOptions
