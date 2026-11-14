@@ -2362,3 +2362,106 @@ func TestMergeV2KeepsEveryEntryOfMultiEntryTx(t *testing.T) {
 		})
 	}
 }
+
+// TestMergeV2ApplyLookupIgnoresMissingTargets checks that applyLookup leaves
+// the indexes alone when the entry it merged is no longer the one they point
+// to: the bucket, key, member or list item is gone, or the hint can't be
+// matched to a member.
+func TestMergeV2ApplyLookupIgnoresMissingTargets(t *testing.T) {
+	clk := ttl.NewRealClock()
+	db := &DB{
+		opt: DefaultOptions,
+		bucketMgr: &BucketManager{
+			BucketInfoMapper: map[core.BucketId]*core.Bucket{},
+		},
+	}
+	db.Index = db.newIndex()
+	db.ttlService = ttl.NewService(clk, ttl.DefaultConfig(), db.handleExpiredKeys)
+
+	const (
+		btreeBucket  = core.BucketId(1)
+		setBucket    = core.BucketId(2)
+		listBucket   = core.BucketId(3)
+		zsetBucket   = core.BucketId(4)
+		absentBucket = core.BucketId(99)
+	)
+
+	btreeRecord := &core.Record{Key: []byte("kv-key"), Value: []byte("v"), FileID: 10, Timestamp: 1, TTL: Persistent}
+	db.Index.BTree.GetWithDefault(btreeBucket).InsertRecord(btreeRecord.Key, btreeRecord)
+
+	setRecord := &core.Record{Value: []byte("member"), FileID: 11, Timestamp: 1, TTL: Persistent}
+	if err := db.Index.Set.GetWithDefault(setBucket).SAdd("set-key", [][]byte{setRecord.Value}, []*core.Record{setRecord}); err != nil {
+		t.Fatalf("SAdd: %v", err)
+	}
+
+	listKey := []byte("list-key")
+	listRecord := &core.Record{FileID: 12, Timestamp: 1, TTL: Persistent}
+	listIdx := db.Index.List.GetWithDefault(listBucket)
+	listIdx.Items[string(listKey)] = data.NewBTree(0)
+	listIdx.Items[string(listKey)].InsertRecord(utils.ConvertUint64ToBigEndianBytes(1), listRecord)
+
+	zsetValue := []byte("sorted-member")
+	zsetRecord := &core.Record{Value: zsetValue, FileID: 13, Timestamp: 1, TTL: Persistent}
+	if err := db.Index.SortedSet.GetWithDefault(zsetBucket).ZAdd("zset-key", SCORE(1.5), zsetValue, zsetRecord); err != nil {
+		t.Fatalf("ZAdd: %v", err)
+	}
+	zsetHash := fnv.New32a()
+	_, _ = zsetHash.Write(zsetValue)
+
+	hint := func(bucket core.BucketId, ds core.DataStructure, key []byte) *HintEntry {
+		return &HintEntry{
+			BucketId:  uint64(bucket),
+			Key:       key,
+			Ds:        uint16(ds),
+			Flag:      DataSetFlag,
+			FileID:    500,
+			DataPos:   5000,
+			Timestamp: 100,
+		}
+	}
+	listHint := func(bucket core.BucketId, key []byte, seq uint64, flag uint16) *HintEntry {
+		h := hint(bucket, DataStructureList, utils.EncodeListKey(key, seq))
+		h.Flag = flag
+		return h
+	}
+	zsetKey := []byte("zset-key" + SeparatorForZSetKey + "1.5")
+
+	cases := map[string]*mergeLookupEntry{
+		"nil hint":               {},
+		"btree bucket missing":   {hint: hint(absentBucket, DataStructureBTree, btreeRecord.Key)},
+		"btree key missing":      {hint: hint(btreeBucket, DataStructureBTree, []byte("other"))},
+		"set bucket missing":     {hint: hint(absentBucket, DataStructureSet, []byte("set-key")), hasValueHash: true},
+		"set key missing":        {hint: hint(setBucket, DataStructureSet, []byte("other")), hasValueHash: true},
+		"set without value hash": {hint: hint(setBucket, DataStructureSet, []byte("set-key"))},
+		"set member missing":     {hint: hint(setBucket, DataStructureSet, []byte("set-key")), valueHash: 1, hasValueHash: true},
+		"list pop flag":          {hint: listHint(listBucket, listKey, 1, DataLPopFlag)},
+		"list bucket missing":    {hint: listHint(absentBucket, listKey, 1, DataRPushFlag)},
+		"list key missing":       {hint: listHint(listBucket, []byte("other"), 1, DataRPushFlag)},
+		"list item missing":      {hint: listHint(listBucket, listKey, 2, DataRPushFlag)},
+		"zset bucket missing":    {hint: hint(absentBucket, DataStructureSortedSet, zsetKey), valueHash: zsetHash.Sum32(), hasValueHash: true},
+		"zset key missing":       {hint: hint(zsetBucket, DataStructureSortedSet, []byte("other"+SeparatorForZSetKey+"1.5")), valueHash: zsetHash.Sum32(), hasValueHash: true},
+		"zset without hash":      {hint: hint(zsetBucket, DataStructureSortedSet, zsetKey)},
+		"zset member missing":    {hint: hint(zsetBucket, DataStructureSortedSet, zsetKey), valueHash: zsetHash.Sum32() + 1, hasValueHash: true},
+	}
+
+	job := &mergeV2Job{db: db}
+	job.applyLookup(nil)
+	for name, entry := range cases {
+		job.applyLookup(entry)
+		for _, r := range []*core.Record{btreeRecord, setRecord, listRecord, zsetRecord} {
+			if r.FileID == 500 || r.DataPos == 5000 {
+				t.Fatalf("%s: record was updated: %+v", name, r)
+			}
+		}
+	}
+
+	// The same lookups pointing at existing entries do update them.
+	job.applyLookup(&mergeLookupEntry{hint: hint(btreeBucket, DataStructureBTree, btreeRecord.Key)})
+	job.applyLookup(&mergeLookupEntry{hint: listHint(listBucket, listKey, 1, DataRPushFlag)})
+	job.applyLookup(&mergeLookupEntry{hint: hint(zsetBucket, DataStructureSortedSet, zsetKey), valueHash: zsetHash.Sum32(), hasValueHash: true})
+	for _, r := range []*core.Record{btreeRecord, listRecord, zsetRecord} {
+		if r.FileID != 500 || r.DataPos != 5000 {
+			t.Fatalf("record not updated: %+v", r)
+		}
+	}
+}
