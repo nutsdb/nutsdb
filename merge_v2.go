@@ -413,10 +413,6 @@ func (job *mergeV2Job) rewriteFile(fid int64) error {
 
 		off += sz
 
-		// Skip entries that are not committed
-		if entry.Meta.Status != Committed {
-			continue
-		}
 		// Skip filter entries
 		if entry.IsFilter() {
 			continue
@@ -433,6 +429,14 @@ func (job *mergeV2Job) rewriteFile(fid int64) error {
 		if !pending {
 			continue
 		}
+
+		// Only the last entry of a transaction is written with the Committed
+		// status, so the status can't tell whether an entry is live. Being
+		// still referenced by the index can: it means the entry belongs to a
+		// committed transaction. Mark the copy as committed so that it is
+		// recovered on its own when the merge file is scanned without a
+		// hint file.
+		entry.Meta.Status = Committed
 
 		// Allow custom processing of entries during rewrite
 		if job.onRewriteEntry != nil {
