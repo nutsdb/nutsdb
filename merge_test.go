@@ -59,7 +59,12 @@ func dataFileIDsForMode(mode mergeTestMode, sets mergeFileSets) []int64 {
 	if mode.enableMergeV2 {
 		return sets.mergeIDs
 	}
-	return sets.userIDs
+	// The legacy merge seals the files it wrote before building their hint
+	// files, so the last user file is the new active file and has none.
+	if len(sets.userIDs) == 0 {
+		return nil
+	}
+	return sets.userIDs[:len(sets.userIDs)-1]
 }
 
 func unionDataFileIDs(sets mergeFileSets) []int64 {

@@ -68,29 +68,10 @@ func (db *DB) mergeLegacy() error {
 		return ErrDontNeedMerge
 	}
 
-	db.MaxFileID++
-
-	if !db.opt.SyncEnable && db.opt.RWMode == MMap {
-		if err := db.ActiveFile.rwManager.Sync(); err != nil {
-			db.mu.Unlock()
-			return err
-		}
-	}
-
-	if err := db.ActiveFile.rwManager.Release(); err != nil {
+	if err := db.rotateActiveFile(); err != nil {
 		db.mu.Unlock()
 		return err
 	}
-
-	var err error
-	path := getDataPath(db.MaxFileID, db.opt.Dir)
-	db.ActiveFile, err = db.fm.GetDataFile(path, db.opt.SegmentSize)
-	if err != nil {
-		db.mu.Unlock()
-		return err
-	}
-
-	db.ActiveFile.fileID = db.MaxFileID
 	startFileID := db.MaxFileID
 
 	db.mu.Unlock()
@@ -123,7 +104,7 @@ func (db *DB) mergeLegacy() error {
 
 				// Index reads can race with commits; use a transaction to avoid inconsistencies.
 				err := db.Update(func(tx *Tx) error {
-					if ok := db.isPendingMergeEntry(entry); ok {
+					if ok := db.isPendingMergeEntry(entry, pendingMergeFId, off); ok {
 						bucket, err := db.bucketMgr.GetBucketById(entry.Meta.BucketId)
 						if err != nil {
 							return err
@@ -185,11 +166,20 @@ func (db *DB) mergeLegacy() error {
 		mergingPath[i] = path
 	}
 
-	db.mu.Lock()
-	endFileID := db.MaxFileID
-	db.mu.Unlock()
-
 	if db.opt.EnableHintFile {
+		// The merged entries were written to the active file, and later
+		// writes would go there as well. A hint file is loaded instead of
+		// its data file on open, so a hint file built for the active file
+		// would hide those later writes. Seal it first, so that hint files
+		// are only built for files that no longer change.
+		db.mu.Lock()
+		err := db.rotateActiveFile()
+		endFileID := db.MaxFileID - 1
+		db.mu.Unlock()
+		if err != nil {
+			return err
+		}
+
 		if err := db.buildHintFilesAfterMerge(startFileID, endFileID); err != nil {
 			return fmt.Errorf("failed to build hint files after merge: %w", err)
 		}
@@ -290,12 +280,14 @@ func (db *DB) buildHintFilesAfterMerge(startFileID, endFileID int64) error {
 	return nil
 }
 
-func (db *DB) isPendingMergeEntry(entry *core.Entry) bool {
+// isPendingMergeEntry reports whether entry, read at offset off of data file
+// fid, is still live and therefore has to be kept by a merge.
+func (db *DB) isPendingMergeEntry(entry *core.Entry, fid int64, off int64) bool {
 	switch {
 	case entry.IsBelongsToBTree():
-		return db.isPendingBtreeEntry(entry)
+		return db.isPendingBtreeEntry(entry, fid, off)
 	case entry.IsBelongsToList():
-		return db.isPendingListEntry(entry)
+		return db.isPendingListEntry(entry, fid, off)
 	case entry.IsBelongsToSet():
 		return db.isPendingSetEntry(entry)
 	case entry.IsBelongsToSortSet():
@@ -304,7 +296,22 @@ func (db *DB) isPendingMergeEntry(entry *core.Entry) bool {
 	return false
 }
 
-func (db *DB) isPendingBtreeEntry(entry *core.Entry) bool {
+// recordIsEntry reports whether the index record r was built from entry, which
+// is stored at offset off of data file fid.
+//
+// Records built from a data file carry the TxID of their entry, and the TxID
+// and timestamp tell the entry apart from older versions of the same key.
+// Records rebuilt from a hint file have no TxID, because hint files don't
+// store it. For them the location is compared instead: a hint record always
+// points at the entry it was built from.
+func recordIsEntry(r *core.Record, entry *core.Entry, fid int64, off int64) bool {
+	if r.TxID == 0 {
+		return r.FileID == fid && r.DataPos == uint64(off)
+	}
+	return r.TxID == entry.Meta.TxID && r.Timestamp == entry.Meta.Timestamp
+}
+
+func (db *DB) isPendingBtreeEntry(entry *core.Entry, fid int64, off int64) bool {
 	idx, exist := db.Index.BTree.exist(entry.Meta.BucketId)
 	if !exist {
 		return false
@@ -320,11 +327,7 @@ func (db *DB) isPendingBtreeEntry(entry *core.Entry) bool {
 		return false
 	}
 
-	if r.TxID != entry.Meta.TxID || r.Timestamp != entry.Meta.Timestamp {
-		return false
-	}
-
-	return true
+	return recordIsEntry(r, entry, fid, off)
 }
 
 func (db *DB) isPendingSetEntry(entry *core.Entry) bool {
@@ -355,7 +358,7 @@ func (db *DB) isPendingZSetEntry(entry *core.Entry) bool {
 	return true
 }
 
-func (db *DB) isPendingListEntry(entry *core.Entry) bool {
+func (db *DB) isPendingListEntry(entry *core.Entry, fid int64, off int64) bool {
 	var userKeyStr string
 	var curSeq uint64
 	var userKey []byte
@@ -402,11 +405,7 @@ func (db *DB) isPendingListEntry(entry *core.Entry) bool {
 			return false
 		}
 
-		if !bytes.Equal(r.Key, entry.Key) || r.TxID != entry.Meta.TxID || r.Timestamp != entry.Meta.Timestamp {
-			return false
-		}
-
-		return true
+		return bytes.Equal(r.Key, entry.Key) && recordIsEntry(r, entry, fid, off)
 	}
 
 	return false

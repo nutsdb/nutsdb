@@ -480,28 +480,7 @@ func (tx *Tx) allocCommitBuffer() *bytes.Buffer {
 
 // rotateActiveFile rotates log file when active file is not enough space to store the entry.
 func (tx *Tx) rotateActiveFile() error {
-	var err error
-	tx.db.MaxFileID++
-
-	if !tx.db.opt.SyncEnable && tx.db.opt.RWMode == MMap {
-		if err := tx.db.ActiveFile.rwManager.Sync(); err != nil {
-			return err
-		}
-	}
-
-	if err := tx.db.ActiveFile.rwManager.Release(); err != nil {
-		return err
-	}
-
-	// reset ActiveFile
-	path := getDataPath(tx.db.MaxFileID, tx.db.opt.Dir)
-	tx.db.ActiveFile, err = tx.db.fm.GetDataFile(path, tx.db.opt.SegmentSize)
-	if err != nil {
-		return err
-	}
-
-	tx.db.ActiveFile.fileID = tx.db.MaxFileID
-	return nil
+	return tx.db.rotateActiveFile()
 }
 
 func (tx *Tx) writeData(data []byte) (n int, err error) {
