@@ -104,7 +104,7 @@ func (db *DB) mergeLegacy() error {
 
 				// Index reads can race with commits; use a transaction to avoid inconsistencies.
 				err := db.Update(func(tx *Tx) error {
-					if ok := db.isPendingMergeEntry(entry, pendingMergeFId, off); ok {
+					if ok := db.isPendingMergeEntry(entry, pendingMergeFId, uint64(off)); ok {
 						bucket, err := db.bucketMgr.GetBucketById(entry.Meta.BucketId)
 						if err != nil {
 							return err
@@ -280,9 +280,7 @@ func (db *DB) buildHintFilesAfterMerge(startFileID, endFileID int64) error {
 	return nil
 }
 
-// isPendingMergeEntry reports whether entry, read at offset off of data file
-// fid, is still live and therefore has to be kept by a merge.
-func (db *DB) isPendingMergeEntry(entry *core.Entry, fid int64, off int64) bool {
+func (db *DB) isPendingMergeEntry(entry *core.Entry, fid int64, off uint64) bool {
 	switch {
 	case entry.IsBelongsToBTree():
 		return db.isPendingBtreeEntry(entry, fid, off)
@@ -296,22 +294,8 @@ func (db *DB) isPendingMergeEntry(entry *core.Entry, fid int64, off int64) bool 
 	return false
 }
 
-// recordIsEntry reports whether the index record r was built from entry, which
-// is stored at offset off of data file fid.
-//
-// Records built from a data file carry the TxID of their entry, and the TxID
-// and timestamp tell the entry apart from older versions of the same key.
-// Records rebuilt from a hint file have no TxID, because hint files don't
-// store it. For them the location is compared instead: a hint record always
-// points at the entry it was built from.
-func recordIsEntry(r *core.Record, entry *core.Entry, fid int64, off int64) bool {
-	if r.TxID == 0 {
-		return r.FileID == fid && r.DataPos == uint64(off)
-	}
-	return r.TxID == entry.Meta.TxID && r.Timestamp == entry.Meta.Timestamp
-}
-
-func (db *DB) isPendingBtreeEntry(entry *core.Entry, fid int64, off int64) bool {
+// Hint reload leaves TxID zero, so the index position identifies the live entry.
+func (db *DB) isPendingBtreeEntry(entry *core.Entry, fid int64, off uint64) bool {
 	idx, exist := db.Index.BTree.exist(entry.Meta.BucketId)
 	if !exist {
 		return false
@@ -327,7 +311,7 @@ func (db *DB) isPendingBtreeEntry(entry *core.Entry, fid int64, off int64) bool 
 		return false
 	}
 
-	return recordIsEntry(r, entry, fid, off)
+	return r.FileID == fid && r.DataPos == off
 }
 
 func (db *DB) isPendingSetEntry(entry *core.Entry) bool {
@@ -358,7 +342,7 @@ func (db *DB) isPendingZSetEntry(entry *core.Entry) bool {
 	return true
 }
 
-func (db *DB) isPendingListEntry(entry *core.Entry, fid int64, off int64) bool {
+func (db *DB) isPendingListEntry(entry *core.Entry, fid int64, off uint64) bool {
 	var userKeyStr string
 	var curSeq uint64
 	var userKey []byte
@@ -405,7 +389,11 @@ func (db *DB) isPendingListEntry(entry *core.Entry, fid int64, off int64) bool {
 			return false
 		}
 
-		return bytes.Equal(r.Key, entry.Key) && recordIsEntry(r, entry, fid, off)
+		if !bytes.Equal(r.Key, entry.Key) || r.FileID != fid || r.DataPos != off {
+			return false
+		}
+
+		return true
 	}
 
 	return false
