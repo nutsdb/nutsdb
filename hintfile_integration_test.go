@@ -587,3 +587,95 @@ func TestHintFileIntegration_LargeDataset(t *testing.T) {
 		removeDir(opts.Dir)
 	})
 }
+
+// TestHintFileIntegration_WritesAfterMergeSurviveRestart checks that writes
+// made after a merge, into the file that was active when the merge ended, are
+// not hidden by a hint file built for that file.
+func TestHintFileIntegration_WritesAfterMergeSurviveRestart(t *testing.T) {
+	runForMergeModes(t, func(t *testing.T, mode mergeTestMode) {
+		bucket := "bucket"
+		opts := DefaultOptions
+		opts.SegmentSize = KB
+		opts.Dir = filepath.Join(t.TempDir(), "test-hintfile-writes-after-merge-"+mode.name)
+		opts.EnableHintFile = true
+		opts.EnableMergeV2 = mode.enableMergeV2
+
+		db, err := Open(opts)
+		require.NoError(t, err)
+		txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+
+		for i := 0; i < 60; i++ {
+			txPut(t, db, bucket, testutils.GetTestBytes(i%5), testutils.GetTestBytes(i), Persistent, nil, nil)
+		}
+		require.NoError(t, db.Merge())
+
+		txPut(t, db, bucket, testutils.GetTestBytes(0), []byte("after-merge"), Persistent, nil, nil)
+		txPut(t, db, bucket, []byte("new-key"), []byte("new-value"), Persistent, nil, nil)
+		txDel(t, db, bucket, testutils.GetTestBytes(1), nil)
+		require.NoError(t, db.Close())
+
+		db, err = Open(opts)
+		require.NoError(t, err)
+		txGet(t, db, bucket, testutils.GetTestBytes(0), []byte("after-merge"), nil)
+		txGet(t, db, bucket, []byte("new-key"), []byte("new-value"), nil)
+		txGet(t, db, bucket, testutils.GetTestBytes(1), nil, ErrKeyNotFound)
+		txGet(t, db, bucket, testutils.GetTestBytes(2), testutils.GetTestBytes(57), nil)
+		require.NoError(t, db.Close())
+	})
+}
+
+// TestHintFileIntegration_MergeAfterRestartKeepsData checks that a merge keeps
+// the entries whose index records were rebuilt from hint files on open. Hint
+// files don't store the TxID of an entry, so such records can't be matched to
+// their entries by TxID.
+func TestHintFileIntegration_MergeAfterRestartKeepsData(t *testing.T) {
+	runForMergeModes(t, func(t *testing.T, mode mergeTestMode) {
+		for _, idxMode := range []EntryIdxMode{HintKeyValAndRAMIdxMode, HintKeyAndRAMIdxMode} {
+			kvBucket, listBucket := "kv", "list"
+			opts := DefaultOptions
+			opts.SegmentSize = KB
+			opts.Dir = filepath.Join(t.TempDir(), "test-hintfile-merge-after-restart-"+mode.name)
+			opts.EnableHintFile = true
+			opts.EnableMergeV2 = mode.enableMergeV2
+			opts.EntryIdxMode = idxMode
+
+			db, err := Open(opts)
+			require.NoError(t, err)
+			txCreateBucket(t, db, DataStructureBTree, kvBucket, nil)
+			txCreateBucket(t, db, DataStructureList, listBucket, nil)
+
+			txPut(t, db, kvBucket, []byte("cold"), []byte("value"), Persistent, nil, nil)
+			txPush(t, db, listBucket, []byte("list"), []byte("a"), false, nil, nil)
+			txPush(t, db, listBucket, []byte("list"), []byte("b"), false, nil, nil)
+			churn := func() {
+				for i := 0; i < 60; i++ {
+					txPut(t, db, kvBucket, testutils.GetTestBytes(i%3), testutils.GetTestBytes(i), Persistent, nil, nil)
+				}
+			}
+			check := func() {
+				txGet(t, db, kvBucket, []byte("cold"), []byte("value"), nil)
+				txLRange(t, db, listBucket, []byte("list"), 0, -1, 2, [][]byte{[]byte("a"), []byte("b")}, nil)
+				txGet(t, db, kvBucket, testutils.GetTestBytes(0), testutils.GetTestBytes(57), nil)
+			}
+
+			churn()
+			require.NoError(t, db.Merge())
+			require.NoError(t, db.Close())
+
+			// The cold entries are now indexed from the hint files.
+			db, err = Open(opts)
+			require.NoError(t, err)
+			check()
+
+			churn()
+			require.NoError(t, db.Merge())
+			check()
+			require.NoError(t, db.Close())
+
+			db, err = Open(opts)
+			require.NoError(t, err)
+			check()
+			require.NoError(t, db.Close())
+		}
+	})
+}
