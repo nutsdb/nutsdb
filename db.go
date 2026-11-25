@@ -1052,19 +1052,17 @@ func (db *DB) buildIndexes() (err error) {
 func (db *DB) createRecordByModeWithFidAndOff(fid int64, off uint64, entry *core.Entry) *core.Record {
 	record := core.NewRecord()
 
+	// Hint reload leaves TxID zero, so every index mode keeps the entry position.
 	record.WithKey(entry.Key).
 		WithTimestamp(entry.Meta.Timestamp).
 		WithTTL(entry.Meta.TTL).
-		WithTxID(entry.Meta.TxID)
+		WithTxID(entry.Meta.TxID).
+		WithFileId(fid).
+		WithDataPos(off).
+		WithValueSize(uint32(len(entry.Value)))
 
 	if db.opt.EntryIdxMode == HintKeyValAndRAMIdxMode {
 		record.WithValue(entry.Value)
-	}
-
-	if db.opt.EntryIdxMode == HintKeyAndRAMIdxMode {
-		record.WithFileId(fid).
-			WithDataPos(off).
-			WithValueSize(uint32(len(entry.Value)))
 	}
 
 	return record

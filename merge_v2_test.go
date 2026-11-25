@@ -2042,10 +2042,16 @@ func TestMergeV2RewriteFileSkipsCorruptedEntries(t *testing.T) {
 
 	goodEntry := createTestEntry(bucketID, []byte("good"), []byte("keep"), DataSetFlag, Committed, Persistent, now, 5, DataStructureBTree)
 
-	for _, e := range append(entries, goodEntry) {
-		if _, err := f.Write(e.Encode()); err != nil {
+	goodOff := int64(0)
+	for _, e := range entries {
+		n, err := f.Write(e.Encode())
+		if err != nil {
 			t.Fatalf("write entry: %v", err)
 		}
+		goodOff += int64(n)
+	}
+	if _, err := f.Write(goodEntry.Encode()); err != nil {
+		t.Fatalf("write entry: %v", err)
 	}
 
 	if _, err := f.Write([]byte{0x01, 0x02, 0x03}); err != nil {
@@ -2058,7 +2064,7 @@ func TestMergeV2RewriteFileSkipsCorruptedEntries(t *testing.T) {
 	bt := data.NewBTree(0) // bucketId 0 for test
 	bt.InsertRecord(goodEntry.Key, (&core.Record{}).
 		WithFileId(fid).
-		WithDataPos(0).
+		WithDataPos(uint64(goodOff)).
 		WithTimestamp(goodEntry.Meta.Timestamp).
 		WithTTL(goodEntry.Meta.TTL).
 		WithTxID(goodEntry.Meta.TxID).

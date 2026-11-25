@@ -425,7 +425,7 @@ func (job *mergeV2Job) rewriteFile(fid int64) error {
 
 		// Check if entry is still pending merge (not overwritten by newer version)
 		job.db.mu.RLock()
-		pending := job.db.isPendingMergeEntry(entry, fid, entryOff)
+		pending := job.db.isPendingMergeEntry(entry, fid, uint64(entryOff))
 		job.db.mu.RUnlock()
 		if !pending {
 			continue
