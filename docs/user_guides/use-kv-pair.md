@@ -21,7 +21,7 @@ if err := db.Update(
 
 This will set the value of the "name1" key to "val1" in the bucket1 bucket.
 
-To update the the value of the "name1" key,we can still use the `tx.Put`:
+To update the value of the "name1" key, we can still use the `tx.Put`:
 
 ```go
 if err := db.Update(
@@ -150,7 +150,7 @@ if err := db.Update(func(tx *nutsdb.Tx) error {
 
 ## Increments and Decrements
 
-The key needs to be present for increment and decrement operations on values, otherwise an error will be reported indicating that the key does not exist. When the result of incrementing and decrementing a value will be outside the range of `int64`, a string-based large number calculation will be used, so you don't have to worry about the range of the value being too large.
+The key needs to be present for increment and decrement operations on values, otherwise an error will be reported indicating that the key does not exist. When the result of incrementing or decrementing a value will be outside the range of `int64`, a string-based large number calculation will be used, so you don't have to worry about the range of the value being too large.
 
 * Use the `tx.Incr()` method to make the value corresponding to a key increment itself by 1
 
@@ -200,30 +200,30 @@ if err := db.Update(func(tx *nutsdb.Tx) error {
 }
 ```
 
-## PutIfNotExists and PutIfExits
+## PutIfNotExists and PutIfExists
 
-* Use `PutIfNotExists` set the value for a key in bucket only if the key doesn't exist in the bucket already.
+* Use `PutIfNotExists` to set the value for a key in bucket only if the key doesn't exist in the bucket already.
 
 ```golang
 if err := db.Update(func(tx *nutsdb.Tx) error {
     bucket := "bucket"
     key := []byte("key")
     value := []byte("value")
-    ttl := unit32(100)
+    ttl := uint32(100)
     return tx.PutIfNotExists(bucket, key, value, ttl)
 }); err != nil {
     log.Println(err)
 }
 ```
 
-* Use `PutIfExists`` set the value for a key in  bucket only if the key already exist in the bucket.
+* Use `PutIfExists` to set the value for a key in  bucket only if the key already exist in the bucket.
 
 ```golang
 if err := db.Update(func(tx *nutsdb.Tx) error {
     bucket := "bucket"
     key := []byte("key")
     value := []byte("value")
-    ttl := unit32(100)
+    ttl := uint32(100)
     return tx.PutIfExists(bucket, key, value, ttl)
 }); err != nil {
     log.Println(err)
@@ -269,7 +269,7 @@ if err := db.View(func(tx *nutsdb.Tx) error {
 
 ## GetTTL and Persist
 
-* Use `GetTTL` to get remaining TTL of a value by key. It returns (-1, nil) if TTL is Persistent, (0, ErrBucketNotFound|ErrKeyNotFound) If expired or bucket/key not found and (remaining TTL and nil) if the record exits.
+* Use `GetTTL` to get remaining TTL of a value by key. It returns (-1, nil) if TTL is Persistent, (0, ErrBucketNotFound|ErrKeyNotFound) If expired or bucket/key not found and (remaining TTL and nil) if the record exists.
 
 ```golang
 if err := db.View(func(tx *nutsdb.Tx) error {
@@ -282,7 +282,7 @@ if err := db.View(func(tx *nutsdb.Tx) error {
     log.Println(ttl)
 ```
 
-* Use `Persist` to update record's TTL as Persistent if the record exits.
+* Use `Persist` to update record's TTL as Persistent if the record exists.
 
 ```golang
 if err := db.Update(func(tx *nutsdb.Tx) error {

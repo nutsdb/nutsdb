@@ -162,7 +162,7 @@ if err := db.Update(
     func(tx *nutsdb.Tx) error {
         bucket := "bucketForList"
         key := []byte("myList")
-        return tx.LRem(bucket, key, 1, []byte("value11))
+        return tx.LRem(bucket, key, 1, []byte("value11"))
     }); err != nil {
     log.Fatal(err)
 }
@@ -210,7 +210,7 @@ if err := db.Update(
 Returns the size of key in the bucket in the bucket at given bucket and key.
 
 ```go
-if err := db.Update(
+if err := db.View(
     func(tx *nutsdb.Tx) error {
         bucket := "bucketForList"
         key := []byte("myList")
@@ -229,7 +229,7 @@ if err := db.Update(
 
 <details>
   <summary><b>LKeys</b></summary>
-find all keys of type List matching a given pattern, similar to Redis command: KEYS
+Find all keys of type List matching a given pattern, similar to Redis command: KEYS
 
 Note: pattern matching use filepath.Match, It is different from redis' behavior in some details, such as [.
 
@@ -255,7 +255,7 @@ if err := db.View(
 
 <details>
   <summary><b>SAdd</b></summary>
-Adds the specified members to the set stored int the bucket at given bucket,key and items.
+Adds the specified members to the set stored int the bucket at given bucket, key and items.
 
 ```go
 if err := db.Update(

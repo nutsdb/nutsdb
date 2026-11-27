@@ -51,7 +51,7 @@ go get -u github.com/nutsdb/nutsdb
 
 ### Opening a database
 
-To open your database, use the nutsdb.Open() function,with the appropriate options.The `Dir` , `EntryIdxMode`  and  `SegmentSize`  options are must be specified by the client. About options see [here](https://github.com/nutsdb/nutsdb#options) for detail.
+To open your database, use the nutsdb.Open() function, with the appropriate options. The `Dir`, `EntryIdxMode`  and  `SegmentSize`  options must be specified by the client. About options see [here](https://github.com/nutsdb/nutsdb#options) for detail.
 
 ```go
 package main
@@ -329,7 +329,7 @@ if err := db.Merge(); err != nil {
 
 - [Merge V2 and HintFile](#merge-v2-and-hintfile)
 - [Watch Key Changes](./docs/user_guides/others.md#watch-key-changes)
-- [More Operation](./docs/user_guides/others.md)
+- [More Operations](./docs/user_guides/others.md)
 </details>
 
 <details>
