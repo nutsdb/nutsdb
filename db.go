@@ -145,6 +145,18 @@ func open(opt Options) (*DB, error) {
 	}
 
 	if err := db.buildIndexes(); err != nil {
+		if db.ActiveFile != nil && db.ActiveFile.rwManager != nil {
+			_ = db.ActiveFile.rwManager.Release()
+		}
+		if db.fm != nil {
+			_ = db.fm.Close()
+		}
+		if db.flock != nil && db.flock.Locked() {
+			_ = db.flock.Unlock()
+		}
+		if db.bucketMgr != nil {
+			_ = db.bucketMgr.Close()
+		}
 		return nil, fmt.Errorf("db.buildIndexes error: %s", err)
 	}
 
@@ -593,10 +605,51 @@ func (db *DB) parseDataFiles(dataFileIds []int64) (err error) {
 		return nil
 	}
 
+	activeTailZeroStart := func(curOff int64) int64 {
+		if dataInTx.TxId != 0 {
+			for _, held := range dataInTx.Es {
+				if held.Fid == fID {
+					return held.Off
+				}
+			}
+		}
+		return curOff
+	}
+
 	readEntriesFromFile := func() error {
 		for {
-			entry, err := f.readEntry(off)
+			entry, entryLen, err := f.readEntryWithSize(off)
 			if err != nil {
+				if fID == db.MaxFileID {
+					isTornErr := errors.Is(err, io.EOF) ||
+						errors.Is(err, io.ErrUnexpectedEOF) ||
+						errors.Is(err, core.ErrHeaderSizeOutOfBounds) ||
+						errors.Is(err, ErrIndexOutOfBound) ||
+						errors.Is(err, ErrEntryZero)
+					if !isTornErr && errors.Is(err, ErrCrc) {
+						tailAfter, probeErr := f.isTornTailAfter(off + entryLen)
+						if probeErr != nil {
+							_ = f.release()
+							return probeErr
+						}
+						if !tailAfter {
+							_ = f.release()
+							return err
+						}
+						isTornErr = true
+					}
+					if isTornErr {
+						zeroFrom := activeTailZeroStart(off)
+						if clearErr := f.zeroTail(zeroFrom); clearErr != nil {
+							_ = f.release()
+							return clearErr
+						}
+						dataInTx.Reset()
+						off = zeroFrom
+						_ = f.release()
+						break
+					}
+				}
 				// whatever which logic branch it will choose, we will release the fd.
 				_ = f.release()
 				if errors.Is(err, io.EOF) || errors.Is(err, ErrIndexOutOfBound) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, ErrEntryZero) || errors.Is(err, core.ErrHeaderSizeOutOfBounds) {
@@ -610,6 +663,16 @@ func (db *DB) parseDataFiles(dataFileIds []int64) (err error) {
 			}
 
 			if entry == nil {
+				if fID == db.MaxFileID && dataInTx.TxId != 0 {
+					zeroFrom := activeTailZeroStart(off)
+					if clearErr := f.zeroTail(zeroFrom); clearErr != nil {
+						_ = f.release()
+						return clearErr
+					}
+					dataInTx.Reset()
+					off = zeroFrom
+					_ = f.release()
+				}
 				break
 			}
 
@@ -618,26 +681,22 @@ func (db *DB) parseDataFiles(dataFileIds []int64) (err error) {
 				Fid:   fID,
 				Off:   off,
 			}
+			if dataInTx.TxId != 0 && !dataInTx.IsSameTx(entryWhenRecovery) {
+				dataInTx.Reset()
+			}
 			if dataInTx.TxId == 0 {
-				dataInTx.AppendEntry(entryWhenRecovery)
 				dataInTx.TxId = entry.Meta.TxID
 				dataInTx.StartOff = off
-			} else if dataInTx.IsSameTx(entryWhenRecovery) {
-				dataInTx.AppendEntry(entryWhenRecovery)
 			}
+			dataInTx.AppendEntry(entryWhenRecovery)
 
 			if entry.Meta.Status == Committed {
 				err := parseDataInTx()
 				if err != nil {
+					_ = f.release()
 					return err
 				}
 				dataInTx.Reset()
-				dataInTx.StartOff = off
-			}
-
-			if !dataInTx.IsSameTx(entryWhenRecovery) {
-				dataInTx.Reset()
-				dataInTx.StartOff = off
 			}
 
 			off += entry.Size()
