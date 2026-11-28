@@ -81,9 +81,11 @@ func (fr *fileRecovery) readEntryWithSize(off int64) (e *core.Entry, entryLen in
 
 	payloadSize := e.Meta.PayloadSize()
 	// Bound payloadSize against the remaining file bytes before allocating so a
-	// corrupted varint in a torn header cannot trigger an OOM panic.
+	// corrupted varint in a torn header cannot trigger an OOM panic. Return ErrCrc
+	// with entryLen = fr.size - off so active-file recovery still treats it as a
+	// torn tail (isTornTailAfter(fr.size) == true), while sealed files fail Open.
 	if payloadSize < 0 || payloadSize > fr.size-off-headerSize {
-		return nil, 0, io.ErrUnexpectedEOF
+		return nil, fr.size - off, ErrCrc
 	}
 	entryLen = headerSize + payloadSize
 

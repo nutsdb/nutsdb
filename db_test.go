@@ -17,9 +17,11 @@ package nutsdb
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"log"
+	"math"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -4237,6 +4239,81 @@ func TestDB_RecoverActiveDataFileTornTruncatedTailAndHugeVarint(t *testing.T) {
 			t.Fatalf("expected truncated >32KiB tail zeroed at offset %d, got 0x%02x", i, raw[i])
 		}
 	}
+
+	// Huge ValueSize varint exceeding remaining file bytes must trigger the
+	// payloadSize > fr.size-off-headerSize guard without OOM, return ErrCrc
+	// for sealed files, and still be treated as a torn tail in the active file.
+	hugeHeader := encodeCorruptHugeVarintHeader()
+	fd, err = os.OpenFile(activePath, os.O_RDWR, 0644)
+	require.NoError(t, err)
+	_, err = fd.WriteAt(hugeHeader, tailOff)
+	require.NoError(t, err)
+	require.NoError(t, fd.Sync())
+	require.NoError(t, fd.Close())
+
+	fr, err = newFileRecovery(activePath, 4*KB)
+	require.NoError(t, err)
+	_, probeLen, probeErr := fr.readEntryWithSize(tailOff)
+	require.ErrorIs(t, probeErr, ErrCrc)
+	require.Equal(t, fr.size-tailOff, probeLen)
+	require.NoError(t, fr.release())
+
+	db, err = Open(opts)
+	require.NoError(t, err)
+	txGet(t, db, bucket, []byte("k1"), []byte("v1"), nil)
+	require.NoError(t, db.Close())
+
+	raw, err = os.ReadFile(activePath)
+	require.NoError(t, err)
+	for i := int(tailOff); i < len(raw); i++ {
+		if raw[i] != 0 {
+			t.Fatalf("expected huge-varint tail zeroed at offset %d, got 0x%02x", i, raw[i])
+		}
+	}
+}
+
+func encodeCorruptHugeVarintHeader() []byte {
+	buf := make([]byte, core.MaxEntryHeaderSize)
+	idx := 4
+	idx += binary.PutUvarint(buf[idx:], 1)                          // Timestamp
+	idx += binary.PutUvarint(buf[idx:], 4)                          // KeySize
+	idx += binary.PutUvarint(buf[idx:], uint64(math.MaxUint32))     // ValueSize > file size
+	idx += binary.PutUvarint(buf[idx:], uint64(DataSetFlag))        // Flag
+	idx += binary.PutUvarint(buf[idx:], uint64(Persistent))         // TTL
+	idx += binary.PutUvarint(buf[idx:], uint64(Committed))          // Status
+	idx += binary.PutUvarint(buf[idx:], uint64(DataStructureBTree)) // Ds
+	idx += binary.PutUvarint(buf[idx:], 1002)                       // TxID
+	idx += binary.PutUvarint(buf[idx:], 1)                          // BucketId
+	return buf[:max(idx, core.MinEntryHeaderSize)]
+}
+
+func TestDB_OpenFailsOnSealedDataFileOversizedPayloadVarint(t *testing.T) {
+	bucket := "bucket"
+	opts := DefaultOptions
+	opts.Dir = filepath.Join(t.TempDir(), "huge-varint-sealed")
+	opts.SegmentSize = 256
+	opts.EnableHintFile = false
+
+	db, err := Open(opts)
+	require.NoError(t, err)
+	txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+	val := bytes.Repeat([]byte("a"), 180)
+	txPut(t, db, bucket, []byte("k1"), val, Persistent, nil, nil)
+	txPut(t, db, bucket, []byte("k2"), val, Persistent, nil, nil)
+	require.True(t, db.MaxFileID > 0, "expected rotation to create a sealed data file")
+	require.NoError(t, db.Close())
+
+	sealedPath := getDataPath(0, opts.Dir)
+	fd, err := os.OpenFile(sealedPath, os.O_RDWR, 0644)
+	require.NoError(t, err)
+	_, err = fd.WriteAt(encodeCorruptHugeVarintHeader(), 0)
+	require.NoError(t, err)
+	require.NoError(t, fd.Sync())
+	require.NoError(t, fd.Close())
+
+	_, err = Open(opts)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), ErrCrc.Error())
 }
 
 func TestDB_OpenFailsOnSealedDataFileCrcError(t *testing.T) {
