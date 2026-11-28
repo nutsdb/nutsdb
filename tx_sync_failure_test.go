@@ -13,12 +13,17 @@ import (
 // failSyncRWManager wraps a RWManager and fails Sync while failSync is set.
 type failSyncRWManager struct {
 	fileio.RWManager
-	failSync bool
+	failSync      bool
+	failSyncCount int
 }
 
 func (m *failSyncRWManager) Sync() error {
 	if m.failSync {
 		m.failSync = false
+		return errors.New("injected fsync failure")
+	}
+	if m.failSyncCount > 0 {
+		m.failSyncCount--
 		return errors.New("injected fsync failure")
 	}
 	return m.RWManager.Sync()
@@ -104,4 +109,40 @@ func TestTx_FailedMultiEntrySyncClearsWholeCommitBeforeReuse(t *testing.T) {
 	txGet(t, db, "bucket1", []byte("after-failure"), []byte("ok"), nil)
 	txGet(t, db, "bucket1", []byte("failed-a"), nil, ErrNotFoundKey)
 	txGet(t, db, "bucket1", []byte("failed-b"), nil, ErrNotFoundKey)
+}
+
+func TestTx_ConsecutiveSyncFailuresDoNotLeaveHole(t *testing.T) {
+	dir, err := os.MkdirTemp("", "nutsdb")
+	require.NoError(t, err)
+	defer os.RemoveAll(dir)
+
+	opt := DefaultOptions
+	opt.Dir = dir
+	opt.SegmentSize = 8 * 1024
+	db, err := Open(opt)
+	require.NoError(t, err)
+
+	txCreateBucket(t, db, DataStructureBTree, "bucket1", nil)
+	txPut(t, db, "bucket1", []byte("seed"), []byte("value"), Persistent, nil, nil)
+
+	wrapper := &failSyncRWManager{RWManager: db.ActiveFile.rwManager, failSyncCount: 2}
+	db.ActiveFile.rwManager = wrapper
+
+	for _, key := range []string{"failed-first", "failed-second"} {
+		err = db.Update(func(tx *Tx) error {
+			return tx.Put("bucket1", []byte(key), []byte("value"), Persistent)
+		})
+		require.Error(t, err)
+	}
+
+	txPut(t, db, "bucket1", []byte("after-failures"), []byte("value"), Persistent, nil, nil)
+	require.NoError(t, db.Close())
+
+	db, err = Open(opt)
+	require.NoError(t, err)
+	defer db.Close()
+	txGet(t, db, "bucket1", []byte("seed"), []byte("value"), nil)
+	txGet(t, db, "bucket1", []byte("after-failures"), []byte("value"), nil)
+	txGet(t, db, "bucket1", []byte("failed-first"), nil, ErrNotFoundKey)
+	txGet(t, db, "bucket1", []byte("failed-second"), nil, ErrNotFoundKey)
 }

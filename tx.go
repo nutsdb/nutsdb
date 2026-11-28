@@ -509,21 +509,24 @@ func (tx *Tx) writeData(data []byte) (n int, err error) {
 			// later commit can leave valid or corrupt tail bytes behind.
 			cleared := make([]byte, l)
 			clearedN, clearErr := tx.db.ActiveFile.WriteAt(cleared, writeOffset)
-			if clearErr == nil && clearedN != l {
-				clearErr = fmt.Errorf("short write while clearing failed commit: wrote %d of %d bytes", clearedN, l)
+			if clearErr == nil && clearedN == l {
+				// Reuse this range immediately. The next successful commit Sync
+				// will persist both this zeroing and the new commit. A separate
+				// Sync here could fail and leave a zero-filled hole before later
+				// commits in the same file.
+				tx.db.ActiveFile.writeOff -= int64(l)
+				tx.db.ActiveFile.ActualSize -= int64(l)
+				return 0, err
 			}
 			if clearErr == nil {
-				clearErr = tx.db.ActiveFile.rwManager.Sync()
+				clearErr = fmt.Errorf("short write while clearing failed commit: wrote %d of %d bytes", clearedN, l)
 			}
-			if clearErr != nil {
-				// Keep the offsets advanced so future writes cannot overwrite a
-				// range whose contents are uncertain after a failed Sync.
-				return 0, fmt.Errorf("sync commit: %w; clear failed commit bytes: %v", err, clearErr)
+			// The failed or partial clearing leaves this range uncertain. Keep
+			// it at the end of its file and write future commits to a new file.
+			if rotateErr := tx.rotateActiveFile(); rotateErr != nil {
+				return 0, fmt.Errorf("sync commit: %w; clear failed commit bytes: %v; rotate active file: %w", err, clearErr, rotateErr)
 			}
-
-			tx.db.ActiveFile.writeOff -= int64(l)
-			tx.db.ActiveFile.ActualSize -= int64(l)
-			return 0, err
+			return 0, fmt.Errorf("sync commit: %w; clear failed commit bytes: %v", err, clearErr)
 		}
 	}
 
