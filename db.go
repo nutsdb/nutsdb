@@ -333,24 +333,31 @@ func (db *DB) release() error {
 // rotateActiveFile seals the active data file and makes a new, empty data
 // file the active one. The caller must hold db.mu.
 func (db *DB) rotateActiveFile() error {
-	db.MaxFileID++
-
 	if !db.opt.SyncEnable && db.opt.RWMode == MMap {
 		if err := db.ActiveFile.rwManager.Sync(); err != nil {
-			return err
+			return fmt.Errorf("failed to sync active file: %w", err)
 		}
 	}
 
-	if err := db.ActiveFile.rwManager.Release(); err != nil {
-		return err
-	}
-
-	activeFile, err := db.fm.GetDataFile(getDataPath(db.MaxFileID, db.opt.Dir), db.opt.SegmentSize)
+	nextFileID := db.MaxFileID + 1
+	activeFile, err := db.fm.GetDataFile(getDataPath(nextFileID, db.opt.Dir), db.opt.SegmentSize)
 	if err != nil {
 		return err
 	}
+	if db.opt.SyncEnable {
+		if err := syncDir(db.opt.Dir); err != nil {
+			_ = activeFile.Release()
+			return err
+		}
+	}
+	if err := db.ActiveFile.rwManager.Release(); err != nil {
+		_ = activeFile.Release()
+		return err
+	}
+
+	db.MaxFileID = nextFileID
 	db.ActiveFile = activeFile
-	db.ActiveFile.fileID = db.MaxFileID
+	db.ActiveFile.fileID = nextFileID
 	return nil
 }
 
@@ -543,10 +550,29 @@ func (db *DB) setActiveFile() (err error) {
 	if err != nil {
 		return
 	}
+	if db.opt.SyncEnable {
+		if err = syncDir(db.opt.Dir); err != nil {
+			return err
+		}
+	}
 
 	db.ActiveFile.fileID = db.MaxFileID
 
 	return nil
+}
+
+// syncDir fsyncs dir so that a newly created data file's name is durable.
+// Windows cannot fsync a directory handle and persists directory entries itself.
+func syncDir(dir string) error {
+	if runtime.GOOS == "windows" {
+		return nil
+	}
+	d, err := os.Open(dir)
+	if err != nil {
+		return err
+	}
+	defer d.Close()
+	return d.Sync()
 }
 
 // getMaxFileIDAndFileIds returns max fileId and fileIds.
