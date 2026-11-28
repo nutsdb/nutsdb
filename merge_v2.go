@@ -178,30 +178,12 @@ func (job *mergeV2Job) prepare() error {
 	// Sort files by ID for consistent processing order
 	sort.Slice(job.pending, func(i, j int) bool { return job.pending[i] < job.pending[j] })
 
-	// Sync active file if using mmap without sync
-	if !job.db.opt.SyncEnable && job.db.opt.RWMode == MMap {
-		if err := job.db.ActiveFile.rwManager.Sync(); err != nil {
-			job.db.mu.Unlock()
-			return fmt.Errorf("failed to sync active file: %w", err)
-		}
-	}
-
-	// Release current active file for merge processing
-	if err := job.db.ActiveFile.rwManager.Release(); err != nil {
+	// Use the shared rotation path so directory metadata is synced and the
+	// current active file remains usable if creating the next one fails.
+	if err := job.db.rotateActiveFile(); err != nil {
 		job.db.mu.Unlock()
-		return fmt.Errorf("failed to release active file: %w", err)
+		return fmt.Errorf("failed to rotate active file for merge: %w", err)
 	}
-
-	// Create new active file for writes during merge
-	job.db.MaxFileID++
-	path := getDataPath(job.db.MaxFileID, job.db.opt.Dir)
-	activeFile, err := job.db.fm.GetDataFile(path, job.db.opt.SegmentSize)
-	if err != nil {
-		job.db.mu.Unlock()
-		return fmt.Errorf("failed to create new active file: %w", err)
-	}
-	job.db.ActiveFile = activeFile
-	job.db.ActiveFile.fileID = job.db.MaxFileID
 
 	job.db.mu.Unlock()
 

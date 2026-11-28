@@ -504,8 +504,23 @@ func (tx *Tx) writeData(data []byte) (n int, err error) {
 
 	if tx.db.opt.SyncEnable {
 		if err := tx.db.ActiveFile.rwManager.Sync(); err != nil {
-			// The commit is not acknowledged, so give its bytes back: the next
-			// write reuses this region instead of leaving a hole in the log.
+			// A failed Sync does not mean the write was not persisted. Clear the
+			// unacknowledged commit before reusing its range, otherwise a shorter
+			// later commit can leave valid or corrupt tail bytes behind.
+			cleared := make([]byte, l)
+			clearedN, clearErr := tx.db.ActiveFile.WriteAt(cleared, writeOffset)
+			if clearErr == nil && clearedN != l {
+				clearErr = fmt.Errorf("short write while clearing failed commit: wrote %d of %d bytes", clearedN, l)
+			}
+			if clearErr == nil {
+				clearErr = tx.db.ActiveFile.rwManager.Sync()
+			}
+			if clearErr != nil {
+				// Keep the offsets advanced so future writes cannot overwrite a
+				// range whose contents are uncertain after a failed Sync.
+				return 0, fmt.Errorf("sync commit: %w; clear failed commit bytes: %v", err, clearErr)
+			}
+
 			tx.db.ActiveFile.writeOff -= int64(l)
 			tx.db.ActiveFile.ActualSize -= int64(l)
 			return 0, err

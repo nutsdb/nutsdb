@@ -321,31 +321,31 @@ func (db *DB) release() error {
 // rotateActiveFile seals the active data file and makes a new, empty data
 // file the active one. The caller must hold db.mu.
 func (db *DB) rotateActiveFile() error {
-	db.MaxFileID++
-
 	if !db.opt.SyncEnable && db.opt.RWMode == MMap {
 		if err := db.ActiveFile.rwManager.Sync(); err != nil {
-			return err
+			return fmt.Errorf("failed to sync active file: %w", err)
 		}
 	}
 
-	if err := db.ActiveFile.rwManager.Release(); err != nil {
-		return err
-	}
-
-	activeFile, err := db.fm.GetDataFile(getDataPath(db.MaxFileID, db.opt.Dir), db.opt.SegmentSize)
+	nextFileID := db.MaxFileID + 1
+	activeFile, err := db.fm.GetDataFile(getDataPath(nextFileID, db.opt.Dir), db.opt.SegmentSize)
 	if err != nil {
 		return err
 	}
 	if db.opt.SyncEnable {
 		if err := syncDir(db.opt.Dir); err != nil {
 			_ = activeFile.Release()
-			db.MaxFileID--
 			return err
 		}
 	}
+	if err := db.ActiveFile.rwManager.Release(); err != nil {
+		_ = activeFile.Release()
+		return err
+	}
+
+	db.MaxFileID = nextFileID
 	db.ActiveFile = activeFile
-	db.ActiveFile.fileID = db.MaxFileID
+	db.ActiveFile.fileID = nextFileID
 	return nil
 }
 

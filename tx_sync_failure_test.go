@@ -18,6 +18,7 @@ type failSyncRWManager struct {
 
 func (m *failSyncRWManager) Sync() error {
 	if m.failSync {
+		m.failSync = false
 		return errors.New("injected fsync failure")
 	}
 	return m.RWManager.Sync()
@@ -46,7 +47,7 @@ func TestTx_FailedSyncRewindsActiveFileOffset(t *testing.T) {
 	db.ActiveFile.rwManager = wrapper
 
 	err = db.Update(func(tx *Tx) error {
-		return tx.Put("bucket1", []byte("k2"), []byte("v2"), Persistent)
+		return tx.Put("bucket1", []byte("k2"), []byte("a much longer value from the failed commit"), Persistent)
 	})
 	require.Error(t, err)
 
@@ -55,7 +56,6 @@ func TestTx_FailedSyncRewindsActiveFileOffset(t *testing.T) {
 	assert.Equal(t, sizeBefore, db.ActiveFile.writeOff,
 		"writeOff after failed fsync = %d, want %d", db.ActiveFile.writeOff, sizeBefore)
 
-	wrapper.failSync = false
 	txPut(t, db, "bucket1", []byte("k3"), []byte("v3"), Persistent, nil, nil)
 	txGet(t, db, "bucket1", []byte("k3"), []byte("v3"), nil)
 	require.NoError(t, db.Close())
@@ -68,4 +68,40 @@ func TestTx_FailedSyncRewindsActiveFileOffset(t *testing.T) {
 	txGet(t, db, "bucket1", []byte("k1"), []byte("v1"), nil)
 	txGet(t, db, "bucket1", []byte("k3"), []byte("v3"), nil)
 	txGet(t, db, "bucket1", []byte("k2"), nil, ErrNotFoundKey)
+}
+
+func TestTx_FailedMultiEntrySyncClearsWholeCommitBeforeReuse(t *testing.T) {
+	dir, err := os.MkdirTemp("", "nutsdb")
+	require.NoError(t, err)
+	defer os.RemoveAll(dir)
+
+	opt := DefaultOptions
+	opt.Dir = dir
+	opt.SegmentSize = 8 * 1024
+	db, err := Open(opt)
+	require.NoError(t, err)
+
+	txCreateBucket(t, db, DataStructureBTree, "bucket1", nil)
+	txPut(t, db, "bucket1", []byte("seed"), []byte("value"), Persistent, nil, nil)
+
+	wrapper := &failSyncRWManager{RWManager: db.ActiveFile.rwManager, failSync: true}
+	db.ActiveFile.rwManager = wrapper
+	err = db.Update(func(tx *Tx) error {
+		if err := tx.Put("bucket1", []byte("failed-a"), []byte("long value that leaves a tail after a shorter write"), Persistent); err != nil {
+			return err
+		}
+		return tx.Put("bucket1", []byte("failed-b"), []byte("second failed entry"), Persistent)
+	})
+	require.Error(t, err)
+
+	txPut(t, db, "bucket1", []byte("after-failure"), []byte("ok"), Persistent, nil, nil)
+	require.NoError(t, db.Close())
+
+	db, err = Open(opt)
+	require.NoError(t, err)
+	defer db.Close()
+	txGet(t, db, "bucket1", []byte("seed"), []byte("value"), nil)
+	txGet(t, db, "bucket1", []byte("after-failure"), []byte("ok"), nil)
+	txGet(t, db, "bucket1", []byte("failed-a"), nil, ErrNotFoundKey)
+	txGet(t, db, "bucket1", []byte("failed-b"), nil, ErrNotFoundKey)
 }
