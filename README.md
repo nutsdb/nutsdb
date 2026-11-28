@@ -112,13 +112,16 @@ Merge V2 uses negative FileIDs for merge files to ensure correct processing orde
 #### Configuration
 
 ```go
-// Merge V2 is enabled by default and works automatically
-// You can configure merge behavior through options
+// Merge V2 is disabled by default.
+// Enable it explicitly through the database options.
 
 options := nutsdb.DefaultOptions
+options.EnableMergeV2 = true
 options.SegmentSize = 256 * 1024 * 1024 // 256MB segments
 
 db, err := nutsdb.Open(options, nutsdb.WithDir("/tmp/nutsdb"))
+if err != nil { log.Fatal(err) }
+defer db.Close()
 ```
 
 ### HintFile
