@@ -337,6 +337,13 @@ func (db *DB) rotateActiveFile() error {
 	if err != nil {
 		return err
 	}
+	if db.opt.SyncEnable {
+		if err := syncDir(db.opt.Dir); err != nil {
+			_ = activeFile.Release()
+			db.MaxFileID--
+			return err
+		}
+	}
 	db.ActiveFile = activeFile
 	db.ActiveFile.fileID = db.MaxFileID
 	return nil
@@ -531,10 +538,29 @@ func (db *DB) setActiveFile() (err error) {
 	if err != nil {
 		return
 	}
+	if db.opt.SyncEnable {
+		if err = syncDir(db.opt.Dir); err != nil {
+			return err
+		}
+	}
 
 	db.ActiveFile.fileID = db.MaxFileID
 
 	return nil
+}
+
+// syncDir fsyncs dir so that a newly created data file's name is durable.
+// Windows cannot fsync a directory handle and persists directory entries itself.
+func syncDir(dir string) error {
+	if runtime.GOOS == "windows" {
+		return nil
+	}
+	d, err := os.Open(dir)
+	if err != nil {
+		return err
+	}
+	defer d.Close()
+	return d.Sync()
 }
 
 // getMaxFileIDAndFileIds returns max fileId and fileIds.

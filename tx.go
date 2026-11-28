@@ -504,6 +504,10 @@ func (tx *Tx) writeData(data []byte) (n int, err error) {
 
 	if tx.db.opt.SyncEnable {
 		if err := tx.db.ActiveFile.rwManager.Sync(); err != nil {
+			// The commit is not acknowledged, so give its bytes back: the next
+			// write reuses this region instead of leaving a hole in the log.
+			tx.db.ActiveFile.writeOff -= int64(l)
+			tx.db.ActiveFile.ActualSize -= int64(l)
 			return 0, err
 		}
 	}
