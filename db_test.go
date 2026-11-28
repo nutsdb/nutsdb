@@ -4005,7 +4005,20 @@ func TestDB_RecoverActiveDataFileTornTail(t *testing.T) {
 			txGet(t, db, bucket, []byte("k1"), []byte("v1"), nil)
 			txGet(t, db, bucket, []byte("k2-torn"), nil, ErrKeyNotFound)
 
+			// Verify [tailOff, EOF) was actually zeroed before writing k3.
+			require.NoError(t, db.Close())
+			tailBytes, err := os.ReadFile(activePath)
+			require.NoError(t, err)
+			require.Greater(t, int64(len(tailBytes)), tailOff)
+			for i := int(tailOff); i < len(tailBytes); i++ {
+				if tailBytes[i] != 0 {
+					t.Fatalf("expected [tailOff, EOF) to be zeroed at offset %d, got 0x%02x", i, tailBytes[i])
+				}
+			}
+
 			// Write a shorter committed entry over the reclaimed tail and reopen again.
+			db, err = Open(opts)
+			require.NoError(t, err)
 			txPut(t, db, bucket, []byte("k3"), []byte("v3"), Persistent, nil, nil)
 			require.NoError(t, db.Close())
 
@@ -4016,6 +4029,213 @@ func TestDB_RecoverActiveDataFileTornTail(t *testing.T) {
 			txGet(t, db, bucket, []byte("k2-torn"), nil, ErrKeyNotFound)
 			require.NoError(t, db.Close())
 		})
+	}
+}
+
+func TestDB_RecoverActiveDataFileMidFileCrcFails(t *testing.T) {
+	bucket := "bucket"
+	opts := DefaultOptions
+	opts.Dir = filepath.Join(t.TempDir(), "midfile-crc-active")
+	opts.SegmentSize = 8 * KB
+	opts.EnableHintFile = false
+
+	db, err := Open(opts)
+	require.NoError(t, err)
+	txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+	txPut(t, db, bucket, []byte("k1"), []byte("v1"), Persistent, nil, nil)
+	txPut(t, db, bucket, []byte("k2"), []byte("v2"), Persistent, nil, nil)
+	txPut(t, db, bucket, []byte("k3"), []byte("v3"), Persistent, nil, nil)
+	require.NoError(t, db.Close())
+
+	activePath := getDataPath(0, opts.Dir)
+	fr, err := newFileRecovery(activePath, 4*KB)
+	require.NoError(t, err)
+	var offsets []struct {
+		off  int64
+		size int64
+		key  string
+	}
+	var cur int64
+	for {
+		entry, rerr := fr.readEntry(cur)
+		if rerr != nil || entry == nil {
+			break
+		}
+		offsets = append(offsets, struct {
+			off  int64
+			size int64
+			key  string
+		}{cur, entry.Size(), string(entry.Key)})
+		cur += entry.Size()
+	}
+	require.NoError(t, fr.release())
+
+	var k2End int64
+	for _, o := range offsets {
+		if o.key == "k2" {
+			k2End = o.off + o.size
+			break
+		}
+	}
+	require.NotZero(t, k2End)
+
+	beforeBytes, err := os.ReadFile(activePath)
+	require.NoError(t, err)
+	beforeBytes[k2End-1] ^= 0xff
+	require.NoError(t, os.WriteFile(activePath, beforeBytes, 0644))
+
+	_, err = Open(opts)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), ErrCrc.Error())
+
+	// File contents (including k3 after k2) must not be modified/zeroed on mid-file corruption.
+	afterBytes, err := os.ReadFile(activePath)
+	require.NoError(t, err)
+	require.Equal(t, beforeBytes, afterBytes)
+}
+
+func TestDB_RecoverActiveDataFileTornMultiKeyTx(t *testing.T) {
+	bucket := "bucket"
+	opts := DefaultOptions
+	opts.Dir = filepath.Join(t.TempDir(), "torn-multikey-active")
+	opts.SegmentSize = 8 * KB
+	opts.EnableHintFile = false
+
+	db, err := Open(opts)
+	require.NoError(t, err)
+	txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+	txPut(t, db, bucket, []byte("k1"), []byte("v1"), Persistent, nil, nil)
+	require.NoError(t, db.Close())
+
+	activePath := getDataPath(0, opts.Dir)
+	fr, err := newFileRecovery(activePath, 4*KB)
+	require.NoError(t, err)
+	var tailOff int64
+	for {
+		entry, rerr := fr.readEntry(tailOff)
+		if rerr != nil || entry == nil {
+			break
+		}
+		tailOff += entry.Size()
+	}
+	require.NoError(t, fr.release())
+
+	u1 := &core.Entry{
+		Key:   []byte("u1"),
+		Value: []byte("uncommitted-1"),
+		Meta: core.NewMetaData().
+			WithBucketId(1).
+			WithKeySize(2).
+			WithValueSize(uint32(len("uncommitted-1"))).
+			WithStatus(UnCommitted).
+			WithFlag(DataSetFlag).
+			WithTxID(999).
+			WithDs(DataStructureBTree),
+	}
+	c2 := &core.Entry{
+		Key:   []byte("u2"),
+		Value: []byte("committed-torn"),
+		Meta: core.NewMetaData().
+			WithBucketId(1).
+			WithKeySize(2).
+			WithValueSize(uint32(len("committed-torn"))).
+			WithStatus(Committed).
+			WithFlag(DataSetFlag).
+			WithTxID(999).
+			WithDs(DataStructureBTree),
+	}
+	u1Bytes := u1.Encode()
+	c2Bytes := c2.Encode()
+	// Tear the commit record so only u1 + corrupted c2 land on disk.
+	c2Bytes[len(c2Bytes)-1] ^= 0xff
+
+	fd, err := os.OpenFile(activePath, os.O_RDWR, 0644)
+	require.NoError(t, err)
+	_, err = fd.WriteAt(append(u1Bytes, c2Bytes...), tailOff)
+	require.NoError(t, err)
+	require.NoError(t, fd.Sync())
+	require.NoError(t, fd.Close())
+
+	db, err = Open(opts)
+	require.NoError(t, err)
+	txGet(t, db, bucket, []byte("k1"), []byte("v1"), nil)
+	txGet(t, db, bucket, []byte("u1"), nil, ErrKeyNotFound)
+	txGet(t, db, bucket, []byte("u2"), nil, ErrKeyNotFound)
+
+	// Reclaim from u1's offset must allow writing k3 cleanly without resurrecting u1 on subsequent reopen.
+	txPut(t, db, bucket, []byte("k3"), []byte("v3"), Persistent, nil, nil)
+	require.NoError(t, db.Close())
+
+	db, err = Open(opts)
+	require.NoError(t, err)
+	txGet(t, db, bucket, []byte("k1"), []byte("v1"), nil)
+	txGet(t, db, bucket, []byte("k3"), []byte("v3"), nil)
+	txGet(t, db, bucket, []byte("u1"), nil, ErrKeyNotFound)
+	txGet(t, db, bucket, []byte("u2"), nil, ErrKeyNotFound)
+	require.NoError(t, db.Close())
+}
+
+func TestDB_RecoverActiveDataFileTornTruncatedTailAndHugeVarint(t *testing.T) {
+	bucket := "bucket"
+	opts := DefaultOptions
+	opts.Dir = filepath.Join(t.TempDir(), "torn-truncated-varint")
+	opts.SegmentSize = 128 * KB
+	opts.EnableHintFile = false
+
+	db, err := Open(opts)
+	require.NoError(t, err)
+	txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+	txPut(t, db, bucket, []byte("k1"), []byte("v1"), Persistent, nil, nil)
+	require.NoError(t, db.Close())
+
+	activePath := getDataPath(0, opts.Dir)
+	fr, err := newFileRecovery(activePath, 4*KB)
+	require.NoError(t, err)
+	var tailOff int64
+	for {
+		entry, rerr := fr.readEntry(tailOff)
+		if rerr != nil || entry == nil {
+			break
+		}
+		tailOff += entry.Size()
+	}
+	require.NoError(t, fr.release())
+
+	// Large torn entry (>32 KiB) truncated mid-payload so zeroTail spans multiple chunks
+	// and readEntry sees payloadSize > remaining bytes.
+	largeEntry := &core.Entry{
+		Key:   []byte("k2-large-torn"),
+		Value: bytes.Repeat([]byte("z"), 48*1024),
+		Meta: core.NewMetaData().
+			WithBucketId(1).
+			WithKeySize(uint32(len("k2-large-torn"))).
+			WithValueSize(48 * 1024).
+			WithStatus(Committed).
+			WithFlag(DataSetFlag).
+			WithTxID(1001).
+			WithDs(DataStructureBTree),
+	}
+	encoded := largeEntry.Encode()
+	truncated := encoded[:len(encoded)-128]
+	fd, err := os.OpenFile(activePath, os.O_RDWR, 0644)
+	require.NoError(t, err)
+	_, err = fd.WriteAt(truncated, tailOff)
+	require.NoError(t, err)
+	require.NoError(t, fd.Sync())
+	require.NoError(t, fd.Close())
+
+	db, err = Open(opts)
+	require.NoError(t, err)
+	txGet(t, db, bucket, []byte("k1"), []byte("v1"), nil)
+	txGet(t, db, bucket, []byte("k2-large-torn"), nil, ErrKeyNotFound)
+	require.NoError(t, db.Close())
+
+	raw, err := os.ReadFile(activePath)
+	require.NoError(t, err)
+	for i := int(tailOff); i < len(raw); i++ {
+		if raw[i] != 0 {
+			t.Fatalf("expected truncated >32KiB tail zeroed at offset %d, got 0x%02x", i, raw[i])
+		}
 	}
 }
 
