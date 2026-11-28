@@ -135,6 +135,42 @@ func calBufferSize(size int) int {
 	return size
 }
 
+func (fr *fileRecovery) zeroTail(off int64) error {
+	if off < 0 || off >= fr.size {
+		return nil
+	}
+	const chunkSize = 32 * 1024
+	buf := make([]byte, chunkSize)
+	zeros := make([]byte, chunkSize)
+	wrote := false
+	for pos := off; pos < fr.size; {
+		n := min(chunkSize, int(fr.size-pos))
+		nr, err := fr.fd.ReadAt(buf[:n], pos)
+		if nr > 0 {
+			for _, b := range buf[:nr] {
+				if b != 0 {
+					if _, werr := fr.fd.WriteAt(zeros[:nr], pos); werr != nil {
+						return werr
+					}
+					wrote = true
+					break
+				}
+			}
+			pos += int64(nr)
+		}
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return err
+		}
+	}
+	if wrote {
+		return fr.fd.Sync()
+	}
+	return nil
+}
+
 func (fr *fileRecovery) release() error {
 	if fr.closed {
 		return nil

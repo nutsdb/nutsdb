@@ -145,6 +145,18 @@ func open(opt Options) (*DB, error) {
 	}
 
 	if err := db.buildIndexes(); err != nil {
+		if db.ActiveFile != nil && db.ActiveFile.rwManager != nil {
+			_ = db.ActiveFile.rwManager.Release()
+		}
+		if db.fm != nil {
+			_ = db.fm.Close()
+		}
+		if db.flock != nil && db.flock.Locked() {
+			_ = db.flock.Unlock()
+		}
+		if db.bucketMgr != nil {
+			_ = db.bucketMgr.Close()
+		}
 		return nil, fmt.Errorf("db.buildIndexes error: %s", err)
 	}
 
@@ -597,6 +609,14 @@ func (db *DB) parseDataFiles(dataFileIds []int64) (err error) {
 		for {
 			entry, err := f.readEntry(off)
 			if err != nil {
+				if fID == db.MaxFileID && errors.Is(err, ErrCrc) {
+					if clearErr := f.zeroTail(off); clearErr != nil {
+						_ = f.release()
+						return clearErr
+					}
+					_ = f.release()
+					break
+				}
 				// whatever which logic branch it will choose, we will release the fd.
 				_ = f.release()
 				if errors.Is(err, io.EOF) || errors.Is(err, ErrIndexOutOfBound) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, ErrEntryZero) || errors.Is(err, core.ErrHeaderSizeOutOfBounds) {

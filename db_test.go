@@ -3940,3 +3940,122 @@ func TestDB_WatchDeleteBucket(t *testing.T) {
 		}
 	})
 }
+
+func TestDB_RecoverActiveDataFileTornTail(t *testing.T) {
+	bucket := "bucket"
+	for _, rwMode := range []RWMode{FileIO, MMap} {
+		modeName := "FileIO"
+		if rwMode == MMap {
+			modeName = "MMap"
+		}
+		t.Run(modeName, func(t *testing.T) {
+			opts := DefaultOptions
+			opts.Dir = filepath.Join(t.TempDir(), "torn-active-"+modeName)
+			opts.SegmentSize = 8 * KB
+			opts.RWMode = rwMode
+			opts.EnableHintFile = false
+
+			db, err := Open(opts)
+			require.NoError(t, err)
+			txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+			txPut(t, db, bucket, []byte("k1"), []byte("v1"), Persistent, nil, nil)
+			require.NoError(t, db.Close())
+
+			// Append a valid-looking committed entry whose payload/CRC is torn in the active file.
+			activePath := getDataPath(0, opts.Dir)
+			fr, err := newFileRecovery(activePath, 4*KB)
+			require.NoError(t, err)
+			var tailOff int64
+			for {
+				entry, rerr := fr.readEntry(tailOff)
+				if rerr != nil || entry == nil {
+					break
+				}
+				tailOff += entry.Size()
+			}
+			require.NoError(t, fr.release())
+
+			tornEntry := &core.Entry{
+				Key:   []byte("k2-torn"),
+				Value: bytes.Repeat([]byte("x"), 256),
+				Meta: core.NewMetaData().
+					WithBucketId(1).
+					WithKeySize(uint32(len("k2-torn"))).
+					WithValueSize(256).
+					WithStatus(Committed).
+					WithFlag(DataSetFlag).
+					WithTxID(999).
+					WithDs(DataStructureBTree),
+			}
+			encoded := tornEntry.Encode()
+			// Corrupt the tail payload/CRC bytes while preserving a valid header.
+			encoded[len(encoded)-1] ^= 0xff
+			encoded[len(encoded)-10] ^= 0xff
+
+			fd, err := os.OpenFile(activePath, os.O_RDWR, 0644)
+			require.NoError(t, err)
+			_, err = fd.WriteAt(encoded, tailOff)
+			require.NoError(t, err)
+			require.NoError(t, fd.Sync())
+			require.NoError(t, fd.Close())
+
+			// First reopen must tolerate the torn tail in the active file instead of failing with ErrCrc.
+			db, err = Open(opts)
+			require.NoError(t, err)
+			txGet(t, db, bucket, []byte("k1"), []byte("v1"), nil)
+			txGet(t, db, bucket, []byte("k2-torn"), nil, ErrKeyNotFound)
+
+			// Write a shorter committed entry over the reclaimed tail and reopen again.
+			txPut(t, db, bucket, []byte("k3"), []byte("v3"), Persistent, nil, nil)
+			require.NoError(t, db.Close())
+
+			db, err = Open(opts)
+			require.NoError(t, err)
+			txGet(t, db, bucket, []byte("k1"), []byte("v1"), nil)
+			txGet(t, db, bucket, []byte("k3"), []byte("v3"), nil)
+			txGet(t, db, bucket, []byte("k2-torn"), nil, ErrKeyNotFound)
+			require.NoError(t, db.Close())
+		})
+	}
+}
+
+func TestDB_OpenFailsOnSealedDataFileCrcError(t *testing.T) {
+	bucket := "bucket"
+	opts := DefaultOptions
+	opts.Dir = filepath.Join(t.TempDir(), "crc-sealed")
+	opts.SegmentSize = 256
+	opts.EnableHintFile = false
+
+	db, err := Open(opts)
+	require.NoError(t, err)
+	txCreateBucket(t, db, DataStructureBTree, bucket, nil)
+	val := bytes.Repeat([]byte("a"), 180)
+	txPut(t, db, bucket, []byte("k1"), val, Persistent, nil, nil)
+	txPut(t, db, bucket, []byte("k2"), val, Persistent, nil, nil)
+	require.True(t, db.MaxFileID > 0, "expected rotation to create a sealed data file")
+	require.NoError(t, db.Close())
+
+	// Corrupt the last byte of the first entry inside the sealed data file (0.dat, not MaxFileID).
+	sealedPath := getDataPath(0, opts.Dir)
+	fr, err := newFileRecovery(sealedPath, 4*KB)
+	require.NoError(t, err)
+	firstEntry, err := fr.readEntry(0)
+	require.NoError(t, err)
+	require.NoError(t, fr.release())
+
+	corruptOff := firstEntry.Size() - 1
+	fd, err := os.OpenFile(sealedPath, os.O_RDWR, 0644)
+	require.NoError(t, err)
+	buf := make([]byte, 1)
+	_, err = fd.ReadAt(buf, corruptOff)
+	require.NoError(t, err)
+	buf[0] ^= 0xff
+	_, err = fd.WriteAt(buf, corruptOff)
+	require.NoError(t, err)
+	require.NoError(t, fd.Sync())
+	require.NoError(t, fd.Close())
+
+	_, err = Open(opts)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), ErrCrc.Error())
+}
